@@ -1,6 +1,10 @@
 # DiceMaiden - Rust Edition
 
 A powerful Discord dice rolling bot written in Rust using the Serenity framework. This is a complete rewrite of the original [DiceMaiden](https://github.com/Humblemonk/DiceMaiden) Ruby bot, featuring all the same functionality with improved performance and memory safety.
+<p align="center">
+<a href="https://top.gg/bot/377701707943116800">
+    <img src="https://top.gg/api/widget/377701707943116800.svg" alt="Dice Maiden" />
+</a>
 
 ## Features
 
