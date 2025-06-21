@@ -194,19 +194,70 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some(format!("{}d6 + 1d6 ie{}", count, pips));
     }
 
-    // Hero System (2hsn, 5hsk1, 3hsh)
-    let hs_regex = Regex::new(r"^(\d+(?:\.\d+)?)hs([nk]\d*|h)$").unwrap();
+    // Hero System (2hsn, 3hsk, 2.5hsk, 3hsh)
+    let hs_regex = Regex::new(r"^(\d+(?:\.\d+)?)hs([nkh])$").unwrap();
     if let Some(captures) = hs_regex.captures(input) {
-        let dice_count = &captures[1];
+        let dice_count_str = &captures[1];
         let damage_type = &captures[2];
 
-        return Some(match damage_type {
-            "n" => format!("{}d6", dice_count), // normal damage
-            variant if variant.starts_with('k') => {
-                let stun_mod = variant.get(1..).unwrap_or("0");
-                format!("{}d6 + {}d3", dice_count, stun_mod) // killing damage
+        match damage_type {
+            "n" => {
+                // Normal damage - XdY
+                let dice_count = dice_count_str.parse::<f64>().ok()?;
+                let whole_dice = dice_count.floor() as u32;
+                let has_fractional = dice_count.fract() > 0.0;
+
+                let dice_expr = if has_fractional {
+                    format!("{}d6 + 1d3 hsn", whole_dice)
+                } else {
+                    format!("{}d6 hsn", whole_dice)
+                };
+                return Some(dice_expr);
             }
-            "h" => format!("11 + {} - 3d6", dice_count), // healing
+            "k" => {
+                // Killing damage - XdY
+                let dice_count = dice_count_str.parse::<f64>().ok()?;
+                let whole_dice = dice_count.floor() as u32;
+                let has_fractional = dice_count.fract() > 0.0;
+
+                let dice_expr = if has_fractional {
+                    format!("{}d6 + 1d3 hsk", whole_dice)
+                } else {
+                    format!("{}d6 hsk", whole_dice)
+                };
+                return Some(dice_expr);
+            }
+            "h" => {
+                // To hit roll - always 3d6 regardless of the number (Hero System standard)
+                return Some("3d6 hsh".to_string());
+            }
+            _ => return None,
+        }
+    }
+    // Alternative Hero System notation with explicit fractional dice (2hsk1 = 2.5d6 killing)
+    let hs_frac_regex = Regex::new(r"^(\d+)hs([nkh])(\d+)$").unwrap();
+    if let Some(captures) = hs_frac_regex.captures(input) {
+        let dice_count = &captures[1];
+        let damage_type = &captures[2];
+        let fraction = &captures[3];
+
+        return Some(match (damage_type, fraction) {
+            ("k", "1") => {
+                // Killing damage with +0.5 dice: 2hsk1 = 2d6 + 1d3
+                format!("{}d6 + 1d3", dice_count)
+            }
+            ("n", _) => {
+                // Normal damage ignores fraction
+                format!("{}d6", dice_count)
+            }
+            ("h", _) => {
+                // Healing ignores fraction modifier
+                if let Ok(count) = dice_count.parse::<u32>() {
+                    format!("{}d6 + {}", count, count)
+                } else {
+                    format!("{}d6 + {}", dice_count, dice_count)
+                }
+            }
             _ => return None,
         });
     }
@@ -258,6 +309,9 @@ fn get_static_aliases() -> HashMap<String, String> {
     aliases.insert("save".to_string(), "1d20".to_string());
     aliases.insert("gb".to_string(), "1d20 gb".to_string()); // Basic Godbound roll with damage chart
     aliases.insert("gbs".to_string(), "1d20 gbs".to_string()); // Basic Godbound straight damage
+    aliases.insert("hsn".to_string(), "1d6 hsn".to_string()); // 1d6 normal damage
+    aliases.insert("hsk".to_string(), "1d6 hsk".to_string()); // 1d6 killing damage
+    aliases.insert("hsh".to_string(), "3d6 hsh".to_string()); // Hero System to-hit roll
 
     aliases
 }

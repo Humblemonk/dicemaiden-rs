@@ -1,4 +1,4 @@
-use super::{DiceRoll, Modifier};
+use super::{DiceRoll, HeroSystemType, Modifier};
 use anyhow::{anyhow, Result};
 use regex::Regex;
 
@@ -264,6 +264,21 @@ struct ModifierPattern {
 impl ModifierPattern {
     const PATTERNS: &'static [ModifierPattern] = &[
         ModifierPattern {
+            prefix: "hsh",
+            regex: r"^(hsh)",
+            exclude_prefixes: &[],
+        },
+        ModifierPattern {
+            prefix: "hsk",
+            regex: r"^(hsk)",
+            exclude_prefixes: &[],
+        },
+        ModifierPattern {
+            prefix: "hsn",
+            regex: r"^(hsn)",
+            exclude_prefixes: &[],
+        },
+        ModifierPattern {
             prefix: "gbs",
             regex: r"^(gbs)",
             exclude_prefixes: &[],
@@ -393,6 +408,9 @@ fn is_simple_modifier(input: &str) -> bool {
         r"^f\d+$",       // f1
         r"^b\d*$",       // b, b1
         r"^wng\d*t?$",   // wng, wng3, wngt, wng3t
+        r"^hsn$",        // hsn
+        r"^hsk$",        // hsk
+        r"^hsh$",        // hsh
     ];
 
     simple_patterns
@@ -430,6 +448,17 @@ fn parse_required_number(stripped: &str, error_msg: &str) -> Result<u32> {
 }
 
 fn parse_modifier(part: &str) -> Result<Modifier> {
+    // Hero System modifiers
+    if part == "hsn" {
+        return Ok(Modifier::HeroSystem(HeroSystemType::Normal));
+    }
+    if part == "hsk" {
+        return Ok(Modifier::HeroSystem(HeroSystemType::Killing));
+    }
+    if part == "hsh" {
+        return Ok(Modifier::HeroSystem(HeroSystemType::Hit));
+    }
+
     // Godbound damage chart system
     if part == "gb" {
         return Ok(Modifier::Godbound(false)); // Normal damage chart

@@ -20,6 +20,13 @@ pub struct DiceRoll {
 }
 
 #[derive(Debug, Clone)]
+pub enum HeroSystemType {
+    Normal,  // hsn - normal damage
+    Killing, // hsk - killing damage
+    Hit,     // hsh - to hit roll (3d6 roll-under)
+}
+
+#[derive(Debug, Clone)]
 pub enum Modifier {
     Add(i32),
     Subtract(i32),
@@ -39,6 +46,7 @@ pub enum Modifier {
     SubtractDice(DiceRoll),         // Subtract dice result
     WrathGlory(Option<u32>, bool),  // Wrath & Glory: (difficulty, use_total_instead_of_successes)
     Godbound(bool),                 // gb (false) or gbs (true for straight damage)
+    HeroSystem(HeroSystemType),     // Hero System damage/hit calculations
 }
 
 #[derive(Debug, Clone)]

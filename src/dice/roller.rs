@@ -1,4 +1,4 @@
-use super::{DiceGroup, DiceRoll, Modifier, RollResult};
+use super::{DiceGroup, DiceRoll, HeroSystemType, Modifier, RollResult};
 use anyhow::{anyhow, Result};
 use rand::Rng;
 
@@ -154,6 +154,9 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
             }
             Modifier::Godbound(straight_damage) => {
                 apply_godbound_damage(&mut result, *straight_damage, has_math_modifiers)?;
+            }
+            Modifier::HeroSystem(hero_type) => {
+                apply_hero_system_calculation(&mut result, &mut rng, hero_type)?;
             }
             _ => {} // Skip modifiers already handled above
         }
@@ -618,6 +621,46 @@ fn reroll_dice(
                 "{} dice rerolled (≤ {}, reroll {})",
                 total_rerolls, threshold, reroll_type
             ));
+        }
+    }
+
+    Ok(())
+}
+
+// Hero System calculation function
+fn apply_hero_system_calculation(
+    result: &mut RollResult,
+    rng: &mut impl Rng,
+    hero_type: &HeroSystemType,
+) -> Result<()> {
+    match hero_type {
+        HeroSystemType::Normal => {
+            // Normal damage - just use the total as-is
+            result.notes.push("Normal damage".to_string());
+        }
+        HeroSystemType::Killing => {
+            // Killing damage: BODY = dice total, STUN = BODY × multiplier (1d3)
+            let body_damage = result.total;
+            let stun_multiplier = rng.gen_range(1..=3);
+            let stun_damage = body_damage * stun_multiplier;
+
+            result.notes.push(format!(
+                "Killing damage: {} BODY, {} STUN (×{})",
+                body_damage, stun_damage, stun_multiplier
+            ));
+
+            // Override the total to show STUN damage (more commonly used)
+            result.total = stun_damage;
+        }
+        HeroSystemType::Hit => {
+            // To hit roll - 3d6 roll-under, typically against 11 + OCV - DCV
+            // Just provide helpful context for Hero System to-hit mechanics
+            result
+                .notes
+                .push("Hero System to-hit roll (3d6 roll-under)".to_string());
+            result
+                .notes
+                .push("Target: 11 + OCV - DCV or less".to_string());
         }
     }
 

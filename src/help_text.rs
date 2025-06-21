@@ -54,6 +54,14 @@ pub fn generate_alias_help() -> String {
 • `+d20` → 2d20 k1 (advantage)
 • `-d20` → 2d20 kl1 (disadvantage)
 
+**Hero System 5th Edition:**
+• `2hsn` → 2d6 hsn (normal damage)
+• `3hsk` → 3d6 hsk (killing damage)
+• `2.5hsk` → 2d6 + 1d3 hsk (2½ dice killing damage)
+• `2hsk1` → 2d6 + 1d3 hsk (alternative fractional notation)
+• `3hsh` → 3d6 hsh (to-hit roll)
+• `hsn`, `hsk`, `hsh` → 1d6 hsn, 1d6 hsk, 3d6 hsh (single die versions)
+
 **Godbound:**
 • `gb` → 1d20 gb (basic d20 with damage chart)
 • `gbs` → 1d20 gbs (basic d20 with straight damage)
@@ -102,6 +110,17 @@ The Godbound damage chart converts each die individually:
 
 Use `gbs` for "straight damage" that bypasses the chart.
 
+**Hero System:**
+• `/roll 2hsn` - 2d6 normal damage
+• `/roll 3hsk` - 3d6 killing damage (shows BODY and STUN)
+• `/roll 2.5hsk` - 2d6 + 1d3 killing damage with fractional dice
+• `/roll 3hsh` - 3d6 to-hit roll (roll-under mechanics)
+
+**Hero System Damage:**
+• **Normal damage (hsn)**: Standard dice total
+• **Killing damage (hsk)**: BODY = dice total, STUN = BODY × 1d3 multiplier
+• **To-hit (hsh)**: 3d6 roll-under (target: 11 + OCV - DCV)
+
 **Warhammer 40k Wrath & Glory:**
 • `/roll wng 4d6` - 4d6 with wrath die
 • `/roll wng dn2 4d6` - 4d6 with difficulty 2 test (shows PASS/FAIL)
@@ -110,11 +129,6 @@ Use `gbs` for "straight damage" that bypasses the chart.
 
 **Dark Heresy 2nd Edition:**
 • `/roll dh 4d10` - 4d10 with righteous fury on 10s
-
-**Hero System:**
-• `/roll 2hsn` - 2d6 normal damage
-• `/roll 5hsk1 +1d3` - 5½d6 killing damage +1 stun
-• `/roll 3hsh` - 3d6 healing (11 + 3 - 3d6)
 
 **Earthdawn:**
 • `/roll ed1` through `/roll ed50` - Step numbers 1-50
