@@ -17,6 +17,8 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         notes: Vec::new(),
         dice_groups: Vec::new(),
         original_expression: dice.original_expression.clone(), // Pass through the original expression
+        simple: dice.simple, // Transfer simple flag from DiceRoll
+        no_results: dice.no_results, // Transfer no_results flag from DiceRoll
     };
     
     // Initial dice rolls
