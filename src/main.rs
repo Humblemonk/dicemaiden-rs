@@ -170,13 +170,13 @@ async fn main() -> Result<()> {
         data.insert::<DatabaseContainer>(Arc::clone(&db));
     }
 
-    let _shard_manager = Arc::clone(&client.shard_manager);
+    let shard_manager = Arc::clone(&client.shard_manager);
     let db_clone = Arc::clone(&db);
     let cache_clone = Arc::clone(&client.cache);
 
-    // Start the statistics collection task
+    // Start the statistics collection task with shard manager for multi-shard support
     tokio::spawn(async move {
-        collect_shard_stats(db_clone, cache_clone).await;
+        collect_shard_stats(db_clone, cache_clone, shard_manager).await;
     });
 
     let _shard_manager = Arc::clone(&client.shard_manager);
@@ -195,7 +195,11 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn collect_shard_stats(db: Arc<database::Database>, cache: Arc<serenity::cache::Cache>) {
+async fn collect_shard_stats(
+    db: Arc<database::Database>,
+    cache: Arc<serenity::cache::Cache>,
+    shard_manager: Arc<ShardManager>,
+) {
     let mut interval = interval(Duration::from_secs(300)); // 5 minutes
     let mut system = System::new_all();
 
@@ -213,23 +217,53 @@ async fn collect_shard_stats(db: Arc<database::Database>, cache: Arc<serenity::c
             0.0
         };
 
-        // Get server count from cache
-        let server_count = cache.guilds().len() as i32;
+        // Get shard information
+        let shard_info = shard_manager.runners.lock().await;
 
-        // For now, we'll use shard_id 0 since this is likely a single-shard bot
-        // In a multi-shard setup, you'd iterate through all shards
-        let shard_id = 0;
-
-        if let Err(e) = db
-            .update_shard_stats(shard_id, server_count, memory_usage)
-            .await
-        {
-            error!("Failed to update shard stats: {}", e);
-        } else {
-            info!(
-                "Updated shard {} stats: {} servers, {:.2} MB memory",
-                shard_id, server_count, memory_usage
-            );
+        if shard_info.is_empty() {
+            // No shards running yet, wait for next interval
+            continue;
         }
+
+        // Iterate through all active shards
+        for (&shard_id, shard_runner) in shard_info.iter() {
+            // Check if this shard is connected
+            if shard_runner.stage != serenity::gateway::ConnectionStage::Connected {
+                continue;
+            }
+
+            // Get guilds for this specific shard
+            let shard_guild_count = cache
+                .guilds()
+                .iter()
+                .filter(|guild_id| {
+                    // Calculate which shard this guild belongs to
+                    // Discord uses: (guild_id >> 22) % num_shards
+                    let guild_shard_id = (guild_id.get() >> 22) % shard_info.len() as u64;
+                    guild_shard_id == shard_id.0 as u64
+                })
+                .count() as i32;
+
+            // Update stats for this shard
+            if let Err(e) = db
+                .update_shard_stats(shard_id.0 as i32, shard_guild_count, memory_usage)
+                .await
+            {
+                error!("Failed to update shard {} stats: {}", shard_id.0, e);
+            } else {
+                info!(
+                    "Updated shard {} stats: {} servers, {:.2} MB memory",
+                    shard_id.0, shard_guild_count, memory_usage
+                );
+            }
+        }
+
+        // Also log total stats
+        let total_guilds = cache.guilds().len();
+        let total_shards = shard_info.len();
+        info!(
+            "Total stats: {} shards, {} servers, {:.2} MB memory",
+            total_shards, total_guilds, memory_usage
+        );
     }
 }
