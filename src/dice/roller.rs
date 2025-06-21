@@ -106,10 +106,18 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
                 count_failures_and_subtract(&mut result, *value)?;
             }
             Modifier::Botch(threshold) => {
-                count_dice_matching(&mut result, |roll| roll <= threshold.unwrap_or(1) as i32, "botches")?;
+                count_dice_matching(
+                    &mut result,
+                    |roll| roll <= threshold.unwrap_or(1) as i32,
+                    "botches",
+                )?;
                 let botch_count = result.botches.unwrap_or(0);
                 if botch_count > 0 {
-                    result.notes.push(format!("{} dice botched (≤{})", botch_count, threshold.unwrap_or(1)));
+                    result.notes.push(format!(
+                        "{} dice botched (≤{})",
+                        botch_count,
+                        threshold.unwrap_or(1)
+                    ));
                 }
             }
             Modifier::WrathGlory(difficulty, use_total) => {
@@ -187,7 +195,12 @@ fn count_failures_and_subtract(result: &mut RollResult, threshold: u32) -> Resul
 }
 
 // Handle adding or subtracting additional dice
-fn handle_additional_dice(result: &mut RollResult, dice: &DiceRoll, modifier_type: &str, multiplier: i32) -> Result<()> {
+fn handle_additional_dice(
+    result: &mut RollResult,
+    dice: &DiceRoll,
+    modifier_type: &str,
+    multiplier: i32,
+) -> Result<()> {
     let additional_result = roll_dice(dice.clone())?;
     result
         .individual_rolls
@@ -290,7 +303,12 @@ fn count_wrath_glory_successes(
 }
 
 // Helper function for wrath die notes to reduce duplication
-fn add_wrath_die_notes(result: &mut RollResult, has_complication: bool, has_critical: bool, wrath_die_value: i32) {
+fn add_wrath_die_notes(
+    result: &mut RollResult,
+    has_complication: bool,
+    has_critical: bool,
+    wrath_die_value: i32,
+) {
     if has_complication {
         result
             .notes
@@ -347,14 +365,20 @@ fn explode_dice(
 }
 
 // Helper function for explosion notes
-fn add_explosion_notes(result: &mut RollResult, explosion_count: usize, dice_sides: u32, explode_on: u32, indefinite: bool) {
+fn add_explosion_notes(
+    result: &mut RollResult,
+    explosion_count: usize,
+    dice_sides: u32,
+    explode_on: u32,
+    indefinite: bool,
+) {
     // Check if this looks like Dark Heresy (d10 indefinite exploding on 10)
     if dice_sides == 10 && explode_on == 10 && indefinite {
         // This is likely Dark Heresy righteous fury
         if explosion_count == 1 {
-            result.notes.push(
-                "⚔️ **RIGHTEOUS FURY!** Natural 10 rolled - additional damage!".to_string(),
-            );
+            result
+                .notes
+                .push("⚔️ **RIGHTEOUS FURY!** Natural 10 rolled - additional damage!".to_string());
         } else {
             result.notes.push(format!(
                 "⚔️ **RIGHTEOUS FURY!** {} natural 10s - Emperor's wrath unleashed!",

@@ -196,7 +196,11 @@ fn parse_all_modifiers(dice: &mut DiceRoll, parts: &[&str]) -> Result<()> {
 }
 
 // Helper function to try parsing operator-based modifiers
-fn try_parse_operator_modifier(dice: &mut DiceRoll, parts: &[&str], i: usize) -> Result<Option<usize>> {
+fn try_parse_operator_modifier(
+    dice: &mut DiceRoll,
+    parts: &[&str],
+    i: usize,
+) -> Result<Option<usize>> {
     if i + 1 >= parts.len() {
         return Ok(None);
     }
@@ -317,8 +321,11 @@ impl ModifierPattern {
     ];
 
     fn matches(&self, input: &str) -> bool {
-        input.starts_with(self.prefix) && 
-        !self.exclude_prefixes.iter().any(|&exclude| input.starts_with(exclude))
+        input.starts_with(self.prefix)
+            && !self
+                .exclude_prefixes
+                .iter()
+                .any(|&exclude| input.starts_with(exclude))
     }
 
     fn extract(&self, input: &str) -> Option<String> {
@@ -400,18 +407,14 @@ fn parse_optional_number(stripped: &str, error_msg: &str) -> Result<Option<u32>>
         Ok(None)
     } else {
         Ok(Some(
-            stripped
-                .parse()
-                .map_err(|_| anyhow!("{}", error_msg))?,
+            stripped.parse().map_err(|_| anyhow!("{}", error_msg))?,
         ))
     }
 }
 
 // Helper function to parse required number from stripped prefix
 fn parse_required_number(stripped: &str, error_msg: &str) -> Result<u32> {
-    stripped
-        .parse()
-        .map_err(|_| anyhow!("{}", error_msg))
+    stripped.parse().map_err(|_| anyhow!("{}", error_msg))
 }
 
 fn parse_modifier(part: &str) -> Result<Modifier> {
