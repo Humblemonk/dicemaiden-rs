@@ -1,7 +1,0 @@
-services:
-  dicemaiden_rs:
-    image: registry.jkirsche.com/humblemonk/dicemaiden-rust
-    container_name: dicemaiden-rs
-    user: 1000:1000
-    volumes:
-      - /opt/dicemaiden-rs:/app
