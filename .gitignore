@@ -22,3 +22,6 @@ target
 .env
 main.db*
 *.log
+nohup.out
+dice_rolls.log*
+Gemfile.lock
