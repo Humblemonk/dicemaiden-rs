@@ -208,4 +208,4 @@ This project is licensed under the GPLv3 License
 
 - Create an issue for bugs or feature requests
 - Check the original DiceMaiden documentation for dice syntax questions
-- Join the Discord community for help and discussion
+- Join the [Discord community](https://discord.gg/AYNcxc9NeU) for help and discussion
