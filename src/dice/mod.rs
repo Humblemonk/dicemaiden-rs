@@ -73,26 +73,45 @@ impl fmt::Display for RollResult {
             output.push_str(&format!("**{}**: ", label));
         }
         
-        // Check if no_results flag is set - if so, only show total/successes
+        // Check if no_results flag is set - show dice tally but no result total
         if self.no_results {
-            // Show only the result without dice breakdown
-            if let Some(successes) = self.successes {
-                output.push_str(&format!("= **{}** successes", successes));
-                if let Some(failures) = self.failures {
-                    if failures > 0 {
-                        output.push_str(&format!(" ({} failures)", failures));
+            // Show dice breakdown but no total/results
+            if !self.dice_groups.is_empty() {
+                output.push_str("Roll: ");
+                for (i, group) in self.dice_groups.iter().enumerate() {
+                    if i > 0 {
+                        match group.modifier_type.as_str() {
+                            "add" => output.push_str(" + "),
+                            "subtract" => output.push_str(" - "),
+                            _ => output.push_str(" "),
+                        }
                     }
+                    output.push_str(&format!("`[{}]`", 
+                        group.rolls.iter()
+                            .map(|x| x.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ));
                 }
-                if let Some(botches) = self.botches {
-                    if botches > 0 {
-                        output.push_str(&format!(" ({} botches)", botches));
-                    }
-                }
-            } else if let Some(botches) = self.botches {
-                output.push_str(&format!("= **{}** total, **{}** botches", self.total, botches));
-            } else {
-                output.push_str(&format!("= **{}**", self.total));
+            } else if !self.kept_rolls.is_empty() {
+                output.push_str(&format!("Roll: `[{}]`", 
+                    self.kept_rolls.iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
             }
+            
+            // Add dropped dice if any
+            if !self.dropped_rolls.is_empty() {
+                output.push_str(&format!(" ~~[{}]~~", 
+                    self.dropped_rolls.iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+            // Note: No total/results shown for nr flag
         } else if self.simple {
             // Simple output: show only the total/successes without dice breakdown
             if let Some(successes) = self.successes {
