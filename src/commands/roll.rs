@@ -7,6 +7,27 @@ use serenity::{
 };
 use sysinfo::{System, Pid};
 
+// Custom response type to include privacy information
+#[derive(Debug)]
+pub struct CommandResponse {
+    pub content: String,
+    pub ephemeral: bool,
+}
+
+impl CommandResponse {
+    pub fn new(content: String, ephemeral: bool) -> Self {
+        Self { content, ephemeral }
+    }
+    
+    pub fn public(content: String) -> Self {
+        Self::new(content, false)
+    }
+    
+    pub fn private(content: String) -> Self {
+        Self::new(content, true)
+    }
+}
+
 pub fn register() -> CreateCommand {
     CreateCommand::new("roll")
         .description("Roll dice using standard RPG notation")
@@ -36,7 +57,7 @@ pub fn register_r_alias() -> CreateCommand {
 pub async fn run(
     ctx: &Context,
     command: &CommandInteraction,
-) -> Result<String> {
+) -> Result<CommandResponse> {
     let options = &command.data.options;
     
     let dice_expr = options
@@ -49,23 +70,24 @@ pub async fn run(
 
     // Handle special commands
     if dice_expr.trim().to_lowercase() == "help" {
-        return Ok(generate_help_text());
+        return Ok(CommandResponse::public(generate_help_text()));
     }
     
     if dice_expr.trim().to_lowercase() == "help alias" {
-        return Ok(generate_alias_help());
+        return Ok(CommandResponse::public(generate_alias_help()));
     }
     
     if dice_expr.trim().to_lowercase() == "help system" {
-        return Ok(generate_system_help());
+        return Ok(CommandResponse::public(generate_system_help()));
     }
     
     if dice_expr.trim().to_lowercase() == "donate" {
-        return Ok("Care to support the bot? You can donate via Patreon https://www.patreon.com/dicemaiden \n Another option is join the Dice Maiden Discord server and subscribe! https://discord.gg/4T3R5Cb".to_string());
+        return Ok(CommandResponse::public("Care to support the bot? You can donate via Patreon https://www.patreon.com/dicemaiden \n Another option is join the Dice Maiden Discord server and subscribe! https://discord.gg/4T3R5Cb".to_string()));
     }
 
     if dice_expr.trim().to_lowercase() == "bot-info" {
-        return generate_bot_info(ctx).await;
+        let bot_info = generate_bot_info(ctx).await?;
+        return Ok(CommandResponse::public(bot_info));
     }
 
     // Parse and roll dice
@@ -74,33 +96,33 @@ pub async fn run(
             let formatted = dice::format_multiple_results(&results);
             
             // Check if any roll was marked as private
-            let is_private = results.iter().any(|_r| {
-                // We'd need to track private flag through the system
-                false // For now, assuming no private rolls
-            });
+            let is_private = results.iter().any(|r| r.private);
             
             if is_private {
-                Ok(format!("🎲 **Private Roll** `/roll {}` 🎲\n{}", dice_expr, formatted))
+                Ok(CommandResponse::private(format!("🎲 **Private Roll** `/roll {}` 🎲\n{}", dice_expr, formatted)))
             } else {
                 // Check if this has multiple results that are semicolon-separated
                 let is_semicolon_separated = results.len() > 1 
                     && results.iter().any(|r| r.original_expression.is_some())
                     && !results.iter().all(|r| r.label.as_ref().map_or(false, |l| l.starts_with("Set ")));
                 
-                if is_semicolon_separated {
+                let content = if is_semicolon_separated {
                     // For semicolon-separated rolls, the formatted string already contains individual requests
-                    Ok(format!("🎲 **{}** {}", command.user.name, formatted))
+                    format!("🎲 **{}** {}", command.user.name, formatted)
                 } else if results.len() > 1 {
                     // For roll sets, add newline after request for multiple results
-                    Ok(format!("🎲 **{}** Request: `/roll {}`\n{}", command.user.name, dice_expr, formatted))
+                    format!("🎲 **{}** Request: `/roll {}`\n{}", command.user.name, dice_expr, formatted)
                 } else {
                     // Single result stays on same line
-                    Ok(format!("🎲 **{}** Request: `/roll {}` {}", command.user.name, dice_expr, formatted))
-                }
+                    format!("🎲 **{}** Request: `/roll {}` {}", command.user.name, dice_expr, formatted)
+                };
+                
+                Ok(CommandResponse::public(content))
             }
         }
         Err(e) => {
-            Ok(format!("🎲 **{}** used `/roll {}` - ❌ **Error**: {}", command.user.name, dice_expr, e))
+            let content = format!("🎲 **{}** used `/roll {}` - ❌ **Error**: {}", command.user.name, dice_expr, e);
+            Ok(CommandResponse::public(content))
         }
     }
 }

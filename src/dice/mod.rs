@@ -63,6 +63,7 @@ pub struct RollResult {
     pub original_expression: Option<String>, // Store the original expression that generated this result
     pub simple: bool, // Add simple flag to control output formatting
     pub no_results: bool, // Add no_results flag
+    pub private: bool, // Add private flag for ephemeral responses
 }
 
 impl fmt::Display for RollResult {

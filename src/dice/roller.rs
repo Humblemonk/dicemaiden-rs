@@ -19,6 +19,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         original_expression: dice.original_expression.clone(), // Pass through the original expression
         simple: dice.simple, // Transfer simple flag from DiceRoll
         no_results: dice.no_results, // Transfer no_results flag from DiceRoll
+        private: dice.private, // Transfer private flag from DiceRoll
     };
     
     // Initial dice rolls

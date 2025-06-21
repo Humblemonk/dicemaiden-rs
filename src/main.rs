@@ -86,25 +86,42 @@ impl EventHandler for Handler {
             let response = match command.data.name.as_str() {
                 "roll" => commands::roll::run(&ctx, &command).await,
                 "r" => commands::roll::run(&ctx, &command).await,
-                "help" => commands::help::run(&ctx, &command).await,
-                "purge" => commands::purge::run(&ctx, &command).await,
-                _ => Ok("Unknown command".to_string()),
+                "help" => {
+                    // Convert help command response to the new format
+                    match commands::help::run(&ctx, &command).await {
+                        Ok(content) => Ok(commands::CommandResponse::public(content)),
+                        Err(e) => Err(e),
+                    }
+                }
+                "purge" => {
+                    // Convert purge command response to the new format
+                    match commands::purge::run(&ctx, &command).await {
+                        Ok(content) => Ok(commands::CommandResponse::public(content)),
+                        Err(e) => Err(e),
+                    }
+                }
+                _ => Ok(commands::CommandResponse::public("Unknown command".to_string())),
             };
 
-            let response_content = match response {
-                Ok(content) => content,
+            let (response_content, ephemeral) = match response {
+                Ok(cmd_response) => (cmd_response.content, cmd_response.ephemeral),
                 Err(e) => {
                     error!("Error executing command: {}", e);
-                    "An error occurred while executing the command.".to_string()
+                    ("An error occurred while executing the command.".to_string(), false)
                 }
             };
 
+            // Create the response with appropriate ephemeral setting
+            let mut response_message = serenity::builder::CreateInteractionResponseMessage::new()
+                .content(response_content);
+            
+            if ephemeral {
+                response_message = response_message.ephemeral(true);
+            }
+
             if let Err(why) = command
                 .create_response(&ctx.http, 
-                    serenity::builder::CreateInteractionResponse::Message(
-                        serenity::builder::CreateInteractionResponseMessage::new()
-                            .content(response_content)
-                    )
+                    serenity::builder::CreateInteractionResponse::Message(response_message)
                 )
                 .await
             {
