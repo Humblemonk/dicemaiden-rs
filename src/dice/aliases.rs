@@ -15,6 +15,25 @@ pub fn expand_alias(input: &str) -> Option<String> {
 }
 
 fn expand_parameterized_alias(input: &str) -> Option<String> {
+    // Godbound system - full dice expressions (gb 3d8, gbs 2d10, etc.)
+    let gb_dice_regex = Regex::new(r"^(gbs?)\s+(\d+)d(\d+)(?:\s*([+-]\s*\d+))?$").unwrap();
+    if let Some(captures) = gb_dice_regex.captures(input) {
+        let gb_type = &captures[1];
+        let count = &captures[2];
+        let sides = &captures[3];
+        let modifier = captures.get(4).map(|m| m.as_str().trim()).unwrap_or("");
+
+        return Some(format!("{}d{} {}{}", count, sides, gb_type, modifier));
+    }
+
+    // Godbound system - simple modifiers (gb+5, gbs-2, etc.)
+    let gb_simple_regex = Regex::new(r"^(gbs?)(?:\s*([+-]\s*\d+))?$").unwrap();
+    if let Some(captures) = gb_simple_regex.captures(input) {
+        let gb_type = &captures[1];
+        let modifier = captures.get(2).map(|m| m.as_str().trim()).unwrap_or("");
+        return Some(format!("1d20 {}{}", gb_type, modifier));
+    }
+
     // Wrath & Glory (wng 4d6, wng dn2 4d6, wng 4d6 !soak)
     let wng_regex = Regex::new(r"^wng(?:\s+dn(\d+))?\s+(\d+)d(\d+)(?:\s*!\s*(\w+))?$").unwrap();
     if let Some(captures) = wng_regex.captures(input) {
@@ -237,6 +256,8 @@ fn get_static_aliases() -> HashMap<String, String> {
     aliases.insert("attack".to_string(), "1d20".to_string());
     aliases.insert("skill".to_string(), "1d20".to_string());
     aliases.insert("save".to_string(), "1d20".to_string());
+    aliases.insert("gb".to_string(), "1d20 gb".to_string()); // Basic Godbound roll with damage chart
+    aliases.insert("gbs".to_string(), "1d20 gbs".to_string()); // Basic Godbound straight damage
 
     aliases
 }

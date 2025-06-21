@@ -20,6 +20,8 @@ pub fn generate_basic_help() -> String {
 • `t7` - Count successes (≥ 7)
 • `f1` - Count failures (≤ 1)
 • `b1` - Count botches (≤ 1)
+• `gb` - Godbound damage chart (1-=0, 2-5=1, 6-9=2, 10+=4)
+• `gbs` - Godbound straight damage (no chart)
 
 **Special Flags:**
 • `p` - Private roll (only you see results)
@@ -52,6 +54,12 @@ pub fn generate_alias_help() -> String {
 • `+d20` → 2d20 k1 (advantage)
 • `-d20` → 2d20 kl1 (disadvantage)
 
+**Godbound:**
+• `gb` → 1d20 gb (basic d20 with damage chart)
+• `gbs` → 1d20 gbs (basic d20 with straight damage)
+• `gb 3d8` → 3d8 gb (3d8 with damage chart conversion)
+• `gbs 2d10` → 2d10 gbs (2d10 straight damage)
+
 **Warhammer 40k Wrath & Glory:**
 • `wng 4d6` → 4d6 with wrath die and success counting
 • `wng dn3 5d6` → 5d6 with difficulty 3 test (shows PASS/FAIL)
@@ -76,6 +84,23 @@ Use `/roll help system` for specific examples!"#
 
 pub fn generate_system_help() -> String {
     r#"🎲 **Game System Examples** 🎲
+
+**Godbound:**
+• `/roll gb` - Basic d20 with damage chart (1-=0, 2-5=1, 6-9=2, 10+=4)
+• `/roll gbs` - Basic d20 with straight damage (no chart)
+• `/roll gb 3d8` - 3d8 with damage chart conversion
+• `/roll gbs 2d10 +5` - 2d10 straight damage +5
+• `/roll 5d6 gb` - 5d6 using damage chart
+• `/roll 2d12 gbs` - 2d12 straight damage
+
+**Damage Chart Conversion:**
+The Godbound damage chart converts each die individually:
+• 1 or less → 0 damage
+• 2-5 → 1 damage  
+• 6-9 → 2 damage
+• 10+ → 4 damage
+
+Use `gbs` for "straight damage" that bypasses the chart.
 
 **Warhammer 40k Wrath & Glory:**
 • `/roll wng 4d6` - 4d6 with wrath die

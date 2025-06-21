@@ -38,6 +38,7 @@ pub enum Modifier {
     AddDice(DiceRoll),              // Additional dice
     SubtractDice(DiceRoll),         // Subtract dice result
     WrathGlory(Option<u32>, bool),  // Wrath & Glory: (difficulty, use_total_instead_of_successes)
+    Godbound(bool),                 // gb (false) or gbs (true for straight damage)
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +65,7 @@ pub struct RollResult {
     pub simple: bool,                        // Add simple flag to control output formatting
     pub no_results: bool,                    // Add no_results flag
     pub private: bool,                       // Add private flag for ephemeral responses
+    pub godbound_damage: Option<i32>,        // Store converted Godbound damage
 }
 
 impl fmt::Display for RollResult {
@@ -122,7 +124,9 @@ impl fmt::Display for RollResult {
             // Note: No total/results shown for nr flag
         } else if self.simple {
             // Simple output: show only the total/successes without dice breakdown
-            if let Some(successes) = self.successes {
+            if let Some(gb_damage) = self.godbound_damage {
+                output.push_str(&format!("= **{}** damage", gb_damage));
+            } else if let Some(successes) = self.successes {
                 output.push_str(&format!("= **{}** successes", successes));
                 if let Some(failures) = self.failures {
                     if failures > 0 {
@@ -189,7 +193,9 @@ impl fmt::Display for RollResult {
             }
 
             // Add results after the tally
-            if let Some(successes) = self.successes {
+            if let Some(gb_damage) = self.godbound_damage {
+                output.push_str(&format!(" = **{}** damage", gb_damage));
+            } else if let Some(successes) = self.successes {
                 output.push_str(&format!(" = **{}** successes", successes));
                 if let Some(failures) = self.failures {
                     if failures > 0 {
@@ -267,7 +273,10 @@ pub fn format_multiple_results(results: &[RollResult]) -> String {
             }
             output.push_str(&result.to_string());
 
-            if let Some(successes) = result.successes {
+            // Sum based on what type of result this is
+            if let Some(gb_damage) = result.godbound_damage {
+                total_sum += gb_damage;
+            } else if let Some(successes) = result.successes {
                 total_sum += successes;
             } else {
                 total_sum += result.total;

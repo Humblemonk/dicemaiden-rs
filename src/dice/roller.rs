@@ -20,6 +20,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         simple: dice.simple,
         no_results: dice.no_results,
         private: dice.private,
+        godbound_damage: None,
     };
 
     // Initial dice rolls
@@ -81,24 +82,52 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     }
     result.total = result.kept_rolls.iter().sum();
 
-    // Apply mathematical and other modifiers
+    // Check if we have mathematical modifiers that should be applied before Godbound conversion
+    let has_math_modifiers = dice.modifiers.iter().any(|m| {
+        matches!(
+            m,
+            Modifier::Add(_)
+                | Modifier::Subtract(_)
+                | Modifier::Multiply(_)
+                | Modifier::Divide(_)
+                | Modifier::AddDice(_)
+                | Modifier::SubtractDice(_)
+        )
+    });
+
+    // Apply mathematical modifiers BEFORE special systems like Godbound (if they exist)
+    if has_math_modifiers {
+        for modifier in &dice.modifiers {
+            match modifier {
+                Modifier::Add(value) => {
+                    result.total += value;
+                }
+                Modifier::Subtract(value) => {
+                    result.total -= value;
+                }
+                Modifier::Multiply(value) => {
+                    result.total *= value;
+                }
+                Modifier::Divide(value) => {
+                    if *value == 0 {
+                        return Err(anyhow!("Cannot divide by zero"));
+                    }
+                    result.total /= value;
+                }
+                Modifier::AddDice(dice_to_add) => {
+                    handle_additional_dice(&mut result, dice_to_add, "add", 1)?;
+                }
+                Modifier::SubtractDice(dice_to_subtract) => {
+                    handle_additional_dice(&mut result, dice_to_subtract, "subtract", -1)?;
+                }
+                _ => {} // Skip other modifiers for now
+            }
+        }
+    }
+
+    // Apply special system modifiers
     for modifier in &dice.modifiers {
         match modifier {
-            Modifier::Add(value) => {
-                result.total += value;
-            }
-            Modifier::Subtract(value) => {
-                result.total -= value;
-            }
-            Modifier::Multiply(value) => {
-                result.total *= value;
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                result.total /= value;
-            }
             Modifier::Target(value) => {
                 count_dice_matching(&mut result, |roll| roll >= *value as i32, "successes")?;
             }
@@ -123,19 +152,16 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
             Modifier::WrathGlory(difficulty, use_total) => {
                 count_wrath_glory_successes(&mut result, *difficulty, *use_total)?;
             }
-            Modifier::AddDice(dice_to_add) => {
-                handle_additional_dice(&mut result, dice_to_add, "add", 1)?;
-            }
-            Modifier::SubtractDice(dice_to_subtract) => {
-                handle_additional_dice(&mut result, dice_to_subtract, "subtract", -1)?;
+            Modifier::Godbound(straight_damage) => {
+                apply_godbound_damage(&mut result, *straight_damage, has_math_modifiers)?;
             }
             _ => {} // Skip modifiers already handled above
         }
     }
 
-    // If target/success system was used, don't use the dice total
-    if result.successes.is_some() {
-        result.total = 0; // Reset total for success-based systems
+    // If target/success system or godbound was used, don't use the dice total
+    if result.successes.is_some() || result.godbound_damage.is_some() {
+        result.total = 0; // Reset total for special systems
     }
 
     // Sort rolls unless unsorted flag is set
@@ -325,6 +351,70 @@ fn add_wrath_die_notes(
     }
 }
 
+fn apply_godbound_damage(
+    result: &mut RollResult,
+    straight_damage: bool,
+    has_math_modifiers: bool,
+) -> Result<()> {
+    if straight_damage {
+        // Straight damage - use the final total (including all modifiers)
+        result.godbound_damage = Some(result.total);
+        result
+            .notes
+            .push("Straight damage (bypasses chart)".to_string());
+    } else {
+        if has_math_modifiers {
+            // If we have mathematical modifiers, convert the final total
+            let damage = convert_to_godbound_damage(result.total);
+            result.godbound_damage = Some(damage);
+            result
+                .notes
+                .push(format!("Damage chart: {} → {}", result.total, damage));
+        } else {
+            // If no mathematical modifiers, convert each die individually and sum
+            let mut total_damage = 0;
+            let mut chart_conversions = Vec::new();
+
+            for &roll in &result.kept_rolls {
+                let damage = convert_to_godbound_damage(roll);
+                total_damage += damage;
+                chart_conversions.push(format!("{} → {}", roll, damage));
+            }
+
+            result.godbound_damage = Some(total_damage);
+
+            // Add detailed conversion note if there are multiple dice
+            if result.kept_rolls.len() > 1 {
+                result.notes.push(format!(
+                    "Damage chart conversions: [{}]",
+                    chart_conversions.join(", ")
+                ));
+            } else if let Some(&roll) = result.kept_rolls.first() {
+                result.notes.push(format!(
+                    "Damage chart: {} → {}",
+                    roll,
+                    convert_to_godbound_damage(roll)
+                ));
+            }
+        }
+
+        result
+            .notes
+            .push("Using Godbound damage chart (1-=0, 2-5=1, 6-9=2, 10+=4)".to_string());
+    }
+
+    Ok(())
+}
+
+fn convert_to_godbound_damage(value: i32) -> i32 {
+    match value {
+        ..=1 => 0,  // 1 or less = 0 damage
+        2..=5 => 1, // 2-5 = 1 damage
+        6..=9 => 2, // 6-9 = 2 damage
+        _ => 4,     // 10+ = 4 damage
+    }
+}
+
 fn explode_dice(
     result: &mut RollResult,
     rng: &mut impl Rng,
@@ -460,10 +550,12 @@ fn reroll_dice(
 ) -> Result<()> {
     let mut total_rerolls = 0;
     let max_total_rerolls = 100;
+    let mut reroll_notes = Vec::new(); // Track detailed reroll info
 
     for i in 0..result.individual_rolls.len() {
         let mut rerolls_for_this_die = 0;
         let max_rerolls_per_die = if indefinite { 100 } else { 1 };
+        let original_roll = result.individual_rolls[i];
 
         while result.individual_rolls[i] <= threshold as i32
             && rerolls_for_this_die < max_rerolls_per_die
@@ -474,31 +566,59 @@ fn reroll_dice(
             rerolls_for_this_die += 1;
             total_rerolls += 1;
 
-            // Add a note about the reroll
-            if rerolls_for_this_die == 1 {
-                result.notes.push(format!(
+            if !indefinite {
+                // For single rerolls, show the immediate result
+                reroll_notes.push(format!(
                     "Rerolled {} → {}",
                     old_roll, result.individual_rolls[i]
                 ));
-            }
-
-            if !indefinite {
                 break;
+            }
+        }
+
+        // For indefinite rerolls, show original → final if any rerolls happened
+        if indefinite && rerolls_for_this_die > 0 {
+            if rerolls_for_this_die == 1 {
+                reroll_notes.push(format!(
+                    "Rerolled {} → {}",
+                    original_roll, result.individual_rolls[i]
+                ));
+            } else {
+                reroll_notes.push(format!(
+                    "Rerolled {} → {} ({} rerolls)",
+                    original_roll, result.individual_rolls[i], rerolls_for_this_die
+                ));
             }
         }
     }
 
+    // Add reroll notes to result
+    for note in reroll_notes {
+        result.notes.push(note);
+    }
+
+    // Safety check note
     if total_rerolls >= max_total_rerolls {
         result
             .notes
             .push("Maximum rerolls reached (100)".to_string());
     }
 
-    if total_rerolls > 0 && total_rerolls < 10 {
-        // Don't spam notes for lots of rerolls
-        result
-            .notes
-            .push(format!("{} dice rerolled", total_rerolls));
+    // Always show summary if rerolls happened, regardless of count
+    if total_rerolls > 0 {
+        let reroll_type = if indefinite { "indefinitely" } else { "once" };
+        if total_rerolls > 10 {
+            result.notes.push(format!(
+                "{} total rerolls (dice ≤ {}, reroll {})",
+                total_rerolls, threshold, reroll_type
+            ));
+        } else if result.notes.len() <= 1 {
+            // Only add summary if we don't already have detailed notes
+            result.notes.push(format!(
+                "{} dice rerolled (≤ {}, reroll {})",
+                total_rerolls, threshold, reroll_type
+            ));
+        }
     }
 
     Ok(())

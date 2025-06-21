@@ -264,6 +264,16 @@ struct ModifierPattern {
 impl ModifierPattern {
     const PATTERNS: &'static [ModifierPattern] = &[
         ModifierPattern {
+            prefix: "gbs",
+            regex: r"^(gbs)",
+            exclude_prefixes: &[],
+        },
+        ModifierPattern {
+            prefix: "gb",
+            regex: r"^(gb)",
+            exclude_prefixes: &["gbs"],
+        },
+        ModifierPattern {
             prefix: "wng",
             regex: r"^(wng\d*t?)",
             exclude_prefixes: &[],
@@ -370,6 +380,8 @@ fn is_simple_modifier(input: &str) -> bool {
     let simple_patterns = [
         r"^[+\-*/]\d+$", // +5, -3, *2, /4
         r"^\d+$",        // 5
+        r"^gbs$",        // gbs
+        r"^gb$",         // gb
         r"^ie\d*$",      // ie, ie6
         r"^ir\d+$",      // ir2
         r"^r\d+$",       // r2
@@ -418,6 +430,14 @@ fn parse_required_number(stripped: &str, error_msg: &str) -> Result<u32> {
 }
 
 fn parse_modifier(part: &str) -> Result<Modifier> {
+    // Godbound damage chart system
+    if part == "gb" {
+        return Ok(Modifier::Godbound(false)); // Normal damage chart
+    }
+    if part == "gbs" {
+        return Ok(Modifier::Godbound(true)); // Straight damage (bypass chart)
+    }
+
     // Wrath & Glory success counting with optional difficulty and total flag
     if let Some(stripped) = part.strip_prefix("wng") {
         let use_total = part.ends_with('t');
