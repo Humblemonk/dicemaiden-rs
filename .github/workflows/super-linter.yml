@@ -27,5 +27,5 @@ jobs:
           VALIDATE_ALL_CODEBASE: false
           DEFAULT_BRANCH: "main"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FIX_RUST_2015: false
-          FIX_RUST_2018: false
+          VALIDATE_RUST_2015: false
+          VALIDATE_RUST_2018: false
