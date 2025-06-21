@@ -1,11 +1,11 @@
 use crate::dice;
 use anyhow::Result;
 use serenity::{
+    all::{CommandDataOptionValue, CommandInteraction, CommandOptionType},
     builder::{CreateCommand, CreateCommandOption},
-    all::{CommandInteraction, CommandDataOptionValue, CommandOptionType},
     prelude::Context,
 };
-use sysinfo::{System, Pid};
+use sysinfo::{Pid, System};
 
 // Custom response type to include privacy information
 #[derive(Debug)]
@@ -18,11 +18,11 @@ impl CommandResponse {
     pub fn new(content: String, ephemeral: bool) -> Self {
         Self { content, ephemeral }
     }
-    
+
     pub fn public(content: String) -> Self {
         Self::new(content, false)
     }
-    
+
     pub fn private(content: String) -> Self {
         Self::new(content, true)
     }
@@ -35,9 +35,9 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(
                 CommandOptionType::String,
                 "dice",
-                "Dice expression (e.g., 2d6+3, 4d6 k3, 3d10 t7)"
+                "Dice expression (e.g., 2d6+3, 4d6 k3, 3d10 t7)",
             )
-            .required(true)
+            .required(true),
         )
 }
 
@@ -48,19 +48,17 @@ pub fn register_r_alias() -> CreateCommand {
             CreateCommandOption::new(
                 CommandOptionType::String,
                 "dice",
-                "Dice expression (e.g., 2d6+3, 4d6 k3, 3d10 t7)"
+                "Dice expression (e.g., 2d6+3, 4d6 k3, 3d10 t7)",
             )
-            .required(true)
+            .required(true),
         )
 }
 
-pub async fn run(
-    ctx: &Context,
-    command: &CommandInteraction,
-) -> Result<CommandResponse> {
+pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandResponse> {
     let options = &command.data.options;
-    
-    let dice_expr = options.first()
+
+    let dice_expr = options
+        .first()
         .and_then(|opt| match &opt.value {
             CommandDataOptionValue::String(s) => Some(s.as_str()),
             _ => None,
@@ -71,15 +69,15 @@ pub async fn run(
     if dice_expr.trim().to_lowercase() == "help" {
         return Ok(CommandResponse::public(generate_help_text()));
     }
-    
+
     if dice_expr.trim().to_lowercase() == "help alias" {
         return Ok(CommandResponse::public(generate_alias_help()));
     }
-    
+
     if dice_expr.trim().to_lowercase() == "help system" {
         return Ok(CommandResponse::public(generate_system_help()));
     }
-    
+
     if dice_expr.trim().to_lowercase() == "donate" {
         return Ok(CommandResponse::public("Care to support the bot? You can donate via Patreon https://www.patreon.com/dicemaiden \n Another option is join the Dice Maiden Discord server and subscribe! https://discord.gg/4T3R5Cb".to_string()));
     }
@@ -93,34 +91,48 @@ pub async fn run(
     match dice::parse_and_roll(dice_expr) {
         Ok(results) => {
             let formatted = dice::format_multiple_results(&results);
-            
+
             // Check if any roll was marked as private
             let is_private = results.iter().any(|r| r.private);
-            
+
             if is_private {
-                Ok(CommandResponse::private(format!("🎲 **Private Roll** `/roll {}` {}", dice_expr, formatted)))
+                Ok(CommandResponse::private(format!(
+                    "🎲 **Private Roll** `/roll {}` {}",
+                    dice_expr, formatted
+                )))
             } else {
                 // Check if this has multiple results that are semicolon-separated
-                let is_semicolon_separated = results.len() > 1 
+                let is_semicolon_separated = results.len() > 1
                     && results.iter().any(|r| r.original_expression.is_some())
-                    && !results.iter().all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
-                
+                    && !results
+                        .iter()
+                        .all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
+
                 let content = if is_semicolon_separated {
                     // For semicolon-separated rolls, the formatted string already contains individual requests
                     format!("🎲 **{}** {}", command.user.name, formatted)
                 } else if results.len() > 1 {
                     // For roll sets, add newline after request for multiple results
-                    format!("🎲 **{}** Request: `/roll {}`\n{}", command.user.name, dice_expr, formatted)
+                    format!(
+                        "🎲 **{}** Request: `/roll {}`\n{}",
+                        command.user.name, dice_expr, formatted
+                    )
                 } else {
                     // Single result stays on same line
-                    format!("🎲 **{}** Request: `/roll {}` {}", command.user.name, dice_expr, formatted)
+                    format!(
+                        "🎲 **{}** Request: `/roll {}` {}",
+                        command.user.name, dice_expr, formatted
+                    )
                 };
-                
+
                 Ok(CommandResponse::public(content))
             }
         }
         Err(e) => {
-            let content = format!("🎲 **{}** used `/roll {}` - ❌ **Error**: {}", command.user.name, dice_expr, e);
+            let content = format!(
+                "🎲 **{}** used `/roll {}` - ❌ **Error**: {}",
+                command.user.name, dice_expr, e
+            );
             Ok(CommandResponse::public(content))
         }
     }
@@ -157,7 +169,8 @@ fn generate_help_text() -> String {
 • `/roll 6 4d6` - Roll 6 sets of 4d6
 • `/roll 4d100 ; 3d10 k2` - Multiple separate rolls
 
-Type `/roll help alias` for game system shortcuts!"#.to_string()
+Type `/roll help alias` for game system shortcuts!"#
+        .to_string()
 }
 
 fn generate_alias_help() -> String {
@@ -194,7 +207,8 @@ fn generate_alias_help() -> String {
 • `ed15` → Earthdawn step 15
 • `2hsn` → Hero System normal damage
 
-Use `/roll help system` for specific examples!"#.to_string()
+Use `/roll help system` for specific examples!"#
+        .to_string()
 }
 
 fn generate_system_help() -> String {
@@ -224,13 +238,14 @@ Maximum 4 separate rolls with semicolons:
 **Roll Sets:**
 • `/roll 6 4d6` - Roll 6 sets of 4d6 (2-20 sets allowed)
 
-Use `/help` for basic syntax!"#.to_string()
+Use `/help` for basic syntax!"#
+        .to_string()
 }
 
 async fn generate_bot_info(ctx: &Context) -> Result<String> {
     let mut system = System::new_all();
     system.refresh_all();
-    
+
     // Get memory usage
     let current_pid = std::process::id();
     let memory_usage = if let Some(process) = system.process(Pid::from_u32(current_pid)) {
@@ -238,20 +253,23 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
     } else {
         0.0
     };
-    
+
     // Get server count
     let server_count = ctx.cache.guilds().len();
-    
+
     // Get user count (approximate)
-    let user_count: usize = ctx.cache.guilds()
+    let user_count: usize = ctx
+        .cache
+        .guilds()
         .iter()
         .map(|guild_id| {
-            ctx.cache.guild(*guild_id)
+            ctx.cache
+                .guild(*guild_id)
                 .map(|guild| guild.member_count as usize)
                 .unwrap_or(0)
         })
         .sum();
-    
+
     // Get database stats if available
     let db_stats = {
         let data = ctx.data.read().await;
@@ -265,13 +283,13 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
                         "**Database Stats:** No data yet\n".to_string()
                     }
                 }
-                Err(_) => "**Database Stats:** Error reading data\n".to_string()
+                Err(_) => "**Database Stats:** Error reading data\n".to_string(),
             }
         } else {
             "**Database Stats:** Not available\n".to_string()
         }
     };
-    
+
     let bot_info = format!(
         r#"🤖 **Dice Maiden Bot Info** 🤖
 
@@ -281,11 +299,8 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
 • Memory Usage: {:.2} MB
 
 {}"#,
-        server_count,
-        user_count,
-        memory_usage,
-        db_stats
+        server_count, user_count, memory_usage, db_stats
     );
-    
+
     Ok(bot_info)
 }

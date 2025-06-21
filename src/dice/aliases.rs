@@ -1,14 +1,14 @@
-use std::collections::HashMap;
 use regex::Regex;
+use std::collections::HashMap;
 
 pub fn expand_alias(input: &str) -> Option<String> {
     let input = input.trim().to_lowercase();
-    
+
     // Handle parameterized aliases first
     if let Some(result) = expand_parameterized_alias(&input) {
         return Some(result);
     }
-    
+
     // Static aliases
     let aliases = get_static_aliases();
     aliases.get(&input).map(|s| s.to_string())
@@ -22,7 +22,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let count = &captures[2];
         let sides = &captures[3];
         let special = captures.get(4).map(|m| m.as_str());
-        
+
         // Use the new WrathGlory modifier for proper success counting
         return Some(match (difficulty, special) {
             (Some(dn), Some("soak") | Some("exempt") | Some("dmg")) => {
@@ -43,7 +43,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             }
         });
     }
-    
+
     // Simple wng pattern (wng 4d6)
     let wng_simple_regex = Regex::new(r"^wng\s+(\d+)d(\d+)$").unwrap();
     if let Some(captures) = wng_simple_regex.captures(input) {
@@ -51,21 +51,21 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let sides = &captures[2];
         return Some(format!("{}d{} wng", count, sides));
     }
-    
+
     // Chronicles of Darkness (4cod -> 4d10 t8 ie10)
     let cod_regex = Regex::new(r"^(\d+)cod([89r]?)$").unwrap();
     if let Some(captures) = cod_regex.captures(input) {
         let count = &captures[1];
         let variant = captures.get(2).map_or("", |m| m.as_str());
-        
+
         return Some(match variant {
-            "8" => format!("{}d10 t7 ie10", count), // 8-again
-            "9" => format!("{}d10 t6 ie10", count), // 9-again
+            "8" => format!("{}d10 t7 ie10", count),    // 8-again
+            "9" => format!("{}d10 t6 ie10", count),    // 9-again
             "r" => format!("{}d10 t8 ie10 r1", count), // rote quality
-            _ => format!("{}d10 t8 ie10", count), // standard
+            _ => format!("{}d10 t8 ie10", count),      // standard
         });
     }
-    
+
     // World of Darkness (4wod8 -> 4d10 f1 ie10 t8)
     let wod_regex = Regex::new(r"^(\d+)wod(\d+)$").unwrap();
     if let Some(captures) = wod_regex.captures(input) {
@@ -73,7 +73,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let difficulty = &captures[2];
         return Some(format!("{}d10 f1 ie10 t{}", count, difficulty));
     }
-    
+
     // Dark Heresy (dh 4d10 -> 4d10 ie10)
     let dh_regex = Regex::new(r"^dh\s+(\d+)d(\d+)$").unwrap();
     if let Some(captures) = dh_regex.captures(input) {
@@ -81,14 +81,14 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let sides = &captures[2];
         return Some(format!("{}d{} ie{}", count, sides, sides));
     }
-    
+
     // Fudge dice (3df -> 3d3 t3 f1)
     let df_regex = Regex::new(r"^(\d+)df$").unwrap();
     if let Some(captures) = df_regex.captures(input) {
         let count = &captures[1];
         return Some(format!("{}d3 t3 f1", count));
     }
-    
+
     // Warhammer (3wh4+ -> 3d6 t4)
     let wh_regex = Regex::new(r"^(\d+)wh(\d+)\+$").unwrap();
     if let Some(captures) = wh_regex.captures(input) {
@@ -96,7 +96,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let target = &captures[2];
         return Some(format!("{}d6 t{}", count, target));
     }
-    
+
     // Double digit (dd34 -> (1d3 * 10) + 1d4)
     let dd_regex = Regex::new(r"^dd(\d)(\d)$").unwrap();
     if let Some(captures) = dd_regex.captures(input) {
@@ -104,22 +104,26 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let ones = &captures[2];
         return Some(format!("1d{} * 10 + 1d{}", tens, ones));
     }
-    
+
     // Advantage/Disadvantage (+d20, -d20, etc.)
     let adv_regex = Regex::new(r"^([+-])d(\d+|%)$").unwrap();
     if let Some(captures) = adv_regex.captures(input) {
         let modifier = &captures[1];
         let sides = &captures[2];
-        
-        let dice_sides = if sides == "%" { "100".to_string() } else { sides.to_string() };
-        
+
+        let dice_sides = if sides == "%" {
+            "100".to_string()
+        } else {
+            sides.to_string()
+        };
+
         return Some(match modifier {
-            "+" => format!("2d{} k1", dice_sides), // advantage
+            "+" => format!("2d{} k1", dice_sides),  // advantage
             "-" => format!("2d{} kl1", dice_sides), // disadvantage
             _ => return None,
         });
     }
-    
+
     // Percentile advantage/disadvantage
     if input == "+d%" {
         return Some("2d10 kl1 * 10 + 1d10".to_string());
@@ -127,42 +131,42 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if input == "-d%" {
         return Some("2d10 k1 * 10 + 1d10".to_string());
     }
-    
+
     // Simple percentile (xd% -> xd100)
     let perc_regex = Regex::new(r"^(\d+)d%$").unwrap();
     if let Some(captures) = perc_regex.captures(input) {
         let count = &captures[1];
         return Some(format!("{}d100", count));
     }
-    
+
     // Shadowrun (sr6 -> 6d6 t5)
     let sr_regex = Regex::new(r"^sr(\d+)$").unwrap();
     if let Some(captures) = sr_regex.captures(input) {
         let count = &captures[1];
         return Some(format!("{}d6 t5", count));
     }
-    
+
     // Storypath (sp4 -> 4d10 t8 ie10)
     let sp_regex = Regex::new(r"^sp(\d+)$").unwrap();
     if let Some(captures) = sp_regex.captures(input) {
         let count = &captures[1];
         return Some(format!("{}d10 t8 ie10", count));
     }
-    
+
     // Year Zero (6yz -> 6d6 t6)
     let yz_regex = Regex::new(r"^(\d+)yz$").unwrap();
     if let Some(captures) = yz_regex.captures(input) {
         let count = &captures[1];
         return Some(format!("{}d6 t6", count));
     }
-    
+
     // Sunsails New Millennium (snm5 -> 5d6 ie6 t4)
     let snm_regex = Regex::new(r"^snm(\d+)$").unwrap();
     if let Some(captures) = snm_regex.captures(input) {
         let count = &captures[1];
         return Some(format!("{}d6 ie6 t4", count));
     }
-    
+
     // D6 System (d6s4 -> 4d6 + 1d6 ie)
     let d6s_regex = Regex::new(r"^d6s(\d+)(\s*\+\s*\d+)?$").unwrap();
     if let Some(captures) = d6s_regex.captures(input) {
@@ -170,13 +174,13 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let pips = captures.get(2).map_or("", |m| m.as_str());
         return Some(format!("{}d6 + 1d6 ie{}", count, pips));
     }
-    
+
     // Hero System (2hsn, 5hsk1, 3hsh)
     let hs_regex = Regex::new(r"^(\d+(?:\.\d+)?)hs([nk]\d*|h)$").unwrap();
     if let Some(captures) = hs_regex.captures(input) {
         let dice_count = &captures[1];
         let damage_type = &captures[2];
-        
+
         return Some(match damage_type {
             "n" => format!("{}d6", dice_count), // normal damage
             variant if variant.starts_with('k') => {
@@ -187,7 +191,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             _ => return None,
         });
     }
-    
+
     // Exalted (ex5 -> 5d10 t7 t10, ex5t8 -> 5d10 t8 t10)
     let ex_regex = Regex::new(r"^ex(\d+)(?:t(\d+))?$").unwrap();
     if let Some(captures) = ex_regex.captures(input) {
@@ -195,7 +199,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let target = captures.get(2).map_or("7", |m| m.as_str());
         return Some(format!("{}d10 t{} t10", count, target));
     }
-    
+
     // Earthdawn system (ed1 through ed50)
     let ed_regex = Regex::new(r"^ed(\d+)$").unwrap();
     if let Some(captures) = ed_regex.captures(input) {
@@ -204,7 +208,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             return Some(get_earthdawn_step(step));
         }
     }
-    
+
     // Earthdawn 4th edition (ed4e1 through ed4e50)
     let ed4e_regex = Regex::new(r"^ed4e(\d+)$").unwrap();
     if let Some(captures) = ed4e_regex.captures(input) {
@@ -213,7 +217,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             return Some(get_earthdawn_4e_step(step));
         }
     }
-    
+
     // DnD style rolls with modifiers (attack +10, skill -4, save +2)
     let dnd_regex = Regex::new(r"^(attack|skill|save)(\s*[+-]\s*\d+)?$").unwrap();
     if let Some(captures) = dnd_regex.captures(input) {
@@ -221,19 +225,19 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let modifier = captures.get(2).map_or("", |m| m.as_str().trim());
         return Some(format!("1d20{}", modifier));
     }
-    
+
     None
 }
 
 fn get_static_aliases() -> HashMap<String, String> {
     let mut aliases = HashMap::new();
-    
+
     aliases.insert("age".to_string(), "2d6 + 1d6".to_string());
     aliases.insert("dndstats".to_string(), "6 4d6 k3".to_string());
     aliases.insert("attack".to_string(), "1d20".to_string());
     aliases.insert("skill".to_string(), "1d20".to_string());
     aliases.insert("save".to_string(), "1d20".to_string());
-    
+
     aliases
 }
 

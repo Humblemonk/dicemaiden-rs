@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serenity::{
+    all::{CommandDataOptionValue, CommandInteraction, CommandOptionType},
     builder::{CreateCommand, CreateCommandOption},
-    all::{CommandInteraction, CommandOptionType, CommandDataOptionValue},
     prelude::Context,
 };
 
@@ -12,20 +12,20 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(
                 CommandOptionType::String,
                 "topic",
-                "Help topic (basic, alias, system)"
+                "Help topic (basic, alias, system)",
             )
             .required(false)
             .add_string_choice("basic", "basic")
             .add_string_choice("alias", "alias")
-            .add_string_choice("system", "system")
+            .add_string_choice("system", "system"),
         )
 }
 
-pub async fn run(
-    _ctx: &Context,
-    command: &CommandInteraction,
-) -> Result<String> {
-    let topic = command.data.options.first()
+pub async fn run(_ctx: &Context, command: &CommandInteraction) -> Result<String> {
+    let topic = command
+        .data
+        .options
+        .first()
         .and_then(|opt| match &opt.value {
             CommandDataOptionValue::String(s) => Some(s.as_str()),
             _ => None,
@@ -70,7 +70,8 @@ fn generate_basic_help() -> String {
 • `/roll 6 4d6` - Roll 6 sets of 4d6
 • `/roll 4d100 ; 3d10 k2` - Multiple separate rolls
 
-Use `/help topic:alias` for game system shortcuts!"#.to_string()
+Use `/help topic:alias` for game system shortcuts!"#
+        .to_string()
 }
 
 fn generate_alias_help() -> String {
@@ -107,7 +108,8 @@ fn generate_alias_help() -> String {
 • `ed15` → Earthdawn step 15
 • `2hsn` → Hero System normal damage
 
-Use `/help topic:system` for specific examples!"#.to_string()
+Use `/help topic:system` for specific examples!"#
+        .to_string()
 }
 
 fn generate_system_help() -> String {
@@ -137,5 +139,6 @@ Maximum 4 separate rolls with semicolons:
 **Roll Sets:**
 • `/roll 6 4d6` - Roll 6 sets of 4d6 (2-20 sets allowed)
 
-Use `/help` for basic syntax!"#.to_string()
+Use `/help` for basic syntax!"#
+        .to_string()
 }

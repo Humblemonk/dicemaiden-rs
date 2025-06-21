@@ -1,22 +1,22 @@
 use super::{DiceRoll, Modifier};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use regex::Regex;
 
 pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     let input = input.trim();
-    
+
     // Check for aliases first
     if let Some(expanded) = super::aliases::expand_alias(input) {
         return parse_dice_string(&expanded);
     }
-    
+
     // Check for multi-roll (semicolon separated)
     if input.contains(';') {
         let parts: Vec<&str> = input.split(';').collect();
         if parts.len() > 4 {
             return Err(anyhow!("Maximum of 4 separate rolls allowed"));
         }
-        
+
         let mut results = Vec::new();
         for part in parts {
             let part = part.trim();
@@ -29,17 +29,18 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         }
         return Ok(results);
     }
-    
+
     // Check for roll sets (e.g., "6 4d6")
     let set_regex = Regex::new(r"^(\d+)\s+(.+)$").unwrap();
     if let Some(captures) = set_regex.captures(input) {
-        let count: u32 = captures[1].parse()
+        let count: u32 = captures[1]
+            .parse()
             .map_err(|_| anyhow!("Invalid set count"))?;
         if !(2..=20).contains(&count) {
             return Err(anyhow!("Set count must be between 2 and 20"));
         }
         let dice_expr = &captures[2];
-        
+
         let mut results = Vec::new();
         for i in 0..count {
             let mut dice = parse_single_dice_expression(dice_expr)?;
@@ -48,7 +49,7 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         }
         return Ok(results);
     }
-    
+
     // Parse single expression
     Ok(vec![parse_single_dice_expression(input)?])
 }
@@ -66,9 +67,9 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
         unsorted: false,
         original_expression: None, // Will be set by caller if needed
     };
-    
+
     let mut remaining = input.trim();
-    
+
     // Parse flags at the beginning
     let flags = ["p ", "s ", "nr ", "ul ", "!"];
     for flag in &flags {
@@ -83,48 +84,54 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
             remaining = &remaining[flag.len()..];
         }
     }
-    
+
     // Parse label (parentheses)
     let label_regex = Regex::new(r"^\(([^)]+)\)\s*").unwrap();
     if let Some(captures) = label_regex.captures(remaining) {
         dice.label = Some(captures[1].to_string());
         remaining = &remaining[captures.get(0).unwrap().end()..];
     }
-    
+
     // Parse comment (exclamation mark)
     let comment_regex = Regex::new(r"!\s*(.+)$").unwrap();
     if let Some(captures) = comment_regex.captures(remaining) {
         dice.comment = Some(captures[1].to_string());
         remaining = remaining[..captures.get(0).unwrap().start()].trim();
     }
-    
+
     // Parse the main dice expression and modifiers
-    let parts: Vec<&str> = if remaining.chars().any(|c| matches!(c, '+' | '-' | '*' | '/')) && !remaining.contains(' ') {
+    let parts: Vec<&str> = if remaining
+        .chars()
+        .any(|c| matches!(c, '+' | '-' | '*' | '/'))
+        && !remaining.contains(' ')
+    {
         // Split mathematical expressions without spaces using regex
         split_math_expression_regex(remaining)?
     } else {
         // Split by whitespace for expressions with spaces
         remaining.split_whitespace().collect()
     };
-    
+
     if parts.is_empty() {
         return Err(anyhow!("No dice expression found"));
     }
-    
+
     // Parse main dice part (XdY)
     let dice_regex = Regex::new(r"^(\d+)?d(\d+|%)$").unwrap();
     if let Some(captures) = dice_regex.captures(parts[0]) {
-        dice.count = captures.get(1)
+        dice.count = captures
+            .get(1)
             .map(|m| m.as_str().parse().unwrap_or(1))
             .unwrap_or(1);
-        
+
         if &captures[2] == "%" {
             dice.sides = 100;
         } else {
-            dice.sides = captures[2].parse()
+            dice.sides = captures[2]
+                .parse()
                 .map_err(|_| anyhow!("Invalid dice sides"))?;
         }
-        
+
         if dice.count > 100 {
             return Err(anyhow!("Maximum 100 dice allowed"));
         }
@@ -134,7 +141,7 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     } else {
         return Err(anyhow!("Invalid dice expression: {}", parts[0]));
     }
-    
+
     // Parse modifiers
     let mut i = 1;
     while i < parts.len() {
@@ -178,7 +185,7 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
                 continue;
             }
         }
-        
+
         // Handle combined modifiers by splitting them first
         let split_modifiers = split_combined_modifiers(parts[i])?;
         for modifier_str in split_modifiers {
@@ -187,7 +194,7 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
         }
         i += 1;
     }
-    
+
     Ok(dice)
 }
 
@@ -197,10 +204,10 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
     if is_simple_modifier(input) {
         return Ok(vec![input.to_string()]);
     }
-    
+
     let mut modifiers = Vec::new();
     let mut remaining = input;
-    
+
     while !remaining.is_empty() {
         let (modifier, rest) = extract_next_modifier(remaining)?;
         if modifier.is_empty() {
@@ -209,7 +216,7 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
         modifiers.push(modifier);
         remaining = rest;
     }
-    
+
     if modifiers.is_empty() {
         // If we couldn't split it, return the original
         Ok(vec![input.to_string()])
@@ -221,29 +228,29 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
 fn is_simple_modifier(input: &str) -> bool {
     // Check if it's a simple modifier that doesn't need splitting
     let simple_patterns = [
-        r"^[+\-*/]\d+$",  // +5, -3, *2, /4
-        r"^\d+$",         // 5
-        r"^ie\d*$",       // ie, ie6
-        r"^ir\d+$",       // ir2
-        r"^r\d+$",        // r2
-        r"^e\d*$",        // e, e6 (but only if no other modifiers follow)
-        r"^kl\d+$",       // kl2
-        r"^k\d+$",        // k3 (but only if no other modifiers follow)
-        r"^d\d+$",        // d2 (but only if no other modifiers follow)
-        r"^t\d+$",        // t7
-        r"^f\d+$",        // f1
-        r"^b\d*$",        // b, b1
-        r"^wng\d*t?$",    // wng, wng3, wngt, wng3t (Wrath & Glory with optional difficulty and total flag)
+        r"^[+\-*/]\d+$", // +5, -3, *2, /4
+        r"^\d+$",        // 5
+        r"^ie\d*$",      // ie, ie6
+        r"^ir\d+$",      // ir2
+        r"^r\d+$",       // r2
+        r"^e\d*$",       // e, e6 (but only if no other modifiers follow)
+        r"^kl\d+$",      // kl2
+        r"^k\d+$",       // k3 (but only if no other modifiers follow)
+        r"^d\d+$",       // d2 (but only if no other modifiers follow)
+        r"^t\d+$",       // t7
+        r"^f\d+$",       // f1
+        r"^b\d*$",       // b, b1
+        r"^wng\d*t?$", // wng, wng3, wngt, wng3t (Wrath & Glory with optional difficulty and total flag)
     ];
-    
-    simple_patterns.iter().any(|pattern| {
-        Regex::new(pattern).unwrap().is_match(input)
-    })
+
+    simple_patterns
+        .iter()
+        .any(|pattern| Regex::new(pattern).unwrap().is_match(input))
 }
 
 fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
     // Try to match modifier patterns in order of complexity
-    
+
     // Wrath & Glory modifier with optional difficulty and total flag
     if input.starts_with("wng") {
         let re = Regex::new(r"^(wng\d*t?)").unwrap();
@@ -253,7 +260,7 @@ fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
             return Ok((modifier, rest));
         }
     }
-    
+
     // Indefinite explode: ie or ie#
     if input.starts_with("ie") {
         let re = Regex::new(r"^(ie\d*)").unwrap();
@@ -263,7 +270,7 @@ fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
             return Ok((modifier, rest));
         }
     }
-    
+
     // Indefinite reroll: ir#
     if input.starts_with("ir") {
         let re = Regex::new(r"^(ir\d+)").unwrap();
@@ -273,7 +280,7 @@ fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
             return Ok((modifier, rest));
         }
     }
-    
+
     // Keep low: kl#
     if input.starts_with("kl") {
         let re = Regex::new(r"^(kl\d+)").unwrap();
@@ -283,7 +290,7 @@ fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
             return Ok((modifier, rest));
         }
     }
-    
+
     // Explode: e or e#
     if input.starts_with('e') && !input.starts_with("ie") {
         let re = Regex::new(r"^(e\d*)").unwrap();
@@ -293,7 +300,7 @@ fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
             return Ok((modifier, rest));
         }
     }
-    
+
     // Keep high: k#
     if input.starts_with('k') && !input.starts_with("kl") {
         let re = Regex::new(r"^(k\d+)").unwrap();
@@ -303,7 +310,7 @@ fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
             return Ok((modifier, rest));
         }
     }
-    
+
     // Drop: d#
     if input.starts_with('d') {
         let re = Regex::new(r"^(d\d+)").unwrap();
@@ -313,7 +320,7 @@ fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
             return Ok((modifier, rest));
         }
     }
-    
+
     // Reroll: r#
     if input.starts_with('r') && !input.starts_with("ir") {
         let re = Regex::new(r"^(r\d+)").unwrap();
@@ -323,7 +330,7 @@ fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
             return Ok((modifier, rest));
         }
     }
-    
+
     // Target: t#
     if input.starts_with('t') {
         let re = Regex::new(r"^(t\d+)").unwrap();
@@ -333,7 +340,7 @@ fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
             return Ok((modifier, rest));
         }
     }
-    
+
     // Failure: f#
     if input.starts_with('f') {
         let re = Regex::new(r"^(f\d+)").unwrap();
@@ -343,7 +350,7 @@ fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
             return Ok((modifier, rest));
         }
     }
-    
+
     // Botch: b or b#
     if input.starts_with('b') {
         let re = Regex::new(r"^(b\d*)").unwrap();
@@ -353,7 +360,7 @@ fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
             return Ok((modifier, rest));
         }
     }
-    
+
     // If no pattern matched, return empty
     Ok((String::new(), input))
 }
@@ -363,29 +370,34 @@ fn parse_modifier(part: &str) -> Result<Modifier> {
     if let Some(stripped) = part.strip_prefix("wng") {
         let use_total = part.ends_with('t');
         let number_part = if use_total {
-            &stripped[..stripped.len()-1] // Remove "t" from the end
+            &stripped[..stripped.len() - 1] // Remove "t" from the end
         } else {
             stripped // Use the already stripped version
         };
-        
+
         let difficulty = if !number_part.is_empty() {
-            Some(number_part.parse().map_err(|_| anyhow!("Invalid difficulty number"))?)
+            Some(
+                number_part
+                    .parse()
+                    .map_err(|_| anyhow!("Invalid difficulty number"))?,
+            )
         } else {
             None
         };
-        
+
         return Ok(Modifier::WrathGlory(difficulty, use_total));
     }
-    
+
     // Numeric modifiers (positive numbers)
     if let Ok(num) = part.parse::<i32>() {
         return Ok(Modifier::Add(num));
     }
-    
+
     // Operators with numbers (e.g., "+2", "-3", "*4", "/2")
     let op_regex = Regex::new(r"^([+\-*/])(\d+)$").unwrap();
     if let Some(captures) = op_regex.captures(part) {
-        let num: i32 = captures[2].parse()
+        let num: i32 = captures[2]
+            .parse()
             .map_err(|_| anyhow!("Invalid modifier number"))?;
         match &captures[1] {
             "+" => return Ok(Modifier::Add(num)),
@@ -395,85 +407,106 @@ fn parse_modifier(part: &str) -> Result<Modifier> {
             _ => {}
         }
     }
-    
+
     // Special modifiers
     if let Some(stripped) = part.strip_prefix("ie") {
         let num = if !stripped.is_empty() {
-            Some(stripped.parse().map_err(|_| anyhow!("Invalid explode value"))?)
+            Some(
+                stripped
+                    .parse()
+                    .map_err(|_| anyhow!("Invalid explode value"))?,
+            )
         } else {
             None
         };
         return Ok(Modifier::ExplodeIndefinite(num));
     }
-    
+
     if let Some(stripped) = part.strip_prefix('e') {
         let num = if !stripped.is_empty() {
-            Some(stripped.parse().map_err(|_| anyhow!("Invalid explode value"))?)
+            Some(
+                stripped
+                    .parse()
+                    .map_err(|_| anyhow!("Invalid explode value"))?,
+            )
         } else {
             None
         };
         return Ok(Modifier::Explode(num));
     }
-    
+
     if let Some(stripped) = part.strip_prefix("ir") {
-        let num: u32 = stripped.parse()
+        let num: u32 = stripped
+            .parse()
             .map_err(|_| anyhow!("Invalid reroll value"))?;
         return Ok(Modifier::RerollIndefinite(num));
     }
-    
+
     if let Some(stripped) = part.strip_prefix('r') {
-        let num: u32 = stripped.parse()
+        let num: u32 = stripped
+            .parse()
             .map_err(|_| anyhow!("Invalid reroll value"))?;
         return Ok(Modifier::Reroll(num));
     }
-    
+
     if let Some(stripped) = part.strip_prefix("kl") {
-        let num: u32 = stripped.parse()
+        let num: u32 = stripped
+            .parse()
             .map_err(|_| anyhow!("Invalid keep low value"))?;
         return Ok(Modifier::KeepLow(num));
     }
-    
+
     if let Some(stripped) = part.strip_prefix('k') {
-        let num: u32 = stripped.parse()
+        let num: u32 = stripped
+            .parse()
             .map_err(|_| anyhow!("Invalid keep value"))?;
         return Ok(Modifier::KeepHigh(num));
     }
-    
+
     if let Some(stripped) = part.strip_prefix('d') {
-        let num: u32 = stripped.parse()
+        let num: u32 = stripped
+            .parse()
             .map_err(|_| anyhow!("Invalid drop value"))?;
         return Ok(Modifier::Drop(num));
     }
-    
+
     if let Some(stripped) = part.strip_prefix('t') {
-        let num: u32 = stripped.parse()
+        let num: u32 = stripped
+            .parse()
             .map_err(|_| anyhow!("Invalid target value"))?;
         return Ok(Modifier::Target(num));
     }
-    
+
     if let Some(stripped) = part.strip_prefix('f') {
-        let num: u32 = stripped.parse()
+        let num: u32 = stripped
+            .parse()
             .map_err(|_| anyhow!("Invalid failure value"))?;
         return Ok(Modifier::Failure(num));
     }
-    
+
     if let Some(stripped) = part.strip_prefix('b') {
         let num = if !stripped.is_empty() {
-            Some(stripped.parse().map_err(|_| anyhow!("Invalid botch value"))?)
+            Some(
+                stripped
+                    .parse()
+                    .map_err(|_| anyhow!("Invalid botch value"))?,
+            )
         } else {
             None
         };
         return Ok(Modifier::Botch(num));
     }
-    
+
     // Additional dice (e.g., "+2d6", "-1d4")
     let dice_mod_regex = Regex::new(r"^([+\-])(\d+)d(\d+)$").unwrap();
     if let Some(captures) = dice_mod_regex.captures(part) {
-        let count: u32 = captures[2].parse()
+        let count: u32 = captures[2]
+            .parse()
             .map_err(|_| anyhow!("Invalid dice count in modifier"))?;
-        let sides: u32 = captures[3].parse()
+        let sides: u32 = captures[3]
+            .parse()
             .map_err(|_| anyhow!("Invalid dice sides in modifier"))?;
-        
+
         let add_dice = DiceRoll {
             count,
             sides,
@@ -486,10 +519,10 @@ fn parse_modifier(part: &str) -> Result<Modifier> {
             unsorted: false,
             original_expression: None,
         };
-        
+
         return Ok(Modifier::AddDice(add_dice));
     }
-    
+
     Err(anyhow!("Unknown modifier: {}", part))
 }
 
@@ -501,12 +534,14 @@ fn is_dice_expression(input: &str) -> bool {
 fn parse_dice_expression_only(input: &str) -> Result<DiceRoll> {
     let dice_regex = Regex::new(r"^(\d+)?d(\d+)$").unwrap();
     if let Some(captures) = dice_regex.captures(input) {
-        let count = captures.get(1)
+        let count = captures
+            .get(1)
             .map(|m| m.as_str().parse().unwrap_or(1))
             .unwrap_or(1);
-        let sides = captures[2].parse()
+        let sides = captures[2]
+            .parse()
             .map_err(|_| anyhow!("Invalid dice sides"))?;
-        
+
         Ok(DiceRoll {
             count,
             sides,
@@ -528,7 +563,7 @@ fn split_math_expression_regex(input: &str) -> Result<Vec<&str>> {
     // Use regex to split expressions like "4d10+2" into ["4d10", "+2"]
     let re = Regex::new(r"(\d+d\d+|[+\-*/]\d+)")?;
     let parts: Vec<&str> = re.find_iter(input).map(|m| m.as_str()).collect();
-    
+
     if parts.is_empty() {
         // If no matches, return the original input
         Ok(vec![input])

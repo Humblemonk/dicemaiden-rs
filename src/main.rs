@@ -1,25 +1,15 @@
-mod dice;
 mod commands;
 mod database;
+mod dice;
 
 use anyhow::Result;
 use serenity::{
-    async_trait,
-    gateway::ShardManager,
-    http::Http,
-    model::gateway::Ready,
-    prelude::*,
-    all::*,
+    all::*, async_trait, gateway::ShardManager, http::Http, model::gateway::Ready, prelude::*,
 };
-use std::{
-    collections::HashSet,
-    env,
-    sync::Arc,
-    time::Duration,
-};
-use tracing::{error, info};
+use std::{collections::HashSet, env, sync::Arc, time::Duration};
+use sysinfo::{Pid, System};
 use tokio::time::interval;
-use sysinfo::{System, Pid};
+use tracing::{error, info};
 
 pub struct ShardManagerContainer;
 
@@ -54,7 +44,7 @@ impl EventHandler for Handler {
                 commands::help::register(),
                 commands::purge::register(),
             ];
-            
+
             guild_id.set_commands(&ctx.http, commands).await
         } else {
             // Global commands
@@ -64,16 +54,13 @@ impl EventHandler for Handler {
                 commands::help::register(),
                 commands::purge::register(),
             ];
-            
+
             Command::set_global_commands(&ctx.http, commands).await
         };
 
         match commands {
             Ok(commands) => {
-                info!(
-                    "Registered {} slash commands",
-                    commands.len()
-                );
+                info!("Registered {} slash commands", commands.len());
             }
             Err(e) => {
                 error!("Failed to register slash commands: {}", e);
@@ -100,28 +87,34 @@ impl EventHandler for Handler {
                         Err(e) => Err(e),
                     }
                 }
-                _ => Ok(commands::CommandResponse::public("Unknown command".to_string())),
+                _ => Ok(commands::CommandResponse::public(
+                    "Unknown command".to_string(),
+                )),
             };
 
             let (response_content, ephemeral) = match response {
                 Ok(cmd_response) => (cmd_response.content, cmd_response.ephemeral),
                 Err(e) => {
                     error!("Error executing command: {}", e);
-                    ("An error occurred while executing the command.".to_string(), false)
+                    (
+                        "An error occurred while executing the command.".to_string(),
+                        false,
+                    )
                 }
             };
 
             // Create the response with appropriate ephemeral setting
             let mut response_message = serenity::builder::CreateInteractionResponseMessage::new()
                 .content(response_content);
-            
+
             if ephemeral {
                 response_message = response_message.ephemeral(true);
             }
 
             if let Err(why) = command
-                .create_response(&ctx.http, 
-                    serenity::builder::CreateInteractionResponse::Message(response_message)
+                .create_response(
+                    &ctx.http,
+                    serenity::builder::CreateInteractionResponse::Message(response_message),
                 )
                 .await
             {
@@ -134,15 +127,14 @@ impl EventHandler for Handler {
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv::dotenv().ok();
-    
+
     tracing_subscriber::fmt::init();
 
     // Initialize database
     let db = Arc::new(database::Database::new().await?);
     db.init().await?;
 
-    let token = env::var("DISCORD_TOKEN")
-        .expect("Expected DISCORD_TOKEN in environment");
+    let token = env::var("DISCORD_TOKEN").expect("Expected DISCORD_TOKEN in environment");
 
     let http = Http::new(&token);
     let (_owners, _bot_id) = match http.get_current_application_info().await {
@@ -205,13 +197,13 @@ async fn main() -> Result<()> {
 async fn collect_shard_stats(db: Arc<database::Database>, cache: Arc<serenity::cache::Cache>) {
     let mut interval = interval(Duration::from_secs(300)); // 5 minutes
     let mut system = System::new_all();
-    
+
     loop {
         interval.tick().await;
-        
+
         // Refresh system information
         system.refresh_all();
-        
+
         // Get current process memory usage in MB
         let current_pid = std::process::id();
         let memory_usage = if let Some(process) = system.process(Pid::from_u32(current_pid)) {
@@ -219,19 +211,24 @@ async fn collect_shard_stats(db: Arc<database::Database>, cache: Arc<serenity::c
         } else {
             0.0
         };
-        
+
         // Get server count from cache
         let server_count = cache.guilds().len() as i32;
-        
+
         // For now, we'll use shard_id 0 since this is likely a single-shard bot
         // In a multi-shard setup, you'd iterate through all shards
         let shard_id = 0;
-        
-        if let Err(e) = db.update_shard_stats(shard_id, server_count, memory_usage).await {
+
+        if let Err(e) = db
+            .update_shard_stats(shard_id, server_count, memory_usage)
+            .await
+        {
             error!("Failed to update shard stats: {}", e);
         } else {
-            info!("Updated shard {} stats: {} servers, {:.2} MB memory", 
-                shard_id, server_count, memory_usage);
+            info!(
+                "Updated shard {} stats: {} servers, {:.2} MB memory",
+                shard_id, server_count, memory_usage
+            );
         }
     }
 }
