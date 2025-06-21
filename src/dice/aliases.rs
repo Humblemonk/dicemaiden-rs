@@ -200,7 +200,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     let ed_regex = Regex::new(r"^ed(\d+)$").unwrap();
     if let Some(captures) = ed_regex.captures(input) {
         let step: u32 = captures[1].parse().ok()?;
-        if step >= 1 && step <= 50 {
+        if (1..=50).contains(&step) {
             return Some(get_earthdawn_step(step));
         }
     }
@@ -209,7 +209,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     let ed4e_regex = Regex::new(r"^ed4e(\d+)$").unwrap();
     if let Some(captures) = ed4e_regex.captures(input) {
         let step: u32 = captures[1].parse().ok()?;
-        if step >= 1 && step <= 50 {
+        if (1..=50).contains(&step) {
             return Some(get_earthdawn_4e_step(step));
         }
     }

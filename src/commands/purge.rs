@@ -34,7 +34,7 @@ pub async fn run(
             })?;
             
             // Check if user has admin or manage messages permission
-            member.permissions.map_or(false, |perms| {
+            member.permissions.is_some_and(|perms| {
                 perms.administrator() || perms.manage_messages()
             })
         }
@@ -45,15 +45,14 @@ pub async fn run(
         return Ok("❌ You need the 'Manage Messages' or 'Administrator' permission to use this command.".to_string());
     }
 
-    let count = command.data.options
-        .get(0)
+    let count = command.data.options.first()
         .and_then(|opt| match &opt.value {
-            CommandDataOptionValue::Integer(i) => Some(i.abs() as u8),
+            CommandDataOptionValue::Integer(i) => Some(i.unsigned_abs() as u8),
             _ => None,
         })
         .unwrap_or(10);
 
-    if count < 2 || count > 100 {
+    if !(2..=100).contains(&count) {
         return Ok("❌ Message count must be between 2 and 100.".to_string());
     }
 

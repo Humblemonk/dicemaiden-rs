@@ -60,8 +60,7 @@ pub async fn run(
 ) -> Result<CommandResponse> {
     let options = &command.data.options;
     
-    let dice_expr = options
-        .get(0)
+    let dice_expr = options.first()
         .and_then(|opt| match &opt.value {
             CommandDataOptionValue::String(s) => Some(s.as_str()),
             _ => None,
@@ -99,12 +98,12 @@ pub async fn run(
             let is_private = results.iter().any(|r| r.private);
             
             if is_private {
-                Ok(CommandResponse::private(format!("🎲 **Private Roll** `/roll {}` 🎲\n{}", dice_expr, formatted)))
+                Ok(CommandResponse::private(format!("🎲 **Private Roll** `/roll {}` {}", dice_expr, formatted)))
             } else {
                 // Check if this has multiple results that are semicolon-separated
                 let is_semicolon_separated = results.len() > 1 
                     && results.iter().any(|r| r.original_expression.is_some())
-                    && !results.iter().all(|r| r.label.as_ref().map_or(false, |l| l.starts_with("Set ")));
+                    && !results.iter().all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
                 
                 let content = if is_semicolon_separated {
                     // For semicolon-separated rolls, the formatted string already contains individual requests

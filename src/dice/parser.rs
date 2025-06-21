@@ -35,7 +35,7 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     if let Some(captures) = set_regex.captures(input) {
         let count: u32 = captures[1].parse()
             .map_err(|_| anyhow!("Invalid set count"))?;
-        if count < 2 || count > 20 {
+        if !(2..=20).contains(&count) {
             return Err(anyhow!("Set count must be between 2 and 20"));
         }
         let dice_expr = &captures[2];
@@ -95,7 +95,7 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     let comment_regex = Regex::new(r"!\s*(.+)$").unwrap();
     if let Some(captures) = comment_regex.captures(remaining) {
         dice.comment = Some(captures[1].to_string());
-        remaining = &remaining[..captures.get(0).unwrap().start()].trim();
+        remaining = remaining[..captures.get(0).unwrap().start()].trim();
     }
     
     // Parse the main dice expression and modifiers
@@ -360,12 +360,12 @@ fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
 
 fn parse_modifier(part: &str) -> Result<Modifier> {
     // Wrath & Glory success counting with optional difficulty and total flag
-    if part.starts_with("wng") {
+    if let Some(stripped) = part.strip_prefix("wng") {
         let use_total = part.ends_with('t');
         let number_part = if use_total {
-            &part[3..part.len()-1] // Remove "wng" and "t"
+            &stripped[..stripped.len()-1] // Remove "t" from the end
         } else {
-            &part[3..] // Remove "wng"
+            stripped // Use the already stripped version
         };
         
         let difficulty = if !number_part.is_empty() {
@@ -397,69 +397,69 @@ fn parse_modifier(part: &str) -> Result<Modifier> {
     }
     
     // Special modifiers
-    if part.starts_with("ie") {
-        let num = if part.len() > 2 {
-            Some(part[2..].parse().map_err(|_| anyhow!("Invalid explode value"))?)
+    if let Some(stripped) = part.strip_prefix("ie") {
+        let num = if !stripped.is_empty() {
+            Some(stripped.parse().map_err(|_| anyhow!("Invalid explode value"))?)
         } else {
             None
         };
         return Ok(Modifier::ExplodeIndefinite(num));
     }
     
-    if part.starts_with('e') {
-        let num = if part.len() > 1 {
-            Some(part[1..].parse().map_err(|_| anyhow!("Invalid explode value"))?)
+    if let Some(stripped) = part.strip_prefix('e') {
+        let num = if !stripped.is_empty() {
+            Some(stripped.parse().map_err(|_| anyhow!("Invalid explode value"))?)
         } else {
             None
         };
         return Ok(Modifier::Explode(num));
     }
     
-    if part.starts_with("ir") {
-        let num: u32 = part[2..].parse()
+    if let Some(stripped) = part.strip_prefix("ir") {
+        let num: u32 = stripped.parse()
             .map_err(|_| anyhow!("Invalid reroll value"))?;
         return Ok(Modifier::RerollIndefinite(num));
     }
     
-    if part.starts_with('r') {
-        let num: u32 = part[1..].parse()
+    if let Some(stripped) = part.strip_prefix('r') {
+        let num: u32 = stripped.parse()
             .map_err(|_| anyhow!("Invalid reroll value"))?;
         return Ok(Modifier::Reroll(num));
     }
     
-    if part.starts_with("kl") {
-        let num: u32 = part[2..].parse()
+    if let Some(stripped) = part.strip_prefix("kl") {
+        let num: u32 = stripped.parse()
             .map_err(|_| anyhow!("Invalid keep low value"))?;
         return Ok(Modifier::KeepLow(num));
     }
     
-    if part.starts_with('k') {
-        let num: u32 = part[1..].parse()
+    if let Some(stripped) = part.strip_prefix('k') {
+        let num: u32 = stripped.parse()
             .map_err(|_| anyhow!("Invalid keep value"))?;
         return Ok(Modifier::KeepHigh(num));
     }
     
-    if part.starts_with('d') {
-        let num: u32 = part[1..].parse()
+    if let Some(stripped) = part.strip_prefix('d') {
+        let num: u32 = stripped.parse()
             .map_err(|_| anyhow!("Invalid drop value"))?;
         return Ok(Modifier::Drop(num));
     }
     
-    if part.starts_with('t') {
-        let num: u32 = part[1..].parse()
+    if let Some(stripped) = part.strip_prefix('t') {
+        let num: u32 = stripped.parse()
             .map_err(|_| anyhow!("Invalid target value"))?;
         return Ok(Modifier::Target(num));
     }
     
-    if part.starts_with('f') {
-        let num: u32 = part[1..].parse()
+    if let Some(stripped) = part.strip_prefix('f') {
+        let num: u32 = stripped.parse()
             .map_err(|_| anyhow!("Invalid failure value"))?;
         return Ok(Modifier::Failure(num));
     }
     
-    if part.starts_with('b') {
-        let num = if part.len() > 1 {
-            Some(part[1..].parse().map_err(|_| anyhow!("Invalid botch value"))?)
+    if let Some(stripped) = part.strip_prefix('b') {
+        let num = if !stripped.is_empty() {
+            Some(stripped.parse().map_err(|_| anyhow!("Invalid botch value"))?)
         } else {
             None
         };

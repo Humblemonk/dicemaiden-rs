@@ -25,8 +25,7 @@ pub async fn run(
     _ctx: &Context,
     command: &CommandInteraction,
 ) -> Result<String> {
-    let topic = command.data.options
-        .get(0)
+    let topic = command.data.options.first()
         .and_then(|opt| match &opt.value {
             CommandDataOptionValue::String(s) => Some(s.as_str()),
             _ => None,

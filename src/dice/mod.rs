@@ -84,7 +84,7 @@ impl fmt::Display for RollResult {
                         match group.modifier_type.as_str() {
                             "add" => output.push_str(" + "),
                             "subtract" => output.push_str(" - "),
-                            _ => output.push_str(" "),
+                            _ => output.push(' '),
                         }
                     }
                     output.push_str(&format!("`[{}]`", 
@@ -142,7 +142,7 @@ impl fmt::Display for RollResult {
                         match group.modifier_type.as_str() {
                             "add" => output.push_str(" + "),
                             "subtract" => output.push_str(" - "),
-                            _ => output.push_str(" "),
+                            _ => output.push(' '),
                         }
                     }
                     output.push_str(&format!("`[{}]`", 
@@ -227,7 +227,7 @@ pub fn format_multiple_results(results: &[RollResult]) -> String {
     
     // Check if this is a roll set (all results have "Set X" labels)
     let is_roll_set = results.len() > 1 
-        && results.iter().all(|r| r.label.as_ref().map_or(false, |l| l.starts_with("Set ")));
+        && results.iter().all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
     
     // Check if these are semicolon-separated rolls (have original expressions but no "Set X" labels)
     let is_semicolon_separated = results.len() > 1 
@@ -241,7 +241,7 @@ pub fn format_multiple_results(results: &[RollResult]) -> String {
         
         for (i, result) in results.iter().enumerate() {
             if i > 0 {
-                output.push_str("\n");
+                output.push('\n');
             }
             output.push_str(&result.to_string());
             
@@ -259,12 +259,12 @@ pub fn format_multiple_results(results: &[RollResult]) -> String {
         let mut output = String::new();
         for (i, result) in results.iter().enumerate() {
             if i > 0 {
-                output.push_str("\n");
+                output.push('\n');
             }
             
             // Show the request for each individual roll
             if let Some(expr) = &result.original_expression {
-                output.push_str(&format!("Request: `/roll {}` {}", expr, result.to_string()));
+                output.push_str(&format!("Request: `/roll {}` {}", expr, result));
             } else {
                 output.push_str(&result.to_string());
             }
@@ -275,7 +275,7 @@ pub fn format_multiple_results(results: &[RollResult]) -> String {
         let mut output = String::new();
         for (i, result) in results.iter().enumerate() {
             if i > 0 {
-                output.push_str("\n");
+                output.push('\n');
             }
             output.push_str(&result.to_string());
         }

@@ -151,13 +151,10 @@ async fn main() -> Result<()> {
             if let Some(owner) = &info.owner {
                 owners.insert(owner.id);
             }
-            match info.team {
-                Some(team) => {
-                    for member in &team.members {
-                        owners.insert(member.user.id);
-                    }
+            if let Some(team) = info.team {
+                for member in &team.members {
+                    owners.insert(member.user.id);
                 }
-                None => {}
             }
             (owners, info.id)
         }
