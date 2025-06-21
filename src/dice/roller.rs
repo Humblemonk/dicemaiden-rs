@@ -16,10 +16,10 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         label: dice.label.clone(),
         notes: Vec::new(),
         dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(), // Pass through the original expression
-        simple: dice.simple,                                   // Transfer simple flag from DiceRoll
-        no_results: dice.no_results, // Transfer no_results flag from DiceRoll
-        private: dice.private,       // Transfer private flag from DiceRoll
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
     };
 
     // Initial dice rolls
@@ -41,28 +41,19 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         match modifier {
             Modifier::Explode(threshold) => {
                 explode_dice(&mut result, &mut rng, *threshold, dice.sides, false)?;
-                // Update the base group with exploded dice
-                if let Some(base_group) = result.dice_groups.get_mut(0) {
-                    base_group.rolls = result.individual_rolls.clone();
-                }
+                update_base_group(&mut result);
             }
             Modifier::ExplodeIndefinite(threshold) => {
                 explode_dice(&mut result, &mut rng, *threshold, dice.sides, true)?;
-                if let Some(base_group) = result.dice_groups.get_mut(0) {
-                    base_group.rolls = result.individual_rolls.clone();
-                }
+                update_base_group(&mut result);
             }
             Modifier::Reroll(threshold) => {
                 reroll_dice(&mut result, &mut rng, *threshold, dice.sides, false)?;
-                if let Some(base_group) = result.dice_groups.get_mut(0) {
-                    base_group.rolls = result.individual_rolls.clone();
-                }
+                update_base_group(&mut result);
             }
             Modifier::RerollIndefinite(threshold) => {
                 reroll_dice(&mut result, &mut rng, *threshold, dice.sides, true)?;
-                if let Some(base_group) = result.dice_groups.get_mut(0) {
-                    base_group.rolls = result.individual_rolls.clone();
-                }
+                update_base_group(&mut result);
             }
             _ => {} // Handle other modifiers later
         }
@@ -109,46 +100,26 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
                 result.total /= value;
             }
             Modifier::Target(value) => {
-                count_successes(&mut result, *value)?;
+                count_dice_matching(&mut result, |roll| roll >= *value as i32, "successes")?;
             }
             Modifier::Failure(value) => {
-                count_failures(&mut result, *value)?;
+                count_failures_and_subtract(&mut result, *value)?;
             }
             Modifier::Botch(threshold) => {
-                count_botches(&mut result, threshold.unwrap_or(1))?;
+                count_dice_matching(&mut result, |roll| roll <= threshold.unwrap_or(1) as i32, "botches")?;
+                let botch_count = result.botches.unwrap_or(0);
+                if botch_count > 0 {
+                    result.notes.push(format!("{} dice botched (≤{})", botch_count, threshold.unwrap_or(1)));
+                }
             }
             Modifier::WrathGlory(difficulty, use_total) => {
                 count_wrath_glory_successes(&mut result, *difficulty, *use_total)?;
             }
             Modifier::AddDice(dice_to_add) => {
-                let additional_result = roll_dice(dice_to_add.clone())?;
-                result
-                    .individual_rolls
-                    .extend(additional_result.individual_rolls.clone());
-                result.total += additional_result.total;
-
-                // Add a new dice group for the additional dice
-                let add_group = DiceGroup {
-                    _description: format!("{}d{}", dice_to_add.count, dice_to_add.sides),
-                    rolls: additional_result.individual_rolls,
-                    modifier_type: "add".to_string(),
-                };
-                result.dice_groups.push(add_group);
+                handle_additional_dice(&mut result, dice_to_add, "add", 1)?;
             }
             Modifier::SubtractDice(dice_to_subtract) => {
-                let subtract_result = roll_dice(dice_to_subtract.clone())?;
-                result
-                    .individual_rolls
-                    .extend(subtract_result.individual_rolls.clone());
-                result.total -= subtract_result.total;
-
-                // Add a new dice group for the subtracted dice
-                let subtract_group = DiceGroup {
-                    _description: format!("{}d{}", dice_to_subtract.count, dice_to_subtract.sides),
-                    rolls: subtract_result.individual_rolls,
-                    modifier_type: "subtract".to_string(),
-                };
-                result.dice_groups.push(subtract_group);
+                handle_additional_dice(&mut result, dice_to_subtract, "subtract", -1)?;
             }
             _ => {} // Skip modifiers already handled above
         }
@@ -165,6 +136,72 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     }
 
     Ok(result)
+}
+
+// Helper function to update the base group with current rolls
+fn update_base_group(result: &mut RollResult) {
+    if let Some(base_group) = result.dice_groups.get_mut(0) {
+        base_group.rolls = result.individual_rolls.clone();
+    }
+}
+
+// Generic function for counting dice that match a condition
+fn count_dice_matching<F>(result: &mut RollResult, condition: F, count_type: &str) -> Result<()>
+where
+    F: Fn(i32) -> bool,
+{
+    let count = result
+        .individual_rolls
+        .iter()
+        .filter(|&&roll| condition(roll))
+        .count() as i32;
+
+    match count_type {
+        "successes" => {
+            result.successes = Some(result.successes.unwrap_or(0) + count);
+        }
+        "botches" => {
+            result.botches = Some(count);
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+// Handle failures with subtraction from successes
+fn count_failures_and_subtract(result: &mut RollResult, threshold: u32) -> Result<()> {
+    let failures = result
+        .individual_rolls
+        .iter()
+        .filter(|&&roll| roll <= threshold as i32)
+        .count() as i32;
+
+    result.failures = Some(result.failures.unwrap_or(0) + failures);
+
+    // Subtract failures from successes
+    if let Some(ref mut successes) = result.successes {
+        *successes -= failures;
+    }
+
+    Ok(())
+}
+
+// Handle adding or subtracting additional dice
+fn handle_additional_dice(result: &mut RollResult, dice: &DiceRoll, modifier_type: &str, multiplier: i32) -> Result<()> {
+    let additional_result = roll_dice(dice.clone())?;
+    result
+        .individual_rolls
+        .extend(additional_result.individual_rolls.clone());
+    result.total += additional_result.total * multiplier;
+
+    // Add a new dice group for the additional dice
+    let dice_group = DiceGroup {
+        _description: format!("{}d{}", dice.count, dice.sides),
+        rolls: additional_result.individual_rolls,
+        modifier_type: modifier_type.to_string(),
+    };
+    result.dice_groups.push(dice_group);
+    Ok(())
 }
 
 fn count_wrath_glory_successes(
@@ -187,7 +224,6 @@ fn count_wrath_glory_successes(
             if first_die == 1 {
                 has_complication = true;
             }
-            // Note: We don't show critical/glory effects for soak/damage rolls
         }
 
         // Check difficulty if specified (comparing total to difficulty)
@@ -247,23 +283,28 @@ fn count_wrath_glory_successes(
         }
 
         // Add notes for wrath die effects
-        if has_complication {
-            result
-                .notes
-                .push("Wrath die rolled 1 - Complication!".to_string());
-        }
-        if has_critical {
-            result
-                .notes
-                .push("Wrath die rolled 6 - Critical/Glory!".to_string());
-        }
-
-        if has_complication || has_critical {
-            result.notes.push(format!("Wrath die: {}", wrath_die_value));
-        }
+        add_wrath_die_notes(result, has_complication, has_critical, wrath_die_value);
     }
 
     Ok(())
+}
+
+// Helper function for wrath die notes to reduce duplication
+fn add_wrath_die_notes(result: &mut RollResult, has_complication: bool, has_critical: bool, wrath_die_value: i32) {
+    if has_complication {
+        result
+            .notes
+            .push("Wrath die rolled 1 - Complication!".to_string());
+    }
+    if has_critical {
+        result
+            .notes
+            .push("Wrath die rolled 6 - Critical/Glory!".to_string());
+    }
+
+    if has_complication || has_critical {
+        result.notes.push(format!("Wrath die: {}", wrath_die_value));
+    }
 }
 
 fn explode_dice(
@@ -299,28 +340,33 @@ fn explode_dice(
     }
 
     if explosion_count > 0 {
-        // Check if this look like Dark Heresy (d10 indefinite exploding on 10)
-        if dice_sides == 10 && explode_on == 10 && indefinite {
-            // This is likely Dark Heresy righteous fury
-            if explosion_count == 1 {
-                result.notes.push(
-                    "⚔️ **RIGHTEOUS FURY!** Natural 10 rolled - additional damage!".to_string(),
-                );
-            } else {
-                result.notes.push(format!(
-                    "⚔️ **RIGHTEOUS FURY!** {} natural 10s - Emperor's wrath unleashed!",
-                    explosion_count
-                ));
-            }
-        } else {
-            // Generic exploding dice message for other systems
-            result
-                .notes
-                .push(format!("{} dice exploded", explosion_count));
-        }
+        add_explosion_notes(result, explosion_count, dice_sides, explode_on, indefinite);
     }
 
     Ok(())
+}
+
+// Helper function for explosion notes
+fn add_explosion_notes(result: &mut RollResult, explosion_count: usize, dice_sides: u32, explode_on: u32, indefinite: bool) {
+    // Check if this looks like Dark Heresy (d10 indefinite exploding on 10)
+    if dice_sides == 10 && explode_on == 10 && indefinite {
+        // This is likely Dark Heresy righteous fury
+        if explosion_count == 1 {
+            result.notes.push(
+                "⚔️ **RIGHTEOUS FURY!** Natural 10 rolled - additional damage!".to_string(),
+            );
+        } else {
+            result.notes.push(format!(
+                "⚔️ **RIGHTEOUS FURY!** {} natural 10s - Emperor's wrath unleashed!",
+                explosion_count
+            ));
+        }
+    } else {
+        // Generic exploding dice message for other systems
+        result
+            .notes
+            .push(format!("{} dice exploded", explosion_count));
+    }
 }
 
 fn drop_dice(result: &mut RollResult, count: usize) -> Result<()> {
@@ -429,52 +475,6 @@ fn reroll_dice(
         result
             .notes
             .push(format!("{} dice rerolled", total_rerolls));
-    }
-
-    Ok(())
-}
-
-fn count_successes(result: &mut RollResult, target: u32) -> Result<()> {
-    let successes = result
-        .individual_rolls
-        .iter()
-        .filter(|&&roll| roll >= target as i32)
-        .count() as i32;
-
-    result.successes = Some(result.successes.unwrap_or(0) + successes);
-    Ok(())
-}
-
-fn count_failures(result: &mut RollResult, threshold: u32) -> Result<()> {
-    let failures = result
-        .individual_rolls
-        .iter()
-        .filter(|&&roll| roll <= threshold as i32)
-        .count() as i32;
-
-    result.failures = Some(result.failures.unwrap_or(0) + failures);
-
-    // Subtract failures from successes
-    if let Some(ref mut successes) = result.successes {
-        *successes -= failures;
-    }
-
-    Ok(())
-}
-
-fn count_botches(result: &mut RollResult, threshold: u32) -> Result<()> {
-    let botches = result
-        .individual_rolls
-        .iter()
-        .filter(|&&roll| roll <= threshold as i32)
-        .count() as i32;
-
-    result.botches = Some(botches);
-
-    if botches > 0 {
-        result
-            .notes
-            .push(format!("{} dice botched (≤{})", botches, threshold));
     }
 
     Ok(())

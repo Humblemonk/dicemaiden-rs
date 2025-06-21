@@ -1,6 +1,7 @@
 mod commands;
 mod database;
 mod dice;
+mod help_text; // New shared help text module
 
 use anyhow::Result;
 use serenity::{
