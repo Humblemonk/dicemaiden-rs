@@ -128,7 +128,9 @@ RUST_LOG=debug cargo run
 ### Project Structure
 ```
 src/
-├── main.rs              # Application entry point
+├── main.rs             # Application entry point
+├── database.rs         # Sqlite db management for shard stats
+├── help_text.rs        # Help text for Help command
 ├── dice/
 │   ├── mod.rs          # Dice module exports
 │   ├── parser.rs       # Dice expression parsing
