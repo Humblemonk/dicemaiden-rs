@@ -43,7 +43,7 @@ A powerful Discord dice rolling bot written in Rust using the Serenity framework
    - Read Message History
 
 **Invite URL Template:**
-```
+```text
 https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=274878000128&scope=bot%20applications.commands
 ```
 
@@ -100,13 +100,12 @@ https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=27487
 - `GUILD_ID` - Guild ID for testing commands (optional)
 - `RUST_LOG` - Log level (default: info)
 
-### Features
-The bot includes all features by default. You can customize the build by modifying `Cargo.toml` dependencies.
+You can customize the build further by modifying `Cargo.toml` dependencies.
 
 ## Development
 
 ### Requirements
-- Rust 1.70+ 
+- Rust 1.70+
 - Discord bot token
 - A sqlite db residing in the same directory as your .env file
 
@@ -126,7 +125,7 @@ RUST_LOG=debug cargo run
 ```
 
 ### Project Structure
-```
+```text
 src/
 ├── main.rs             # Application entry point
 ├── database.rs         # Sqlite db management for shard stats
