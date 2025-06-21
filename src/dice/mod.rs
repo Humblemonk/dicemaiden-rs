@@ -68,156 +68,120 @@ pub struct RollResult {
     pub godbound_damage: Option<i32>,        // Store converted Godbound damage
 }
 
-impl fmt::Display for RollResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl RollResult {
+    /// Format the dice roll display based on whether we have dice groups or kept rolls
+    fn format_dice_display(&self) -> String {
+        if !self.dice_groups.is_empty() {
+            self.format_dice_groups()
+        } else if !self.kept_rolls.is_empty() {
+            format!(
+                "`[{}]`",
+                self.kept_rolls
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        } else {
+            String::new()
+        }
+    }
+
+    /// Format dice groups with proper separators
+    fn format_dice_groups(&self) -> String {
+        let mut output = String::new();
+        for (i, group) in self.dice_groups.iter().enumerate() {
+            if i > 0 {
+                match group.modifier_type.as_str() {
+                    "add" => output.push_str(" + "),
+                    "subtract" => output.push_str(" - "),
+                    _ => output.push(' '),
+                }
+            }
+            output.push_str(&format!(
+                "`[{}]`",
+                group
+                    .rolls
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+        output
+    }
+
+    /// Format dropped dice if any exist
+    fn format_dropped_dice(&self) -> String {
+        if self.dropped_rolls.is_empty() {
+            String::new()
+        } else {
+            format!(
+                " ~~[{}]~~",
+                self.dropped_rolls
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
+    }
+
+    /// Format the result value (damage, successes, or total)
+    fn format_result_value(&self) -> String {
+        if let Some(gb_damage) = self.godbound_damage {
+            format!("**{}** damage", gb_damage)
+        } else if let Some(successes) = self.successes {
+            let mut result = format!("**{}** successes", successes);
+            if let Some(failures) = self.failures {
+                if failures > 0 {
+                    result.push_str(&format!(" ({} failures)", failures));
+                }
+            }
+            if let Some(botches) = self.botches {
+                if botches > 0 {
+                    result.push_str(&format!(" ({} botches)", botches));
+                }
+            }
+            result
+        } else if let Some(botches) = self.botches {
+            format!("**{}** total, **{}** botches", self.total, botches)
+        } else {
+            format!("**{}**", self.total)
+        }
+    }
+
+    /// Format the complete output based on the result type
+    fn format_output(&self, show_dice: bool, show_result: bool) -> String {
         let mut output = String::new();
 
         if let Some(label) = &self.label {
             output.push_str(&format!("**{}**: ", label));
         }
 
-        // Check if no_results flag is set - show dice tally but no result total
-        if self.no_results {
-            // Show dice breakdown but no total/results
-            if !self.dice_groups.is_empty() {
+        if show_dice {
+            let dice_display = self.format_dice_display();
+            if !dice_display.is_empty() {
                 output.push_str("Roll: ");
-                for (i, group) in self.dice_groups.iter().enumerate() {
-                    if i > 0 {
-                        match group.modifier_type.as_str() {
-                            "add" => output.push_str(" + "),
-                            "subtract" => output.push_str(" - "),
-                            _ => output.push(' '),
-                        }
-                    }
-                    output.push_str(&format!(
-                        "`[{}]`",
-                        group
-                            .rolls
-                            .iter()
-                            .map(|x| x.to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ));
-                }
-            } else if !self.kept_rolls.is_empty() {
-                output.push_str(&format!(
-                    "Roll: `[{}]`",
-                    self.kept_rolls
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
-            }
-
-            // Add dropped dice if any
-            if !self.dropped_rolls.is_empty() {
-                output.push_str(&format!(
-                    " ~~[{}]~~",
-                    self.dropped_rolls
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
-            }
-            // Note: No total/results shown for nr flag
-        } else if self.simple {
-            // Simple output: show only the total/successes without dice breakdown
-            if let Some(gb_damage) = self.godbound_damage {
-                output.push_str(&format!("= **{}** damage", gb_damage));
-            } else if let Some(successes) = self.successes {
-                output.push_str(&format!("= **{}** successes", successes));
-                if let Some(failures) = self.failures {
-                    if failures > 0 {
-                        output.push_str(&format!(" ({} failures)", failures));
-                    }
-                }
-                if let Some(botches) = self.botches {
-                    if botches > 0 {
-                        output.push_str(&format!(" ({} botches)", botches));
-                    }
-                }
-            } else if let Some(botches) = self.botches {
-                output.push_str(&format!(
-                    "= **{}** total, **{}** botches",
-                    self.total, botches
-                ));
-            } else {
-                output.push_str(&format!("= **{}**", self.total));
-            }
-        } else {
-            // Full output: show dice breakdown
-            // Add dice groups if we have them, otherwise use kept_rolls
-            if !self.dice_groups.is_empty() {
-                output.push_str("Roll: ");
-                for (i, group) in self.dice_groups.iter().enumerate() {
-                    if i > 0 {
-                        match group.modifier_type.as_str() {
-                            "add" => output.push_str(" + "),
-                            "subtract" => output.push_str(" - "),
-                            _ => output.push(' '),
-                        }
-                    }
-                    output.push_str(&format!(
-                        "`[{}]`",
-                        group
-                            .rolls
-                            .iter()
-                            .map(|x| x.to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ));
-                }
-            } else if !self.kept_rolls.is_empty() {
-                output.push_str(&format!(
-                    "Roll: `[{}]`",
-                    self.kept_rolls
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
-            }
-
-            // Add dropped dice if any
-            if !self.dropped_rolls.is_empty() {
-                output.push_str(&format!(
-                    " ~~[{}]~~",
-                    self.dropped_rolls
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
-            }
-
-            // Add results after the tally
-            if let Some(gb_damage) = self.godbound_damage {
-                output.push_str(&format!(" = **{}** damage", gb_damage));
-            } else if let Some(successes) = self.successes {
-                output.push_str(&format!(" = **{}** successes", successes));
-                if let Some(failures) = self.failures {
-                    if failures > 0 {
-                        output.push_str(&format!(" ({} failures)", failures));
-                    }
-                }
-                if let Some(botches) = self.botches {
-                    if botches > 0 {
-                        output.push_str(&format!(" ({} botches)", botches));
-                    }
-                }
-            } else if let Some(botches) = self.botches {
-                // Show botches even without success system
-                output.push_str(&format!(
-                    " = **{}** total, **{}** botches",
-                    self.total, botches
-                ));
-            } else {
-                output.push_str(&format!(" = **{}**", self.total));
+                output.push_str(&dice_display);
+                output.push_str(&self.format_dropped_dice());
             }
         }
 
+        if show_result {
+            let result_value = self.format_result_value();
+            if show_dice && !self.format_dice_display().is_empty() {
+                output.push_str(&format!(" = {}", result_value));
+            } else {
+                output.push_str(&format!("= {}", result_value));
+            }
+        }
+
+        output
+    }
+
+    /// Add comment and notes to the output
+    fn add_comment_and_notes(&self, output: &mut String) {
         if let Some(comment) = &self.comment {
             output.push_str(&format!(" Reason: `{}`", comment));
         }
@@ -225,7 +189,23 @@ impl fmt::Display for RollResult {
         for note in &self.notes {
             output.push_str(&format!("\n*Note: {}*", note));
         }
+    }
+}
 
+impl fmt::Display for RollResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut output = if self.no_results {
+            // Show dice breakdown but no total/results
+            self.format_output(true, false)
+        } else if self.simple {
+            // Simple output: show only the total/successes without dice breakdown
+            self.format_output(false, true)
+        } else {
+            // Full output: show dice breakdown and results
+            self.format_output(true, true)
+        };
+
+        self.add_comment_and_notes(&mut output);
         write!(f, "{}", output)
     }
 }
@@ -263,53 +243,65 @@ pub fn format_multiple_results(results: &[RollResult]) -> String {
         && results.iter().any(|r| r.original_expression.is_some());
 
     if is_roll_set {
-        // Special formatting for roll sets - no "Request:" prefix
-        let mut output = String::new();
-        let mut total_sum = 0;
-
-        for (i, result) in results.iter().enumerate() {
-            if i > 0 {
-                output.push('\n');
-            }
-            output.push_str(&result.to_string());
-
-            // Sum based on what type of result this is
-            if let Some(gb_damage) = result.godbound_damage {
-                total_sum += gb_damage;
-            } else if let Some(successes) = result.successes {
-                total_sum += successes;
-            } else {
-                total_sum += result.total;
-            }
-        }
-
-        output.push_str(&format!("\n**Total: {}**", total_sum));
-        output
+        format_roll_set_results(results)
     } else if is_semicolon_separated {
-        // Special formatting for semicolon-separated rolls - show individual requests
-        let mut output = String::new();
-        for (i, result) in results.iter().enumerate() {
-            if i > 0 {
-                output.push('\n');
-            }
-
-            // Show the request for each individual roll
-            if let Some(expr) = &result.original_expression {
-                output.push_str(&format!("Request: `/roll {}` {}", expr, result));
-            } else {
-                output.push_str(&result.to_string());
-            }
-        }
-        output
+        format_semicolon_separated_results(results)
     } else {
-        // Original formatting for other multiple results
-        let mut output = String::new();
-        for (i, result) in results.iter().enumerate() {
-            if i > 0 {
-                output.push('\n');
-            }
+        format_standard_multiple_results(results)
+    }
+}
+
+/// Format roll set results with totals
+fn format_roll_set_results(results: &[RollResult]) -> String {
+    let mut output = String::new();
+    let mut total_sum = 0;
+
+    for (i, result) in results.iter().enumerate() {
+        if i > 0 {
+            output.push('\n');
+        }
+        output.push_str(&result.to_string());
+
+        // Sum based on what type of result this is
+        total_sum += if let Some(gb_damage) = result.godbound_damage {
+            gb_damage
+        } else if let Some(successes) = result.successes {
+            successes
+        } else {
+            result.total
+        };
+    }
+
+    output.push_str(&format!("\n**Total: {}**", total_sum));
+    output
+}
+
+/// Format semicolon-separated results showing individual requests
+fn format_semicolon_separated_results(results: &[RollResult]) -> String {
+    let mut output = String::new();
+    for (i, result) in results.iter().enumerate() {
+        if i > 0 {
+            output.push('\n');
+        }
+
+        // Show the request for each individual roll
+        if let Some(expr) = &result.original_expression {
+            output.push_str(&format!("Request: `/roll {}` {}", expr, result));
+        } else {
             output.push_str(&result.to_string());
         }
-        output
     }
+    output
+}
+
+/// Format standard multiple results
+fn format_standard_multiple_results(results: &[RollResult]) -> String {
+    let mut output = String::new();
+    for (i, result) in results.iter().enumerate() {
+        if i > 0 {
+            output.push('\n');
+        }
+        output.push_str(&result.to_string());
+    }
+    output
 }
