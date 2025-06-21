@@ -276,32 +276,34 @@ fn format_roll_set_results(results: &[RollResult]) -> String {
     output
 }
 
-/// Format semicolon-separated results showing individual requests
-fn format_semicolon_separated_results(results: &[RollResult]) -> String {
+/// Helper function to format multiple results with a custom formatter
+fn format_results_with_separator<F>(results: &[RollResult], formatter: F) -> String
+where
+    F: Fn(&RollResult) -> String,
+{
     let mut output = String::new();
     for (i, result) in results.iter().enumerate() {
         if i > 0 {
             output.push('\n');
         }
-
-        // Show the request for each individual roll
-        if let Some(expr) = &result.original_expression {
-            output.push_str(&format!("Request: `/roll {}` {}", expr, result));
-        } else {
-            output.push_str(&result.to_string());
-        }
+        output.push_str(&formatter(result));
     }
     output
 }
 
+/// Format semicolon-separated results showing individual requests
+fn format_semicolon_separated_results(results: &[RollResult]) -> String {
+    format_results_with_separator(results, |result| {
+        // Show the request for each individual roll
+        if let Some(expr) = &result.original_expression {
+            format!("Request: `/roll {}` {}", expr, result)
+        } else {
+            result.to_string()
+        }
+    })
+}
+
 /// Format standard multiple results
 fn format_standard_multiple_results(results: &[RollResult]) -> String {
-    let mut output = String::new();
-    for (i, result) in results.iter().enumerate() {
-        if i > 0 {
-            output.push('\n');
-        }
-        output.push_str(&result.to_string());
-    }
-    output
+    format_results_with_separator(results, |result| result.to_string())
 }
