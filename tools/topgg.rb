@@ -19,7 +19,8 @@ db.busy_timeout = (10_000)
 
 servers = db.execute 'select sum(server_count) from shard_stats;'
 
-RestClient.post('https://top.gg/api/bots/377701707943116800/stats', { "shard_count": total_shards, "server_count": servers.join.to_i }.to_json, { Authorization: ENV['API'], content_type: :json }) do |response, _request, _result, &block|
+RestClient.post('https://top.gg/api/bots/377701707943116800/stats',
+                { "shard_count": total_shards, "server_count": servers.join.to_i }.to_json, { Authorization: ENV['API'], content_type: :json }) do |response, _request, _result, &block|
   case response.code
   when 200
     puts 'Bot stats update successful!'

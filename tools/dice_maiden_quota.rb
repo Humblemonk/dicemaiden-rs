@@ -1,4 +1,6 @@
 #!/usr/bin/ruby
+# frozen_string_literal: true
+
 # Check current session start quota. Helpful to check how close the API token is from being reset by Discord
 
 require 'dotenv'
