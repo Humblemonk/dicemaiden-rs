@@ -22,6 +22,10 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         private: dice.private,
         godbound_damage: None,
         fudge_symbols: None,
+        // Initialize Wrath & Glory fields
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
     };
 
     // Initial dice rolls
@@ -292,15 +296,25 @@ fn count_wrath_glory_successes(
     } else {
         // Standard Wrath & Glory success counting
         let mut total_successes = 0;
+        let mut icon_count = 0;
+        let mut exalted_icon_count = 0;
 
         // In Wrath & Glory, one die is designated as the "wrath die"
         // For simplicity, we'll treat the first die as the wrath die
         for (i, &roll) in result.individual_rolls.iter().enumerate() {
             let successes = match roll {
                 1..=3 => 0, // No successes
-                4..=5 => 1, // Icons (1 success)
-                6 => 2,     // Exalted Icons (2 successes)
-                _ => 0,     // Shouldn't happen with normal dice
+                4..=5 => {
+                    // Icons (1 success)
+                    icon_count += 1;
+                    1
+                }
+                6 => {
+                    // Exalted Icons (2 successes)
+                    exalted_icon_count += 1;
+                    2
+                }
+                _ => 0, // Shouldn't happen with normal dice
             };
 
             total_successes += successes;
@@ -316,6 +330,11 @@ fn count_wrath_glory_successes(
             }
         }
 
+        // Set Wrath & Glory specific fields
+        result.wng_wrath_die = Some(wrath_die_value);
+        result.wng_icons = Some(icon_count);
+        result.wng_exalted_icons = Some(exalted_icon_count);
+
         result.successes = Some(total_successes);
         result.total = 0; // Don't use total for success-based systems
 
@@ -329,7 +348,7 @@ fn count_wrath_glory_successes(
         }
 
         // Add notes for wrath die effects
-        add_wrath_die_notes(result, has_complication, has_critical, wrath_die_value);
+        add_wrath_die_notes(result, has_complication, has_critical);
     }
 
     Ok(())
@@ -340,7 +359,7 @@ fn add_wrath_die_notes(
     result: &mut RollResult,
     has_complication: bool,
     has_critical: bool,
-    wrath_die_value: i32,
+    //wrath_die_value: i32,
 ) {
     if has_complication {
         result
@@ -353,9 +372,10 @@ fn add_wrath_die_notes(
             .push("Wrath die rolled 6 - Critical/Glory!".to_string());
     }
 
-    if has_complication || has_critical {
-        result.notes.push(format!("Wrath die: {}", wrath_die_value));
-    }
+    // old code as note is no longer needed. commenting out
+    //if has_complication || has_critical {
+    //    result.notes.push(format!("Wrath die: {}", wrath_die_value));
+    //}
 }
 
 fn apply_godbound_damage(

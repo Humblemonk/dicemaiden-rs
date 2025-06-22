@@ -76,6 +76,10 @@ pub struct RollResult {
     pub private: bool,                       // Add private flag for ephemeral responses
     pub godbound_damage: Option<i32>,        // Store converted Godbound damage
     pub fudge_symbols: Option<Vec<String>>,  // Store Fudge dice symbols
+    // Wrath & Glory specific fields
+    pub wng_wrath_die: Option<i32>, // Value of the wrath die (first die)
+    pub wng_icons: Option<i32>,     // Count of icons (4-5 results)
+    pub wng_exalted_icons: Option<i32>, // Count of exalted icons (6 results)
 }
 
 impl RollResult {
@@ -144,6 +148,17 @@ impl RollResult {
 
     /// Format the result value (damage, successes, or total)
     fn format_result_value(&self) -> String {
+        // Special handling for Wrath & Glory
+        if let (Some(wrath_die), Some(icons), Some(exalted_icons)) =
+            (self.wng_wrath_die, self.wng_icons, self.wng_exalted_icons)
+        {
+            let exalted_value = exalted_icons * 2;
+            return format!(
+                "Wrath: `{}` | TOTAL - Icons: `{}` Exalted Icons: `{}` (Value:{})",
+                wrath_die, icons, exalted_icons, exalted_value
+            );
+        }
+
         if let Some(gb_damage) = self.godbound_damage {
             format!("**{}** damage", gb_damage)
         } else if let Some(successes) = self.successes {
