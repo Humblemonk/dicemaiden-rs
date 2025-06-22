@@ -89,7 +89,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
 
             if is_private {
                 Ok(CommandResponse::private(format!(
-                    "🎲 **Private Roll** `/roll {}` {}",
+                    "🎲 **Private Roll** `{}` {}",
                     dice_expr, formatted
                 )))
             } else {
@@ -106,13 +106,13 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
                 } else if results.len() > 1 {
                     // For roll sets, add newline after request for multiple results
                     format!(
-                        "🎲 **{}** Request: `/roll {}`\n{}",
+                        "🎲 **{}** Request: `{}`\n{}",
                         command.user.name, dice_expr, formatted
                     )
                 } else {
                     // Single result stays on same line
                     format!(
-                        "🎲 **{}** Request: `/roll {}` {}",
+                        "🎲 **{}** Request: `{}` {}",
                         command.user.name, dice_expr, formatted
                     )
                 };
@@ -122,7 +122,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
         }
         Err(e) => {
             let content = format!(
-                "🎲 **{}** used `/roll {}` - ❌ **Error**: {}",
+                "🎲 **{}** used `{}` - ❌ **Error**: {}",
                 command.user.name, dice_expr, e
             );
             Ok(CommandResponse::public(content))

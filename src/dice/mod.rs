@@ -309,9 +309,9 @@ where
 /// Format semicolon-separated results showing individual requests
 fn format_semicolon_separated_results(results: &[RollResult]) -> String {
     format_results_with_separator(results, |result| {
-        // Show the request for each individual roll
+        // Show the request for each individual roll (without /roll prefix)
         if let Some(expr) = &result.original_expression {
-            format!("Request: `/roll {}` {}", expr, result)
+            format!("Request: `{}` {}", expr, result)
         } else {
             result.to_string()
         }
