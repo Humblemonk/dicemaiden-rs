@@ -38,6 +38,8 @@ This will authorize the bot for your server and you should see it in your defaul
 
 Supported dice rolls and game systems can be [found here!](roll_syntax.md)
 
+**NOTE: USERS WILL NEED THE ROLE "USE APPLICATION COMMANDS" TO USE SLASH COMMANDS**
+
 ## Local Instance Setup
 
 1. **Clone the repository**
