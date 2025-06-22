@@ -165,8 +165,8 @@ fn parse_base_dice(dice: &mut DiceRoll, part: &str) -> Result<()> {
         if dice.count > 100 {
             return Err(anyhow!("Maximum 100 dice allowed"));
         }
-        if dice.sides > 10000 {
-            return Err(anyhow!("Maximum 10000 sides allowed"));
+        if dice.sides > 1000 {
+            return Err(anyhow!("Maximum 1000 sides allowed"));
         }
         Ok(())
     } else {
