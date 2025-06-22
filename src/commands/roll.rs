@@ -83,7 +83,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
     // Parse and roll dice
     match dice::parse_and_roll(dice_expr) {
         Ok(results) => {
-            let formatted = dice::format_multiple_results(&results);
+            let formatted = dice::format_multiple_results_with_limit(&results);
 
             // Check if any roll was marked as private
             let is_private = results.iter().any(|r| r.private);
@@ -122,7 +122,29 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
                     )
                 };
 
-                Ok(CommandResponse::public(content))
+                // Check if final content exceeds Discord limit
+                if content.len() > 2000 {
+                    // Final fallback - just show the simplified result
+                    let clean_expr = strip_comment_from_expression(dice_expr);
+                    let simplified_result = if results.len() == 1 {
+                        let mut simplified = results[0].create_simplified();
+                        simplified.simple = true; // Show only result, no dice breakdown
+                        simplified.to_string()
+                    } else {
+                        format!(
+                            "**{}** total results Reason: `Simplified roll due to character limit`",
+                            results.len()
+                        )
+                    };
+
+                    let simplified_content = format!(
+                        "🎲 **{}** Request: `{}` {}",
+                        command.user.name, clean_expr, simplified_result
+                    );
+                    Ok(CommandResponse::public(simplified_content))
+                } else {
+                    Ok(CommandResponse::public(content))
+                }
             }
         }
         Err(e) => {

@@ -2,8 +2,8 @@ pub mod aliases;
 pub mod parser;
 pub mod roller;
 
-use regex::Regex;
 use anyhow::Result;
+use regex::Regex;
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -363,4 +363,53 @@ fn strip_comment_from_expression(expr: &str) -> String {
     // Use regex to remove comment (everything after ! including the !)
     let comment_regex = Regex::new(r"\s*!\s*.*$").unwrap();
     comment_regex.replace(expr, "").trim().to_string()
+}
+
+const DISCORD_MESSAGE_LIMIT: usize = 2000;
+
+impl RollResult {
+    /// Create a simplified copy of the roll result with suppressed comment and simplified output
+    pub fn create_simplified(&self) -> RollResult {
+        let mut simplified = self.clone();
+        simplified.suppress_comment = true;
+        // Clear the original comment and replace with simplified reason
+        simplified.comment = Some("Simplified roll due to character limit".to_string());
+        simplified.suppress_comment = false; // Allow the new comment to show
+        simplified
+    }
+}
+
+pub fn format_multiple_results_with_limit(results: &[RollResult]) -> String {
+    let full_output = format_multiple_results(results);
+
+    if full_output.len() > DISCORD_MESSAGE_LIMIT {
+        // Create simplified version
+        let simplified_results: Vec<RollResult> =
+            results.iter().map(|r| r.create_simplified()).collect();
+
+        if simplified_results.len() == 1 {
+            // For single results, use simple format
+            let mut simplified = simplified_results[0].clone();
+            simplified.simple = true; // Show only result, no dice breakdown
+            simplified.to_string()
+        } else {
+            // For multiple results, show simplified format
+            let is_roll_set = simplified_results.len() > 1
+                && simplified_results
+                    .iter()
+                    .all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
+
+            if is_roll_set {
+                format_roll_set_results(&simplified_results)
+            } else {
+                format_results_with_separator(&simplified_results, |result| {
+                    let mut simple_result = result.clone();
+                    simple_result.simple = true;
+                    simple_result.to_string()
+                })
+            }
+        }
+    } else {
+        full_output
+    }
 }
