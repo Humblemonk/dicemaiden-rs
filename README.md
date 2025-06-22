@@ -15,11 +15,32 @@ A powerful Discord dice rolling bot written in Rust using the Serenity framework
 - **Multiple Roll Types**: Single rolls, roll sets, and multi-roll expressions
 - **Message Management**: Purge command for cleaning up chat
 
-## Quick Start
+## Quick Install
+
+Follow the link below to add your bot to your Discord server:
+
+https://discord.com/api/oauth2/authorize?client_id=572301609305112596&permissions=274878000128&scope=bot%20applications.commands
+
+This will authorize the bot for your server and you should see it in your default public channel. The bot will have permissions to read, send and manage messages.
+
+## Commands
+
+- `/roll <dice>` - Roll dice using RPG notation
+- `/r <dice>` - Short alias for roll
+- `/help [topic]` - Show help (topics: basic, alias, system)
+- `/purge <count>` - Delete recent messages (requires permissions)
+
+## Dice Rolling Syntax
+
+### Example Dice Roll
+
+Supported dice rolls and game systems can be [found here!](roll_syntax.md)
+
+## Local Instance Setup
 
 1. **Clone the repository**
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/Humblemonk/dicemaiden-rs.git
    cd dicemaiden-rs
    ```
 
@@ -35,7 +56,7 @@ A powerful Discord dice rolling bot written in Rust using the Serenity framework
    cargo run
    ```
 
-## Discord Bot Setup
+### Discord Bot Setup
 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
 2. Create a new application and bot
@@ -51,52 +72,6 @@ A powerful Discord dice rolling bot written in Rust using the Serenity framework
 https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=274878000128&scope=bot%20applications.commands
 ```
 
-## Dice Rolling Syntax
-
-### Basic Usage
-- `/roll 2d6` - Roll two six-sided dice
-- `/roll 3d6 + 5` - Roll 3d6 and add 5
-- `/roll 4d6 k3` - Roll 4d6, keep highest 3
-
-### Modifiers
-- **Exploding**: `e6` (explode on 6), `ie6` (explode indefinitely)
-- **Keep/Drop**: `k3` (keep 3 highest), `kl2` (keep 2 lowest), `d1` (drop 1 lowest)
-- **Rerolls**: `r2` (reroll ≤2 once), `ir2` (reroll ≤2 indefinitely)
-- **Success Counting**: `t7` (count successes ≥7), `f1` (count failures ≤1)
-- **Math**: `+5`, `-3`, `*2`, `/2`
-
-### Special Features
-- **Roll Sets**: `/roll 6 4d6` (roll 6 sets of 4d6)
-- **Multi-Roll**: `/roll 2d6 ; 3d8 ; 1d20` (separate rolls)
-- **Comments**: `/roll 2d6 ! Fire damage`
-- **Labels**: `/roll (Attack) 1d20 + 5`
-
-### Game System Aliases
-
-#### D&D/Pathfinder
-- `dndstats` → 6 4d6 k3
-- `attack +5` → 1d20 +5
-- `+d20` → 2d20 k1 (advantage)
-- `-d20` → 2d20 kl1 (disadvantage)
-
-#### World of Darkness
-- `4cod` → 4d10 t8 ie10 (Chronicles of Darkness)
-- `4wod8` → 4d10 f1 ie10 t8 (World of Darkness)
-
-#### Other Systems
-- `sr6` → 6d6 t5 (Shadowrun)
-- `ex5` → 5d10 t7 t10 (Exalted)
-- `3df` → 3d3 t3 f1 (Fudge dice)
-- `age` → 2d6 + 1d6 (AGE system)
-- `ed15` → Earthdawn step 15
-
-## Commands
-
-- `/roll <dice>` - Roll dice using RPG notation
-- `/r <dice>` - Short alias for roll
-- `/help [topic]` - Show help (topics: basic, alias, system)
-- `/purge <count>` - Delete recent messages (requires permissions)
-
 ## Configuration
 
 ### Environment Variables
@@ -108,10 +83,11 @@ You can customize the build further by modifying `Cargo.toml` dependencies.
 
 ## Development
 
+
 ### Requirements
 - Rust 1.70+
 - Discord bot token
-- A sqlite db residing in the same directory as your .env file
+- SQLite database (automatically created for bot statistics)
 
 ### Building
 ```bash
@@ -131,19 +107,19 @@ RUST_LOG=debug cargo run
 ### Project Structure
 ```text
 src/
-├── main.rs             # Application entry point
-├── database.rs         # Sqlite db management for shard stats
-├── help_text.rs        # Help text for Help command
+├── main.rs             # Application entry point and Discord client setup
+├── database.rs         # SQLite database management for shard statistics
+├── help_text.rs        # Shared help text generation for all help commands
 ├── dice/
-│   ├── mod.rs          # Dice module exports
-│   ├── parser.rs       # Dice expression parsing
-│   ├── roller.rs       # Dice rolling logic
-│   └── aliases.rs      # Game system aliases
+│   ├── mod.rs          # Dice module exports and core types (DiceRoll, RollResult, etc.)
+│   ├── parser.rs       # Dice expression parsing and syntax validation
+│   ├── roller.rs       # Dice rolling execution and modifier application
+│   └── aliases.rs      # Game system aliases and expression expansions
 └── commands/
-    ├── mod.rs          # Command module exports
-    ├── roll.rs         # Roll command implementation
-    ├── help.rs         # Help command
-    └── purge.rs        # Message purge command
+    ├── mod.rs          # Command module exports and CommandResponse type
+    ├── roll.rs         # Roll command implementation with system info
+    ├── help.rs         # Help command with topic-based help system
+    └── purge.rs        # Message purge command with permission checking
 ```
 
 ## Deployment
