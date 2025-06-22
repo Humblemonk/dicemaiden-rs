@@ -41,11 +41,11 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     for modifier in &dice.modifiers {
         match modifier {
             Modifier::Explode(threshold) => {
-                explode_dice(&mut result, &mut rng, *threshold, dice.sides, false)?;
+                explode_dice(&mut result, &mut rng, *threshold, dice.sides, false, &dice)?;
                 update_base_group(&mut result);
             }
             Modifier::ExplodeIndefinite(threshold) => {
-                explode_dice(&mut result, &mut rng, *threshold, dice.sides, true)?;
+                explode_dice(&mut result, &mut rng, *threshold, dice.sides, true, &dice)?;
                 update_base_group(&mut result);
             }
             Modifier::Reroll(threshold) => {
@@ -424,6 +424,7 @@ fn explode_dice(
     threshold: Option<u32>,
     dice_sides: u32,
     indefinite: bool,
+    dice: &DiceRoll, // Add this parameter
 ) -> Result<()> {
     let explode_on = threshold.unwrap_or(dice_sides);
 
@@ -451,7 +452,14 @@ fn explode_dice(
     }
 
     if explosion_count > 0 {
-        add_explosion_notes(result, explosion_count, dice_sides, explode_on, indefinite);
+        add_explosion_notes(
+            result,
+            explosion_count,
+            dice_sides,
+            explode_on,
+            indefinite,
+            dice,
+        );
     }
 
     Ok(())
@@ -464,10 +472,22 @@ fn add_explosion_notes(
     dice_sides: u32,
     explode_on: u32,
     indefinite: bool,
+    dice: &DiceRoll, // Add this parameter
 ) {
-    // Check if this looks like Dark Heresy (d10 indefinite exploding on 10)
-    if dice_sides == 10 && explode_on == 10 && indefinite {
-        // This is likely Dark Heresy righteous fury
+    // Check if this has success counting modifiers (Chronicles of Darkness, etc.)
+    let has_success_modifiers = dice.modifiers.iter().any(|m| {
+        matches!(
+            m,
+            Modifier::Target(_) | Modifier::Failure(_) | Modifier::WrathGlory(_, _)
+        )
+    });
+
+    // Only show Dark Heresy messages for d10s exploding on 10s WITHOUT success counting
+    let is_dark_heresy =
+        dice_sides == 10 && explode_on == 10 && indefinite && !has_success_modifiers;
+
+    if is_dark_heresy {
+        // Dark Heresy righteous fury
         if explosion_count == 1 {
             result
                 .notes
@@ -479,10 +499,14 @@ fn add_explosion_notes(
             ));
         }
     } else {
-        // Generic exploding dice message for other systems
-        result
-            .notes
-            .push(format!("{} dice exploded", explosion_count));
+        // Generic exploding dice message for other systems (including Chronicles of Darkness)
+        if explosion_count == 1 {
+            result.notes.push("1 die exploded".to_string());
+        } else {
+            result
+                .notes
+                .push(format!("{} dice exploded", explosion_count));
+        }
     }
 }
 
