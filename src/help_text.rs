@@ -57,6 +57,8 @@ pub fn generate_alias_help() -> String {
 • `save +3` → 1d20 +3
 • `+d20` → 2d20 k1 (advantage)
 • `-d20` → 2d20 kl1 (disadvantage)
+• `+d%` → Percentile advantage (roll-under systems)
+• `-d%` → Percentile disadvantage (roll-under systems)
 
 **Hero System 5th Edition:**
 • `2hsn` → 2d6 hsn (normal damage)
@@ -96,6 +98,16 @@ Use `/roll help system` for specific examples!"#
 
 pub fn generate_system_help() -> String {
     r#"🎲 **Game System Examples** 🎲
+
+**Percentile Advantage/Disadvantage:**
+• `/roll +d%` - Percentile advantage for roll-under systems (Call of Cthulhu, etc.)
+• `/roll -d%` - Percentile disadvantage for roll-under systems
+
+**Percentile System Details:**
+For roll-under systems (like Call of Cthulhu), percentile advantage/disadvantage works by:
+• **Advantage (+d%)**: Roll 2d10 for tens digit, keep lowest + 1d10 for ones
+• **Disadvantage (-d%)**: Roll 2d10 for tens digit, keep highest + 1d10 for ones
+• Lower results are better in roll-under systems, so advantage keeps the lower tens die
 
 **Fudge/FATE Dice:**
 • `/roll 3df` - 3 Fudge dice showing symbols: + (plus), (blank), - (minus)

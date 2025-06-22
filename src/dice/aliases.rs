@@ -15,6 +15,14 @@ pub fn expand_alias(input: &str) -> Option<String> {
 }
 
 fn expand_parameterized_alias(input: &str) -> Option<String> {
+    // Handle percentile advantage/disadvantage FIRST before general advantage/disadvantage
+    if input == "+d%" {
+        return Some("2d10 kl1 * 10 + 1d10 - 10".to_string());
+    }
+    if input == "-d%" {
+        return Some("2d10 k1 * 10 + 1d10 - 10".to_string());
+    }
+
     // Godbound system - full dice expressions (gb 3d8, gbs 2d10, etc.)
     let gb_dice_regex = Regex::new(r"^(gbs?)\s+(\d+)d(\d+)(?:\s*([+-]\s*\d+))?$").unwrap();
     if let Some(captures) = gb_dice_regex.captures(input) {
@@ -124,31 +132,17 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some(format!("1d{} * 10 + 1d{}", tens, ones));
     }
 
-    // Advantage/Disadvantage (+d20, -d20, etc.)
-    let adv_regex = Regex::new(r"^([+-])d(\d+|%)$").unwrap();
+    // General advantage/disadvantage (+d20, -d20, etc.) but NOT +d% or -d%
+    let adv_regex = Regex::new(r"^([+-])d(\d+)$").unwrap();
     if let Some(captures) = adv_regex.captures(input) {
         let modifier = &captures[1];
         let sides = &captures[2];
 
-        let dice_sides = if sides == "%" {
-            "100".to_string()
-        } else {
-            sides.to_string()
-        };
-
         return Some(match modifier {
-            "+" => format!("2d{} k1", dice_sides),  // advantage
-            "-" => format!("2d{} kl1", dice_sides), // disadvantage
+            "+" => format!("2d{} k1", sides),  // advantage
+            "-" => format!("2d{} kl1", sides), // disadvantage
             _ => return None,
         });
-    }
-
-    // Percentile advantage/disadvantage
-    if input == "+d%" {
-        return Some("2d10 kl1 * 10 + 1d10".to_string());
-    }
-    if input == "-d%" {
-        return Some("2d10 k1 * 10 + 1d10".to_string());
     }
 
     // Simple percentile (xd% -> xd100)
