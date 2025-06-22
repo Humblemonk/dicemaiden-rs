@@ -34,6 +34,8 @@ This will authorize the bot for your server and you should see it in your defaul
 
 ### Example Dice Roll
 
+![readme](https://github.com/user-attachments/assets/0371ff72-e3da-4400-9e1b-8063ef8554a7)
+
 Supported dice rolls and game systems can be [found here!](roll_syntax.md)
 
 ## Local Instance Setup
