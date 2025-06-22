@@ -31,7 +31,7 @@ impl CommandResponse {
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("roll")
-        .description("Roll dice using standard RPG notation")
+        .description("Ask Dice Maiden to roll some dice!")
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,

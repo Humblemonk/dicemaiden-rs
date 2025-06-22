@@ -34,42 +34,57 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
-        info!("{} is connected!", ready.user.name);
+        info!(
+            "{} is connected on shard {}!",
+            ready.user.name, ctx.shard_id
+        );
+
+        // Set the bot's activity status to "Listening to /roll"
+        let activity = ActivityData::listening("/roll");
+        ctx.set_activity(Some(activity));
+
+        // Only log this once from shard 0 to avoid spam
+        if ctx.shard_id.0 == 0 {
+            info!("Bot activity set to 'Listening to /roll'");
+        }
 
         let guild_id = env::var("GUILD_ID")
             .ok()
             .and_then(|id| id.parse().ok())
             .map(GuildId::new);
 
-        // Register slash commands globally (or to a specific guild for testing)
-        let commands = if let Some(guild_id) = guild_id {
-            // Guild-specific commands for testing
-            let commands = vec![
-                commands::roll::register(),
-                commands::roll::register_r_alias(),
-                commands::help::register(),
-                commands::purge::register(),
-            ];
+        // Only register commands from shard 0 to avoid conflicts
+        if ctx.shard_id.0 == 0 {
+            // Register slash commands globally (or to a specific guild for testing)
+            let commands = if let Some(guild_id) = guild_id {
+                // Guild-specific commands for testing
+                let commands = vec![
+                    commands::roll::register(),
+                    commands::roll::register_r_alias(),
+                    commands::help::register(),
+                    commands::purge::register(),
+                ];
 
-            guild_id.set_commands(&ctx.http, commands).await
-        } else {
-            // Global commands
-            let commands = vec![
-                commands::roll::register(),
-                commands::roll::register_r_alias(),
-                commands::help::register(),
-                commands::purge::register(),
-            ];
+                guild_id.set_commands(&ctx.http, commands).await
+            } else {
+                // Global commands
+                let commands = vec![
+                    commands::roll::register(),
+                    commands::roll::register_r_alias(),
+                    commands::help::register(),
+                    commands::purge::register(),
+                ];
 
-            Command::set_global_commands(&ctx.http, commands).await
-        };
+                Command::set_global_commands(&ctx.http, commands).await
+            };
 
-        match commands {
-            Ok(commands) => {
-                info!("Registered {} slash commands", commands.len());
-            }
-            Err(e) => {
-                error!("Failed to register slash commands: {}", e);
+            match commands {
+                Ok(commands) => {
+                    info!("Registered {} slash commands", commands.len());
+                }
+                Err(e) => {
+                    error!("Failed to register slash commands: {}", e);
+                }
             }
         }
     }
@@ -134,6 +149,22 @@ async fn main() -> Result<()> {
 
     let token = env::var("DISCORD_TOKEN").expect("Expected DISCORD_TOKEN in environment");
 
+    // Configure the number of shards (must be a multiple of 16 for large bot sharding)
+    let shard_count = env::var("SHARD_COUNT")
+        .ok()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(1); // Default to 1 shard for smaller bots
+
+    // Validate that shard count is a multiple of 16 for large bot sharding
+    if shard_count % 16 != 0 {
+        warn!("SHARD_COUNT ({}) is not a multiple of 16. This is required for Discord's large bot sharding.", shard_count);
+        warn!(
+            "Consider using 16, 32, 48, 64, etc. shards if you need large bot sharding approval."
+        );
+    }
+
+    info!("Configuring bot with {} shards", shard_count);
+
     let http = Http::new(&token);
     let (_owners, _bot_id) = match http.get_current_application_info().await {
         Ok(info) => {
@@ -151,16 +182,15 @@ async fn main() -> Result<()> {
         Err(why) => panic!("Could not access application info: {:?}", why),
     };
 
-    let intents = GatewayIntents::GUILD_MESSAGES
-        | GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT
-        | GatewayIntents::GUILDS;
+    let intents = GatewayIntents::GUILDS;
 
+    // Create client with explicit shard configuration
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler)
         .await
         .expect("Error creating client");
 
+    // Configure sharding after client creation
     {
         let mut data = client.data.write().await;
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
@@ -195,14 +225,17 @@ async fn main() -> Result<()> {
 
     // Run the client with graceful shutdown
     let client_handle = tokio::spawn(async move {
-        if let Err(why) = client.start().await {
+        if let Err(why) = client.start_shards(shard_count).await {
             error!("Client error: {:?}", why);
         }
         info!("Discord client stopped");
     });
 
     // Wait for shutdown signal
-    info!("Dice Maiden is running. Press Ctrl+C to shut down gracefully.");
+    info!(
+        "Dice Maiden is running with {} shards. Press Ctrl+C to shut down gracefully.",
+        shard_count
+    );
     shutdown_signal.await;
 
     info!("Shutdown signal received, initiating graceful shutdown...");
@@ -212,8 +245,8 @@ async fn main() -> Result<()> {
         warn!("Error broadcasting shutdown signal: {}", e);
     }
 
-    // Wait for background tasks with timeout
-    let shutdown_timeout = Duration::from_secs(10);
+    // Wait for background tasks with timeout (longer for multiple shards)
+    let shutdown_timeout = Duration::from_secs(30); // Increased from 10 to 30 seconds
 
     tokio::select! {
         _ = stats_handle => {
@@ -292,38 +325,50 @@ async fn collect_shard_stats_with_shutdown(
         };
 
         // Get shard information
-        let shard_info = shard_manager.runners.lock().await;
+        let shard_info = match shard_manager.runners.lock().await {
+            shard_runners => shard_runners,
+        };
 
         if shard_info.is_empty() {
             // No shards running yet, wait for next interval
             continue;
         }
 
+        let total_shards = shard_info.len();
+
         // Iterate through all active shards
         for (&shard_id, shard_runner) in shard_info.iter() {
-            // Check if this shard is connected
+            // Check if this shard is connected (skip if shutting down)
             if shard_runner.stage != serenity::gateway::ConnectionStage::Connected {
                 continue;
             }
 
-            // Get guilds for this specific shard
+            // Get guilds for this specific shard (with error handling for shutdown)
             let shard_guild_count = cache
                 .guilds()
                 .iter()
                 .filter(|guild_id| {
                     // Calculate which shard this guild belongs to
                     // Discord uses: (guild_id >> 22) % num_shards
-                    let guild_shard_id = (guild_id.get() >> 22) % shard_info.len() as u64;
+                    let guild_shard_id = (guild_id.get() >> 22) % total_shards as u64;
                     guild_shard_id == shard_id.0 as u64
                 })
                 .count() as i32;
 
-            // Update stats for this shard
+            // Update stats for this shard (continue on error during shutdown)
             if let Err(e) = db
                 .update_shard_stats(shard_id.0 as i32, shard_guild_count, memory_usage)
                 .await
             {
-                error!("Failed to update shard {} stats: {}", shard_id.0, e);
+                // During shutdown, database errors are expected, so just log them at debug level
+                if shard_runner.stage == serenity::gateway::ConnectionStage::Connected {
+                    error!("Failed to update shard {} stats: {}", shard_id.0, e);
+                } else {
+                    warn!(
+                        "Shard {} stats update failed during shutdown: {}",
+                        shard_id.0, e
+                    );
+                }
             } else {
                 info!(
                     "Updated shard {} stats: {} servers, {:.2} MB memory",
@@ -334,7 +379,6 @@ async fn collect_shard_stats_with_shutdown(
 
         // Also log total stats
         let total_guilds = cache.guilds().len();
-        let total_shards = shard_info.len();
         info!(
             "Total stats: {} shards, {} servers, {:.2} MB memory",
             total_shards, total_guilds, memory_usage
