@@ -12,7 +12,7 @@ cwd = File.expand_path(File.join(File.dirname(__FILE__), %w[../]))
 
 Dotenv.load("#{cwd}/.env")
 
-total_shards = ENV['SHARD'].to_i
+total_shards = ENV['SHARD_COUNT'].to_i
 
 db = SQLite3::Database.new "#{cwd}/main.db"
 db.busy_timeout = (10_000)
