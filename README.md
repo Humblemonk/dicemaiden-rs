@@ -19,7 +19,7 @@ A powerful Discord dice rolling bot written in Rust using the Serenity framework
 
 Follow the link below to add your bot to your Discord server:
 
-https://discord.com/api/oauth2/authorize?client_id=572301609305112596&permissions=274878000128&scope=bot%20applications.commands
+<https://discord.com/api/oauth2/authorize?client_id=572301609305112596&permissions=274878000128&scope=bot%20applications.commands>
 
 This will authorize the bot for your server and you should see it in your default public channel. The bot will have permissions to read, send and manage messages.
 
