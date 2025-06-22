@@ -348,6 +348,9 @@ async fn collect_shard_stats_with_shutdown(
     let mut interval = interval(Duration::from_secs(300)); // 5 minutes
     let mut system = System::new_all();
 
+    // Get current process PID once (all shards share the same process)
+    let current_pid = std::process::id();
+
     loop {
         select! {
             _ = interval.tick() => {
@@ -359,16 +362,8 @@ async fn collect_shard_stats_with_shutdown(
             }
         }
 
-        // Refresh system information
+        // Refresh system information (only needed for shard 0)
         system.refresh_all();
-
-        // Get current process memory usage in MB
-        let current_pid = std::process::id();
-        let memory_usage = if let Some(process) = system.process(Pid::from_u32(current_pid)) {
-            process.memory() as f64 / 1024.0 / 1024.0 // Convert from KB to MB
-        } else {
-            0.0
-        };
 
         // Get shard information
         let shard_info = match shard_manager.runners.lock().await {
@@ -401,6 +396,19 @@ async fn collect_shard_stats_with_shutdown(
                 })
                 .count() as i32;
 
+            // Calculate memory usage - ONLY for shard 0, all others report 0
+            let memory_usage = if shard_id.0 == 0 {
+                // Only shard 0 reports actual memory usage
+                if let Some(process) = system.process(Pid::from_u32(current_pid)) {
+                    process.memory() as f64 / 1024.0 / 1024.0 // Convert from KB to MB
+                } else {
+                    0.0
+                }
+            } else {
+                // All other shards report 0 memory usage
+                0.0
+            };
+
             // Update stats for this shard (continue on error during shutdown)
             if let Err(e) = db
                 .update_shard_stats(shard_id.0 as i32, shard_guild_count, memory_usage)
@@ -416,18 +424,33 @@ async fn collect_shard_stats_with_shutdown(
                     );
                 }
             } else {
-                info!(
-                    "Updated shard {} stats: {} servers, {:.2} MB memory",
-                    shard_id.0, shard_guild_count, memory_usage
-                );
+                if shard_id.0 == 0 {
+                    // Only log memory for shard 0
+                    info!(
+                        "Updated shard {} stats: {} servers, {:.2} MB memory",
+                        shard_id.0, shard_guild_count, memory_usage
+                    );
+                } else {
+                    // Log without memory for other shards
+                    info!(
+                        "Updated shard {} stats: {} servers",
+                        shard_id.0, shard_guild_count
+                    );
+                }
             }
         }
 
-        // Also log total stats
+        // Also log total stats (only calculate actual memory for the total)
         let total_guilds = cache.guilds().len();
+        let total_memory = if let Some(process) = system.process(Pid::from_u32(current_pid)) {
+            process.memory() as f64 / 1024.0 / 1024.0 // Convert from KB to MB
+        } else {
+            0.0
+        };
+
         info!(
             "Total stats: {} shards, {} servers, {:.2} MB memory",
-            total_shards, total_guilds, memory_usage
+            total_shards, total_guilds, total_memory
         );
     }
 

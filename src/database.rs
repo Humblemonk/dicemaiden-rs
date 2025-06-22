@@ -79,7 +79,7 @@ impl Database {
 
     pub async fn get_all_shard_stats(&self) -> Result<Vec<ShardStats>> {
         let rows = sqlx::query(
-            "SELECT shard_id, server_count, timestamp, mem FROM shard_stats ORDER BY shard_id",
+            "SELECT shard_id, server_count, timestamp, mem FROM shard_stats ORDER BY timestamp DESC",
         )
         .fetch_all(&self.pool)
         .await?;
