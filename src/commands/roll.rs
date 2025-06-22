@@ -1,6 +1,7 @@
 use crate::dice;
 use crate::help_text; // Import the shared help text module from src root
 use anyhow::Result;
+use regex::Regex;
 use serenity::{
     all::{CommandDataOptionValue, CommandInteraction, CommandOptionType},
     builder::{CreateCommand, CreateCommandOption},
@@ -88,9 +89,11 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
             let is_private = results.iter().any(|r| r.private);
 
             if is_private {
+                // For private rolls, strip comment from request display
+                let clean_expr = strip_comment_from_expression(dice_expr);
                 Ok(CommandResponse::private(format!(
                     "🎲 **Private Roll** `{}` {}",
-                    dice_expr, formatted
+                    clean_expr, formatted
                 )))
             } else {
                 // Check if this has multiple results that are semicolon-separated
@@ -104,16 +107,18 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
                     // For semicolon-separated rolls, the formatted string already contains individual requests
                     format!("🎲 **{}** {}", command.user.name, formatted)
                 } else if results.len() > 1 {
-                    // For roll sets, add newline after request for multiple results
+                    // For roll sets, strip comment from request display
+                    let clean_expr = strip_comment_from_expression(dice_expr);
                     format!(
                         "🎲 **{}** Request: `{}`\n{}",
-                        command.user.name, dice_expr, formatted
+                        command.user.name, clean_expr, formatted
                     )
                 } else {
-                    // Single result stays on same line
+                    // Single result, strip comment from request display
+                    let clean_expr = strip_comment_from_expression(dice_expr);
                     format!(
                         "🎲 **{}** Request: `{}` {}",
-                        command.user.name, dice_expr, formatted
+                        command.user.name, clean_expr, formatted
                     )
                 };
 
@@ -121,9 +126,10 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
             }
         }
         Err(e) => {
+            let clean_expr = strip_comment_from_expression(dice_expr);
             let content = format!(
                 "🎲 **{}** used `{}` - ❌ **Error**: {}",
-                command.user.name, dice_expr, e
+                command.user.name, clean_expr, e
             );
             Ok(CommandResponse::public(content))
         }
@@ -195,4 +201,10 @@ async fn get_database_stats(ctx: &Context) -> String {
     } else {
         "**Database Stats:** Not available\n".to_string()
     }
+}
+
+fn strip_comment_from_expression(expr: &str) -> String {
+    // Use regex to remove comment (everything after ! including the !)
+    let comment_regex = Regex::new(r"\s*!\s*.*$").unwrap();
+    comment_regex.replace(expr, "").trim().to_string()
 }

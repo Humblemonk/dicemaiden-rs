@@ -2,6 +2,7 @@ pub mod aliases;
 pub mod parser;
 pub mod roller;
 
+use regex::Regex;
 use anyhow::Result;
 use std::fmt;
 
@@ -80,6 +81,7 @@ pub struct RollResult {
     pub wng_wrath_die: Option<i32>, // Value of the wrath die (first die)
     pub wng_icons: Option<i32>,     // Count of icons (4-5 results)
     pub wng_exalted_icons: Option<i32>, // Count of exalted icons (6 results)
+    pub suppress_comment: bool,
 }
 
 impl RollResult {
@@ -212,8 +214,11 @@ impl RollResult {
 
     /// Add comment and notes to the output
     fn add_comment_and_notes(&self, output: &mut String) {
-        if let Some(comment) = &self.comment {
-            output.push_str(&format!(" Reason: `{}`", comment));
+        // Only add comment if not suppressed
+        if !self.suppress_comment {
+            if let Some(comment) = &self.comment {
+                output.push_str(&format!(" Reason: `{}`", comment));
+            }
         }
 
         for note in &self.notes {
@@ -281,16 +286,24 @@ pub fn format_multiple_results(results: &[RollResult]) -> String {
     }
 }
 
-/// Format roll set results with totals
+/// Format roll set results with totals and single comment display
 fn format_roll_set_results(results: &[RollResult]) -> String {
     let mut output = String::new();
     let mut total_sum = 0;
+
+    // Extract the comment from the first roll to show once for the entire set
+    let set_comment = results.first().and_then(|r| r.comment.as_ref());
 
     for (i, result) in results.iter().enumerate() {
         if i > 0 {
             output.push('\n');
         }
-        output.push_str(&result.to_string());
+
+        // Create a copy with suppressed comment for individual display
+        let mut display_result = result.clone();
+        display_result.suppress_comment = true;
+
+        output.push_str(&display_result.to_string());
 
         // Sum based on what type of result this is
         total_sum += if let Some(gb_damage) = result.godbound_damage {
@@ -303,6 +316,12 @@ fn format_roll_set_results(results: &[RollResult]) -> String {
     }
 
     output.push_str(&format!("\n**Total: {}**", total_sum));
+
+    // Add the comment once for the entire set
+    if let Some(comment) = set_comment {
+        output.push_str(&format!(" Reason: `{}`", comment));
+    }
+
     output
 }
 
@@ -324,9 +343,10 @@ where
 /// Format semicolon-separated results showing individual requests
 fn format_semicolon_separated_results(results: &[RollResult]) -> String {
     format_results_with_separator(results, |result| {
-        // Show the request for each individual roll (without /roll prefix)
+        // Show the request for each individual roll (without /roll prefix and without comment)
         if let Some(expr) = &result.original_expression {
-            format!("Request: `{}` {}", expr, result)
+            let clean_expr = strip_comment_from_expression(expr);
+            format!("Request: `{}` {}", clean_expr, result)
         } else {
             result.to_string()
         }
@@ -336,4 +356,11 @@ fn format_semicolon_separated_results(results: &[RollResult]) -> String {
 /// Format standard multiple results
 fn format_standard_multiple_results(results: &[RollResult]) -> String {
     format_results_with_separator(results, |result| result.to_string())
+}
+
+/// Extract the dice expression without the comment portion
+fn strip_comment_from_expression(expr: &str) -> String {
+    // Use regex to remove comment (everything after ! including the !)
+    let comment_regex = Regex::new(r"\s*!\s*.*$").unwrap();
+    comment_regex.replace(expr, "").trim().to_string()
 }

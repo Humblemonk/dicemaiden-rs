@@ -29,23 +29,51 @@ impl TypeMapKey for DatabaseContainer {
     type Value = Arc<database::Database>;
 }
 
-struct Handler;
+struct Handler {
+    shard_count: u32,
+    connected_shards: Arc<std::sync::atomic::AtomicU32>,
+}
+
+impl Handler {
+    fn new(shard_count: u32) -> Self {
+        Self {
+            shard_count,
+            connected_shards: Arc::new(std::sync::atomic::AtomicU32::new(0)),
+        }
+    }
+}
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, ctx: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, _ready: Ready) {
+        let connected = self
+            .connected_shards
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+            + 1;
+
         info!(
-            "{} is connected on shard {}!",
-            ready.user.name, ctx.shard_id
+            "Shard {} connected! ({}/{} shards ready)",
+            ctx.shard_id.0, connected, self.shard_count
         );
+
+        // Log progress milestones
+        if connected % 25 == 0 || connected == self.shard_count {
+            info!(
+                "Startup progress: {}/{} shards connected ({:.1}%)",
+                connected,
+                self.shard_count,
+                (connected as f32 / self.shard_count as f32) * 100.0
+            );
+        }
 
         // Set the bot's activity status to "Listening to /roll"
         let activity = ActivityData::listening("/roll");
         ctx.set_activity(Some(activity));
 
-        // Only log this once from shard 0 to avoid spam
+        // Only do initial setup from shard 0
         if ctx.shard_id.0 == 0 {
             info!("Bot activity set to 'Listening to /roll'");
+            info!("Starting command registration...");
         }
 
         let guild_id = env::var("GUILD_ID")
@@ -80,12 +108,20 @@ impl EventHandler for Handler {
 
             match commands {
                 Ok(commands) => {
-                    info!("Registered {} slash commands", commands.len());
+                    info!("Successfully registered {} slash commands", commands.len());
                 }
                 Err(e) => {
                     error!("Failed to register slash commands: {}", e);
                 }
             }
+        }
+
+        // Log when all shards are ready
+        if connected == self.shard_count {
+            info!(
+                "All {} shards are now connected and ready!",
+                self.shard_count
+            );
         }
     }
 
@@ -186,7 +222,7 @@ async fn main() -> Result<()> {
 
     // Create client with explicit shard configuration
     let mut client = Client::builder(&token, intents)
-        .event_handler(Handler)
+        .event_handler(Handler::new(shard_count))
         .await
         .expect("Error creating client");
 
@@ -232,10 +268,20 @@ async fn main() -> Result<()> {
     });
 
     // Wait for shutdown signal
-    info!(
-        "Dice Maiden is running with {} shards. Press Ctrl+C to shut down gracefully.",
-        shard_count
-    );
+    if shard_count > 1 {
+        info!("Dice Maiden is starting with {} shards. This may take a few minutes for all shards to connect...", shard_count);
+        info!(
+            "Expected startup time: ~{} minutes for {} shards",
+            (shard_count as f32 / 60.0).ceil() as u32,
+            shard_count
+        );
+    } else {
+        info!(
+            "Dice Maiden is running with {} shard. Press Ctrl+C to shut down gracefully.",
+            shard_count
+        );
+    }
+
     shutdown_signal.await;
 
     info!("Shutdown signal received, initiating graceful shutdown...");
@@ -246,7 +292,7 @@ async fn main() -> Result<()> {
     }
 
     // Wait for background tasks with timeout (longer for multiple shards)
-    let shutdown_timeout = Duration::from_secs(30); // Increased from 10 to 30 seconds
+    let shutdown_timeout = Duration::from_secs(5);
 
     tokio::select! {
         _ = stats_handle => {

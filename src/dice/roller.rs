@@ -26,6 +26,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         wng_wrath_die: None,
         wng_icons: None,
         wng_exalted_icons: None,
+        suppress_comment: false,
     };
 
     // Initial dice rolls
