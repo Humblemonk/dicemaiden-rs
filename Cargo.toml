@@ -13,7 +13,7 @@ serenity = { version = "0.12", default-features = false, features = [
     "standard_framework",
     "builder",
 ] }
-tokio = { version = "1.21.2", features = ["macros", "rt-multi-thread", "signal"] }
+tokio = { version = "1.21.2", features = ["full","signal"] }
 rand = "0.8"
 regex = "1.10"
 nom = "7.1"

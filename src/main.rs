@@ -1,7 +1,7 @@
 mod commands;
 mod database;
 mod dice;
-mod help_text; // New shared help text module
+mod help_text;
 
 use anyhow::Result;
 use serenity::{
@@ -9,8 +9,13 @@ use serenity::{
 };
 use std::{collections::HashSet, env, sync::Arc, time::Duration};
 use sysinfo::{Pid, System};
-use tokio::time::interval;
-use tracing::{error, info};
+use tokio::{
+    select,
+    signal::unix::{signal, SignalKind},
+    sync::broadcast,
+    time::interval,
+};
+use tracing::{error, info, warn};
 
 pub struct ShardManagerContainer;
 
@@ -74,20 +79,14 @@ impl EventHandler for Handler {
             let response = match command.data.name.as_str() {
                 "roll" => commands::roll::run(&ctx, &command).await,
                 "r" => commands::roll::run(&ctx, &command).await,
-                "help" => {
-                    // Convert help command response to the new format
-                    match commands::help::run(&ctx, &command).await {
-                        Ok(content) => Ok(commands::CommandResponse::public(content)),
-                        Err(e) => Err(e),
-                    }
-                }
-                "purge" => {
-                    // Convert purge command response to the new format
-                    match commands::purge::run(&ctx, &command).await {
-                        Ok(content) => Ok(commands::CommandResponse::public(content)),
-                        Err(e) => Err(e),
-                    }
-                }
+                "help" => match commands::help::run(&ctx, &command).await {
+                    Ok(content) => Ok(commands::CommandResponse::public(content)),
+                    Err(e) => Err(e),
+                },
+                "purge" => match commands::purge::run(&ctx, &command).await {
+                    Ok(content) => Ok(commands::CommandResponse::public(content)),
+                    Err(e) => Err(e),
+                },
                 _ => Ok(commands::CommandResponse::public(
                     "Unknown command".to_string(),
                 )),
@@ -104,7 +103,6 @@ impl EventHandler for Handler {
                 }
             };
 
-            // Create the response with appropriate ephemeral setting
             let mut response_message = serenity::builder::CreateInteractionResponseMessage::new()
                 .content(response_content);
 
@@ -128,7 +126,6 @@ impl EventHandler for Handler {
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv::dotenv().ok();
-
     tracing_subscriber::fmt::init();
 
     // Initialize database
@@ -170,41 +167,118 @@ async fn main() -> Result<()> {
         data.insert::<DatabaseContainer>(Arc::clone(&db));
     }
 
+    // Create shutdown broadcast channel
+    let (shutdown_tx, _) = broadcast::channel::<()>(1);
+
     let shard_manager = Arc::clone(&client.shard_manager);
     let db_clone = Arc::clone(&db);
     let cache_clone = Arc::clone(&client.cache);
+    let stats_shutdown_rx = shutdown_tx.subscribe();
 
-    // Start the statistics collection task with shard manager for multi-shard support
-    tokio::spawn(async move {
-        collect_shard_stats(db_clone, cache_clone, shard_manager).await;
+    // Start the statistics collection task with graceful shutdown
+    let stats_handle = tokio::spawn(async move {
+        if let Err(e) = collect_shard_stats_with_shutdown(
+            db_clone,
+            cache_clone,
+            shard_manager,
+            stats_shutdown_rx,
+        )
+        .await
+        {
+            error!("Statistics collection error: {}", e);
+        }
+        info!("Statistics collection task stopped");
     });
 
-    let _shard_manager = Arc::clone(&client.shard_manager);
+    // Setup signal handlers for graceful shutdown
+    let shutdown_signal = setup_signal_handlers(shutdown_tx.clone());
 
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Could not register ctrl+c handler");
-        _shard_manager.shutdown_all().await;
+    // Run the client with graceful shutdown
+    let client_handle = tokio::spawn(async move {
+        if let Err(why) = client.start().await {
+            error!("Client error: {:?}", why);
+        }
+        info!("Discord client stopped");
     });
 
-    if let Err(why) = client.start().await {
-        error!("Client error: {:?}", why);
+    // Wait for shutdown signal
+    info!("Dice Maiden is running. Press Ctrl+C to shut down gracefully.");
+    shutdown_signal.await;
+
+    info!("Shutdown signal received, initiating graceful shutdown...");
+
+    // Broadcast shutdown to all tasks
+    if let Err(e) = shutdown_tx.send(()) {
+        warn!("Error broadcasting shutdown signal: {}", e);
     }
 
+    // Wait for background tasks with timeout
+    let shutdown_timeout = Duration::from_secs(10);
+
+    tokio::select! {
+        _ = stats_handle => {
+            info!("Statistics task finished");
+        }
+        _ = tokio::time::sleep(shutdown_timeout) => {
+            warn!("Statistics task did not finish within timeout, continuing shutdown");
+        }
+    }
+
+    // Shutdown Discord client
+    tokio::select! {
+        _ = client_handle => {
+            info!("Discord client finished");
+        }
+        _ = tokio::time::sleep(shutdown_timeout) => {
+            warn!("Discord client did not finish within timeout, continuing shutdown");
+        }
+    }
+
+    info!("Graceful shutdown completed");
     Ok(())
 }
 
-async fn collect_shard_stats(
+async fn setup_signal_handlers(shutdown_tx: broadcast::Sender<()>) {
+    let mut sigterm = signal(SignalKind::terminate()).expect("Failed to register SIGTERM handler");
+    let mut sigint = signal(SignalKind::interrupt()).expect("Failed to register SIGINT handler");
+
+    select! {
+        _ = sigterm.recv() => {
+            info!("Received SIGTERM");
+        }
+        _ = sigint.recv() => {
+            info!("Received SIGINT");
+        }
+        _ = tokio::signal::ctrl_c() => {
+            info!("Received Ctrl+C");
+        }
+    }
+
+    // Send shutdown signal to all tasks
+    if let Err(e) = shutdown_tx.send(()) {
+        error!("Failed to send shutdown signal: {}", e);
+    }
+}
+
+async fn collect_shard_stats_with_shutdown(
     db: Arc<database::Database>,
     cache: Arc<serenity::cache::Cache>,
     shard_manager: Arc<ShardManager>,
-) {
+    mut shutdown_rx: broadcast::Receiver<()>,
+) -> Result<()> {
     let mut interval = interval(Duration::from_secs(300)); // 5 minutes
     let mut system = System::new_all();
 
     loop {
-        interval.tick().await;
+        select! {
+            _ = interval.tick() => {
+                // Continue with stats collection
+            }
+            _ = shutdown_rx.recv() => {
+                info!("Statistics collection received shutdown signal");
+                break;
+            }
+        }
 
         // Refresh system information
         system.refresh_all();
@@ -266,4 +340,7 @@ async fn collect_shard_stats(
             total_shards, total_guilds, memory_usage
         );
     }
+
+    info!("Statistics collection loop ended");
+    Ok(())
 }
