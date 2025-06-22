@@ -176,8 +176,16 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     }
 
     // Sort rolls unless unsorted flag is set
-    if !dice.unsorted && !result.kept_rolls.is_empty() {
-        result.kept_rolls.sort_by(|a, b| b.cmp(a)); // Sort descending by default
+    if !dice.unsorted {
+        // Sort kept_rolls
+        if !result.kept_rolls.is_empty() {
+            result.kept_rolls.sort_by(|a, b| b.cmp(a)); // Sort descending by default
+        }
+
+        // Sort all dice groups' rolls as well
+        for group in &mut result.dice_groups {
+            group.rolls.sort_by(|a, b| b.cmp(a)); // Sort descending by default
+        }
     }
 
     Ok(result)
