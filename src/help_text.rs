@@ -4,6 +4,10 @@
 pub fn generate_basic_help() -> String {
     r#"🎲 **Dice Maiden** 🎲
 
+**Note:**
+• Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+• If you experience a bug, please report the issue on GitHub!
+
 **Basic Usage:**
 `/roll 2d6 + 3d10` - Roll two six-sided dice and three ten-sided dice
 `/roll 3d6 + 5` - Roll three six-sided dice and add five
