@@ -21,6 +21,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         no_results: dice.no_results,
         private: dice.private,
         godbound_damage: None,
+        fudge_symbols: None,
     };
 
     // Initial dice rolls
@@ -148,6 +149,9 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
                         threshold.unwrap_or(1)
                     ));
                 }
+            }
+            Modifier::Fudge => {
+                apply_fudge_conversion(&mut result)?;
             }
             Modifier::WrathGlory(difficulty, use_total) => {
                 count_wrath_glory_successes(&mut result, *difficulty, *use_total)?;
@@ -687,6 +691,30 @@ fn apply_hero_system_calculation(
                 .push("Target: 11 + OCV - DCV or less".to_string());
         }
     }
+
+    Ok(())
+}
+
+fn apply_fudge_conversion(result: &mut RollResult) -> Result<()> {
+    let mut symbols = Vec::new();
+    let mut fudge_total = 0;
+
+    for &roll in &result.individual_rolls {
+        let (symbol, value) = match roll {
+            1 => ("-", -1), // Minus
+            2 => (" ", 0),  // Blank
+            3 => ("+", 1),  // Plus
+            _ => return Err(anyhow!("Invalid Fudge die value: {}", roll)),
+        };
+        symbols.push(symbol.to_string());
+        fudge_total += value;
+    }
+
+    result.fudge_symbols = Some(symbols);
+    result.total = fudge_total;
+    result
+        .notes
+        .push("Fudge dice: 1=(-), 2=( ), 3=(+)".to_string());
 
     Ok(())
 }

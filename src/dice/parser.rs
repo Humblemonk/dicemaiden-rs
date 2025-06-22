@@ -459,6 +459,10 @@ fn parse_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::HeroSystem(HeroSystemType::Hit));
     }
 
+    if part == "fudge" || part == "df" {
+        return Ok(Modifier::Fudge);
+    }
+
     // Godbound damage chart system
     if part == "gb" {
         return Ok(Modifier::Godbound(false)); // Normal damage chart

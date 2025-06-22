@@ -47,6 +47,7 @@ pub enum Modifier {
     WrathGlory(Option<u32>, bool),  // Wrath & Glory: (difficulty, use_total_instead_of_successes)
     Godbound(bool),                 // gb (false) or gbs (true for straight damage)
     HeroSystem(HeroSystemType),     // Hero System damage/hit calculations
+    Fudge,                          // df - Fudge dice with symbol display
 }
 
 #[derive(Debug, Clone)]
@@ -74,11 +75,17 @@ pub struct RollResult {
     pub no_results: bool,                    // Add no_results flag
     pub private: bool,                       // Add private flag for ephemeral responses
     pub godbound_damage: Option<i32>,        // Store converted Godbound damage
+    pub fudge_symbols: Option<Vec<String>>,  // Store Fudge dice symbols
 }
 
 impl RollResult {
     /// Format the dice roll display based on whether we have dice groups or kept rolls
     fn format_dice_display(&self) -> String {
+        // Special handling for Fudge dice
+        if let Some(ref symbols) = self.fudge_symbols {
+            return format!("`[{}]`", symbols.join(", "));
+        }
+
         if !self.dice_groups.is_empty() {
             self.format_dice_groups()
         } else if !self.kept_rolls.is_empty() {

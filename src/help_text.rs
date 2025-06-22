@@ -78,7 +78,7 @@ pub fn generate_alias_help() -> String {
 • `wng 4d6 !soak` → 4d6 without wrath die
 
 **Other Systems:**
-• `3df` → 3d3 t3 f1 (Fudge dice)
+• `3df` → 3d3 fudge (Fudge dice showing +/blank/- symbols)
 • `3wh4+` → 3d6 t4 (Warhammer 40k/AoS)
 • `sr6` → 6d6 t5 (Shadowrun)
 • `ex5` → 5d10 t7 t10 (Exalted)
@@ -96,6 +96,17 @@ Use `/roll help system` for specific examples!"#
 
 pub fn generate_system_help() -> String {
     r#"🎲 **Game System Examples** 🎲
+
+**Fudge/FATE Dice:**
+• `/roll 3df` - 3 Fudge dice showing symbols: + (plus), (blank), - (minus)
+• `/roll 4df` - Standard FATE roll (4 Fudge dice)
+• `/roll 4d3 fudge` - Alternative syntax for Fudge dice
+
+**Fudge Dice Values:**
+Each Fudge die shows a symbol representing:
+• **+** (plus) = +1 to total
+• ` `(blank) = 0 to total  
+• **-** (minus) = -1 to total
 
 **Godbound:**
 • `/roll gb` - Basic d20 with damage chart (1-=0, 2-5=1, 6-9=2, 10+=4)

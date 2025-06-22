@@ -101,11 +101,11 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some(format!("{}d{} ie{}", count, sides, sides));
     }
 
-    // Fudge dice (3df -> 3d3 t3 f1)
+    // Fudge dice (3df -> 3d3 fudge)
     let df_regex = Regex::new(r"^(\d+)df$").unwrap();
     if let Some(captures) = df_regex.captures(input) {
         let count = &captures[1];
-        return Some(format!("{}d3 t3 f1", count));
+        return Some(format!("{}d3 fudge", count));
     }
 
     // Warhammer (3wh4+ -> 3d6 t4)
@@ -312,6 +312,7 @@ fn get_static_aliases() -> HashMap<String, String> {
     aliases.insert("hsn".to_string(), "1d6 hsn".to_string()); // 1d6 normal damage
     aliases.insert("hsk".to_string(), "1d6 hsk".to_string()); // 1d6 killing damage
     aliases.insert("hsh".to_string(), "3d6 hsh".to_string()); // Hero System to-hit roll
+    aliases.insert("3df".to_string(), "3d3 fudge".to_string()); // Fixed Fudge dice
 
     aliases
 }
