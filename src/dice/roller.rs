@@ -3,6 +3,14 @@ use anyhow::{anyhow, Result};
 use rand::Rng;
 
 pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
+    // Validation check
+    if dice.sides < 1 {
+        return Err(anyhow!("Cannot roll dice with {} sides", dice.sides));
+    }
+    if dice.count == 0 {
+        return Err(anyhow!("Cannot roll 0 dice"));
+    }
+
     let mut rng = rand::thread_rng();
     let mut result = RollResult {
         individual_rolls: Vec::new(),
