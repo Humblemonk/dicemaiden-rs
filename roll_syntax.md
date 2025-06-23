@@ -1,6 +1,6 @@
 # Dice Rolling Syntax
 
-### Basic Usage
+## Basic Usage
 - `/roll 2d6` - Roll two six-sided dice
 - `/roll 3d6 + 5` - Roll 3d6 and add 5
 - `/roll 4d6 k3` - Roll 4d6, keep highest 3
@@ -27,7 +27,7 @@
 - **Comments**: `/roll 2d6 ! Fire damage`
 - **Labels**: `/roll (Attack) 1d20 + 5`
 
-### Game System Aliases
+## Game System Aliases
 
 #### D&D/Pathfinder
 - `dndstats` → 6 4d6 k3 (ability score generation)
@@ -83,7 +83,7 @@
 - **Sunsails**: `snm5` → 5d6 ie6 t4
 - **D6 System**: `d6s4` → 4d6 + 1d6 ie
 
-### System-Specific Examples
+## System-Specific Examples
 
 #### Percentile Systems (Call of Cthulhu, etc.)
 ```text
