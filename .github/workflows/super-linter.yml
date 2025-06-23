@@ -32,4 +32,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VALIDATE_RUST_2015: false
           VALIDATE_RUST_2018: false
-          MARKDOWN_CONFIG_FILE: '{"MD024": false}'
+          MARKDOWN_CONFIG_FILE: |
+            {
+              "MD024": false,
+              "no-duplicate-heading": false,
+              "no-duplicate-header": false
+            }
