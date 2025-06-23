@@ -211,12 +211,33 @@ async fn get_database_stats(ctx: &Context) -> String {
     if let Some(db) = data.get::<crate::DatabaseContainer>() {
         match db.get_all_shard_stats().await {
             Ok(stats) => {
-                if let Some(latest) = stats.first() {
-                    format!("**Database Stats:**\n• Last update: {}\n• Recorded servers: {}\n• Recorded memory: {:.2} MB\n", 
-                        latest.timestamp, latest.server_count, latest.memory_mb)
-                } else {
-                    "**Database Stats:** No data yet\n".to_string()
+                if stats.is_empty() {
+                    return "**Database Stats:** No data yet\n".to_string();
                 }
+
+                // Get the most recent timestamp from any shard
+                let most_recent_timestamp = stats
+                    .first()
+                    .map(|s| s.timestamp.as_str())
+                    .unwrap_or("Unknown");
+
+                // Sum server counts from all shards
+                let total_servers: i32 = stats.iter().map(|s| s.server_count).sum();
+
+                // Get memory usage specifically from shard 0 (only shard that records actual memory)
+                let shard_0_memory = stats
+                    .iter()
+                    .find(|s| s.shard_id == 0)
+                    .map(|s| s.memory_mb)
+                    .unwrap_or(0.0);
+
+                // Count how many shards we have data for
+                let shard_count = stats.len();
+
+                format!(
+                    "**Database Stats:**\n• Last update: {}\n• Total recorded servers: {} (across {} shards)\n• Recorded memory: {:.2} MB\n", 
+                    most_recent_timestamp, total_servers, shard_count, shard_0_memory
+                )
             }
             Err(_) => "**Database Stats:** Error reading data\n".to_string(),
         }

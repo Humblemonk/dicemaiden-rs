@@ -366,9 +366,7 @@ async fn collect_shard_stats_with_shutdown(
         system.refresh_all();
 
         // Get shard information
-        let shard_info = match shard_manager.runners.lock().await {
-            shard_runners => shard_runners,
-        };
+        let shard_info = shard_manager.runners.lock().await;
 
         if shard_info.is_empty() {
             // No shards running yet, wait for next interval
@@ -423,20 +421,18 @@ async fn collect_shard_stats_with_shutdown(
                         shard_id.0, e
                     );
                 }
+            } else if shard_id.0 == 0 {
+                // Only log memory for shard 0
+                info!(
+                    "Updated shard {} stats: {} servers, {:.2} MB memory",
+                    shard_id.0, shard_guild_count, memory_usage
+                );
             } else {
-                if shard_id.0 == 0 {
-                    // Only log memory for shard 0
-                    info!(
-                        "Updated shard {} stats: {} servers, {:.2} MB memory",
-                        shard_id.0, shard_guild_count, memory_usage
-                    );
-                } else {
-                    // Log without memory for other shards
-                    info!(
-                        "Updated shard {} stats: {} servers",
-                        shard_id.0, shard_guild_count
-                    );
-                }
+                // Log without memory for other shards
+                info!(
+                    "Updated shard {} stats: {} servers",
+                    shard_id.0, shard_guild_count
+                );
             }
         }
 
