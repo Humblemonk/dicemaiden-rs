@@ -186,11 +186,36 @@ async fn main() -> Result<()> {
 
     let token = env::var("DISCORD_TOKEN").expect("Expected DISCORD_TOKEN in environment");
 
+    // Read max_concurrency from environment
+    let max_concurrency = env::var("MAX_CONCURRENCY")
+        .ok()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(1); // Default to 1 for unverified bots
+
     // Configure the number of shards (must be a multiple of 16 for large bot sharding)
     let shard_count = env::var("SHARD_COUNT")
         .ok()
         .and_then(|s| s.parse::<u32>().ok())
         .unwrap_or(1); // Default to 1 shard for smaller bots
+
+    // Validate shard configuration for verified bots
+    if max_concurrency > 1 {
+        info!(
+            "Verified bot detected with max_concurrency: {}",
+            max_concurrency
+        );
+
+        // Calculate optimal startup
+        let startup_batches = shard_count.div_ceil(max_concurrency);
+        let estimated_startup = startup_batches * 5;
+
+        info!(
+            "Startup config: {} shards in {} batches (~{}s)",
+            shard_count, startup_batches, estimated_startup
+        );
+    } else {
+        info!("Unverified bot mode: 1 shard per 5 seconds");
+    }
 
     // Validate that shard count is a multiple of 16 for large bot sharding
     if shard_count % 16 != 0 {
