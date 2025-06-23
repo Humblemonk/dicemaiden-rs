@@ -16,6 +16,7 @@ on:
       - '**/*.md'
       - '**/*.example'
       - '**/*.Gemfile'
+      - '**/*.yml'
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ "main" ]
@@ -23,6 +24,7 @@ on:
       - '**/*.md'
       - '**/*.example'
       - '**/*.Gemfile'
+      - '**/*.yml'
   schedule:
     - cron: '20 10 * * 6'
 
