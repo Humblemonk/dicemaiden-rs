@@ -88,10 +88,8 @@ https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=27487
 - `USE_AUTOSHARDING` - Set to true to use discord recommended shard count. Defaults to false (optional)
 - `MAX_CONCURRENCY` - Max concurrent shard connections. Discord will override this with your bots actual limit (optional)
 - `RUST_LOG` - Log level (default: info)
-
-### Multi-Process Sharding
-- `SHARD_START` - Starting shard ID for the process
-- `TOTAL_SHARDS` - Total shards across all processes
+- `SHARD_START` - Starting shard ID for the process (needed for multi-process sharding)
+- `TOTAL_SHARDS` - Total shards across all processes (needed for multi-process sharding)
 
 You can customize the build further by modifying `Cargo.toml` dependencies.
 
