@@ -171,7 +171,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         }
     }
 
-        if result.successes.is_some() && has_math_modifiers {
+    if result.successes.is_some() && has_math_modifiers {
         for modifier in &dice.modifiers {
             match modifier {
                 Modifier::Add(value) => {
