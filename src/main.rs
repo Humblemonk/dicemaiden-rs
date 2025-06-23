@@ -464,15 +464,11 @@ async fn collect_shard_stats_with_shutdown(
             }
         }
 
-        // Reduce log frequency to minimize string allocations and I/O overhead. Log every 30 mins
-        let should_log_summary = (chrono::Utc::now().timestamp() / 1800) % 2 == 0;
-
-        if should_log_summary {
-            info!(
-                "Stats summary: {} shards, {} servers, {:.2} MB memory",
-                total_shards, total_guilds, memory_usage
-            );
-        }
+        // Log summary every 15 minutes (same as stats collection interval)
+        info!(
+            "Stats summary: {} shards, {} servers, {:.2} MB memory",
+            total_shards, total_guilds, memory_usage
+        );
     }
 
     info!("Statistics collection loop ended");
