@@ -345,7 +345,7 @@ async fn collect_shard_stats_with_shutdown(
     shard_manager: Arc<ShardManager>,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<()> {
-    let mut interval = interval(Duration::from_secs(300)); // 5 minutes
+    let mut interval = interval(Duration::from_secs(900)); // 15 minutes
     let mut system = System::new_all();
 
     // Get current process PID once (all shards share the same process)
