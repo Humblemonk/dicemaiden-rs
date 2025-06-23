@@ -171,6 +171,30 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         }
     }
 
+        if result.successes.is_some() && has_math_modifiers {
+        for modifier in &dice.modifiers {
+            match modifier {
+                Modifier::Add(value) => {
+                    result.successes = Some(result.successes.unwrap() + value);
+                }
+                Modifier::Subtract(value) => {
+                    result.successes = Some(result.successes.unwrap() - value);
+                }
+                Modifier::Multiply(value) => {
+                    result.successes = Some(result.successes.unwrap() * value);
+                }
+                Modifier::Divide(value) => {
+                    if *value == 0 {
+                        return Err(anyhow!("Cannot divide by zero"));
+                    }
+                    result.successes = Some(result.successes.unwrap() / value);
+                }
+                // AddDice and SubtractDice don't make sense for success counts, skip them
+                _ => {}
+            }
+        }
+    }
+
     // If target/success system or godbound was used, don't use the dice total
     if result.successes.is_some() || result.godbound_damage.is_some() {
         result.total = 0; // Reset total for special systems

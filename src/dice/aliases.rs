@@ -175,27 +175,37 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     }
 
     // Chronicles of Darkness (4cod -> 4d10 t8 ie10) using pre-compiled regex
-    if let Some(captures) = COD_REGEX.captures(input) {
-        let count = &captures[1];
-        let variant = captures.get(2).map_or("", |m| m.as_str());
-        let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
+if let Some(captures) = COD_REGEX.captures(input) {
+    let count = &captures[1];
+    let variant = captures.get(2).map_or("", |m| m.as_str());
+    let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
+    
+    let modifier_part = if modifier.is_empty() { 
+        String::new() 
+    } else { 
+        format!(" {}", modifier) 
+    };
 
-        return Some(match variant {
-            "8" => format!("{}d10 t7 ie10{}", count, modifier), // 8-again
-            "9" => format!("{}d10 t6 ie10{}", count, modifier), // 9-again
-            "r" => format!("{}d10 t8 ie10 r1{}", count, modifier), // rote quality
-            _ => format!("{}d10 t8 ie10{}", count, modifier),   // standard
-        });
-    }
+    return Some(match variant {
+        "8" => format!("{}d10 t7 ie10{}", count, modifier_part), // 8-again
+        "9" => format!("{}d10 t6 ie10{}", count, modifier_part), // 9-again
+        "r" => format!("{}d10 t8 ie10 r1{}", count, modifier_part), // rote quality
+        _ => format!("{}d10 t8 ie10{}", count, modifier_part),   // standard
+    });
+}
 
     // World of Darkness (4wod8 -> 4d10 f1 ie10 t8) using pre-compiled regex
-    if let Some(captures) = WOD_REGEX.captures(input) {
-        let count = &captures[1];
-        let difficulty = &captures[2];
-        let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
-        return Some(format!("{}d10 f1 ie10 t{}{}", count, difficulty, modifier));
+if let Some(captures) = WOD_REGEX.captures(input) {
+    let count = &captures[1];
+    let difficulty = &captures[2];
+    let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
+    
+    if modifier.is_empty() {
+        return Some(format!("{}d10 f1 ie10 t{}", count, difficulty));
+    } else {
+        return Some(format!("{}d10 f1 ie10 t{} {}", count, difficulty, modifier));
     }
-
+}
     // Dark Heresy (dh 4d10 -> 4d10 ie10) using pre-compiled regex
     if let Some(captures) = DH_REGEX.captures(input) {
         let count = &captures[1];
