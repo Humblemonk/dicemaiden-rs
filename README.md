@@ -138,37 +138,92 @@ src/
 
 ## Deployment
 
+
 ### Docker
 ```dockerfile
-FROM rust:1.70 as builder
+FROM rust:1.70-slim-bookworm as builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
+
+# Copy manifest files first for better layer caching
+COPY Cargo.toml Cargo.lock ./
+
+# Create dummy source to build dependencies
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release && rm -rf src
+
+# Copy actual source code
 COPY . .
-RUN cargo build --release
+# Force rebuild of our code but reuse dependencies
+RUN touch src/main.rs && cargo build --release
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    sqlite3 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 dicebot
+
 COPY --from=builder /app/target/release/dicemaiden-rs /usr/local/bin/
+
+# Create data directory for SQLite database
+RUN mkdir -p /data && chown dicebot:dicebot /data
+
+USER dicebot
+WORKDIR /data
+
 CMD ["dicemaiden-rs"]
 ```
 
 ### Systemd Service
 ```ini
 [Unit]
-Description=Dice Maiden Rust Bot
-After=network.target
+Description=Dice Maiden
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=dicebot
+Group=dicebot
 WorkingDirectory=/opt/dicemaiden-rs
 Environment=RUST_LOG=info
 EnvironmentFile=/opt/dicemaiden-rs/.env
 ExecStart=/opt/dicemaiden-rs/target/release/dicemaiden-rs
 Restart=always
 RestartSec=10
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/dicemaiden-rs/data
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
+```
+### Multi-Process Sharding
+```bash
+# Example: 3 processes handling 64 shards total
+# Process 1: shards 0-20
+SHARD_COUNT=21 SHARD_START=0 TOTAL_SHARDS=64 ./dicemaiden-rs &
+
+# Process 2: shards 21-41  
+SHARD_COUNT=21 SHARD_START=21 TOTAL_SHARDS=64 ./dicemaiden-rs &
+
+# Process 3: shards 42-63
+SHARD_COUNT=22 SHARD_START=42 TOTAL_SHARDS=64 ./dicemaiden-rs &
 ```
 
 ## Differences from Original
