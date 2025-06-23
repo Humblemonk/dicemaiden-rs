@@ -53,7 +53,7 @@ Supported dice rolls and game systems can be [found here!](roll_syntax.md)
 2. **Set up environment**
    ```bash
    cp env.example .env
-   # Edit .env and add your Discord bot token
+   # Edit .env and add your Discord bot token. review the other ENV variables found in this documentation
    ```
 
 3. **Build and run**
@@ -83,7 +83,15 @@ https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=27487
 ### Environment Variables
 - `DISCORD_TOKEN` - Your Discord bot token (required)
 - `GUILD_ID` - Guild ID for testing commands (optional)
+- `DATABASE_URL` - SQLite database path. Defaults to sqlite:main.db (optional)
+- `SHARD_COUNT` - Manual number of shards to use. Defaults to 1 for small bots (optional)
+- `USE_AUTOSHARDING` - Set to true to use discord recommended shard count. Defaults to false (optional)
+- `MAX_CONCURRENCY` - Max concurrent shard connections. Discord will override this with your bots actual limit (optional)
 - `RUST_LOG` - Log level (default: info)
+
+#### Multi-Process Sharding
+- `SHARD_START` - Starting shard ID for the process
+- `TOTAL_SHARDS` - Total shards across all processes
 
 You can customize the build further by modifying `Cargo.toml` dependencies.
 
