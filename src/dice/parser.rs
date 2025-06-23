@@ -7,8 +7,8 @@ use regex::Regex;
 static SET_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)\s+(.+)$").expect("Failed to compile SET_REGEX"));
 
-static DICE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(\d+)?d(\d+|%)$").expect("Failed to compile DICE_REGEX"));
+static DICE_ONLY_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(\d+)?d(\d+|%)$").expect("Failed to compile DICE_ONLY_REGEX"));
 
 static LABEL_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\(([^)]+)\)\s*").expect("Failed to compile LABEL_REGEX"));
@@ -22,11 +22,6 @@ static OP_REGEX: Lazy<Regex> =
 static DICE_MOD_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^([+\-])(\d+)d(\d+)$").expect("Failed to compile DICE_MOD_REGEX"));
 
-static MATH_SPLIT_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(\d*d\d+|[+\-*/]\d*d\d+|[+\-*/]\d+)").expect("Failed to compile MATH_SPLIT_REGEX")
-});
-
-// Pre-compile modifier matching patterns to avoid runtime compilation
 static WNG_PATTERN: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(wng\d*t?)").expect("Failed to compile WNG_PATTERN"));
 
@@ -137,13 +132,13 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     remaining = parse_comment(&mut dice, remaining);
 
     // Parse the main dice expression and modifiers
-    let parts: Vec<&str> = if remaining
-        .chars()
-        .any(|c| matches!(c, '+' | '-' | '*' | '/'))
-        && !remaining.contains(' ')
-    {
-        // Split mathematical expressions without spaces using pre-compiled regex
-        split_math_expression_regex(remaining)?
+    let parts: Vec<&str> = if should_use_math_splitting(remaining) {
+        // For compact expressions like "3d6k2+4", split into components
+        let split_regex = Regex::new(r"(\d*d\d+|[a-zA-Z]+\d*|[+\-*/]\d+)").unwrap();
+        split_regex
+            .find_iter(remaining)
+            .map(|m| m.as_str())
+            .collect()
     } else {
         // Split by whitespace for expressions with spaces
         remaining.split_whitespace().collect()
@@ -153,13 +148,20 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
         return Err(anyhow!("No dice expression found"));
     }
 
-    // Parse main dice part (XdY)
+    // Parse main dice part (first part should always be dice like "3d6")
     parse_base_dice(&mut dice, parts[0])?;
 
-    // Parse modifiers
+    // Parse all remaining parts as modifiers
     parse_all_modifiers(&mut dice, &parts[1..])?;
 
     Ok(dice)
+}
+
+fn should_use_math_splitting(remaining: &str) -> bool {
+    remaining
+        .chars()
+        .any(|c| matches!(c, '+' | '-' | '*' | '/'))
+        && !remaining.contains(' ')
 }
 
 // Helper function to parse flags
@@ -202,7 +204,7 @@ fn parse_comment<'a>(dice: &mut DiceRoll, remaining: &'a str) -> &'a str {
 
 // Helper function to parse base dice expression using pre-compiled regex
 fn parse_base_dice(dice: &mut DiceRoll, part: &str) -> Result<()> {
-    if let Some(captures) = DICE_REGEX.captures(part) {
+    if let Some(captures) = DICE_ONLY_REGEX.captures(part) {
         dice.count = captures
             .get(1)
             .map(|m| m.as_str().parse().unwrap_or(1))
@@ -217,7 +219,7 @@ fn parse_base_dice(dice: &mut DiceRoll, part: &str) -> Result<()> {
         }
 
         if dice.count > 500 {
-            return Err(anyhow!("Maximum 100 dice allowed"));
+            return Err(anyhow!("Maximum 500 dice allowed"));
         }
 
         if dice.sides < 1 {
@@ -492,6 +494,11 @@ fn parse_required_number(stripped: &str, error_msg: &str) -> Result<u32> {
 }
 
 fn parse_modifier(part: &str) -> Result<Modifier> {
+    // Dark Heresy
+    if part == "dh" {
+        return Ok(Modifier::DarkHeresy);
+    }
+
     // Hero System modifiers
     if part == "hsn" {
         return Ok(Modifier::HeroSystem(HeroSystemType::Normal));
@@ -646,18 +653,22 @@ fn parse_dice_modifier(part: &str) -> Result<Option<Modifier>> {
 
 fn is_dice_expression(input: &str) -> bool {
     // Use pre-compiled regex for dice expression detection
-    DICE_REGEX.is_match(input)
+    DICE_ONLY_REGEX.is_match(input)
 }
 
 fn parse_dice_expression_only(input: &str) -> Result<DiceRoll> {
-    if let Some(captures) = DICE_REGEX.captures(input) {
+    if let Some(captures) = DICE_ONLY_REGEX.captures(input) {
         let count = captures
             .get(1)
             .map(|m| m.as_str().parse().unwrap_or(1))
             .unwrap_or(1);
-        let sides = captures[2]
-            .parse()
-            .map_err(|_| anyhow!("Invalid dice sides"))?;
+        let sides = if &captures[2] == "%" {
+            100
+        } else {
+            captures[2]
+                .parse()
+                .map_err(|_| anyhow!("Invalid dice sides"))?
+        };
 
         Ok(DiceRoll {
             count,
@@ -673,20 +684,5 @@ fn parse_dice_expression_only(input: &str) -> Result<DiceRoll> {
         })
     } else {
         Err(anyhow!("Invalid dice expression: {}", input))
-    }
-}
-
-fn split_math_expression_regex(input: &str) -> Result<Vec<&str>> {
-    // Use pre-compiled regex to split expressions like "4d10+2" into ["4d10", "+2"]
-    let parts: Vec<&str> = MATH_SPLIT_REGEX
-        .find_iter(input)
-        .map(|m| m.as_str())
-        .collect();
-
-    if parts.is_empty() {
-        // If no matches, return the original input
-        Ok(vec![input])
-    } else {
-        Ok(parts)
     }
 }

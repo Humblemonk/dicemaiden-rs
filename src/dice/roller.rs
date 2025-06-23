@@ -534,22 +534,16 @@ fn explode_dice(
 fn add_explosion_notes(
     result: &mut RollResult,
     explosion_count: usize,
-    dice_sides: u32,
-    explode_on: u32,
-    indefinite: bool,
-    dice: &DiceRoll, // Add this parameter
+    _dice_sides: u32,
+    _explode_on: u32,
+    _indefinite: bool,
+    dice: &DiceRoll,
 ) {
-    // Check if this has success counting modifiers (Chronicles of Darkness, etc.)
-    let has_success_modifiers = dice.modifiers.iter().any(|m| {
-        matches!(
-            m,
-            Modifier::Target(_) | Modifier::Failure(_) | Modifier::WrathGlory(_, _)
-        )
-    });
-
-    // Only show Dark Heresy messages for d10s exploding on 10s WITHOUT success counting
-    let is_dark_heresy =
-        dice_sides == 10 && explode_on == 10 && indefinite && !has_success_modifiers;
+    // Check if this is explicitly a Dark Heresy roll
+    let is_dark_heresy = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::DarkHeresy));
 
     if is_dark_heresy {
         // Dark Heresy righteous fury
@@ -564,7 +558,7 @@ fn add_explosion_notes(
             ));
         }
     } else {
-        // Generic exploding dice message for other systems (including Chronicles of Darkness)
+        // Generic exploding dice message for all other systems
         if explosion_count == 1 {
             result.notes.push("1 die exploded".to_string());
         } else {

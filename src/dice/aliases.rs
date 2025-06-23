@@ -210,7 +210,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = DH_REGEX.captures(input) {
         let count = &captures[1];
         let sides = &captures[2];
-        return Some(format!("{}d{} ie{}", count, sides, sides));
+        return Some(format!("{}d{} ie{} dh", count, sides, sides));
     }
 
     // Fudge dice (3df -> 3d3 fudge) using pre-compiled regex

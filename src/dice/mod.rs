@@ -49,6 +49,7 @@ pub enum Modifier {
     Godbound(bool),                 // gb (false) or gbs (true for straight damage)
     HeroSystem(HeroSystemType),     // Hero System damage/hit calculations
     Fudge,                          // df - Fudge dice with symbol display
+    DarkHeresy,
 }
 
 #[derive(Debug, Clone)]
