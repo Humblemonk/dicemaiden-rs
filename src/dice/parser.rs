@@ -58,23 +58,17 @@ static B_PATTERN: Lazy<Regex> =
 pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     let input = input.trim();
 
-    // Check for aliases first
-    if let Some(expanded) = super::aliases::expand_alias(input) {
-        return parse_dice_string(&expanded);
-    }
-
-    // Check for multi-roll (semicolon separated)
+    // Check for multi-roll (semicolon separated) FIRST
     if input.contains(';') {
         let parts: Vec<&str> = input.split(';').collect();
         if parts.len() > 4 {
             return Err(anyhow!("Maximum of 4 separate rolls allowed"));
         }
 
-        let mut results = Vec::with_capacity(parts.len()); // Pre-allocate capacity
+        let mut results = Vec::with_capacity(parts.len());
         for part in parts {
             let part = part.trim();
             let mut sub_results = parse_dice_string(part)?;
-            // Store the original expression for each semicolon-separated roll
             for dice in &mut sub_results {
                 dice.original_expression = Some(part.to_string());
             }
@@ -83,7 +77,7 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         return Ok(results);
     }
 
-    // Use pre-compiled regex for roll sets
+    // Check for roll sets SECOND
     if let Some(captures) = SET_REGEX.captures(input) {
         let count: u32 = captures[1]
             .parse()
@@ -93,7 +87,7 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         }
         let dice_expr = &captures[2];
 
-        let mut results = Vec::with_capacity(count as usize); // Pre-allocate capacity
+        let mut results = Vec::with_capacity(count as usize);
         for i in 0..count {
             let mut dice = parse_single_dice_expression(dice_expr)?;
             dice.label = Some(format!("Set {}", i + 1));
@@ -131,13 +125,27 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     // Parse comment (exclamation mark)
     remaining = parse_comment(&mut dice, remaining);
 
-    // Parse the main dice expression and modifiers
+    // NOW check for aliases after flags/comments are stripped
+    if let Some(expanded) = super::aliases::expand_alias(remaining) {
+        // Recursively parse the expanded alias, but preserve the flags/comment from the original
+        let mut expanded_dice = parse_single_dice_expression(&expanded)?;
+
+        // Transfer the parsed flags and comment to the expanded dice
+        expanded_dice.private = dice.private;
+        expanded_dice.simple = dice.simple;
+        expanded_dice.no_results = dice.no_results;
+        expanded_dice.unsorted = dice.unsorted;
+        expanded_dice.comment = dice.comment;
+        expanded_dice.label = dice.label;
+
+        return Ok(expanded_dice);
+    }
+
+    // Continue with regular parsing...
     let parts: Vec<String> = if remaining.contains(' ') {
-        // Has spaces - split by whitespace and then further split any combined tokens
         let initial_parts: Vec<&str> = remaining.split_whitespace().collect();
         split_space_separated_parts(&initial_parts)?
     } else {
-        // No spaces - need to intelligently split dice from modifiers
         split_dice_and_modifiers(remaining)?
             .into_iter()
             .map(|s| s.to_string())
@@ -148,7 +156,7 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
         return Err(anyhow!("No dice expression found"));
     }
 
-    // Parse main dice part (first part should always be dice like "3d6")
+    // Parse main dice part
     parse_base_dice(&mut dice, &parts[0])?;
 
     // Parse all remaining parts as modifiers
