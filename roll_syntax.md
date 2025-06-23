@@ -86,20 +86,20 @@
 ### System-Specific Examples
 
 #### Percentile Systems (Call of Cthulhu, etc.)
-```
+```text
 /roll +d%    # Advantage: keep lower tens digit
 /roll -d%    # Disadvantage: keep higher tens digit
 /roll d%     # Standard percentile roll
 ```
 
 #### Fudge/FATE Dice
-```
+```text
 /roll 3df    # 3 Fudge dice: + (plus), (blank), - (minus)
 /roll 4df    # Standard FATE roll
 ```
 
 #### Hero System Damage
-```
+```text
 /roll 2hsn      # 2d6 normal damage
 /roll 3hsk      # 3d6 killing: shows BODY and STUN (BODY × 1d3)
 /roll 2.5hsk    # 2d6 + 1d3 killing damage
@@ -107,7 +107,7 @@
 ```
 
 #### Godbound Damage
-```
+```text
 /roll gb        # d20 with damage chart conversion
 /roll gbs       # d20 straight damage (no chart)
 /roll 3d8 gb    # Each die converted: 1-=0, 2-5=1, 6-9=2, 10+=4
@@ -115,7 +115,7 @@
 ```
 
 #### Wrath & Glory Tests
-```
+```text
 /roll wng 4d6              # Standard test with wrath die
 /roll wng dn3 5d6          # Difficulty 3 test
 /roll wng 4d6 !soak        # Soak test (total damage, not successes)
@@ -123,7 +123,7 @@
 ```
 
 ### Complex Examples
-```
+```text
 /roll 10d6 e6 k8 +4        # 10d6, explode 6s, keep 8 highest, +4
 /roll p 3d6 + 2d4          # Private roll
 /roll s 4d6 k3             # Simple output (total only)
