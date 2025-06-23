@@ -23,6 +23,8 @@ Follow the link below to add your bot to your Discord server:
 
 This will authorize the bot for your server and you should see it in your default public channel. The bot will have permissions to read, send and manage messages.
 
+**Note:** It is recommended to review your app integration settings found under Server Settings > Integrations . From here you can restrict the bot slash commands to specific channels
+
 ## Commands
 
 - `/roll <dice>` - Roll dice using RPG notation
