@@ -23,7 +23,7 @@ Follow the link below to add your bot to your Discord server:
 
 This will authorize the bot for your server and you should see it in your default public channel. The bot will have permissions to read, send and manage messages.
 
-**Note:** It is recommended to review your app integration settings found under Server Settings > Integrations . From here you can restrict the bot slash commands to specific channels
+**Note:** It is recommended to review your app integration settings found under Server Settings > Integrations. From here you can restrict the bot slash commands to specific channels
 
 ## Commands
 
@@ -83,7 +83,7 @@ https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=27487
 ### Environment Variables
 - `DISCORD_TOKEN` - Your Discord bot token (required)
 - `GUILD_ID` - Guild ID for testing commands (optional)
-- `DATABASE_URL` - SQLite database path. Defaults to sqlite:main.db (optional)
+- `DATABASE_URL` - SQLite database path. Defaults to sqlite:main.db . This database is automatically created if it doesn't exist (optional)
 - `SHARD_COUNT` - Manual number of shards to use. Defaults to 1 for small bots (optional)
 - `USE_AUTOSHARDING` - Set to true to use discord recommended shard count. Defaults to false (optional)
 - `MAX_CONCURRENCY` - Max concurrent shard connections. Discord will override this with your bots actual limit (optional)
@@ -99,7 +99,7 @@ You can customize the build further by modifying `Cargo.toml` dependencies.
 
 
 ### Requirements
-- Rust 1.70+
+- Rust 1.75+
 - Discord bot token
 - SQLite database (automatically created for bot statistics)
 
