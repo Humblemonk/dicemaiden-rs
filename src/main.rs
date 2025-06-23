@@ -631,7 +631,7 @@ async fn setup_signal_handlers(shutdown_tx: broadcast::Sender<()>) {
     }
 }
 
-// Optimized statistics collection to reduce memory usage and system overhead
+// Optimized statistics collection to support both single-process and multi-process sharding
 async fn collect_shard_stats_with_shutdown(
     db: Arc<database::Database>,
     cache: Arc<serenity::cache::Cache>,
@@ -643,6 +643,30 @@ async fn collect_shard_stats_with_shutdown(
     // Create system info once and only refresh our specific process
     let mut system = System::new();
     let current_pid = Pid::from_u32(std::process::id());
+
+    // Check if we're in multi-process mode
+    let is_multi_process = env::var("SHARD_START").is_ok() && env::var("TOTAL_SHARDS").is_ok();
+
+    // Generate a unique process ID for multi-process mode
+    let process_id = if is_multi_process {
+        let shard_start = env::var("SHARD_START").unwrap_or_default();
+        let process_pid = std::process::id();
+        format!("process_{}_{}", shard_start, process_pid)
+    } else {
+        "single_process".to_string()
+    };
+
+    info!(
+        "Statistics collection mode: {}",
+        if is_multi_process {
+            "multi-process"
+        } else {
+            "single-process"
+        }
+    );
+    if is_multi_process {
+        info!("Process ID: {}", process_id);
+    }
 
     loop {
         select! {
@@ -663,7 +687,7 @@ async fn collect_shard_stats_with_shutdown(
             continue;
         }
 
-        let total_shards = shard_info.len();
+        let total_shards_in_process = shard_info.len();
 
         // Calculate memory once for all shards (they share the same process)
         let memory_usage = if let Some(process) = system.process(current_pid) {
@@ -674,50 +698,136 @@ async fn collect_shard_stats_with_shutdown(
 
         // Get total guild count more efficiently
         let total_guilds = cache.guilds().len() as i32;
-        let guilds_per_shard = if total_shards > 0 {
-            total_guilds / total_shards as i32
-        } else {
-            0
-        };
 
-        // Process shards more efficiently
-        for (&shard_id, shard_runner) in shard_info.iter() {
-            if shard_runner.stage != serenity::gateway::ConnectionStage::Connected {
-                continue;
-            }
+        if is_multi_process {
+            // Multi-process mode: Use process_stats table
+            let shard_start = env::var("SHARD_START")
+                .ok()
+                .and_then(|s| s.parse::<i32>().ok())
+                .unwrap_or(0);
+            let shard_count = env::var("SHARD_COUNT")
+                .ok()
+                .and_then(|s| s.parse::<i32>().ok())
+                .unwrap_or(total_shards_in_process as i32);
+            let total_shards = env::var("TOTAL_SHARDS")
+                .ok()
+                .and_then(|s| s.parse::<i32>().ok())
+                .unwrap_or(shard_count);
 
-            // Approximate guild distribution instead of expensive per-shard calculations
-            let shard_guild_count = if shard_id.0 == 0 {
-                // Shard 0 gets any remainder
-                guilds_per_shard + (total_guilds % total_shards as i32)
-            } else {
-                guilds_per_shard
-            };
-
-            // Only shard 0 reports memory usage to avoid duplication in database
-            let shard_memory = if shard_id.0 == 0 { memory_usage } else { 0.0 };
-
-            // Update stats with simplified error handling during shutdown
+            // Update process stats
             if let Err(e) = db
-                .update_shard_stats(shard_id.0 as i32, shard_guild_count, shard_memory)
+                .update_process_stats(
+                    &process_id,
+                    shard_start,
+                    shard_count,
+                    total_shards,
+                    total_guilds,
+                    memory_usage,
+                )
                 .await
             {
-                if shard_runner.stage == serenity::gateway::ConnectionStage::Connected {
-                    error!("Failed to update shard {} stats: {}", shard_id.0, e);
+                error!("Failed to update process stats: {}", e);
+            }
+
+            // Also update individual shard stats for backwards compatibility
+            let guilds_per_shard = if total_shards_in_process > 0 {
+                total_guilds / total_shards_in_process as i32
+            } else {
+                0
+            };
+
+            // Process shards but don't duplicate memory reporting
+            for (&shard_id, shard_runner) in shard_info.iter() {
+                if shard_runner.stage != serenity::gateway::ConnectionStage::Connected {
+                    continue;
+                }
+
+                // Approximate guild distribution instead of expensive per-shard calculations
+                let actual_shard_id = shard_start + shard_id.0 as i32;
+                let shard_guild_count = if shard_id.0 == 0 {
+                    // First shard in this process gets any remainder
+                    guilds_per_shard + (total_guilds % total_shards_in_process as i32)
                 } else {
-                    warn!(
-                        "Shard {} stats update failed during shutdown: {}",
-                        shard_id.0, e
-                    );
+                    guilds_per_shard
+                };
+
+                // In multi-process mode, don't store memory in shard stats to avoid confusion
+                if let Err(e) = db
+                    .update_shard_stats(actual_shard_id, shard_guild_count, 0.0)
+                    .await
+                {
+                    if shard_runner.stage == serenity::gateway::ConnectionStage::Connected {
+                        error!("Failed to update shard {} stats: {}", actual_shard_id, e);
+                    } else {
+                        warn!(
+                            "Shard {} stats update failed during shutdown: {}",
+                            actual_shard_id, e
+                        );
+                    }
                 }
             }
-        }
 
-        // Log summary every 15 minutes (same as stats collection interval)
-        info!(
-            "Stats summary: {} shards, {} servers, {:.2} MB memory",
-            total_shards, total_guilds, memory_usage
-        );
+            // Cleanup old process stats every hour
+            if let Err(e) = db.cleanup_old_process_stats().await {
+                warn!("Failed to cleanup old process stats: {}", e);
+            }
+
+            // Log summary for this process
+            info!(
+                "Process stats: {} shards ({}-{}), {} servers, {:.2} MB memory",
+                shard_count,
+                shard_start,
+                shard_start + shard_count - 1,
+                total_guilds,
+                memory_usage
+            );
+        } else {
+            // Single-process mode: Use existing shard_stats table
+            let guilds_per_shard = if total_shards_in_process > 0 {
+                total_guilds / total_shards_in_process as i32
+            } else {
+                0
+            };
+
+            // Process shards more efficiently
+            for (&shard_id, shard_runner) in shard_info.iter() {
+                if shard_runner.stage != serenity::gateway::ConnectionStage::Connected {
+                    continue;
+                }
+
+                // Approximate guild distribution instead of expensive per-shard calculations
+                let shard_guild_count = if shard_id.0 == 0 {
+                    // Shard 0 gets any remainder
+                    guilds_per_shard + (total_guilds % total_shards_in_process as i32)
+                } else {
+                    guilds_per_shard
+                };
+
+                // Only shard 0 reports memory usage to avoid duplication in database
+                let shard_memory = if shard_id.0 == 0 { memory_usage } else { 0.0 };
+
+                // Update stats with simplified error handling during shutdown
+                if let Err(e) = db
+                    .update_shard_stats(shard_id.0 as i32, shard_guild_count, shard_memory)
+                    .await
+                {
+                    if shard_runner.stage == serenity::gateway::ConnectionStage::Connected {
+                        error!("Failed to update shard {} stats: {}", shard_id.0, e);
+                    } else {
+                        warn!(
+                            "Shard {} stats update failed during shutdown: {}",
+                            shard_id.0, e
+                        );
+                    }
+                }
+            }
+
+            // Log summary every 15 minutes (same as stats collection interval)
+            info!(
+                "Stats summary: {} shards, {} servers, {:.2} MB memory",
+                total_shards_in_process, total_guilds, memory_usage
+            );
+        }
     }
 
     info!("Statistics collection loop ended");

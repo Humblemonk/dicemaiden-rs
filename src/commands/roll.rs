@@ -268,55 +268,91 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
 async fn get_database_stats(ctx: &Context) -> String {
     let data = ctx.data.read().await;
     if let Some(db) = data.get::<crate::DatabaseContainer>() {
-        match db.get_all_shard_stats().await {
-            Ok(stats) => {
-                if stats.is_empty() {
-                    return "**Database Stats:** No data yet\n".to_string();
-                }
+        // Check if we're in multi-process mode
+        let is_multi_process =
+            std::env::var("SHARD_START").is_ok() && std::env::var("TOTAL_SHARDS").is_ok();
 
-                // Get the most recent timestamp from any shard
-                let most_recent_timestamp = stats
-                    .first()
-                    .map(|s| s.timestamp.as_str())
-                    .unwrap_or("Unknown");
+        if is_multi_process {
+            // Multi-process mode: Use process_stats table
+            match db.get_all_process_stats().await {
+                Ok(process_stats) => {
+                    if process_stats.is_empty() {
+                        return "**Total Stats (All Processes):** No data yet\n".to_string();
+                    }
 
-                // Sum server counts from all shards
-                let total_servers: i32 = stats.iter().map(|s| s.server_count).sum();
+                    // Get the most recent timestamp
+                    let most_recent_timestamp = process_stats
+                        .first()
+                        .map(|s| s.timestamp.as_str())
+                        .unwrap_or("Unknown");
 
-                // Get memory usage specifically from shard 0 (only shard that records actual memory)
-                let shard_0_memory = stats
-                    .iter()
-                    .find(|s| s.shard_id == 0)
-                    .map(|s| s.memory_mb)
-                    .unwrap_or(0.0);
+                    // Sum server counts from all active processes
+                    let total_servers: i32 = process_stats.iter().map(|s| s.server_count).sum();
 
-                // Format recorded memory with appropriate unit
-                let memory_display = if shard_0_memory > 1000.0 {
-                    format!("{:.2} GB", shard_0_memory / 1024.0)
-                } else {
-                    format!("{:.2} MB", shard_0_memory)
-                };
+                    // Sum memory usage from all processes
+                    let total_memory: f64 = process_stats.iter().map(|s| s.memory_mb).sum();
 
-                // Count how many shards we have data for
-                let shard_count = stats.len();
+                    // Count active processes
+                    let active_processes = process_stats.len();
 
-                // Check if we're in multi-process mode
-                let is_multi_process =
-                    std::env::var("SHARD_START").is_ok() && std::env::var("TOTAL_SHARDS").is_ok();
+                    // Get total shards from any process (they should all have the same total_shards)
+                    let total_shards = process_stats.first().map(|s| s.total_shards).unwrap_or(0);
 
-                if is_multi_process {
+                    // Format memory with appropriate unit
+                    let memory_display = if total_memory > 1000.0 {
+                        format!("{:.2} GB", total_memory / 1024.0)
+                    } else {
+                        format!("{:.2} MB", total_memory)
+                    };
+
                     format!(
-                        "**Total Stats (All Processes):**\n• Last update: {}\n• Total servers: {} (across {} shards)\n• Total memory: {}\n• Active processes: Multiple (multi-process sharding)\n", 
-                        most_recent_timestamp, total_servers, shard_count, memory_display
-                    )
-                } else {
-                    format!(
-                        "**Database Stats:**\n• Last update: {}\n• Total recorded servers: {} (across {} shards)\n• Recorded memory: {}\n", 
-                        most_recent_timestamp, total_servers, shard_count, memory_display
+                        "**Total Stats (All Processes):**\n• Last update: {}\n• Total servers: {} (across {} shards)\n• Total memory: {}\n• Active processes: {} (multi-process sharding)\n",
+                        most_recent_timestamp, total_servers, total_shards, memory_display, active_processes
                     )
                 }
+                Err(_) => "**Total Stats (All Processes):** Error reading data\n".to_string(),
             }
-            Err(_) => "**Database Stats:** Error reading data\n".to_string(),
+        } else {
+            // Single-process mode: Use shard_stats table
+            match db.get_all_shard_stats().await {
+                Ok(stats) => {
+                    if stats.is_empty() {
+                        return "**Database Stats:** No data yet\n".to_string();
+                    }
+
+                    // Get the most recent timestamp from any shard
+                    let most_recent_timestamp = stats
+                        .first()
+                        .map(|s| s.timestamp.as_str())
+                        .unwrap_or("Unknown");
+
+                    // Sum server counts from all shards
+                    let total_servers: i32 = stats.iter().map(|s| s.server_count).sum();
+
+                    // Get memory usage specifically from shard 0 (only shard that records actual memory)
+                    let shard_0_memory = stats
+                        .iter()
+                        .find(|s| s.shard_id == 0)
+                        .map(|s| s.memory_mb)
+                        .unwrap_or(0.0);
+
+                    // Format recorded memory with appropriate unit
+                    let memory_display = if shard_0_memory > 1000.0 {
+                        format!("{:.2} GB", shard_0_memory / 1024.0)
+                    } else {
+                        format!("{:.2} MB", shard_0_memory)
+                    };
+
+                    // Count how many shards we have data for
+                    let shard_count = stats.len();
+
+                    format!(
+                        "**Database Stats:**\n• Last update: {}\n• Total recorded servers: {} (across {} shards)\n• Recorded memory: {}\n",
+                        most_recent_timestamp, total_servers, shard_count, memory_display
+                    )
+                }
+                Err(_) => "**Database Stats:** Error reading data\n".to_string(),
+            }
         }
     } else {
         "**Database Stats:** Not available\n".to_string()
