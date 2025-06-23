@@ -20,11 +20,13 @@ static WNG_REGEX: Lazy<Regex> = Lazy::new(|| {
 static WNG_SIMPLE_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^wng\s+(\d+)d(\d+)$").expect("Failed to compile WNG_SIMPLE_REGEX"));
 
-static COD_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(\d+)cod([89r]?)$").expect("Failed to compile COD_REGEX"));
+static COD_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(\d+)cod([89r]?)(?:\s*([+-]\s*\d+))?$").expect("Failed to compile COD_REGEX")
+});
 
-static WOD_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(\d+)wod(\d+)$").expect("Failed to compile WOD_REGEX"));
+static WOD_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(\d+)wod(\d+)(?:\s*([+-]\s*\d+))?$").expect("Failed to compile WOD_REGEX")
+});
 
 static DH_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^dh\s+(\d+)d(\d+)$").expect("Failed to compile DH_REGEX"));
@@ -176,12 +178,13 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = COD_REGEX.captures(input) {
         let count = &captures[1];
         let variant = captures.get(2).map_or("", |m| m.as_str());
+        let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
 
         return Some(match variant {
-            "8" => format!("{}d10 t7 ie10", count),    // 8-again
-            "9" => format!("{}d10 t6 ie10", count),    // 9-again
-            "r" => format!("{}d10 t8 ie10 r1", count), // rote quality
-            _ => format!("{}d10 t8 ie10", count),      // standard
+            "8" => format!("{}d10 t7 ie10{}", count, modifier), // 8-again
+            "9" => format!("{}d10 t6 ie10{}", count, modifier), // 9-again
+            "r" => format!("{}d10 t8 ie10 r1{}", count, modifier), // rote quality
+            _ => format!("{}d10 t8 ie10{}", count, modifier),   // standard
         });
     }
 
@@ -189,7 +192,8 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = WOD_REGEX.captures(input) {
         let count = &captures[1];
         let difficulty = &captures[2];
-        return Some(format!("{}d10 f1 ie10 t{}", count, difficulty));
+        let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
+        return Some(format!("{}d10 f1 ie10 t{}{}", count, difficulty, modifier));
     }
 
     // Dark Heresy (dh 4d10 -> 4d10 ie10) using pre-compiled regex
