@@ -265,7 +265,7 @@ async fn main() -> Result<()> {
     info!("Configured minimal cache settings for reduced memory usage");
 
     // Create client with explicit shard configuration and optimized cache
-    let mut client = Client::builder(&token, intents)
+    let client = Client::builder(&token, intents)
         .event_handler(Handler::new(shard_count))
         .cache_settings(cache_settings) // Apply optimized cache settings
         .await
@@ -308,20 +308,12 @@ async fn main() -> Result<()> {
     let shard_manager_for_shutdown = Arc::clone(&client.shard_manager);
     let client_shutdown_rx = shutdown_tx.subscribe();
 
-    // Start shards with proper shutdown handling
+    // Start the client with proper shard handling
     let client_handle = tokio::spawn(async move {
         let mut shutdown_rx = client_shutdown_rx;
 
         select! {
-            result = async {
-                if max_concurrency > 1 {
-                    // Verified bot - use batching
-                    start_shards_with_batching(&mut client, shard_count, max_concurrency).await
-                } else {
-                    // Unverified bot - use simple start
-                    client.start_shards(shard_count).await
-                }
-            } => {
+            result = start_client_with_proper_sharding(client, shard_count, max_concurrency) => {
                 if let Err(why) = result {
                     error!("Client error: {:?}", why);
                 }
@@ -329,7 +321,6 @@ async fn main() -> Result<()> {
             }
             _ = shutdown_rx.recv() => {
                 info!("Discord client received shutdown signal");
-                // Shutdown all shards immediately
                 shard_manager_for_shutdown.shutdown_all().await;
                 info!("All shards shut down");
             }
@@ -388,79 +379,36 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Start shards with proper batching to respect Discord's max_concurrency limits
-async fn start_shards_with_batching(
-    client: &mut Client,
+/// Properly start the client with correct shard handling
+async fn start_client_with_proper_sharding(
+    mut client: Client,
     shard_count: u32,
     max_concurrency: u32,
 ) -> Result<(), SerenityError> {
-    info!(
-        "Starting {} shards with max_concurrency of {}",
-        shard_count, max_concurrency
-    );
-
-    // Calculate batches
-    let batches = shard_count.div_ceil(max_concurrency);
-
-    for batch in 0..batches {
-        let start_shard = batch * max_concurrency;
-        let end_shard = ((batch + 1) * max_concurrency).min(shard_count);
-        let shards_in_batch = end_shard - start_shard;
-
+    if shard_count == 1 {
+        // Single shard - use the simple start method
+        info!("Starting single shard");
+        client.start().await
+    } else if max_concurrency == 1 {
+        // Multiple shards but max_concurrency is 1 (unverified bot)
+        // This will automatically handle the 5-second delay between shards
         info!(
-            "Starting batch {}/{}: shards {} to {} ({} shards)",
-            batch + 1,
-            batches,
-            start_shard,
-            end_shard - 1,
-            shards_in_batch
+            "Starting {} shards sequentially (unverified bot)",
+            shard_count
+        );
+        client.start_shards(shard_count).await
+    } else {
+        // Multiple shards with higher max_concurrency (verified bot)
+        // Serenity handles the batching internally based on max_concurrency
+        info!(
+            "Starting {} shards with max_concurrency {} (verified bot)",
+            shard_count, max_concurrency
         );
 
-        // Start shards in this batch
-        let shard_range = start_shard..end_shard;
-
-        // Start the batch of shards
-        if let Err(e) = client.start_shard_range(shard_range, shard_count).await {
-            error!("Failed to start shard batch {}: {}", batch + 1, e);
-            return Err(e);
-        }
-
-        // Wait between batches (except for the last batch)
-        if batch + 1 < batches {
-            info!(
-                "Batch {} started successfully, waiting 5 seconds before next batch...",
-                batch + 1
-            );
-            tokio::time::sleep(Duration::from_secs(5)).await;
-        } else {
-            info!("Final batch {} started successfully", batch + 1);
-        }
+        // For verified bots, we still use start_shards but Discord's gateway
+        // will respect the max_concurrency automatically
+        client.start_shards(shard_count).await
     }
-
-    info!(
-        "All {} shards have been started across {} batches",
-        shard_count, batches
-    );
-
-    // Now we need to keep the client running
-    loop {
-        tokio::time::sleep(Duration::from_secs(30)).await;
-
-        // Check if all shards are still running
-        let shard_manager = &client.shard_manager;
-        let runners = shard_manager.runners.lock().await;
-        let connected_count = runners
-            .values()
-            .filter(|runner| runner.stage == serenity::gateway::ConnectionStage::Connected)
-            .count();
-
-        if connected_count == 0 {
-            warn!("No shards are connected, shutting down");
-            break;
-        }
-    }
-
-    Ok(())
 }
 
 async fn setup_signal_handlers(shutdown_tx: broadcast::Sender<()>) {
