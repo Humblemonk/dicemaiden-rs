@@ -43,7 +43,11 @@ Type `/roll help alias` for game system shortcuts!"#
 }
 
 pub fn generate_alias_help() -> String {
-    r#"🎲 **Game System Aliases** 🎲
+    r#"🎲 **Game System Aliases** 🎲\
+
+**Note:**
+• Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+• If you experience a bug, please report the issue on GitHub!
 
 **World/Chronicles of Darkness:**
 • `4cod` → 4d10 t8 ie10 (Chronicles of Darkness)
@@ -99,74 +103,42 @@ Use `/roll help system` for specific examples!"#
 pub fn generate_system_help() -> String {
     r#"🎲 **Game System Examples** 🎲
 
+**Note:**
+• Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+• If you experience a bug, please report the issue on GitHub!
+
 **Percentile Advantage/Disadvantage:**
-• `/roll +d%` - Percentile advantage for roll-under systems (Call of Cthulhu, etc.)
-• `/roll -d%` - Percentile disadvantage for roll-under systems
+• `/roll +d%` - Advantage (keeps lower tens die) for roll-under systems
+• `/roll -d%` - Disadvantage (keeps higher tens die) for roll-under systems
 
-**Percentile System Details:**
-For roll-under systems (like Call of Cthulhu), percentile advantage/disadvantage works by:
-• **Advantage (+d%)**: Roll 2d10 for tens digit, keep lowest + 1d10 for ones
-• **Disadvantage (-d%)**: Roll 2d10 for tens digit, keep highest + 1d10 for ones
-• Lower results are better in roll-under systems, so advantage keeps the lower tens die
-
-**Fudge/FATE Dice:**
-• `/roll 3df` - 3 Fudge dice showing symbols: + (plus), (blank), - (minus)
-• `/roll 4df` - Standard FATE roll (4 Fudge dice)
-• `/roll 4d3 fudge` - Alternative syntax for Fudge dice
-
-**Fudge Dice Values:**
-Each Fudge die shows a symbol representing:
-• **+** (plus) = +1 to total
-• ` `(blank) = 0 to total  
-• **-** (minus) = -1 to total
+**Fudge/FATE:**
+• `/roll 3df` or `/roll 4df` - Fudge dice showing +/blank/- symbols
+• Values: **+** = +1, (blank) = 0, **-** = -1
 
 **Godbound:**
-• `/roll gb` - Basic d20 with damage chart (1-=0, 2-5=1, 6-9=2, 10+=4)
-• `/roll gbs` - Basic d20 with straight damage (no chart)
-• `/roll gb 3d8` - 3d8 with damage chart conversion
-• `/roll gbs 2d10 +5` - 2d10 straight damage +5
-• `/roll 5d6 gb` - 5d6 using damage chart
-• `/roll 2d12 gbs` - 2d12 straight damage
-
-**Damage Chart Conversion:**
-The Godbound damage chart converts each die individually:
-• 1 or less → 0 damage
-• 2-5 → 1 damage  
-• 6-9 → 2 damage
-• 10+ → 4 damage
-
-Use `gbs` for "straight damage" that bypasses the chart.
+• `/roll gb` - d20 with damage chart (1-=0, 2-5=1, 6-9=2, 10+=4)
+• `/roll gbs` - d20 straight damage (bypasses chart)
+• `/roll gb 3d8` - Multi-die with chart conversion
 
 **Hero System:**
 • `/roll 2hsn` - 2d6 normal damage
-• `/roll 3hsk` - 3d6 killing damage (shows BODY and STUN)
-• `/roll 2.5hsk` - 2d6 + 1d3 killing damage with fractional dice
-• `/roll 3hsh` - 3d6 to-hit roll (roll-under mechanics)
+• `/roll 3hsk` - 3d6 killing damage (BODY + STUN = BODY × 1d3)
+• `/roll 2.5hsk` - 2½d6 killing (2d6 + 1d3)
+• `/roll 3hsh` - 3d6 to-hit (target: 11 + OCV - DCV)
 
-**Hero System Damage:**
-• **Normal damage (hsn)**: Standard dice total
-• **Killing damage (hsk)**: BODY = dice total, STUN = BODY × 1d3 multiplier
-• **To-hit (hsh)**: 3d6 roll-under (target: 11 + OCV - DCV)
+**Wrath & Glory:**
+• `/roll wng 4d6` - Standard roll with wrath die
+• `/roll wng dn2 4d6` - Difficulty 2 test (shows PASS/FAIL)
+• `/roll wng 4d6 !soak` - Damage/soak roll (no wrath die)
 
-**Warhammer 40k Wrath & Glory:**
-• `/roll wng 4d6` - 4d6 with wrath die
-• `/roll wng dn2 4d6` - 4d6 with difficulty 2 test (shows PASS/FAIL)
-• `/roll wng 4d6 !soak` - 4d6 without wrath die
-• `/roll wng dn4 6d6 !exempt` - 6d6 difficulty 4 test without wrath die
-
-**Dark Heresy 2nd Edition:**
-• `/roll dh 4d10` - 4d10 with righteous fury on 10s
-
-**Earthdawn:**
-• `/roll ed1` through `/roll ed50` - Step numbers 1-50
+**Other Systems:**
+• `/roll dh 4d10` - Dark Heresy (righteous fury on 10s)
+• `/roll ed15` - Earthdawn step 15 (steps 1-50 available)
 
 **Multiple Rolls:**
-Maximum 4 separate rolls with semicolons:
-• `/roll 4d6 ; 3d8 + 2 ; 1d20 ; 2d10 t7`
-
-**Roll Sets:**
+• `/roll 4d6 ; 3d8 + 2 ; 1d20` - Up to 4 separate rolls
 • `/roll 6 4d6` - Roll 6 sets of 4d6 (2-20 sets allowed)
 
-Use `/help` for basic syntax!"#
+Use `/help` for basic syntax and `/help alias` for more shortcuts!"#
         .to_string()
 }
