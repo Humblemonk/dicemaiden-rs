@@ -23,7 +23,7 @@ static DICE_MOD_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^([+\-])(\d+)d(\d+)$").expect("Failed to compile DICE_MOD_REGEX"));
 
 static MATH_SPLIT_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(\d+d\d+|[+\-*/]\d+d\d+|[+\-*/]\d+)").expect("Failed to compile MATH_SPLIT_REGEX")
+    Regex::new(r"(\d*d\d+|[+\-*/]\d*d\d+|[+\-*/]\d+)").expect("Failed to compile MATH_SPLIT_REGEX")
 });
 
 // Pre-compile modifier matching patterns to avoid runtime compilation
