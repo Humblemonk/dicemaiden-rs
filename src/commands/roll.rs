@@ -181,35 +181,87 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
         format!("{:.2} MB", memory_usage)
     };
 
-    // Get server count
-    let server_count = ctx.cache.guilds().len();
+    // Get database stats first to determine if we should show partial or total stats
+    let db_stats_result = get_database_stats(ctx).await;
 
-    // Get user count (approximate)
-    let user_count: usize = ctx
-        .cache
-        .guilds()
-        .iter()
-        .map(|guild_id| {
-            ctx.cache
-                .guild(*guild_id)
-                .map(|guild| guild.member_count as usize)
-                .unwrap_or(0)
-        })
-        .sum();
+    // Check if we're in multi-process mode by looking for environment variables
+    let is_multi_process =
+        std::env::var("SHARD_START").is_ok() && std::env::var("TOTAL_SHARDS").is_ok();
 
-    // Get database stats if available
-    let db_stats = get_database_stats(ctx).await;
+    let stats_section = if is_multi_process {
+        // Multi-process mode: Show process-specific stats and reference database for totals
+        let shard_start = std::env::var("SHARD_START")
+            .ok()
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(0);
+        let shard_count = std::env::var("SHARD_COUNT")
+            .ok()
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(1);
+        let total_shards = std::env::var("TOTAL_SHARDS")
+            .ok()
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(shard_count);
+
+        // Get current process's server and user counts
+        let process_server_count = ctx.cache.guilds().len();
+        let process_user_count: usize = ctx
+            .cache
+            .guilds()
+            .iter()
+            .map(|guild_id| {
+                ctx.cache
+                    .guild(*guild_id)
+                    .map(|guild| guild.member_count as usize)
+                    .unwrap_or(0)
+            })
+            .sum();
+
+        format!(
+            r#"**Current Process Stats:**
+• Process Shards: {} to {} ({} shards of {} total)
+• Process Servers: {}
+• Process Users: ~{}
+• Process Memory: {}"#,
+            shard_start,
+            shard_start + shard_count - 1,
+            shard_count,
+            total_shards,
+            process_server_count,
+            process_user_count,
+            memory_display
+        )
+    } else {
+        // Single process mode: Show normal stats
+        let server_count = ctx.cache.guilds().len();
+        let user_count: usize = ctx
+            .cache
+            .guilds()
+            .iter()
+            .map(|guild_id| {
+                ctx.cache
+                    .guild(*guild_id)
+                    .map(|guild| guild.member_count as usize)
+                    .unwrap_or(0)
+            })
+            .sum();
+
+        format!(
+            r#"**Current Stats:**
+• Servers: {}
+• Estimated Users: {}
+• Memory Usage: {}"#,
+            server_count, user_count, memory_display
+        )
+    };
 
     Ok(format!(
         r#"🤖 **Dice Maiden Bot Info** 🤖
 
-**Current Stats:**
-• Servers: {}
-• Estimated Users: {}
-• Memory Usage: {}
+{}
 
 {}"#,
-        server_count, user_count, memory_display, db_stats
+        stats_section, db_stats_result
     ))
 }
 
@@ -248,10 +300,21 @@ async fn get_database_stats(ctx: &Context) -> String {
                 // Count how many shards we have data for
                 let shard_count = stats.len();
 
-                format!(
-                    "**Database Stats:**\n• Last update: {}\n• Total recorded servers: {} (across {} shards)\n• Recorded memory: {}\n", 
-                    most_recent_timestamp, total_servers, shard_count, memory_display
-                )
+                // Check if we're in multi-process mode
+                let is_multi_process =
+                    std::env::var("SHARD_START").is_ok() && std::env::var("TOTAL_SHARDS").is_ok();
+
+                if is_multi_process {
+                    format!(
+                        "**Total Stats (All Processes):**\n• Last update: {}\n• Total servers: {} (across {} shards)\n• Total memory: {}\n• Active processes: Multiple (multi-process sharding)\n", 
+                        most_recent_timestamp, total_servers, shard_count, memory_display
+                    )
+                } else {
+                    format!(
+                        "**Database Stats:**\n• Last update: {}\n• Total recorded servers: {} (across {} shards)\n• Recorded memory: {}\n", 
+                        most_recent_timestamp, total_servers, shard_count, memory_display
+                    )
+                }
             }
             Err(_) => "**Database Stats:** Error reading data\n".to_string(),
         }
