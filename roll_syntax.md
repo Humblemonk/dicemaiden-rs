@@ -134,8 +134,8 @@
 ```
 
 ### Help Commands
-- `/roll help` - Basic dice syntax help
-- `/roll help alias` - Game system aliases
-- `/roll help system` - Detailed system examples
+- `/roll help` or `/help` - Basic dice syntax help
+- `/roll help alias` or `/help alias` - Game system aliases
+- `/roll help system` or `/help system` - Detailed system examples
 - `/roll donate` - Support information
-- `/roll bot-info` - Bot statistics
+- `/purge X` - Purge recent messages in channel
