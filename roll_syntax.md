@@ -124,13 +124,13 @@
 
 ### Complex Examples
 ```text
-/roll 10d6 e6 k8 +4        # 10d6, explode 6s, keep 8 highest, +4
-/roll p 3d6 + 2d4          # Private roll
-/roll s 4d6 k3             # Simple output (total only)
-/roll (Fireball) 8d6 ! AOE # Labeled roll with comment
-/roll 6 4d6                # 6 sets of 4d6
-/roll 4d6 ; 3d8 ; 1d20     # Three separate rolls
-/roll 4d10 t8 ie10 f1      # Chronicles of Darkness with botches
+/roll 10d6 e6 k8 +4                                # 10d6, explode 6s, keep 8 highest, +4
+/roll p 3d6 + 2d4                                  # Private roll
+/roll s 4d6 k3                                     # Simple output (total only)
+/roll (Fireball) 8d6 ! AOE                         # Labeled roll with comment
+/roll 6 4d6                                        # 6 sets of 4d6
+/roll 4d100 ; 10d6 e6 k8 +4; 3d10 k2; ul 3d100     # Four separate rolls
+/roll 4d10 t8 ie10 f1                              # Chronicles of Darkness with botches
 ```
 
 ## Help Commands
