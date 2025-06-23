@@ -550,7 +550,7 @@ fn add_explosion_notes(
         if explosion_count == 1 {
             result
                 .notes
-                .push("⚔️ **RIGHTEOUS FURY!** Natural 10 rolled - additional damage!".to_string());
+                .push("⚔️ **RIGHTEOUS FURY!** Natural 10 rolled - Purge the heretics!".to_string());
         } else {
             result.notes.push(format!(
                 "⚔️ **RIGHTEOUS FURY!** {} natural 10s - Emperor's wrath unleashed!",
@@ -570,10 +570,25 @@ fn add_explosion_notes(
 }
 
 fn drop_dice(result: &mut RollResult, count: usize) -> Result<()> {
-    if count >= result.individual_rolls.len() {
-        result
-            .notes
-            .push("Cannot drop more dice than rolled".to_string());
+    let available_dice = result.individual_rolls.len();
+    let already_dropped = result.dropped_rolls.len();
+
+    if count >= available_dice {
+        // Provide context-aware error message
+        if already_dropped > 0 {
+            result.notes.push(format!(
+                "Cannot drop {} dice - only {} dice remaining after previous keep/drop operations (originally rolled {}, {} already dropped)",
+                count,
+                available_dice,
+                available_dice + already_dropped,
+                already_dropped
+            ));
+        } else {
+            result.notes.push(format!(
+                "Cannot drop {} dice - only {} dice available",
+                count, available_dice
+            ));
+        }
         return Ok(());
     }
 
