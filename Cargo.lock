@@ -470,6 +470,7 @@ dependencies = [
  "clap",
  "dotenv",
  "nom",
+ "once_cell",
  "rand",
  "regex",
  "serde",

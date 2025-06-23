@@ -26,3 +26,4 @@ dotenv = "0.15"
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "macros"] }
 chrono = { version = "0.4", features = ["serde"] }
 sysinfo = "0.30"
+once_cell = "1.19"

@@ -5,7 +5,8 @@ mod help_text;
 
 use anyhow::Result;
 use serenity::{
-    all::*, async_trait, gateway::ShardManager, http::Http, model::gateway::Ready, prelude::*,
+    all::*, async_trait, cache::Settings as CacheSettings, gateway::ShardManager, http::Http,
+    model::gateway::Ready, prelude::*,
 };
 use std::{collections::HashSet, env, sync::Arc, time::Duration};
 use sysinfo::{Pid, System};
@@ -220,9 +221,26 @@ async fn main() -> Result<()> {
 
     let intents = GatewayIntents::GUILDS;
 
-    // Create client with explicit shard configuration
+    // Configure minimal cache settings to dramatically reduce memory usage
+    let mut cache_settings = CacheSettings::default();
+
+    // Disable message caching completely (biggest memory saver for a dice bot)
+    cache_settings.max_messages = 0;
+
+    // Disable caching of unnecessary data for a dice bot
+    cache_settings.cache_guilds = true; // Keep guild info for stats, but minimal data
+    cache_settings.cache_channels = false; // Don't cache channel data - we don't need it
+    cache_settings.cache_users = false; // Don't cache user data - we don't need it for dice rolling
+
+    // Set TTL for temporary data (reduces memory over time)
+    cache_settings.time_to_live = Duration::from_secs(3600); // 1 hour TTL
+
+    info!("Configured minimal cache settings for reduced memory usage");
+
+    // Create client with explicit shard configuration and optimized cache
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler::new(shard_count))
+        .cache_settings(cache_settings) // Apply optimized cache settings
         .await
         .expect("Error creating client");
 
@@ -339,6 +357,7 @@ async fn setup_signal_handlers(shutdown_tx: broadcast::Sender<()>) {
     }
 }
 
+// Optimized statistics collection to reduce memory usage and system overhead
 async fn collect_shard_stats_with_shutdown(
     db: Arc<database::Database>,
     cache: Arc<serenity::cache::Cache>,
@@ -346,10 +365,10 @@ async fn collect_shard_stats_with_shutdown(
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<()> {
     let mut interval = interval(Duration::from_secs(900)); // 15 minutes
-    let mut system = System::new_all();
 
-    // Get current process PID once (all shards share the same process)
-    let current_pid = std::process::id();
+    // Create system info once and only refresh our specific process
+    let mut system = System::new();
+    let current_pid = Pid::from_u32(std::process::id());
 
     loop {
         select! {
@@ -362,57 +381,53 @@ async fn collect_shard_stats_with_shutdown(
             }
         }
 
-        // Refresh system information (only needed for shard 0)
-        system.refresh_all();
+        // Only refresh our specific process memory usage instead of scanning all system processes
+        system.refresh_process(current_pid);
 
-        // Get shard information
         let shard_info = shard_manager.runners.lock().await;
-
         if shard_info.is_empty() {
-            // No shards running yet, wait for next interval
             continue;
         }
 
         let total_shards = shard_info.len();
 
-        // Iterate through all active shards
+        // Calculate memory once for all shards (they share the same process)
+        let memory_usage = if let Some(process) = system.process(current_pid) {
+            process.memory() as f64 / 1024.0 / 1024.0 // Convert from KB to MB
+        } else {
+            0.0
+        };
+
+        // Get total guild count more efficiently
+        let total_guilds = cache.guilds().len() as i32;
+        let guilds_per_shard = if total_shards > 0 {
+            total_guilds / total_shards as i32
+        } else {
+            0
+        };
+
+        // Process shards more efficiently
         for (&shard_id, shard_runner) in shard_info.iter() {
-            // Check if this shard is connected (skip if shutting down)
             if shard_runner.stage != serenity::gateway::ConnectionStage::Connected {
                 continue;
             }
 
-            // Get guilds for this specific shard (with error handling for shutdown)
-            let shard_guild_count = cache
-                .guilds()
-                .iter()
-                .filter(|guild_id| {
-                    // Calculate which shard this guild belongs to
-                    // Discord uses: (guild_id >> 22) % num_shards
-                    let guild_shard_id = (guild_id.get() >> 22) % total_shards as u64;
-                    guild_shard_id == shard_id.0 as u64
-                })
-                .count() as i32;
-
-            // Calculate memory usage - ONLY for shard 0, all others report 0
-            let memory_usage = if shard_id.0 == 0 {
-                // Only shard 0 reports actual memory usage
-                if let Some(process) = system.process(Pid::from_u32(current_pid)) {
-                    process.memory() as f64 / 1024.0 / 1024.0 // Convert from KB to MB
-                } else {
-                    0.0
-                }
+            // Approximate guild distribution instead of expensive per-shard calculations
+            let shard_guild_count = if shard_id.0 == 0 {
+                // Shard 0 gets any remainder
+                guilds_per_shard + (total_guilds % total_shards as i32)
             } else {
-                // All other shards report 0 memory usage
-                0.0
+                guilds_per_shard
             };
 
-            // Update stats for this shard (continue on error during shutdown)
+            // Only shard 0 reports memory usage to avoid duplication in database
+            let shard_memory = if shard_id.0 == 0 { memory_usage } else { 0.0 };
+
+            // Update stats with simplified error handling during shutdown
             if let Err(e) = db
-                .update_shard_stats(shard_id.0 as i32, shard_guild_count, memory_usage)
+                .update_shard_stats(shard_id.0 as i32, shard_guild_count, shard_memory)
                 .await
             {
-                // During shutdown, database errors are expected, so just log them at debug level
                 if shard_runner.stage == serenity::gateway::ConnectionStage::Connected {
                     error!("Failed to update shard {} stats: {}", shard_id.0, e);
                 } else {
@@ -421,33 +436,20 @@ async fn collect_shard_stats_with_shutdown(
                         shard_id.0, e
                     );
                 }
-            } else if shard_id.0 == 0 {
-                // Only log memory for shard 0
-                info!(
-                    "Updated shard {} stats: {} servers, {:.2} MB memory",
-                    shard_id.0, shard_guild_count, memory_usage
-                );
-            } else {
-                // Log without memory for other shards
-                info!(
-                    "Updated shard {} stats: {} servers",
-                    shard_id.0, shard_guild_count
-                );
             }
         }
 
-        // Also log total stats (only calculate actual memory for the total)
-        let total_guilds = cache.guilds().len();
-        let total_memory = if let Some(process) = system.process(Pid::from_u32(current_pid)) {
-            process.memory() as f64 / 1024.0 / 1024.0 // Convert from KB to MB
-        } else {
-            0.0
-        };
+        // Reduce log frequency to minimize string allocations and I/O overhead
+        // Only log summary every 4th collection cycle (every hour) for many shards
+        let should_log_summary =
+            total_shards <= 4 || (chrono::Utc::now().timestamp() / 3600) % 4 == 0;
 
-        info!(
-            "Total stats: {} shards, {} servers, {:.2} MB memory",
-            total_shards, total_guilds, total_memory
-        );
+        if should_log_summary {
+            info!(
+                "Stats summary: {} shards, {} servers, {:.2} MB memory",
+                total_shards, total_guilds, memory_usage
+            );
+        }
     }
 
     info!("Statistics collection loop ended");

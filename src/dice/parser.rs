@@ -1,6 +1,63 @@
 use super::{DiceRoll, HeroSystemType, Modifier};
 use anyhow::{anyhow, Result};
+use once_cell::sync::Lazy;
 use regex::Regex;
+
+// Pre-compile all regex patterns at startup to reduce memory allocations
+static SET_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(\d+)\s+(.+)$").expect("Failed to compile SET_REGEX"));
+
+static DICE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(\d+)?d(\d+|%)$").expect("Failed to compile DICE_REGEX"));
+
+static LABEL_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\(([^)]+)\)\s*").expect("Failed to compile LABEL_REGEX"));
+
+static COMMENT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"!\s*(.+)$").expect("Failed to compile COMMENT_REGEX"));
+
+static OP_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^([+\-*/])(\d+)$").expect("Failed to compile OP_REGEX"));
+
+static DICE_MOD_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^([+\-])(\d+)d(\d+)$").expect("Failed to compile DICE_MOD_REGEX"));
+
+static MATH_SPLIT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(\d+d\d+|[+\-*/]\d+)").expect("Failed to compile MATH_SPLIT_REGEX"));
+
+// Pre-compile modifier matching patterns to avoid runtime compilation
+static WNG_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(wng\d*t?)").expect("Failed to compile WNG_PATTERN"));
+
+static IE_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(ie\d*)").expect("Failed to compile IE_PATTERN"));
+
+static IR_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(ir\d+)").expect("Failed to compile IR_PATTERN"));
+
+static KL_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(kl\d+)").expect("Failed to compile KL_PATTERN"));
+
+static E_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(e\d*)").expect("Failed to compile E_PATTERN"));
+
+static K_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(k\d+)").expect("Failed to compile K_PATTERN"));
+
+static R_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(r\d+)").expect("Failed to compile R_PATTERN"));
+
+static D_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(d\d+)").expect("Failed to compile D_PATTERN"));
+
+static T_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(t\d+)").expect("Failed to compile T_PATTERN"));
+
+static F_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(f\d+)").expect("Failed to compile F_PATTERN"));
+
+static B_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(b\d*)").expect("Failed to compile B_PATTERN"));
 
 pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     let input = input.trim();
@@ -17,7 +74,7 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
             return Err(anyhow!("Maximum of 4 separate rolls allowed"));
         }
 
-        let mut results = Vec::new();
+        let mut results = Vec::with_capacity(parts.len()); // Pre-allocate capacity
         for part in parts {
             let part = part.trim();
             let mut sub_results = parse_dice_string(part)?;
@@ -25,14 +82,13 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
             for dice in &mut sub_results {
                 dice.original_expression = Some(part.to_string());
             }
-            results.append(&mut sub_results);
+            results.extend(sub_results);
         }
         return Ok(results);
     }
 
-    // Check for roll sets (e.g., "6 4d6")
-    let set_regex = Regex::new(r"^(\d+)\s+(.+)$").unwrap();
-    if let Some(captures) = set_regex.captures(input) {
+    // Use pre-compiled regex for roll sets
+    if let Some(captures) = SET_REGEX.captures(input) {
         let count: u32 = captures[1]
             .parse()
             .map_err(|_| anyhow!("Invalid set count"))?;
@@ -41,7 +97,7 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         }
         let dice_expr = &captures[2];
 
-        let mut results = Vec::new();
+        let mut results = Vec::with_capacity(count as usize); // Pre-allocate capacity
         for i in 0..count {
             let mut dice = parse_single_dice_expression(dice_expr)?;
             dice.label = Some(format!("Set {}", i + 1));
@@ -85,7 +141,7 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
         .any(|c| matches!(c, '+' | '-' | '*' | '/'))
         && !remaining.contains(' ')
     {
-        // Split mathematical expressions without spaces using regex
+        // Split mathematical expressions without spaces using pre-compiled regex
         split_math_expression_regex(remaining)?
     } else {
         // Split by whitespace for expressions with spaces
@@ -123,10 +179,9 @@ fn parse_flags<'a>(dice: &mut DiceRoll, mut remaining: &'a str) -> &'a str {
     remaining
 }
 
-// Helper function to parse label
+// Helper function to parse label using pre-compiled regex
 fn parse_label<'a>(dice: &mut DiceRoll, remaining: &'a str) -> &'a str {
-    let label_regex = Regex::new(r"^\(([^)]+)\)\s*").unwrap();
-    if let Some(captures) = label_regex.captures(remaining) {
+    if let Some(captures) = LABEL_REGEX.captures(remaining) {
         dice.label = Some(captures[1].to_string());
         &remaining[captures.get(0).unwrap().end()..]
     } else {
@@ -134,10 +189,9 @@ fn parse_label<'a>(dice: &mut DiceRoll, remaining: &'a str) -> &'a str {
     }
 }
 
-// Helper function to parse comment
+// Helper function to parse comment using pre-compiled regex
 fn parse_comment<'a>(dice: &mut DiceRoll, remaining: &'a str) -> &'a str {
-    let comment_regex = Regex::new(r"!\s*(.+)$").unwrap();
-    if let Some(captures) = comment_regex.captures(remaining) {
+    if let Some(captures) = COMMENT_REGEX.captures(remaining) {
         dice.comment = Some(captures[1].to_string());
         remaining[..captures.get(0).unwrap().start()].trim()
     } else {
@@ -145,10 +199,9 @@ fn parse_comment<'a>(dice: &mut DiceRoll, remaining: &'a str) -> &'a str {
     }
 }
 
-// Helper function to parse base dice expression
+// Helper function to parse base dice expression using pre-compiled regex
 fn parse_base_dice(dice: &mut DiceRoll, part: &str) -> Result<()> {
-    let dice_regex = Regex::new(r"^(\d+)?d(\d+|%)$").unwrap();
-    if let Some(captures) = dice_regex.captures(part) {
+    if let Some(captures) = DICE_REGEX.captures(part) {
         dice.count = captures
             .get(1)
             .map(|m| m.as_str().parse().unwrap_or(1))
@@ -254,113 +307,67 @@ fn try_parse_operator_modifier(
     }
 }
 
-// Define modifier patterns for extraction
-struct ModifierPattern {
-    prefix: &'static str,
-    regex: &'static str,
-    exclude_prefixes: &'static [&'static str],
-}
-
-impl ModifierPattern {
-    const PATTERNS: &'static [ModifierPattern] = &[
-        ModifierPattern {
-            prefix: "hsh",
-            regex: r"^(hsh)",
-            exclude_prefixes: &[],
-        },
-        ModifierPattern {
-            prefix: "hsk",
-            regex: r"^(hsk)",
-            exclude_prefixes: &[],
-        },
-        ModifierPattern {
-            prefix: "hsn",
-            regex: r"^(hsn)",
-            exclude_prefixes: &[],
-        },
-        ModifierPattern {
-            prefix: "gbs",
-            regex: r"^(gbs)",
-            exclude_prefixes: &[],
-        },
-        ModifierPattern {
-            prefix: "gb",
-            regex: r"^(gb)",
-            exclude_prefixes: &["gbs"],
-        },
-        ModifierPattern {
-            prefix: "wng",
-            regex: r"^(wng\d*t?)",
-            exclude_prefixes: &[],
-        },
-        ModifierPattern {
-            prefix: "ie",
-            regex: r"^(ie\d*)",
-            exclude_prefixes: &[],
-        },
-        ModifierPattern {
-            prefix: "ir",
-            regex: r"^(ir\d+)",
-            exclude_prefixes: &[],
-        },
-        ModifierPattern {
-            prefix: "kl",
-            regex: r"^(kl\d+)",
-            exclude_prefixes: &[],
-        },
-        ModifierPattern {
-            prefix: "e",
-            regex: r"^(e\d*)",
-            exclude_prefixes: &["ie"],
-        },
-        ModifierPattern {
-            prefix: "k",
-            regex: r"^(k\d+)",
-            exclude_prefixes: &["kl"],
-        },
-        ModifierPattern {
-            prefix: "r",
-            regex: r"^(r\d+)",
-            exclude_prefixes: &["ir"],
-        },
-        ModifierPattern {
-            prefix: "d",
-            regex: r"^(d\d+)",
-            exclude_prefixes: &[],
-        },
-        ModifierPattern {
-            prefix: "t",
-            regex: r"^(t\d+)",
-            exclude_prefixes: &[],
-        },
-        ModifierPattern {
-            prefix: "f",
-            regex: r"^(f\d+)",
-            exclude_prefixes: &[],
-        },
-        ModifierPattern {
-            prefix: "b",
-            regex: r"^(b\d*)",
-            exclude_prefixes: &[],
-        },
-    ];
-
-    fn matches(&self, input: &str) -> bool {
-        input.starts_with(self.prefix)
-            && !self
-                .exclude_prefixes
-                .iter()
-                .any(|&exclude| input.starts_with(exclude))
+// Optimized modifier pattern extraction using pre-compiled regex patterns
+fn extract_modifier_pattern(input: &str) -> Option<String> {
+    // Direct string matching for simple cases (most efficient)
+    match input {
+        "hsh" | "hsk" | "hsn" | "gb" | "gbs" => return Some(input.to_string()),
+        _ => {}
     }
 
-    fn extract(&self, input: &str) -> Option<String> {
-        if self.matches(input) {
-            let re = Regex::new(self.regex).unwrap();
-            re.captures(input).map(|captures| captures[1].to_string())
-        } else {
-            None
+    // Check for excluded prefixes first
+    if input.starts_with("gbs") && input != "gbs" {
+        return None; // Don't match "gb" if it starts with "gbs"
+    }
+
+    // Pattern matching with pre-compiled regex for complex cases
+    if input.starts_with("wng") {
+        if let Some(captures) = WNG_PATTERN.captures(input) {
+            return Some(captures[1].to_string());
+        }
+    } else if input.starts_with("ie") {
+        if let Some(captures) = IE_PATTERN.captures(input) {
+            return Some(captures[1].to_string());
+        }
+    } else if input.starts_with("ir") {
+        if let Some(captures) = IR_PATTERN.captures(input) {
+            return Some(captures[1].to_string());
+        }
+    } else if input.starts_with("kl") {
+        if let Some(captures) = KL_PATTERN.captures(input) {
+            return Some(captures[1].to_string());
+        }
+    } else if input.starts_with('e') && !input.starts_with("ie") {
+        if let Some(captures) = E_PATTERN.captures(input) {
+            return Some(captures[1].to_string());
+        }
+    } else if input.starts_with('k') && !input.starts_with("kl") {
+        if let Some(captures) = K_PATTERN.captures(input) {
+            return Some(captures[1].to_string());
+        }
+    } else if input.starts_with('r') && !input.starts_with("ir") {
+        if let Some(captures) = R_PATTERN.captures(input) {
+            return Some(captures[1].to_string());
+        }
+    } else if input.starts_with('d') {
+        if let Some(captures) = D_PATTERN.captures(input) {
+            return Some(captures[1].to_string());
+        }
+    } else if input.starts_with('t') {
+        if let Some(captures) = T_PATTERN.captures(input) {
+            return Some(captures[1].to_string());
+        }
+    } else if input.starts_with('f') {
+        if let Some(captures) = F_PATTERN.captures(input) {
+            return Some(captures[1].to_string());
+        }
+    } else if input.starts_with('b') {
+        if let Some(captures) = B_PATTERN.captures(input) {
+            return Some(captures[1].to_string());
         }
     }
+
+    None
 }
 
 // New function to split combined modifiers like "e6k8" into ["e6", "k8"]
@@ -391,40 +398,71 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
 }
 
 fn is_simple_modifier(input: &str) -> bool {
-    // Check if it's a simple modifier that doesn't need splitting
-    let simple_patterns = [
-        r"^[+\-*/]\d+$", // +5, -3, *2, /4
-        r"^\d+$",        // 5
-        r"^gbs$",        // gbs
-        r"^gb$",         // gb
-        r"^ie\d*$",      // ie, ie6
-        r"^ir\d+$",      // ir2
-        r"^r\d+$",       // r2
-        r"^e\d*$",       // e, e6 (but only if no other modifiers follow)
-        r"^kl\d+$",      // kl2
-        r"^k\d+$",       // k3 (but only if no other modifiers follow)
-        r"^d\d+$",       // d2 (but only if no other modifiers follow)
-        r"^t\d+$",       // t7
-        r"^f\d+$",       // f1
-        r"^b\d*$",       // b, b1
-        r"^wng\d*t?$",   // wng, wng3, wngt, wng3t
-        r"^hsn$",        // hsn
-        r"^hsk$",        // hsk
-        r"^hsh$",        // hsh
-    ];
+    // Check for exact matches first (most common)
+    match input {
+        "gb" | "gbs" | "ie" | "hsn" | "hsk" | "hsh" | "fudge" | "df" => return true,
+        _ => {}
+    }
 
-    simple_patterns
-        .iter()
-        .any(|pattern| Regex::new(pattern).unwrap().is_match(input))
+    // Check for simple numeric modifiers
+    if input.len() <= 6 {
+        // Check for patterns like "+5", "-3", "*2", "/4"
+        if let Some(first_char) = input.chars().next() {
+            match first_char {
+                '+' | '-' | '*' | '/' => {
+                    return input.len() > 1 && input[1..].chars().all(|c| c.is_ascii_digit())
+                }
+                '0'..='9' => return input.chars().all(|c| c.is_ascii_digit()),
+                _ => {}
+            }
+        }
+    }
+
+    // Check for simple modifiers with numbers like "ie6", "k3", "t7", etc.
+    if input.len() >= 2 && input.len() <= 5 {
+        if let Some(stripped) = input.strip_prefix("ie") {
+            return stripped.chars().all(|c| c.is_ascii_digit());
+        }
+        if let Some(stripped) = input.strip_prefix("ir") {
+            return stripped.chars().all(|c| c.is_ascii_digit());
+        }
+        if let Some(stripped) = input.strip_prefix("kl") {
+            return stripped.chars().all(|c| c.is_ascii_digit());
+        }
+        if let Some(stripped) = input.strip_prefix('e') {
+            return stripped.chars().all(|c| c.is_ascii_digit()) || stripped.is_empty();
+        }
+        if let Some(stripped) = input.strip_prefix('k') {
+            return stripped.chars().all(|c| c.is_ascii_digit()) || stripped.is_empty();
+        }
+        if let Some(stripped) = input.strip_prefix('r') {
+            return stripped.chars().all(|c| c.is_ascii_digit()) || stripped.is_empty();
+        }
+        if let Some(stripped) = input.strip_prefix('d') {
+            return stripped.chars().all(|c| c.is_ascii_digit()) || stripped.is_empty();
+        }
+        if let Some(stripped) = input.strip_prefix('t') {
+            return stripped.chars().all(|c| c.is_ascii_digit()) || stripped.is_empty();
+        }
+        if let Some(stripped) = input.strip_prefix('f') {
+            return stripped.chars().all(|c| c.is_ascii_digit()) || stripped.is_empty();
+        }
+        if let Some(stripped) = input.strip_prefix('b') {
+            return stripped.chars().all(|c| c.is_ascii_digit()) || stripped.is_empty();
+        }
+        if let Some(stripped) = input.strip_prefix("wng") {
+            return stripped.chars().all(|c| c.is_ascii_digit() || c == 't') || input == "wng";
+        }
+    }
+
+    false
 }
 
 fn extract_next_modifier(input: &str) -> Result<(String, &str)> {
-    // Try each pattern in order
-    for pattern in ModifierPattern::PATTERNS {
-        if let Some(modifier) = pattern.extract(input) {
-            let rest = &input[modifier.len()..];
-            return Ok((modifier, rest));
-        }
+    // Try to extract a modifier pattern from the input
+    if let Some(modifier) = extract_modifier_pattern(input) {
+        let rest = &input[modifier.len()..];
+        return Ok((modifier, rest));
     }
 
     // If no pattern matched, return empty
@@ -489,7 +527,7 @@ fn parse_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::Add(num));
     }
 
-    // Operators with numbers (e.g., "+2", "-3", "*4", "/2")
+    // Operators with numbers (e.g., "+2", "-3", "*4", "/2") using pre-compiled regex
     if let Some(modifier) = parse_operator_modifier(part)? {
         return Ok(modifier);
     }
@@ -553,10 +591,9 @@ fn parse_modifier(part: &str) -> Result<Modifier> {
     Err(anyhow!("Unknown modifier: {}", part))
 }
 
-// Helper function to parse operator modifiers
+// Helper function to parse operator modifiers using pre-compiled regex
 fn parse_operator_modifier(part: &str) -> Result<Option<Modifier>> {
-    let op_regex = Regex::new(r"^([+\-*/])(\d+)$").unwrap();
-    if let Some(captures) = op_regex.captures(part) {
+    if let Some(captures) = OP_REGEX.captures(part) {
         let num: i32 = captures[2]
             .parse()
             .map_err(|_| anyhow!("Invalid modifier number"))?;
@@ -572,10 +609,9 @@ fn parse_operator_modifier(part: &str) -> Result<Option<Modifier>> {
     }
 }
 
-// Helper function to parse dice modifiers
+// Helper function to parse dice modifiers using pre-compiled regex
 fn parse_dice_modifier(part: &str) -> Result<Option<Modifier>> {
-    let dice_mod_regex = Regex::new(r"^([+\-])(\d+)d(\d+)$").unwrap();
-    if let Some(captures) = dice_mod_regex.captures(part) {
+    if let Some(captures) = DICE_MOD_REGEX.captures(part) {
         let count: u32 = captures[2]
             .parse()
             .map_err(|_| anyhow!("Invalid dice count in modifier"))?;
@@ -603,13 +639,12 @@ fn parse_dice_modifier(part: &str) -> Result<Option<Modifier>> {
 }
 
 fn is_dice_expression(input: &str) -> bool {
-    let dice_regex = Regex::new(r"^\d*d\d+$").unwrap();
-    dice_regex.is_match(input)
+    // Use pre-compiled regex for dice expression detection
+    DICE_REGEX.is_match(input)
 }
 
 fn parse_dice_expression_only(input: &str) -> Result<DiceRoll> {
-    let dice_regex = Regex::new(r"^(\d+)?d(\d+)$").unwrap();
-    if let Some(captures) = dice_regex.captures(input) {
+    if let Some(captures) = DICE_REGEX.captures(input) {
         let count = captures
             .get(1)
             .map(|m| m.as_str().parse().unwrap_or(1))
@@ -636,9 +671,11 @@ fn parse_dice_expression_only(input: &str) -> Result<DiceRoll> {
 }
 
 fn split_math_expression_regex(input: &str) -> Result<Vec<&str>> {
-    // Use regex to split expressions like "4d10+2" into ["4d10", "+2"]
-    let re = Regex::new(r"(\d+d\d+|[+\-*/]\d+)")?;
-    let parts: Vec<&str> = re.find_iter(input).map(|m| m.as_str()).collect();
+    // Use pre-compiled regex to split expressions like "4d10+2" into ["4d10", "+2"]
+    let parts: Vec<&str> = MATH_SPLIT_REGEX
+        .find_iter(input)
+        .map(|m| m.as_str())
+        .collect();
 
     if parts.is_empty() {
         // If no matches, return the original input
