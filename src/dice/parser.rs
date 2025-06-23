@@ -132,16 +132,26 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     remaining = parse_comment(&mut dice, remaining);
 
     // Parse the main dice expression and modifiers
-    let parts: Vec<&str> = if should_use_math_splitting(remaining) {
-        // For compact expressions like "3d6k2+4", split into components
-        let split_regex = Regex::new(r"(\d*d\d+|[a-zA-Z]+\d*|[+\-*/]\d+)").unwrap();
-        split_regex
-            .find_iter(remaining)
-            .map(|m| m.as_str())
-            .collect()
-    } else {
-        // Split by whitespace for expressions with spaces
+    let parts: Vec<&str> = if remaining.contains(' ') {
+        // Has spaces - split by whitespace
         remaining.split_whitespace().collect()
+    } else {
+        // No spaces - extract dice part, then split modifiers
+        if let Some(dice_match) = Regex::new(r"^\d*d\d+").unwrap().find(remaining) {
+            let dice_part = dice_match.as_str();
+            let rest = &remaining[dice_match.end()..];
+
+            if rest.is_empty() {
+                vec![dice_part]
+            } else {
+                let mut parts = vec![dice_part];
+                let modifier_regex = Regex::new(r"([a-zA-Z]+\d*|[+\-*/]\d+)").unwrap();
+                parts.extend(modifier_regex.find_iter(rest).map(|m| m.as_str()));
+                parts
+            }
+        } else {
+            vec![remaining]
+        }
     };
 
     if parts.is_empty() {
@@ -155,13 +165,6 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     parse_all_modifiers(&mut dice, &parts[1..])?;
 
     Ok(dice)
-}
-
-fn should_use_math_splitting(remaining: &str) -> bool {
-    remaining
-        .chars()
-        .any(|c| matches!(c, '+' | '-' | '*' | '/'))
-        && !remaining.contains(' ')
 }
 
 // Helper function to parse flags
