@@ -7,12 +7,14 @@ on:
       - '**/*.md'
       - '**/*.example'
       - '**/*.Gemfile'
+      - '**/*.yml'
   pull_request:
     branches: [ "main" ]
     paths-ignore:
       - '**/*.md'
       - '**/*.example'
       - '**/*.Gemfile'
+      - '**/*.yml'
 
 env:
   CARGO_TERM_COLOR: always
