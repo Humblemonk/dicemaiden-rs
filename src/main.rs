@@ -439,10 +439,8 @@ async fn collect_shard_stats_with_shutdown(
             }
         }
 
-        // Reduce log frequency to minimize string allocations and I/O overhead
-        // Only log summary every 4th collection cycle (every hour) for many shards
-        let should_log_summary =
-            total_shards <= 4 || (chrono::Utc::now().timestamp() / 3600) % 4 == 0;
+        // Reduce log frequency to minimize string allocations and I/O overhead. Log every 30 mins
+        let should_log_summary = (chrono::Utc::now().timestamp() / 1800) % 2 == 0;
 
         if should_log_summary {
             info!(
