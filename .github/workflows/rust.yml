@@ -5,10 +5,14 @@ on:
     branches: [ "main" ]
     paths-ignore:
       - '**/*.md'
+      - '**/*.example'
+      - '**/*.Gemfile'
   pull_request:
     branches: [ "main" ]
     paths-ignore:
       - '**/*.md'
+      - '**/*.example'
+      - '**/*.Gemfile'
 
 env:
   CARGO_TERM_COLOR: always
