@@ -89,7 +89,7 @@ https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=27487
 - `MAX_CONCURRENCY` - Max concurrent shard connections. Discord will override this with your bots actual limit (optional)
 - `RUST_LOG` - Log level (default: info)
 
-#### Multi-Process Sharding
+### Multi-Process Sharding
 - `SHARD_START` - Starting shard ID for the process
 - `TOTAL_SHARDS` - Total shards across all processes
 
