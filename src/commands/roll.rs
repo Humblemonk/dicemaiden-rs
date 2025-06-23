@@ -174,6 +174,13 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
         0.0
     };
 
+    // Format memory with appropriate unit
+    let memory_display = if memory_usage > 1000.0 {
+        format!("{:.2} GB", memory_usage / 1024.0)
+    } else {
+        format!("{:.2} MB", memory_usage)
+    };
+
     // Get server count
     let server_count = ctx.cache.guilds().len();
 
@@ -199,10 +206,10 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
 **Current Stats:**
 • Servers: {}
 • Estimated Users: {}
-• Memory Usage: {:.2} MB
+• Memory Usage: {}
 
 {}"#,
-        server_count, user_count, memory_usage, db_stats
+        server_count, user_count, memory_display, db_stats
     ))
 }
 
@@ -231,12 +238,19 @@ async fn get_database_stats(ctx: &Context) -> String {
                     .map(|s| s.memory_mb)
                     .unwrap_or(0.0);
 
+                // Format recorded memory with appropriate unit
+                let memory_display = if shard_0_memory > 1000.0 {
+                    format!("{:.2} GB", shard_0_memory / 1024.0)
+                } else {
+                    format!("{:.2} MB", shard_0_memory)
+                };
+
                 // Count how many shards we have data for
                 let shard_count = stats.len();
 
                 format!(
-                    "**Database Stats:**\n• Last update: {}\n• Total recorded servers: {} (across {} shards)\n• Recorded memory: {:.2} MB\n", 
-                    most_recent_timestamp, total_servers, shard_count, shard_0_memory
+                    "**Database Stats:**\n• Last update: {}\n• Total recorded servers: {} (across {} shards)\n• Recorded memory: {}\n", 
+                    most_recent_timestamp, total_servers, shard_count, memory_display
                 )
             }
             Err(_) => "**Database Stats:** Error reading data\n".to_string(),
