@@ -198,6 +198,27 @@ async fn main() -> Result<()> {
         .and_then(|s| s.parse::<u32>().ok())
         .unwrap_or(1); // Default to 1 shard for smaller bots
 
+    info!("Shard configuration:");
+    info!("  Shard count: {}", shard_count);
+    info!("  Max concurrency: {}", max_concurrency);
+
+    let http = Http::new(&token);
+    let (_owners, _bot_id) = match http.get_current_application_info().await {
+        Ok(info) => {
+            let mut owners = HashSet::new();
+            if let Some(owner) = &info.owner {
+                owners.insert(owner.id);
+            }
+            if let Some(team) = info.team {
+                for member in &team.members {
+                    owners.insert(member.user.id);
+                }
+            }
+            (owners, info.id)
+        }
+        Err(why) => panic!("Could not access application info: {:?}", why),
+    };
+
     // Validate shard configuration for verified bots
     if max_concurrency > 1 {
         info!(
@@ -218,31 +239,12 @@ async fn main() -> Result<()> {
     }
 
     // Validate that shard count is a multiple of 16 for large bot sharding
-    if shard_count % 16 != 0 {
+    if shard_count >= 16 && shard_count % 16 != 0 {
         warn!("SHARD_COUNT ({}) is not a multiple of 16. This is required for Discord's large bot sharding.", shard_count);
         warn!(
             "Consider using 16, 32, 48, 64, etc. shards if you need large bot sharding approval."
         );
     }
-
-    info!("Configuring bot with {} shards", shard_count);
-
-    let http = Http::new(&token);
-    let (_owners, _bot_id) = match http.get_current_application_info().await {
-        Ok(info) => {
-            let mut owners = HashSet::new();
-            if let Some(owner) = &info.owner {
-                owners.insert(owner.id);
-            }
-            if let Some(team) = info.team {
-                for member in &team.members {
-                    owners.insert(member.user.id);
-                }
-            }
-            (owners, info.id)
-        }
-        Err(why) => panic!("Could not access application info: {:?}", why),
-    };
 
     let intents = GatewayIntents::GUILDS;
 
@@ -302,27 +304,52 @@ async fn main() -> Result<()> {
     // Setup signal handlers for graceful shutdown
     let shutdown_signal = setup_signal_handlers(shutdown_tx.clone());
 
-    // Run the client with graceful shutdown
+    // Clone shard manager for shutdown
+    let shard_manager_for_shutdown = Arc::clone(&client.shard_manager);
+    let client_shutdown_rx = shutdown_tx.subscribe();
+
+    // Start shards with proper shutdown handling
     let client_handle = tokio::spawn(async move {
-        if let Err(why) = client.start_shards(shard_count).await {
-            error!("Client error: {:?}", why);
+        let mut shutdown_rx = client_shutdown_rx;
+
+        select! {
+            result = async {
+                if max_concurrency > 1 {
+                    // Verified bot - use batching
+                    start_shards_with_batching(&mut client, shard_count, max_concurrency).await
+                } else {
+                    // Unverified bot - use simple start
+                    client.start_shards(shard_count).await
+                }
+            } => {
+                if let Err(why) = result {
+                    error!("Client error: {:?}", why);
+                }
+                info!("Discord client stopped naturally");
+            }
+            _ = shutdown_rx.recv() => {
+                info!("Discord client received shutdown signal");
+                // Shutdown all shards immediately
+                shard_manager_for_shutdown.shutdown_all().await;
+                info!("All shards shut down");
+            }
         }
-        info!("Discord client stopped");
     });
 
     // Wait for shutdown signal
-    if shard_count > 1 {
-        info!("Dice Maiden is starting with {} shards. This may take a few minutes for all shards to connect...", shard_count);
+    if max_concurrency > 1 && shard_count > 1 {
+        let startup_batches = shard_count.div_ceil(max_concurrency);
+        let estimated_startup_time = startup_batches * 5;
+        info!("Dice Maiden is starting with {} shards in {} batches (verified bot). This may take ~{} seconds...", 
+               shard_count, startup_batches, estimated_startup_time);
+    } else if shard_count > 1 {
         info!(
-            "Expected startup time: ~{} minutes for {} shards",
-            (shard_count as f32 / 60.0).ceil() as u32,
-            shard_count
+            "Dice Maiden is starting with {} shards (unverified bot). This may take ~{} seconds...",
+            shard_count,
+            shard_count * 5
         );
     } else {
-        info!(
-            "Dice Maiden is running with {} shard. Press Ctrl+C to shut down gracefully.",
-            shard_count
-        );
+        info!("Dice Maiden is running with 1 shard. Press Ctrl+C to shut down gracefully.");
     }
 
     shutdown_signal.await;
@@ -334,8 +361,8 @@ async fn main() -> Result<()> {
         warn!("Error broadcasting shutdown signal: {}", e);
     }
 
-    // Wait for background tasks with timeout (longer for multiple shards)
-    let shutdown_timeout = Duration::from_secs(5);
+    // Wait for background tasks with a reasonable timeout
+    let shutdown_timeout = Duration::from_secs(3);
 
     tokio::select! {
         _ = stats_handle => {
@@ -346,17 +373,93 @@ async fn main() -> Result<()> {
         }
     }
 
-    // Shutdown Discord client
+    // Don't wait for Discord client - it will shut down when the process exits
+    // Just give it a moment to clean up, but don't block shutdown
     tokio::select! {
         _ = client_handle => {
             info!("Discord client finished");
         }
-        _ = tokio::time::sleep(shutdown_timeout) => {
-            warn!("Discord client did not finish within timeout, continuing shutdown");
+        _ = tokio::time::sleep(Duration::from_millis(500)) => {
+            info!("Discord client shutdown - continuing with process exit");
         }
     }
 
     info!("Graceful shutdown completed");
+    Ok(())
+}
+
+/// Start shards with proper batching to respect Discord's max_concurrency limits
+async fn start_shards_with_batching(
+    client: &mut Client,
+    shard_count: u32,
+    max_concurrency: u32,
+) -> Result<(), SerenityError> {
+    info!(
+        "Starting {} shards with max_concurrency of {}",
+        shard_count, max_concurrency
+    );
+
+    // Calculate batches
+    let batches = shard_count.div_ceil(max_concurrency);
+
+    for batch in 0..batches {
+        let start_shard = batch * max_concurrency;
+        let end_shard = ((batch + 1) * max_concurrency).min(shard_count);
+        let shards_in_batch = end_shard - start_shard;
+
+        info!(
+            "Starting batch {}/{}: shards {} to {} ({} shards)",
+            batch + 1,
+            batches,
+            start_shard,
+            end_shard - 1,
+            shards_in_batch
+        );
+
+        // Start shards in this batch
+        let shard_range = start_shard..end_shard;
+
+        // Start the batch of shards
+        if let Err(e) = client.start_shard_range(shard_range, shard_count).await {
+            error!("Failed to start shard batch {}: {}", batch + 1, e);
+            return Err(e);
+        }
+
+        // Wait between batches (except for the last batch)
+        if batch + 1 < batches {
+            info!(
+                "Batch {} started successfully, waiting 5 seconds before next batch...",
+                batch + 1
+            );
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        } else {
+            info!("Final batch {} started successfully", batch + 1);
+        }
+    }
+
+    info!(
+        "All {} shards have been started across {} batches",
+        shard_count, batches
+    );
+
+    // Now we need to keep the client running
+    loop {
+        tokio::time::sleep(Duration::from_secs(30)).await;
+
+        // Check if all shards are still running
+        let shard_manager = &client.shard_manager;
+        let runners = shard_manager.runners.lock().await;
+        let connected_count = runners
+            .values()
+            .filter(|runner| runner.stage == serenity::gateway::ConnectionStage::Connected)
+            .count();
+
+        if connected_count == 0 {
+            warn!("No shards are connected, shutting down");
+            break;
+        }
+    }
+
     Ok(())
 }
 
