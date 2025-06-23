@@ -1,4 +1,4 @@
-## Dice Rolling Syntax
+# Dice Rolling Syntax
 
 ### Basic Usage
 - `/roll 2d6` - Roll two six-sided dice
