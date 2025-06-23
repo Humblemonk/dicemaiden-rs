@@ -102,6 +102,7 @@ You can customize the build further by modifying `Cargo.toml` dependencies.
 - Rust 1.75+
 - Discord bot token
 - SQLite database (automatically created for bot statistics)
+- Dependencies - For a detailed list, review [Cargo.toml](Cargo.toml)
 
 ### Building
 ```bash
