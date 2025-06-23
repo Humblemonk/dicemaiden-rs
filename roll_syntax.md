@@ -1,6 +1,6 @@
-## Dice Rolling Syntax
+# Dice Rolling Syntax
 
-### Basic Usage
+## Basic Usage
 - `/roll 2d6` - Roll two six-sided dice
 - `/roll 3d6 + 5` - Roll 3d6 and add 5
 - `/roll 4d6 k3` - Roll 4d6, keep highest 3
@@ -27,9 +27,9 @@
 - **Comments**: `/roll 2d6 ! Fire damage`
 - **Labels**: `/roll (Attack) 1d20 + 5`
 
-### Game System Aliases
+## Game System Aliases
 
-#### D&D/Pathfinder
+### D&D/Pathfinder
 - `dndstats` → 6 4d6 k3 (ability score generation)
 - `attack +5` → 1d20 +5 (attack roll)
 - `skill -2` → 1d20 -2 (skill check)
@@ -39,14 +39,14 @@
 - `+d%` → 2d10 kl1 * 10 + 1d10 - 10 (percentile advantage)
 - `-d%` → 2d10 k1 * 10 + 1d10 - 10 (percentile disadvantage)
 
-#### World of Darkness / Chronicles of Darkness
+### World of Darkness / Chronicles of Darkness
 - `4cod` → 4d10 t8 ie10 (Chronicles of Darkness)
 - `4cod8` → 4d10 t7 ie10 (8-again rule)
 - `4cod9` → 4d10 t6 ie10 (9-again rule)
 - `4codr` → 4d10 t8 ie10 r1 (rote quality)
 - `4wod8` → 4d10 f1 ie10 t8 (World of Darkness, difficulty 8)
 
-#### Hero System 5th Edition
+### Hero System 5th Edition
 - `2hsn` → 2d6 hsn (normal damage)
 - `3hsk` → 3d6 hsk (killing damage with STUN multiplier)
 - `2.5hsk` → 2d6 + 1d3 hsk (fractional killing damage)
@@ -54,22 +54,22 @@
 - `3hsh` → 3d6 hsh (to-hit roll, roll-under)
 - `hsn`, `hsk`, `hsh` → Single die versions
 
-#### Godbound
+### Godbound
 - `gb` → 1d20 gb (damage chart: 1-=0, 2-5=1, 6-9=2, 10+=4)
 - `gbs` → 1d20 gbs (straight damage, no chart)
 - `gb 3d8` → 3d8 gb (3d8 with damage chart)
 - `gbs 2d10 +5` → 2d10 straight damage +5
 
-#### Warhammer 40k Wrath & Glory
+### Warhammer 40k Wrath & Glory
 - `wng 4d6` → 4d6 with wrath die and success counting
 - `wng dn3 5d6` → 5d6 with difficulty 3 (shows PASS/FAIL)
 - `wng 4d6 !soak` → 4d6 soak roll (uses total, not successes)
 - `wng dn4 6d6 !exempt` → 6d6 exempt test without wrath die
 
-#### Dark Heresy 2nd Edition
+### Dark Heresy 2nd Edition
 - `dh 4d10` → 4d10 ie10 (righteous fury on natural 10s)
 
-#### Other Popular Systems
+### Other Popular Systems
 - **Shadowrun**: `sr6` → 6d6 t5 (6th edition)
 - **Exalted**: `ex5` → 5d10 t7 t10, `ex5t8` → 5d10 t8 t10
 - **Fudge/FATE**: `3df` → 3d3 fudge (shows +/blank/- symbols)
@@ -83,22 +83,22 @@
 - **Sunsails**: `snm5` → 5d6 ie6 t4
 - **D6 System**: `d6s4` → 4d6 + 1d6 ie
 
-### System-Specific Examples
+## System-Specific Examples
 
-#### Percentile Systems (Call of Cthulhu, etc.)
+### Percentile Systems (Call of Cthulhu, etc.)
 ```text
 /roll +d%    # Advantage: keep lower tens digit
 /roll -d%    # Disadvantage: keep higher tens digit
 /roll d%     # Standard percentile roll
 ```
 
-#### Fudge/FATE Dice
+### Fudge/FATE Dice
 ```text
 /roll 3df    # 3 Fudge dice: + (plus), (blank), - (minus)
 /roll 4df    # Standard FATE roll
 ```
 
-#### Hero System Damage
+### Hero System Damage
 ```text
 /roll 2hsn      # 2d6 normal damage
 /roll 3hsk      # 3d6 killing: shows BODY and STUN (BODY × 1d3)
@@ -106,7 +106,7 @@
 /roll 3hsh      # 3d6 to-hit (roll under 11 + OCV - DCV)
 ```
 
-#### Godbound Damage
+### Godbound Damage
 ```text
 /roll gb        # d20 with damage chart conversion
 /roll gbs       # d20 straight damage (no chart)
@@ -114,7 +114,7 @@
 /roll 2d10 gbs  # Straight damage total
 ```
 
-#### Wrath & Glory Tests
+### Wrath & Glory Tests
 ```text
 /roll wng 4d6              # Standard test with wrath die
 /roll wng dn3 5d6          # Difficulty 3 test
@@ -133,7 +133,7 @@
 /roll 4d10 t8 ie10 f1      # Chronicles of Darkness with botches
 ```
 
-### Help Commands
+## Help Commands
 - `/roll help` or `/help` - Basic dice syntax help
 - `/roll help alias` or `/help alias` - Game system aliases
 - `/roll help system` or `/help system` - Detailed system examples
