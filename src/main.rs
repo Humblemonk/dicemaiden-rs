@@ -186,23 +186,175 @@ async fn main() -> Result<()> {
 
     let token = env::var("DISCORD_TOKEN").expect("Expected DISCORD_TOKEN in environment");
 
-    // Read max_concurrency from environment
-    let max_concurrency = env::var("MAX_CONCURRENCY")
+    // Read max_concurrency from environment, but use Discord's reported value if available
+    let env_max_concurrency = env::var("MAX_CONCURRENCY")
         .ok()
         .and_then(|s| s.parse::<u32>().ok())
-        .unwrap_or(1); // Default to 1 for unverified bots
+        .unwrap_or(1);
 
-    // Configure the number of shards (must be a multiple of 16 for large bot sharding)
-    let shard_count = env::var("SHARD_COUNT")
+    // Configure the number of shards - use Discord's recommendation or manual override
+    let manual_shard_count = env::var("SHARD_COUNT")
         .ok()
-        .and_then(|s| s.parse::<u32>().ok())
-        .unwrap_or(1); // Default to 1 shard for smaller bots
+        .and_then(|s| s.parse::<u32>().ok());
+
+    let use_autosharding = env::var("USE_AUTOSHARDING")
+        .map(|s| s.to_lowercase() == "true")
+        .unwrap_or(false);
 
     info!("Shard configuration:");
-    info!("  Shard count: {}", shard_count);
-    info!("  Max concurrency: {}", max_concurrency);
+    if let Some(manual_count) = manual_shard_count {
+        info!("  Manual shard count: {}", manual_count);
+    }
+    if use_autosharding {
+        info!("  Autosharding: enabled (will use Discord's recommendation)");
+    }
+    info!("  Environment max concurrency: {}", env_max_concurrency);
 
     let http = Http::new(&token);
+
+    // Check what Discord says about gateway info
+    match http.get_gateway().await {
+        Ok(gateway_info) => {
+            info!("Gateway URL: {}", gateway_info.url);
+        }
+        Err(e) => {
+            error!("Failed to get gateway info: {}", e);
+        }
+    }
+
+    // Get bot gateway info which includes session_start_limit
+    let (actual_max_concurrency, recommended_shards) = match http.get_bot_gateway().await {
+        Ok(bot_gateway) => {
+            info!("Recommended shards from Discord: {}", bot_gateway.shards);
+            let session_start_limit = bot_gateway.session_start_limit;
+            info!("Session start limit info:");
+            info!("  Total: {}", session_start_limit.total);
+            info!("  Remaining: {}", session_start_limit.remaining);
+            info!("  Reset after: {}ms", session_start_limit.reset_after);
+            info!("  Max concurrency: {}", session_start_limit.max_concurrency);
+
+            // Convert Discord's u64 to u32 for consistency with our code
+            let discord_max_concurrency = session_start_limit.max_concurrency as u32;
+
+            if discord_max_concurrency != env_max_concurrency {
+                warn!(
+                    "Environment MAX_CONCURRENCY ({}) differs from Discord's actual limit ({})",
+                    env_max_concurrency, discord_max_concurrency
+                );
+            }
+
+            if discord_max_concurrency == 1 {
+                warn!("Discord reports max_concurrency=1. Your bot may not have large bot sharding approved.");
+                warn!("Even verified bots need separate approval for higher concurrency limits.");
+            } else {
+                info!(
+                    "Discord approved max_concurrency: {}",
+                    discord_max_concurrency
+                );
+            }
+
+            (discord_max_concurrency, bot_gateway.shards)
+        }
+        Err(e) => {
+            error!("Failed to get bot gateway info: {}", e);
+            warn!(
+                "Using environment MAX_CONCURRENCY value: {}",
+                env_max_concurrency
+            );
+            (env_max_concurrency, manual_shard_count.unwrap_or(1))
+        }
+    };
+
+    // Determine final shard strategy
+    let (shard_strategy, shard_count, shard_start, total_shards) = if use_autosharding {
+        info!(
+            "Using autosharding with Discord's recommended {} shards",
+            recommended_shards
+        );
+        warn!(
+            "PERFORMANCE WARNING: {} shards = ~{} minute startup time due to Serenity limitation",
+            recommended_shards,
+            (recommended_shards * 5) / 60
+        );
+        warn!("Consider using manual shard count with multi-process for faster startup");
+        ("autoshard", recommended_shards, 0, recommended_shards)
+    } else if let Some(manual_count) = manual_shard_count {
+        // Check for multi-process environment variables
+        let shard_start_env = env::var("SHARD_START")
+            .ok()
+            .and_then(|s| s.parse::<u32>().ok());
+        let total_shards_env = env::var("TOTAL_SHARDS")
+            .ok()
+            .and_then(|s| s.parse::<u32>().ok());
+
+        match (shard_start_env, total_shards_env) {
+            (Some(start), Some(total)) => {
+                // Multi-process mode
+                let process_shard_count = manual_count;
+                info!("Multi-process mode detected:");
+                info!(
+                    "  This process handles shards {} to {} ({} shards)",
+                    start,
+                    start + process_shard_count - 1,
+                    process_shard_count
+                );
+                info!("  Total shards across all processes: {}", total);
+                info!(
+                    "  Estimated startup time: ~{} seconds",
+                    process_shard_count * 5
+                );
+                ("multi_process", process_shard_count, start, total)
+            }
+            _ => {
+                // Single process mode
+                if manual_count != recommended_shards {
+                    let startup_time_minutes = (manual_count * 5) / 60;
+                    info!(
+                        "Manual shard count ({}) differs from Discord's recommendation ({})",
+                        manual_count, recommended_shards
+                    );
+                    info!("Estimated startup time: ~{} minutes", startup_time_minutes);
+                    warn!("For faster startup, consider multi-process sharding:");
+                    warn!("  Set SHARD_START and TOTAL_SHARDS environment variables");
+
+                    if manual_count < recommended_shards {
+                        let guilds_per_shard = if manual_count > 0 {
+                            // Estimate based on typical large bot ratios
+                            2500 * recommended_shards / manual_count
+                        } else {
+                            0
+                        };
+
+                        if guilds_per_shard > 2500 {
+                            warn!(
+                                "WARNING: {} shards may exceed Discord's 2,500 guilds per shard limit",
+                                manual_count
+                            );
+                            warn!("Estimated: ~{} guilds per shard", guilds_per_shard);
+                            warn!(
+                                "Consider using at least {} shards",
+                                recommended_shards * 2500 / 2500
+                            );
+                        } else {
+                            info!(
+                                "Estimated: ~{} guilds per shard (within Discord limits)",
+                                guilds_per_shard
+                            );
+                        }
+                    }
+                }
+                info!("Using manual shard count: {}", manual_count);
+                ("manual", manual_count, 0, manual_count)
+            }
+        }
+    } else {
+        info!("No sharding configuration found, using single shard");
+        ("single", 1, 0, 1)
+    };
+
+    // Use Discord's actual max_concurrency instead of environment variable
+    let max_concurrency = actual_max_concurrency;
+
     let (_owners, _bot_id) = match http.get_current_application_info().await {
         Ok(info) => {
             let mut owners = HashSet::new();
@@ -313,7 +465,7 @@ async fn main() -> Result<()> {
         let mut shutdown_rx = client_shutdown_rx;
 
         select! {
-            result = start_client_with_proper_sharding(client, shard_count, max_concurrency) => {
+            result = start_client_with_shard_strategy(client, shard_strategy, shard_count, shard_start, total_shards) => {
                 if let Err(why) = result {
                     error!("Client error: {:?}", why);
                 }
@@ -327,18 +479,38 @@ async fn main() -> Result<()> {
         }
     });
 
-    // Wait for shutdown signal
-    if max_concurrency > 1 && shard_count > 1 {
-        let startup_batches = shard_count.div_ceil(max_concurrency);
-        let estimated_startup_time = startup_batches * 5;
-        info!("Dice Maiden is starting with {} shards in {} batches (verified bot). This may take ~{} seconds...", 
-               shard_count, startup_batches, estimated_startup_time);
-    } else if shard_count > 1 {
+    // Wait for shutdown signal and provide accurate information
+    if use_autosharding {
         info!(
-            "Dice Maiden is starting with {} shards (unverified bot). This may take ~{} seconds...",
-            shard_count,
-            shard_count * 5
+            "Dice Maiden using autosharding with {} recommended shards",
+            shard_count
         );
+        info!(
+            "Discord will automatically manage shard concurrency (max_concurrency: {})",
+            max_concurrency
+        );
+    } else if shard_strategy == "multi_process" {
+        info!("Dice Maiden starting in multi-process mode");
+        info!(
+            "This process handles shards {} to {} ({} shards)",
+            shard_start,
+            shard_start + shard_count - 1,
+            shard_count
+        );
+        info!("Total shards across all processes: {}", total_shards);
+        info!("Use 'pkill dicemaiden-rs' to stop all processes");
+    } else if shard_count > 1 {
+        info!("Dice Maiden starting {} shards manually", shard_count);
+        info!(
+            "Serenity will handle concurrency internally (max_concurrency: {})",
+            max_concurrency
+        );
+
+        if max_concurrency > 1 {
+            info!("Note: If shards still start sequentially, this may be a Serenity limitation");
+            info!("Consider using multi-process sharding for faster startup:");
+            info!("  Set SHARD_START and TOTAL_SHARDS environment variables");
+        }
     } else {
         info!("Dice Maiden is running with 1 shard. Press Ctrl+C to shut down gracefully.");
     }
@@ -379,35 +551,61 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Properly start the client with correct shard handling
-async fn start_client_with_proper_sharding(
+/// Start the client with proper shard strategy implementation
+async fn start_client_with_shard_strategy(
     mut client: Client,
+    strategy: &str,
     shard_count: u32,
-    max_concurrency: u32,
+    shard_start: u32,
+    total_shards: u32,
 ) -> Result<(), SerenityError> {
-    if shard_count == 1 {
-        // Single shard - use the simple start method
-        info!("Starting single shard");
-        client.start().await
-    } else if max_concurrency == 1 {
-        // Multiple shards but max_concurrency is 1 (unverified bot)
-        // This will automatically handle the 5-second delay between shards
-        info!(
-            "Starting {} shards sequentially (unverified bot)",
-            shard_count
-        );
-        client.start_shards(shard_count).await
-    } else {
-        // Multiple shards with higher max_concurrency (verified bot)
-        // Serenity handles the batching internally based on max_concurrency
-        info!(
-            "Starting {} shards with max_concurrency {} (verified bot)",
-            shard_count, max_concurrency
-        );
-
-        // For verified bots, we still use start_shards but Discord's gateway
-        // will respect the max_concurrency automatically
-        client.start_shards(shard_count).await
+    match strategy {
+        "single" => {
+            info!("Starting single shard");
+            client.start().await
+        }
+        "autoshard" => {
+            warn!(
+                "Shards will start sequentially (~{} minutes total)",
+                (shard_count * 5) / 60
+            );
+            warn!("For faster startup, consider reducing SHARD_COUNT to 64-128 shards");
+            info!("Starting with autosharding - {} shards", shard_count);
+            client.start_autosharded().await
+        }
+        "manual" => {
+            warn!(
+                "Shards will start sequentially (~{} minutes total)",
+                (shard_count * 5) / 60
+            );
+            warn!("For faster startup, consider using multi-process sharding");
+            info!(
+                "Starting {} shards manually (0 to {})",
+                shard_count,
+                shard_count - 1
+            );
+            client.start_shard_range(0..shard_count, shard_count).await
+        }
+        "multi_process" => {
+            info!(
+                "Starting shard range {} to {} ({} shards) out of {} total",
+                shard_start,
+                shard_start + shard_count - 1,
+                shard_count,
+                total_shards
+            );
+            info!(
+                "This process will take ~{} seconds to start",
+                shard_count * 5
+            );
+            client
+                .start_shard_range(shard_start..(shard_start + shard_count), total_shards)
+                .await
+        }
+        _ => {
+            error!("Unknown shard strategy: {}", strategy);
+            Err(SerenityError::Other("Unknown shard strategy"))
+        }
     }
 }
 

@@ -132,26 +132,16 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     remaining = parse_comment(&mut dice, remaining);
 
     // Parse the main dice expression and modifiers
-    let parts: Vec<&str> = if remaining.contains(' ') {
-        // Has spaces - split by whitespace
-        remaining.split_whitespace().collect()
+    let parts: Vec<String> = if remaining.contains(' ') {
+        // Has spaces - split by whitespace and then further split any combined tokens
+        let initial_parts: Vec<&str> = remaining.split_whitespace().collect();
+        split_space_separated_parts(&initial_parts)?
     } else {
-        // No spaces - extract dice part, then split modifiers
-        if let Some(dice_match) = Regex::new(r"^\d*d\d+").unwrap().find(remaining) {
-            let dice_part = dice_match.as_str();
-            let rest = &remaining[dice_match.end()..];
-
-            if rest.is_empty() {
-                vec![dice_part]
-            } else {
-                let mut parts = vec![dice_part];
-                let modifier_regex = Regex::new(r"([a-zA-Z]+\d*|[+\-*/]\d+)").unwrap();
-                parts.extend(modifier_regex.find_iter(rest).map(|m| m.as_str()));
-                parts
-            }
-        } else {
-            vec![remaining]
-        }
+        // No spaces - need to intelligently split dice from modifiers
+        split_dice_and_modifiers(remaining)?
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
     };
 
     if parts.is_empty() {
@@ -159,12 +149,118 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     }
 
     // Parse main dice part (first part should always be dice like "3d6")
-    parse_base_dice(&mut dice, parts[0])?;
+    parse_base_dice(&mut dice, &parts[0])?;
 
     // Parse all remaining parts as modifiers
-    parse_all_modifiers(&mut dice, &parts[1..])?;
+    let string_parts: Vec<&str> = parts.iter().skip(1).map(|s| s.as_str()).collect();
+    parse_all_modifiers(&mut dice, &string_parts)?;
 
     Ok(dice)
+}
+
+// Function to handle space-separated parts that might have combined modifiers
+fn split_space_separated_parts(parts: &[&str]) -> Result<Vec<String>> {
+    let mut result = Vec::new();
+
+    for (i, &part) in parts.iter().enumerate() {
+        if i == 0 {
+            // First part should be dice, but might have modifiers attached
+            if part.contains("d") {
+                // This looks like a dice expression, try to split it
+                let split_parts = split_dice_and_modifiers(part)?;
+                result.extend(split_parts.into_iter().map(|s| s.to_string()));
+            } else {
+                result.push(part.to_string());
+            }
+        } else {
+            // Subsequent parts might be combined modifiers like "+8k2"
+            if part.starts_with('+')
+                || part.starts_with('-')
+                || part.starts_with('*')
+                || part.starts_with('/')
+            {
+                // This is a mathematical operator with possibly attached modifiers
+                let split_parts = split_modifier_combinations(part)?;
+                result.extend(split_parts.into_iter().map(|s| s.to_string()));
+            } else {
+                result.push(part.to_string());
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+// Function to split combined modifiers like "+8k2" into ["+8", "k2"]
+fn split_modifier_combinations(input: &str) -> Result<Vec<String>> {
+    // Handle mathematical operators with attached modifiers
+    if let Some(first_char) = input.chars().next() {
+        if matches!(first_char, '+' | '-' | '*' | '/') {
+            // Find where the number ends and modifiers begin
+            let mut number_end = 1; // Start after the operator
+            while number_end < input.len()
+                && input.chars().nth(number_end).unwrap().is_ascii_digit()
+            {
+                number_end += 1;
+            }
+
+            if number_end == input.len() {
+                // Just an operator and number, no attached modifiers
+                return Ok(vec![input.to_string()]);
+            }
+
+            // Split into operator+number and remaining modifiers
+            let math_part = &input[..number_end];
+            let modifier_part = &input[number_end..];
+
+            let mut result = vec![math_part.to_string()];
+
+            // Split the remaining modifiers
+            let modifier_regex = Regex::new(r"([a-zA-Z]+\d*)").unwrap();
+            for modifier_match in modifier_regex.find_iter(modifier_part) {
+                result.push(modifier_match.as_str().to_string());
+            }
+
+            return Ok(result);
+        }
+    }
+
+    // If it doesn't start with a mathematical operator, just return as-is
+    Ok(vec![input.to_string()])
+}
+
+// Function to intelligently split dice expressions like "2d20+8" into ["2d20", "+8"]
+fn split_dice_and_modifiers(input: &str) -> Result<Vec<String>> {
+    // First, try to find the dice part
+    let dice_regex = Regex::new(r"^\d*d\d+").unwrap();
+    if let Some(dice_match) = dice_regex.find(input) {
+        let dice_part = dice_match.as_str();
+        let rest = &input[dice_match.end()..];
+
+        if rest.is_empty() {
+            return Ok(vec![dice_part.to_string()]);
+        }
+
+        // Now split the rest into modifiers
+        let mut parts = vec![dice_part.to_string()];
+
+        // Use regex to find all modifier patterns
+        let modifier_regex = Regex::new(r"([+\-*/]\d+|[a-zA-Z]+\d*)").unwrap();
+        for modifier_match in modifier_regex.find_iter(rest) {
+            parts.push(modifier_match.as_str().to_string());
+        }
+
+        // Validate that we've consumed the entire string
+        let reconstructed: String = parts.iter().skip(1).map(|s| s.as_str()).collect();
+        if reconstructed != rest {
+            return Err(anyhow!("Unable to parse dice expression: {}", input));
+        }
+
+        Ok(parts)
+    } else {
+        // If no dice pattern found, just return the original as one part
+        Ok(vec![input.to_string()])
+    }
 }
 
 // Helper function to parse flags
@@ -381,7 +477,7 @@ fn extract_modifier_pattern(input: &str) -> Option<String> {
     None
 }
 
-// New function to split combined modifiers like "e6k8" into ["e6", "k8"]
+// Function to split combined modifiers like "e6k8" into ["e6", "k8"]
 fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
     // If it's a simple modifier, return as-is
     if is_simple_modifier(input) {
