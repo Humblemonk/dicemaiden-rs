@@ -79,6 +79,24 @@ fn get_display_name(command: &CommandInteraction) -> String {
     }
 }
 
+// Helper function to calculate server and user counts from cache
+fn get_server_and_user_counts(ctx: &Context) -> (usize, usize) {
+    let server_count = ctx.cache.guilds().len();
+    let user_count: usize = ctx
+        .cache
+        .guilds()
+        .iter()
+        .map(|guild_id| {
+            ctx.cache
+                .guild(*guild_id)
+                .map(|guild| guild.member_count as usize)
+                .unwrap_or(0)
+        })
+        .sum();
+
+    (server_count, user_count)
+}
+
 pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandResponse> {
     let options = &command.data.options;
 
@@ -229,19 +247,8 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
             .and_then(|s| s.parse::<u32>().ok())
             .unwrap_or(shard_count);
 
-        // Get current process's server and user counts
-        let process_server_count = ctx.cache.guilds().len();
-        let process_user_count: usize = ctx
-            .cache
-            .guilds()
-            .iter()
-            .map(|guild_id| {
-                ctx.cache
-                    .guild(*guild_id)
-                    .map(|guild| guild.member_count as usize)
-                    .unwrap_or(0)
-            })
-            .sum();
+        // Get current process's server and user counts using helper function
+        let (process_server_count, process_user_count) = get_server_and_user_counts(ctx);
 
         format!(
             r#"**Current Process Stats:**
@@ -258,19 +265,8 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
             memory_display
         )
     } else {
-        // Single process mode: Show normal stats
-        let server_count = ctx.cache.guilds().len();
-        let user_count: usize = ctx
-            .cache
-            .guilds()
-            .iter()
-            .map(|guild_id| {
-                ctx.cache
-                    .guild(*guild_id)
-                    .map(|guild| guild.member_count as usize)
-                    .unwrap_or(0)
-            })
-            .sum();
+        // Single process mode: Show normal stats using helper function
+        let (server_count, user_count) = get_server_and_user_counts(ctx);
 
         format!(
             r#"**Current Stats:**

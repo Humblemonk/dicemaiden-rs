@@ -52,6 +52,7 @@ impl EventHandler for Handler {
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
             + 1;
 
+        // Display the actual shard ID, not an adjusted one
         info!(
             "Shard {} connected! ({}/{} shards ready)",
             ctx.shard_id.0, connected, self.shard_count
@@ -71,7 +72,7 @@ impl EventHandler for Handler {
         let activity = ActivityData::listening("/roll");
         ctx.set_activity(Some(activity));
 
-        // Only do initial setup from shard 0
+        // Only do initial setup from shard 0 globally (not per-process)
         if ctx.shard_id.0 == 0 {
             info!("Bot activity set to 'Listening to /roll'");
             info!("Starting command registration...");
@@ -82,7 +83,7 @@ impl EventHandler for Handler {
             .and_then(|id| id.parse().ok())
             .map(GuildId::new);
 
-        // Only register commands from shard 0 to avoid conflicts
+        // Only register commands from shard 0 globally to avoid conflicts across all processes
         if ctx.shard_id.0 == 0 {
             // Register slash commands globally (or to a specific guild for testing)
             let commands = if let Some(guild_id) = guild_id {
@@ -117,10 +118,10 @@ impl EventHandler for Handler {
             }
         }
 
-        // Log when all shards are ready
+        // Log when all shards in this process are ready
         if connected == self.shard_count {
             info!(
-                "All {} shards are now connected and ready!",
+                "All {} shards in this process are now connected and ready!",
                 self.shard_count
             );
         }
@@ -587,6 +588,9 @@ async fn start_client_with_shard_strategy(
             client.start_shard_range(0..shard_count, shard_count).await
         }
         "multi_process" => {
+            // The range should be shard_start..(shard_start + shard_count)
+            let end_shard = shard_start + shard_count;
+
             info!(
                 "Starting shard range {} to {} ({} shards) out of {} total",
                 shard_start,
@@ -598,8 +602,11 @@ async fn start_client_with_shard_strategy(
                 "This process will take ~{} seconds to start",
                 shard_count * 5
             );
+
+            // This should create a range from shard_start to shard_start + shard_count (exclusive)
+            // For example: 208..224 includes shards 208, 209, 210, ..., 223 (16 shards)
             client
-                .start_shard_range(shard_start..(shard_start + shard_count), total_shards)
+                .start_shard_range(shard_start..end_shard, total_shards)
                 .await
         }
         _ => {
