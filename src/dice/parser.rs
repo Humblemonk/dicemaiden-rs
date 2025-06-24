@@ -55,6 +55,10 @@ static F_PATTERN: Lazy<Regex> =
 static B_PATTERN: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(b\d*)").expect("Failed to compile B_PATTERN"));
 
+static ALIAS_WITH_MODIFIERS_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(\d*df)([+\-*/].*)$").expect("Failed to compile ALIAS_WITH_MODIFIERS_REGEX")
+});
+
 pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     let input = input.trim();
 
@@ -239,7 +243,7 @@ fn split_modifier_combinations(input: &str) -> Result<Vec<String>> {
 
 // Function to intelligently split dice expressions like "2d20+8" into ["2d20", "+8"]
 fn split_dice_and_modifiers(input: &str) -> Result<Vec<String>> {
-    // First, try to find the dice part
+    // First, try to find standard dice patterns (e.g., "2d20+8")
     let dice_regex = Regex::new(r"^\d*d\d+").unwrap();
     if let Some(dice_match) = dice_regex.find(input) {
         let dice_part = dice_match.as_str();
@@ -265,8 +269,22 @@ fn split_dice_and_modifiers(input: &str) -> Result<Vec<String>> {
         }
 
         Ok(parts)
+    } else if let Some(captures) = ALIAS_WITH_MODIFIERS_REGEX.captures(input) {
+        // Handle fudge dice with modifiers (e.g., "4df+1")
+        let alias_part = captures[1].to_string();
+        let modifier_part = &captures[2];
+
+        let mut parts = vec![alias_part];
+
+        // Split the modifier part
+        let modifier_regex = Regex::new(r"([+\-*/]\d+|[a-zA-Z]+\d*)").unwrap();
+        for modifier_match in modifier_regex.find_iter(modifier_part) {
+            parts.push(modifier_match.as_str().to_string());
+        }
+
+        Ok(parts)
     } else {
-        // If no dice pattern found, just return the original as one part
+        // If no pattern matched, just return the original as one part
         Ok(vec![input.to_string()])
     }
 }
@@ -311,6 +329,16 @@ fn parse_comment<'a>(dice: &mut DiceRoll, remaining: &'a str) -> &'a str {
 
 // Helper function to parse base dice expression using pre-compiled regex
 fn parse_base_dice(dice: &mut DiceRoll, part: &str) -> Result<()> {
+    // First try to expand as alias
+    if let Some(expanded) = super::aliases::expand_alias(part) {
+        // Parse the expanded expression and extract the base dice
+        let expanded_dice = parse_single_dice_expression(&expanded)?;
+        dice.count = expanded_dice.count;
+        dice.sides = expanded_dice.sides;
+        dice.modifiers.extend(expanded_dice.modifiers);
+        return Ok(());
+    }
+
     if let Some(captures) = DICE_ONLY_REGEX.captures(part) {
         dice.count = captures
             .get(1)
