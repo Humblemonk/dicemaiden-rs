@@ -12,12 +12,12 @@ cwd = File.expand_path(File.join(File.dirname(__FILE__), %w[../]))
 
 Dotenv.load("#{cwd}/.env")
 
-total_shards = ENV['SHARD_COUNT'].to_i
+total_shards = ENV['TOTAL_SHARDS'].to_i
 
 db = SQLite3::Database.new "#{cwd}/main.db"
 db.busy_timeout = (10_000)
 
-servers = db.execute 'select sum(server_count) from shard_stats;'
+servers = db.execute 'select sum(server_count) from process_stats;'
 
 RestClient.post('https://top.gg/api/bots/377701707943116800/stats',
                 { "shard_count": total_shards, "server_count": servers.join.to_i }.to_json, { Authorization: ENV['API'], content_type: :json }) do |response, _request, _result, &block|
