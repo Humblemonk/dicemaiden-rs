@@ -1,5 +1,6 @@
 use crate::dice;
 use crate::help_text; // Import the shared help text module from src root
+use crate::DatabaseContainer;
 use anyhow::Result;
 use regex::Regex;
 use serenity::{
@@ -289,7 +290,7 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
 
 async fn get_database_stats(ctx: &Context) -> String {
     let data = ctx.data.read().await;
-    if let Some(db) = data.get::<crate::DatabaseContainer>() {
+    if let Some(db) = data.get::<DatabaseContainer>() {
         // Check if we're in multi-process mode
         let is_multi_process =
             std::env::var("SHARD_START").is_ok() && std::env::var("TOTAL_SHARDS").is_ok();

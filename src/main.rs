@@ -1,9 +1,5 @@
-mod commands;
-mod database;
-mod dice;
-mod help_text;
-
 use anyhow::Result;
+use dicemaiden_rs::{commands, database, DatabaseContainer, ShardManagerContainer};
 use serenity::{
     all::*, async_trait, cache::Settings as CacheSettings, gateway::ShardManager, http::Http,
     model::gateway::Ready, prelude::*,
@@ -17,18 +13,6 @@ use tokio::{
     time::interval,
 };
 use tracing::{error, info, warn};
-
-pub struct ShardManagerContainer;
-
-impl TypeMapKey for ShardManagerContainer {
-    type Value = Arc<ShardManager>;
-}
-
-pub struct DatabaseContainer;
-
-impl TypeMapKey for DatabaseContainer {
-    type Value = Arc<database::Database>;
-}
 
 struct Handler {
     shard_count: u32,
