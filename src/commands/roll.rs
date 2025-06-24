@@ -56,6 +56,29 @@ pub fn register_r_alias() -> CreateCommand {
         )
 }
 
+// Helper function to get the display name (nickname or username)
+fn get_display_name(command: &CommandInteraction) -> String {
+    // Try to get the nickname from the member info (only available in guilds)
+    if let Some(member) = &command.member {
+        if let Some(nick) = &member.nick {
+            return nick.clone();
+        }
+    }
+
+    // Fall back to the user's global display name or username
+    if !command
+        .user
+        .global_name
+        .as_ref()
+        .unwrap_or(&String::new())
+        .is_empty()
+    {
+        command.user.global_name.as_ref().unwrap().clone()
+    } else {
+        command.user.name.clone()
+    }
+}
+
 pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandResponse> {
     let options = &command.data.options;
 
@@ -79,6 +102,9 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
         }
         _ => {} // Continue with normal dice parsing
     }
+
+    // Get the display name (nickname if available, otherwise username)
+    let display_name = get_display_name(command);
 
     // Parse and roll dice
     match dice::parse_and_roll(dice_expr) {
@@ -105,20 +131,20 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
 
                 let content = if is_semicolon_separated {
                     // For semicolon-separated rolls, the formatted string already contains individual requests
-                    format!("🎲 **{}** {}", command.user.name, formatted)
+                    format!("🎲 **{}** {}", display_name, formatted)
                 } else if results.len() > 1 {
                     // For roll sets, strip comment from request display
                     let clean_expr = strip_comment_from_expression(dice_expr);
                     format!(
                         "🎲 **{}** Request: `{}`\n{}",
-                        command.user.name, clean_expr, formatted
+                        display_name, clean_expr, formatted
                     )
                 } else {
                     // Single result, strip comment from request display
                     let clean_expr = strip_comment_from_expression(dice_expr);
                     format!(
                         "🎲 **{}** Request: `{}` {}",
-                        command.user.name, clean_expr, formatted
+                        display_name, clean_expr, formatted
                     )
                 };
 
@@ -139,7 +165,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
 
                     let simplified_content = format!(
                         "🎲 **{}** Request: `{}` {}",
-                        command.user.name, clean_expr, simplified_result
+                        display_name, clean_expr, simplified_result
                     );
                     Ok(CommandResponse::public(simplified_content))
                 } else {
@@ -151,7 +177,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
             let clean_expr = strip_comment_from_expression(dice_expr);
             let content = format!(
                 "🎲 **{}** used `{}` - ❌ **Error**: {}",
-                command.user.name, clean_expr, e
+                display_name, clean_expr, e
             );
             Ok(CommandResponse::public(content))
         }
