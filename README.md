@@ -123,6 +123,8 @@ src/
 ├── main.rs             # Application entry point and Discord client setup
 ├── database.rs         # SQLite database management for shard statistics
 ├── help_text.rs        # Shared help text generation for all help commands
+├── tests/
+│   ├── dice_tests.rs   # Comprehensive list of dice roll unit tests
 ├── dice/
 │   ├── mod.rs          # Dice module exports and core types (DiceRoll, RollResult, etc.)
 │   ├── parser.rs       # Dice expression parsing and syntax validation
