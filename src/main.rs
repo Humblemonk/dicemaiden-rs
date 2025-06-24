@@ -731,9 +731,9 @@ async fn collect_shard_stats_with_shutdown(
             // Log summary for this process
             info!(
                 "Process stats: {} shards ({}-{}), {} servers, {:.2} MB memory",
-                shard_count,
+                shard_count + 1,
                 shard_start,
-                shard_start + shard_count - 1,
+                shard_start + shard_count + 1,
                 total_guilds,
                 memory_usage
             );
