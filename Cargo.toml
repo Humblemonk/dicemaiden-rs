@@ -3,6 +3,10 @@ name = "dicemaiden-rs"
 version = "1.1.0"
 edition = "2021"
 
+[[bin]]
+name = "dicemaiden-rs"
+path = "src/main.rs"
+
 [dependencies]
 serenity = { version = "0.12", default-features = false, features = [
     "client",
