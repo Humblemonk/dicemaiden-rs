@@ -185,22 +185,49 @@ fn split_space_separated_parts(parts: &[&str]) -> Result<Vec<String>> {
                 result.push(part.to_string());
             }
         } else {
-            // Subsequent parts might be combined modifiers like "+8k2"
+            // Handle subsequent parts - they could be operators, dice expressions, or modifiers
             if part.starts_with('+')
                 || part.starts_with('-')
                 || part.starts_with('*')
                 || part.starts_with('/')
             {
-                // This is a mathematical operator with possibly attached modifiers
-                let split_parts = split_modifier_combinations(part)?;
-                result.extend(split_parts.into_iter().map(|s| s.to_string()));
+                // Check if this is a dice expression like "+1d6+15" or just a modifier like "+5"
+                if part.contains("d") {
+                    // This contains dice, so we need to split it properly
+                    let split_parts = split_dice_and_modifiers_from_operator(part)?;
+                    result.extend(split_parts.into_iter().map(|s| s.to_string()));
+                } else {
+                    // This is a mathematical operator with possibly attached modifiers like "+8k2"
+                    let split_parts = split_modifier_combinations(part)?;
+                    result.extend(split_parts.into_iter().map(|s| s.to_string()));
+                }
             } else {
+                // This could be a standalone modifier or number
                 result.push(part.to_string());
             }
         }
     }
 
     Ok(result)
+}
+
+// New function to handle operator-starting expressions that might contain dice
+fn split_dice_and_modifiers_from_operator(input: &str) -> Result<Vec<String>> {
+    let mut parts = Vec::new();
+
+    // Use the same regex pattern as in split_dice_and_modifiers
+    let modifier_regex = Regex::new(r"([+\-*/]\d*d\d+|[+\-*/]\d+|[a-zA-Z]+\d*)").unwrap();
+    for modifier_match in modifier_regex.find_iter(input) {
+        parts.push(modifier_match.as_str().to_string());
+    }
+
+    // Validate that we've consumed the entire string
+    let reconstructed: String = parts.iter().map(|s| s.as_str()).collect();
+    if reconstructed != input {
+        return Err(anyhow!("Unable to parse modifier expression: {}", input));
+    }
+
+    Ok(parts)
 }
 
 // Function to split combined modifiers like "+8k2" into ["+8", "k2"]
@@ -256,8 +283,9 @@ fn split_dice_and_modifiers(input: &str) -> Result<Vec<String>> {
         // Now split the rest into modifiers
         let mut parts = vec![dice_part.to_string()];
 
-        // Use regex to find all modifier patterns
-        let modifier_regex = Regex::new(r"([+\-*/]\d+|[a-zA-Z]+\d*)").unwrap();
+        // FIXED: Updated regex to properly handle dice expressions with operators
+        // The key fix: [+\-*/]\d*d\d+ matches dice expressions like +1d6, -2d8
+        let modifier_regex = Regex::new(r"([+\-*/]\d*d\d+|[+\-*/]\d+|[a-zA-Z]+\d*)").unwrap();
         for modifier_match in modifier_regex.find_iter(rest) {
             parts.push(modifier_match.as_str().to_string());
         }
@@ -265,7 +293,12 @@ fn split_dice_and_modifiers(input: &str) -> Result<Vec<String>> {
         // Validate that we've consumed the entire string
         let reconstructed: String = parts.iter().skip(1).map(|s| s.as_str()).collect();
         if reconstructed != rest {
-            return Err(anyhow!("Unable to parse dice expression: {}", input));
+            return Err(anyhow!(
+                "Unable to parse dice expression: {} (parsed: {} vs original: {})",
+                input,
+                reconstructed,
+                rest
+            ));
         }
 
         Ok(parts)
@@ -276,8 +309,8 @@ fn split_dice_and_modifiers(input: &str) -> Result<Vec<String>> {
 
         let mut parts = vec![alias_part];
 
-        // Split the modifier part
-        let modifier_regex = Regex::new(r"([+\-*/]\d+|[a-zA-Z]+\d*)").unwrap();
+        // Split the modifier part - also needs the same fix for dice expressions
+        let modifier_regex = Regex::new(r"([+\-*/]\d*d\d+|[+\-*/]\d+|[a-zA-Z]+\d*)").unwrap();
         for modifier_match in modifier_regex.find_iter(modifier_part) {
             parts.push(modifier_match.as_str().to_string());
         }
@@ -780,7 +813,11 @@ fn parse_dice_modifier(part: &str) -> Result<Option<Modifier>> {
             original_expression: None,
         };
 
-        Ok(Some(Modifier::AddDice(add_dice)))
+        match &captures[1] {
+            "+" => Ok(Some(Modifier::AddDice(add_dice))),
+            "-" => Ok(Some(Modifier::SubtractDice(add_dice))),
+            _ => Ok(None),
+        }
     } else {
         Ok(None)
     }
