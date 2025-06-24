@@ -729,43 +729,8 @@ async fn collect_shard_stats_with_shutdown(
                 error!("Failed to update process stats: {}", e);
             }
 
-            // Also update individual shard stats for backwards compatibility
-            let guilds_per_shard = if total_shards_in_process > 0 {
-                total_guilds / total_shards_in_process as i32
-            } else {
-                0
-            };
-
-            // Process shards but don't duplicate memory reporting
-            for (&shard_id, shard_runner) in shard_info.iter() {
-                if shard_runner.stage != serenity::gateway::ConnectionStage::Connected {
-                    continue;
-                }
-
-                // Approximate guild distribution instead of expensive per-shard calculations
-                let actual_shard_id = shard_start + shard_id.0 as i32;
-                let shard_guild_count = if shard_id.0 == 0 {
-                    // First shard in this process gets any remainder
-                    guilds_per_shard + (total_guilds % total_shards_in_process as i32)
-                } else {
-                    guilds_per_shard
-                };
-
-                // In multi-process mode, don't store memory in shard stats to avoid confusion
-                if let Err(e) = db
-                    .update_shard_stats(actual_shard_id, shard_guild_count, 0.0)
-                    .await
-                {
-                    if shard_runner.stage == serenity::gateway::ConnectionStage::Connected {
-                        error!("Failed to update shard {} stats: {}", actual_shard_id, e);
-                    } else {
-                        warn!(
-                            "Shard {} stats update failed during shutdown: {}",
-                            actual_shard_id, e
-                        );
-                    }
-                }
-            }
+            // In multi-process mode, we only use process_stats table
+            // Individual shard stats are not needed since process_stats contains all the information
 
             // Cleanup old process stats every hour
             if let Err(e) = db.cleanup_old_process_stats().await {
