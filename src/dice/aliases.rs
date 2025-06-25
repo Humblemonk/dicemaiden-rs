@@ -117,7 +117,11 @@ pub fn expand_alias(input: &str) -> Option<String> {
 }
 
 // Helper function to reduce duplication in Hero System dice processing
-fn process_hero_system_dice(dice_count_str: &str, _damage_type: &str, dice_type: &str) -> Option<String> {
+fn process_hero_system_dice(
+    dice_count_str: &str,
+    _damage_type: &str,
+    dice_type: &str,
+) -> Option<String> {
     if let Ok(dice_count) = dice_count_str.parse::<f64>() {
         let whole_dice = dice_count.floor() as u32;
         let has_fractional = dice_count.fract() > 0.0;

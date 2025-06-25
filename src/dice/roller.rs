@@ -169,7 +169,12 @@ fn apply_mathematical_modifiers(
                     .extend(additional_result.kept_rolls.clone());
 
                 // Add a new dice group for display using the SAME rolled dice
-                add_dice_group(result, dice_to_add, additional_result.individual_rolls, "add");
+                add_dice_group(
+                    result,
+                    dice_to_add,
+                    additional_result.individual_rolls,
+                    "add",
+                );
             }
             Modifier::SubtractDice(dice_to_subtract) => {
                 // Roll the additional dice only once and use that result consistently
@@ -189,7 +194,12 @@ fn apply_mathematical_modifiers(
                     .extend(additional_result.kept_rolls.clone());
 
                 // Add a new dice group for display using the SAME rolled dice
-                add_dice_group(result, dice_to_subtract, additional_result.individual_rolls, "subtract");
+                add_dice_group(
+                    result,
+                    dice_to_subtract,
+                    additional_result.individual_rolls,
+                    "subtract",
+                );
             }
             Modifier::Add(value) => {
                 expression_parts.push("+".to_string());
@@ -223,7 +233,12 @@ fn apply_mathematical_modifiers(
 }
 
 // Helper function to add dice groups, reducing duplication
-fn add_dice_group(result: &mut RollResult, dice_spec: &DiceRoll, rolls: Vec<i32>, modifier_type: &str) {
+fn add_dice_group(
+    result: &mut RollResult,
+    dice_spec: &DiceRoll,
+    rolls: Vec<i32>,
+    modifier_type: &str,
+) {
     let dice_group = DiceGroup {
         _description: format!("{}d{}", dice_spec.count, dice_spec.sides),
         rolls, // Use the actual rolled dice
@@ -777,7 +792,11 @@ fn drop_dice(result: &mut RollResult, count: usize) -> Result<()> {
 // Helper function to drop lowest dice, reducing duplication
 fn drop_lowest_dice(result: &mut RollResult, sorted_rolls: &mut Vec<i32>, count: usize) {
     for _ in 0..count {
-        if let Some(pos) = result.individual_rolls.iter().position(|&x| x == sorted_rolls[0]) {
+        if let Some(pos) = result
+            .individual_rolls
+            .iter()
+            .position(|&x| x == sorted_rolls[0])
+        {
             let dropped = result.individual_rolls.remove(pos);
             result.dropped_rolls.push(dropped);
             sorted_rolls.remove(0);
