@@ -729,15 +729,31 @@ mod tests {
     }
 
     #[test]
+    fn test_earthdawn_4e_alias() {
+        let expanded = aliases::expand_alias("ed4e15").unwrap();
+        assert_eq!(expanded, "1d12 ie + 2d6 ie");
+
+        let expanded = aliases::expand_alias("ed4e50").unwrap();
+        assert_eq!(expanded, "3d20 ie + 1d12 ie + 2d8 ie");
+
+        let expanded = aliases::expand_alias("ed4e100").unwrap();
+        assert_eq!(expanded, "8d20 ie + 2d10 ie");
+    }
+
+    #[test]
     fn test_earthdawn_boundaries() {
+        // Standard Earthdawn (1st edition) - steps 1-50
         assert_valid("ed1");
         assert_valid("ed50");
         assert_invalid("ed0");
         assert_invalid("ed51");
+
+        // Earthdawn 4th Edition - steps 1-100
         assert_valid("ed4e1");
         assert_valid("ed4e50");
+        assert_valid("ed4e100");
         assert_invalid("ed4e0");
-        assert_invalid("ed4e51");
+        assert_invalid("ed4e101");
     }
 
     // ============================================================================
@@ -1230,6 +1246,9 @@ mod tests {
             "age",
             "dd34",
             "ed15",
+            "ed4e15",
+            "ed4e50",
+            "ed4e100",
             "dh 4d10",
         ];
 
