@@ -470,7 +470,7 @@ async fn main() -> Result<()> {
         info!(
             "This process handles shards {} to {} ({} shards)",
             shard_start,
-            shard_start + shard_count + 1,
+            shard_start + shard_count,
             shard_count + 1
         );
         info!("Total shards across all processes: {}", total_shards);
