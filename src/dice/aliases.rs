@@ -396,10 +396,9 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     None
 }
 
-// Earthdawn 4th Edition step mappings - Complete table from steps 1-100
-static EARTHDAWN_4E_STEPS: Lazy<HashMap<u32, &'static str>> = Lazy::new(|| {
+// Shared base steps for both Earthdawn editions (steps 1-18 are identical)
+static EARTHDAWN_BASE_STEPS: Lazy<HashMap<u32, &'static str>> = Lazy::new(|| {
     let mut steps = HashMap::new();
-    // Earthdawn 4th Edition step table based on official FASA 4E rules
     steps.insert(1, "1d4 ie - 2");
     steps.insert(2, "1d4 ie - 1");
     steps.insert(3, "1d4 ie");
@@ -418,6 +417,50 @@ static EARTHDAWN_4E_STEPS: Lazy<HashMap<u32, &'static str>> = Lazy::new(|| {
     steps.insert(16, "1d12 ie + 1d8 ie + 1d6 ie");
     steps.insert(17, "1d12 ie + 2d8 ie");
     steps.insert(18, "1d12 ie + 1d10 ie + 1d8 ie");
+    steps
+});
+
+// Earthdawn 1st Edition specific steps (19-50, different from 4E)
+static EARTHDAWN_1E_EXTENDED_STEPS: Lazy<HashMap<u32, &'static str>> = Lazy::new(|| {
+    let mut steps = HashMap::new();
+    steps.insert(19, "1d20 ie + 2d6 ie");
+    steps.insert(20, "1d20 ie + 1d8 ie + 1d6 ie");
+    steps.insert(21, "1d20 ie + 1d10 ie + 1d6 ie");
+    steps.insert(22, "1d20 ie + 1d10 ie + 1d8 ie");
+    steps.insert(23, "1d20 ie + 2d10 ie");
+    steps.insert(24, "1d20 ie + 1d12 ie + 1d10 ie");
+    steps.insert(25, "1d20 ie + 1d12 ie + 1d8 ie + 1d4 ie");
+    steps.insert(26, "1d20 ie + 1d12 ie + 1d8 ie + 1d6 ie");
+    steps.insert(27, "1d20 ie + 1d12 ie + 2d8 ie");
+    steps.insert(28, "1d20 ie + 2d10 ie + 1d8 ie");
+    steps.insert(29, "1d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
+    steps.insert(30, "1d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
+    steps.insert(31, "1d20 ie + 1d10 ie + 2d8 ie + 1d6 ie");
+    steps.insert(32, "1d20 ie + 2d10 ie + 1d8 ie + 1d6 ie");
+    steps.insert(33, "1d20 ie + 2d10 ie + 2d8 ie");
+    steps.insert(34, "1d20 ie + 3d10 ie + 1d8 ie");
+    steps.insert(35, "1d20 ie + 1d12 ie + 2d10 ie + 1d8 ie");
+    steps.insert(36, "2d20 ie + 1d10 ie + 1d8 ie + 1d4 ie");
+    steps.insert(37, "2d20 ie + 1d10 ie + 1d8 ie + 1d6 ie");
+    steps.insert(38, "2d20 ie + 1d10 ie + 2d8 ie");
+    steps.insert(39, "2d20 ie + 2d10 ie + 1d8 ie");
+    steps.insert(40, "2d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
+    steps.insert(41, "2d20 ie + 1d10 ie + 1d8 ie + 2d6 ie");
+    steps.insert(42, "2d20 ie + 1d10 ie + 2d8 ie + 1d6 ie");
+    steps.insert(43, "2d20 ie + 2d10 ie + 1d8 ie + 1d6 ie");
+    steps.insert(44, "2d20 ie + 3d10 ie + 1d8 ie");
+    steps.insert(45, "2d20 ie + 3d10 ie + 1d8 ie");
+    steps.insert(46, "2d20 ie + 1d12 ie + 2d10 ie + 1d8 ie");
+    steps.insert(47, "2d20 ie + 2d10 ie + 2d8 ie + 1d4 ie");
+    steps.insert(48, "2d20 ie + 2d10 ie + 2d8 ie + 1d6 ie");
+    steps.insert(49, "2d20 ie + 2d10 ie + 3d8 ie");
+    steps.insert(50, "2d20 ie + 3d10 ie + 2d8 ie");
+    steps
+});
+
+// Earthdawn 4th Edition specific steps (19-100, different progression from 1E)
+static EARTHDAWN_4E_EXTENDED_STEPS: Lazy<HashMap<u32, &'static str>> = Lazy::new(|| {
+    let mut steps = HashMap::new();
     steps.insert(19, "1d20 ie + 2d6 ie");
     steps.insert(20, "1d20 ie + 1d8 ie + 1d6 ie");
     steps.insert(21, "1d20 ie + 2d8 ie");
@@ -503,72 +546,30 @@ static EARTHDAWN_4E_STEPS: Lazy<HashMap<u32, &'static str>> = Lazy::new(|| {
     steps
 });
 
-// Pre-calculate and store Earthdawn step mappings for better performance
-static EARTHDAWN_STEPS: Lazy<HashMap<u32, &'static str>> = Lazy::new(|| {
-    let mut steps = HashMap::new();
-    steps.insert(1, "1d4 ie - 2");
-    steps.insert(2, "1d4 ie - 1");
-    steps.insert(3, "1d4 ie");
-    steps.insert(4, "1d6 ie");
-    steps.insert(5, "1d8 ie");
-    steps.insert(6, "1d10 ie");
-    steps.insert(7, "1d12 ie");
-    steps.insert(8, "2d6 ie");
-    steps.insert(9, "1d8 ie + 1d6 ie");
-    steps.insert(10, "2d8 ie");
-    steps.insert(11, "1d10 ie + 1d8 ie");
-    steps.insert(12, "2d10 ie");
-    steps.insert(13, "1d12 ie + 1d10 ie");
-    steps.insert(14, "2d12 ie");
-    steps.insert(15, "1d12 ie + 2d6 ie");
-    steps.insert(16, "1d12 ie + 1d8 ie + 1d6 ie");
-    steps.insert(17, "1d12 ie + 2d8 ie");
-    steps.insert(18, "1d12 ie + 1d10 ie + 1d8 ie");
-    steps.insert(19, "1d20 ie + 2d6 ie");
-    steps.insert(20, "1d20 ie + 1d8 ie + 1d6 ie");
-    steps.insert(21, "1d20 ie + 1d10 ie + 1d6 ie");
-    steps.insert(22, "1d20 ie + 1d10 ie + 1d8 ie");
-    steps.insert(23, "1d20 ie + 2d10 ie");
-    steps.insert(24, "1d20 ie + 1d12 ie + 1d10 ie");
-    steps.insert(25, "1d20 ie + 1d12 ie + 1d8 ie + 1d4 ie");
-    steps.insert(26, "1d20 ie + 1d12 ie + 1d8 ie + 1d6 ie");
-    steps.insert(27, "1d20 ie + 1d12 ie + 2d8 ie");
-    steps.insert(28, "1d20 ie + 2d10 ie + 1d8 ie");
-    steps.insert(29, "1d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
-    steps.insert(30, "1d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
-    steps.insert(31, "1d20 ie + 1d10 ie + 2d8 ie + 1d6 ie");
-    steps.insert(32, "1d20 ie + 2d10 ie + 1d8 ie + 1d6 ie");
-    steps.insert(33, "1d20 ie + 2d10 ie + 2d8 ie");
-    steps.insert(34, "1d20 ie + 3d10 ie + 1d8 ie");
-    steps.insert(35, "1d20 ie + 1d12 ie + 2d10 ie + 1d8 ie");
-    steps.insert(36, "2d20 ie + 1d10 ie + 1d8 ie + 1d4 ie");
-    steps.insert(37, "2d20 ie + 1d10 ie + 1d8 ie + 1d6 ie");
-    steps.insert(38, "2d20 ie + 1d10 ie + 2d8 ie");
-    steps.insert(39, "2d20 ie + 2d10 ie + 1d8 ie");
-    steps.insert(40, "2d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
-    steps.insert(41, "2d20 ie + 1d10 ie + 1d8 ie + 2d6 ie");
-    steps.insert(42, "2d20 ie + 1d10 ie + 2d8 ie + 1d6 ie");
-    steps.insert(43, "2d20 ie + 2d10 ie + 1d8 ie + 1d6 ie");
-    steps.insert(44, "2d20 ie + 3d10 ie + 1d8 ie");
-    steps.insert(45, "2d20 ie + 3d10 ie + 1d8 ie");
-    steps.insert(46, "2d20 ie + 1d12 ie + 2d10 ie + 1d8 ie");
-    steps.insert(47, "2d20 ie + 2d10 ie + 2d8 ie + 1d4 ie");
-    steps.insert(48, "2d20 ie + 2d10 ie + 2d8 ie + 1d6 ie");
-    steps.insert(49, "2d20 ie + 2d10 ie + 3d8 ie");
-    steps.insert(50, "2d20 ie + 3d10 ie + 2d8 ie");
-    steps
-});
-
 fn get_earthdawn_step(step: u32) -> String {
-    EARTHDAWN_STEPS
-        .get(&step)
-        .map(|&s| s.to_string())
-        .unwrap_or_else(|| "1d6".to_string()) // fallback
+    // First check base steps (1-18)
+    if let Some(&step_str) = EARTHDAWN_BASE_STEPS.get(&step) {
+        return step_str.to_string();
+    }
+
+    // Then check 1E extended steps (19-50)
+    if let Some(&step_str) = EARTHDAWN_1E_EXTENDED_STEPS.get(&step) {
+        return step_str.to_string();
+    }
+
+    "1d6".to_string() // fallback
 }
 
 fn get_earthdawn_4e_step(step: u32) -> String {
-    EARTHDAWN_4E_STEPS
-        .get(&step)
-        .map(|&s| s.to_string())
-        .unwrap_or_else(|| "1d6".to_string()) // fallback
+    // First check base steps (1-18)
+    if let Some(&step_str) = EARTHDAWN_BASE_STEPS.get(&step) {
+        return step_str.to_string();
+    }
+
+    // Then check 4E extended steps (19-100)
+    if let Some(&step_str) = EARTHDAWN_4E_EXTENDED_STEPS.get(&step) {
+        return step_str.to_string();
+    }
+
+    "1d6".to_string() // fallback
 }
