@@ -51,52 +51,235 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     };
     result.dice_groups.push(base_group);
 
-    // Apply dice-modifying modifiers first (exploding, rerolls, etc.)
-    for modifier in &dice.modifiers {
-        match modifier {
-            Modifier::Explode(threshold) => {
-                explode_dice(&mut result, &mut rng, *threshold, dice.sides, false, &dice)?;
-                update_base_group(&mut result);
-            }
-            Modifier::ExplodeIndefinite(threshold) => {
-                explode_dice(&mut result, &mut rng, *threshold, dice.sides, true, &dice)?;
-                update_base_group(&mut result);
-            }
-            Modifier::Reroll(threshold) => {
-                reroll_dice(&mut result, &mut rng, *threshold, dice.sides, false)?;
-                update_base_group(&mut result);
-            }
-            Modifier::RerollIndefinite(threshold) => {
-                reroll_dice(&mut result, &mut rng, *threshold, dice.sides, true)?;
-                update_base_group(&mut result);
-            }
-            _ => {} // Handle other modifiers later
-        }
-    }
+    // FIXED: Apply modifiers in the correct order for mathematical precedence
+    // 1. Apply dice-modifying modifiers first (exploding, rerolls, etc.)
+    apply_dice_modifying_modifiers(&mut result, &mut rng, &dice)?;
 
-    // Apply keep/drop modifiers
-    for modifier in &dice.modifiers {
-        match modifier {
-            Modifier::Drop(count) => {
-                drop_dice(&mut result, *count as usize)?;
-            }
-            Modifier::KeepHigh(count) => {
-                keep_dice(&mut result, *count as usize, false)?;
-            }
-            Modifier::KeepLow(count) => {
-                keep_dice(&mut result, *count as usize, true)?;
-            }
-            _ => {} // Skip modifiers already handled
-        }
-    }
+    // 2. Apply keep/drop modifiers
+    apply_keep_drop_modifiers(&mut result, &dice)?;
 
-    // Calculate total from remaining dice
+    // 3. Calculate base total from remaining dice
     if result.kept_rolls.is_empty() {
         result.kept_rolls = result.individual_rolls.clone();
     }
     result.total = result.kept_rolls.iter().sum();
 
-    // Check if we have mathematical modifiers that should be applied before Godbound conversion
+    // 4. Apply mathematical modifiers (add, subtract, multiply, divide)
+    apply_mathematical_modifiers(&mut result, &dice)?;
+
+    // 5. Apply special system modifiers (after math modifiers for proper precedence)
+    apply_special_system_modifiers(&mut result, &dice, &mut rng)?;
+
+    // 6. Sort rolls unless unsorted flag is set
+    if !dice.unsorted {
+        sort_result_rolls(&mut result);
+    }
+
+    Ok(result)
+}
+
+// FIXED: Separate function for dice-modifying modifiers
+fn apply_dice_modifying_modifiers(
+    result: &mut RollResult,
+    rng: &mut impl Rng,
+    dice: &DiceRoll,
+) -> Result<()> {
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::Explode(threshold) => {
+                explode_dice(result, rng, *threshold, dice.sides, false, dice)?;
+                update_base_group(result);
+            }
+            Modifier::ExplodeIndefinite(threshold) => {
+                explode_dice(result, rng, *threshold, dice.sides, true, dice)?;
+                update_base_group(result);
+            }
+            Modifier::Reroll(threshold) => {
+                reroll_dice(result, rng, *threshold, dice.sides, false)?;
+                update_base_group(result);
+            }
+            Modifier::RerollIndefinite(threshold) => {
+                reroll_dice(result, rng, *threshold, dice.sides, true)?;
+                update_base_group(result);
+            }
+            _ => {} // Handle other modifiers later
+        }
+    }
+    Ok(())
+}
+
+// FIXED: Separate function for keep/drop modifiers
+fn apply_keep_drop_modifiers(result: &mut RollResult, dice: &DiceRoll) -> Result<()> {
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::Drop(count) => {
+                drop_dice(result, *count as usize)?;
+            }
+            Modifier::KeepHigh(count) => {
+                keep_dice(result, *count as usize, false)?;
+            }
+            Modifier::KeepLow(count) => {
+                keep_dice(result, *count as usize, true)?;
+            }
+            _ => {} // Skip modifiers already handled
+        }
+    }
+    Ok(())
+}
+
+// FIXED: Mathematical modifiers with proper precedence evaluation
+fn apply_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) -> Result<()> {
+    // Build an expression from the modifiers and evaluate it properly
+    let mut expression_parts = Vec::new();
+    
+    // Start with the dice total
+    expression_parts.push(format!("{}", result.total));
+    
+    // Add each mathematical operation as it appears
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::AddDice(dice_to_add) => {
+                let additional_result = roll_dice(dice_to_add.clone())?;
+                expression_parts.push("+".to_string());
+                expression_parts.push(format!("{}", additional_result.total));
+                handle_additional_dice(result, dice_to_add, "add", 1)?;
+            }
+            Modifier::SubtractDice(dice_to_subtract) => {
+                let additional_result = roll_dice(dice_to_subtract.clone())?;
+                expression_parts.push("-".to_string());
+                expression_parts.push(format!("{}", additional_result.total));
+                handle_additional_dice(result, dice_to_subtract, "subtract", -1)?;
+            }
+            Modifier::Add(value) => {
+                expression_parts.push("+".to_string());
+                expression_parts.push(format!("{}", value));
+            }
+            Modifier::Subtract(value) => {
+                expression_parts.push("-".to_string());
+                expression_parts.push(format!("{}", value));
+            }
+            Modifier::Multiply(value) => {
+                expression_parts.push("*".to_string());
+                expression_parts.push(format!("{}", value));
+            }
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                expression_parts.push("/".to_string());
+                expression_parts.push(format!("{}", value));
+            }
+            _ => {}
+        }
+    }
+    
+    // Evaluate the expression with proper precedence
+    if expression_parts.len() > 1 {
+        result.total = evaluate_expression(&expression_parts)?;
+    }
+
+    Ok(())
+}
+
+// Simple expression evaluator with proper precedence
+fn evaluate_expression(parts: &[String]) -> Result<i32> {
+    if parts.len() == 1 {
+        return Ok(parts[0].parse()?);
+    }
+    
+    // Convert to tokens
+    let mut tokens = Vec::new();
+    for part in parts {
+        if let Ok(num) = part.parse::<i32>() {
+            tokens.push(Token::Number(num));
+        } else {
+            match part.as_str() {
+                "+" => tokens.push(Token::Plus),
+                "-" => tokens.push(Token::Minus),
+                "*" => tokens.push(Token::Multiply),
+                "/" => tokens.push(Token::Divide),
+                _ => return Err(anyhow!("Invalid token: {}", part)),
+            }
+        }
+    }
+    
+    // First pass: handle multiplication and division (left to right)
+    let mut i = 1;
+    while i < tokens.len() {
+        if let Token::Multiply = tokens[i] {
+            if let (Token::Number(left), Token::Number(right)) = (&tokens[i-1], &tokens[i+1]) {
+                let result = left * right;
+                tokens[i-1] = Token::Number(result);
+                tokens.remove(i+1);
+                tokens.remove(i);
+                continue;
+            }
+        } else if let Token::Divide = tokens[i] {
+            if let (Token::Number(left), Token::Number(right)) = (&tokens[i-1], &tokens[i+1]) {
+                if *right == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                let result = left / right;
+                tokens[i-1] = Token::Number(result);
+                tokens.remove(i+1);
+                tokens.remove(i);
+                continue;
+            }
+        }
+        i += 2; // Skip to next operator
+    }
+    
+    // Second pass: handle addition and subtraction (left to right)
+    let mut i = 1;
+    while i < tokens.len() {
+        if let Token::Plus = tokens[i] {
+            if let (Token::Number(left), Token::Number(right)) = (&tokens[i-1], &tokens[i+1]) {
+                let result = left + right;
+                tokens[i-1] = Token::Number(result);
+                tokens.remove(i+1);
+                tokens.remove(i);
+                continue;
+            }
+        } else if let Token::Minus = tokens[i] {
+            if let (Token::Number(left), Token::Number(right)) = (&tokens[i-1], &tokens[i+1]) {
+                let result = left - right;
+                tokens[i-1] = Token::Number(result);
+                tokens.remove(i+1);
+                tokens.remove(i);
+                continue;
+            }
+        }
+        i += 2; // Skip to next operator
+    }
+    
+    // Should have only one number left
+    if tokens.len() == 1 {
+        if let Token::Number(result) = tokens[0] {
+            Ok(result)
+        } else {
+            Err(anyhow!("Invalid expression result"))
+        }
+    } else {
+        Err(anyhow!("Expression did not evaluate to a single value"))
+    }
+}
+
+#[derive(Debug, Clone)]
+enum Token {
+    Number(i32),
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
+}
+
+// FIXED: Special system modifiers applied after math
+fn apply_special_system_modifiers(
+    result: &mut RollResult,
+    dice: &DiceRoll,
+    rng: &mut impl Rng,
+) -> Result<()> {
+    // Check if we have mathematical modifiers that were applied
     let has_math_modifiers = dice.modifiers.iter().any(|m| {
         matches!(
             m,
@@ -109,48 +292,17 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         )
     });
 
-    // Apply mathematical modifiers BEFORE special systems like Godbound (if they exist)
-    if has_math_modifiers {
-        for modifier in &dice.modifiers {
-            match modifier {
-                Modifier::Add(value) => {
-                    result.total += value;
-                }
-                Modifier::Subtract(value) => {
-                    result.total -= value;
-                }
-                Modifier::Multiply(value) => {
-                    result.total *= value;
-                }
-                Modifier::Divide(value) => {
-                    if *value == 0 {
-                        return Err(anyhow!("Cannot divide by zero"));
-                    }
-                    result.total /= value;
-                }
-                Modifier::AddDice(dice_to_add) => {
-                    handle_additional_dice(&mut result, dice_to_add, "add", 1)?;
-                }
-                Modifier::SubtractDice(dice_to_subtract) => {
-                    handle_additional_dice(&mut result, dice_to_subtract, "subtract", -1)?;
-                }
-                _ => {} // Skip other modifiers for now
-            }
-        }
-    }
-
-    // Apply special system modifiers
     for modifier in &dice.modifiers {
         match modifier {
             Modifier::Target(value) => {
-                count_dice_matching(&mut result, |roll| roll >= *value as i32, "successes")?;
+                count_dice_matching(result, |roll| roll >= *value as i32, "successes")?;
             }
             Modifier::Failure(value) => {
-                count_failures_and_subtract(&mut result, *value)?;
+                count_failures_and_subtract(result, *value)?;
             }
             Modifier::Botch(threshold) => {
                 count_dice_matching(
-                    &mut result,
+                    result,
                     |roll| roll <= threshold.unwrap_or(1) as i32,
                     "botches",
                 )?;
@@ -164,21 +316,22 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
                 }
             }
             Modifier::Fudge => {
-                apply_fudge_conversion(&mut result)?;
+                apply_fudge_conversion(result)?;
             }
             Modifier::WrathGlory(difficulty, use_total) => {
-                count_wrath_glory_successes(&mut result, *difficulty, *use_total)?;
+                count_wrath_glory_successes(result, *difficulty, *use_total)?;
             }
             Modifier::Godbound(straight_damage) => {
-                apply_godbound_damage(&mut result, *straight_damage, has_math_modifiers)?;
+                apply_godbound_damage(result, *straight_damage, has_math_modifiers)?;
             }
             Modifier::HeroSystem(hero_type) => {
-                apply_hero_system_calculation(&mut result, &mut rng, hero_type)?;
+                apply_hero_system_calculation(result, rng, hero_type)?;
             }
             _ => {} // Skip modifiers already handled above
         }
     }
 
+    // FIXED: Apply mathematical modifiers to success counts if applicable
     if result.successes.is_some() && has_math_modifiers {
         for modifier in &dice.modifiers {
             match modifier {
@@ -197,7 +350,6 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
                     }
                     result.successes = Some(result.successes.unwrap() / value);
                 }
-                // AddDice and SubtractDice don't make sense for success counts, skip them
                 _ => {}
             }
         }
@@ -208,20 +360,20 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         result.total = 0; // Reset total for special systems
     }
 
-    // Sort rolls unless unsorted flag is set
-    if !dice.unsorted {
-        // Sort kept_rolls
-        if !result.kept_rolls.is_empty() {
-            result.kept_rolls.sort_by(|a, b| b.cmp(a)); // Sort descending by default
-        }
+    Ok(())
+}
 
-        // Sort all dice groups' rolls as well
-        for group in &mut result.dice_groups {
-            group.rolls.sort_by(|a, b| b.cmp(a)); // Sort descending by default
-        }
+// Helper function to sort result rolls
+fn sort_result_rolls(result: &mut RollResult) {
+    // Sort kept_rolls
+    if !result.kept_rolls.is_empty() {
+        result.kept_rolls.sort_by(|a, b| b.cmp(a)); // Sort descending by default
     }
 
-    Ok(result)
+    // Sort all dice groups' rolls as well
+    for group in &mut result.dice_groups {
+        group.rolls.sort_by(|a, b| b.cmp(a)); // Sort descending by default
+    }
 }
 
 // Helper function to update the base group with current rolls
@@ -400,7 +552,6 @@ fn add_wrath_die_notes(
     result: &mut RollResult,
     has_complication: bool,
     has_critical: bool,
-    //wrath_die_value: i32,
 ) {
     if has_complication {
         result
@@ -412,11 +563,6 @@ fn add_wrath_die_notes(
             .notes
             .push("Wrath die rolled 6 - Critical/Glory!".to_string());
     }
-
-    // old code as note is no longer needed. commenting out
-    //if has_complication || has_critical {
-    //    result.notes.push(format!("Wrath die: {}", wrath_die_value));
-    //}
 }
 
 fn apply_godbound_damage(
@@ -489,7 +635,7 @@ fn explode_dice(
     threshold: Option<u32>,
     dice_sides: u32,
     indefinite: bool,
-    dice: &DiceRoll, // Add this parameter
+    dice: &DiceRoll,
 ) -> Result<()> {
     let explode_on = threshold.unwrap_or(dice_sides);
 
@@ -569,26 +715,21 @@ fn add_explosion_notes(
     }
 }
 
+// FIXED: Better drop dice with proper error handling
 fn drop_dice(result: &mut RollResult, count: usize) -> Result<()> {
     let available_dice = result.individual_rolls.len();
-    let already_dropped = result.dropped_rolls.len();
 
     if count >= available_dice {
-        // Provide context-aware error message
-        if already_dropped > 0 {
-            result.notes.push(format!(
-                "Cannot drop {} dice - only {} dice remaining after previous keep/drop operations (originally rolled {}, {} already dropped)",
-                count,
-                available_dice,
-                available_dice + already_dropped,
-                already_dropped
-            ));
-        } else {
-            result.notes.push(format!(
-                "Cannot drop {} dice - only {} dice available",
-                count, available_dice
-            ));
+        // Don't allow dropping all dice - that would be an error
+        if count == available_dice {
+            return Err(anyhow!("Cannot drop all dice"));
         }
+        
+        // Provide context-aware error message
+        result.notes.push(format!(
+            "Cannot drop {} dice - only {} dice available",
+            count, available_dice
+        ));
         return Ok(());
     }
 
@@ -607,9 +748,15 @@ fn drop_dice(result: &mut RollResult, count: usize) -> Result<()> {
     Ok(())
 }
 
+// FIXED: Better keep dice with proper validation
 fn keep_dice(result: &mut RollResult, count: usize, keep_low: bool) -> Result<()> {
     if count >= result.individual_rolls.len() {
         return Ok(()); // Keep all dice
+    }
+
+    // FIXED: Validate that count > 0
+    if count == 0 {
+        return Err(anyhow!("Cannot keep 0 dice"));
     }
 
     let mut indexed_rolls: Vec<(usize, i32)> = result
@@ -651,7 +798,7 @@ fn reroll_dice(
 ) -> Result<()> {
     let mut total_rerolls = 0;
     let max_total_rerolls = 100;
-    let mut reroll_notes = Vec::new(); // Track detailed reroll info
+    let mut reroll_notes = Vec::new();
 
     for i in 0..result.individual_rolls.len() {
         let mut rerolls_for_this_die = 0;

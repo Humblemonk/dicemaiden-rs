@@ -20,6 +20,10 @@ static WNG_REGEX: Lazy<Regex> = Lazy::new(|| {
 static WNG_SIMPLE_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^wng\s+(\d+)d(\d+)$").expect("Failed to compile WNG_SIMPLE_REGEX"));
 
+// FIXED: Add pattern for standalone wng
+static WNG_STANDALONE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^wng$").expect("Failed to compile WNG_STANDALONE_REGEX"));
+
 static COD_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(\d+)cod([89r]?)(?:\s*([+-]\s*\d+))?$").expect("Failed to compile COD_REGEX")
 });
@@ -30,6 +34,10 @@ static WOD_REGEX: Lazy<Regex> = Lazy::new(|| {
 
 static DH_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^dh\s+(\d+)d(\d+)$").expect("Failed to compile DH_REGEX"));
+
+// FIXED: Add pattern for standalone dh
+static DH_STANDALONE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^dh$").expect("Failed to compile DH_STANDALONE_REGEX"));
 
 static DF_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)df$").expect("Failed to compile DF_REGEX"));
@@ -94,6 +102,9 @@ static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| 
     aliases.insert("hsk", "1d6 hsk");
     aliases.insert("hsh", "3d6 hsh");
     aliases.insert("3df", "3d3 fudge");
+    // FIXED: Add missing aliases
+    aliases.insert("dh", "1d10 dh"); // Default Dark Heresy
+    aliases.insert("wng", "1d6 wng"); // Default Wrath & Glory
     aliases
 });
 
@@ -120,6 +131,67 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     }
     if input == "-d%" {
         return Some("2d10 k1 * 10 + 1d10 - 10".to_string());
+    }
+
+    // FIXED: Handle standalone wng and dh first
+    if input == "wng" {
+        return Some("1d6 wng".to_string());
+    }
+
+    if input == "dh" {
+        return Some("1d10 dh".to_string());
+    }
+
+    // FIXED: Handle Hero System fractional dice properly
+    if let Some(captures) = HS_REGEX.captures(input) {
+        let dice_count_str = &captures[1];
+        let damage_type = &captures[2];
+
+        match damage_type {
+            "n" => {
+                // Normal damage - XdY
+                if let Ok(dice_count) = dice_count_str.parse::<f64>() {
+                    let whole_dice = dice_count.floor() as u32;
+                    let has_fractional = dice_count.fract() > 0.0;
+
+                    // FIXED: Handle 0.5 dice properly
+                    if whole_dice == 0 && has_fractional {
+                        return Some("1d3 hsn".to_string());
+                    }
+
+                    let dice_expr = if has_fractional {
+                        format!("{}d6 + 1d3 hsn", whole_dice)
+                    } else {
+                        format!("{}d6 hsn", whole_dice)
+                    };
+                    return Some(dice_expr);
+                }
+            }
+            "k" => {
+                // Killing damage - XdY
+                if let Ok(dice_count) = dice_count_str.parse::<f64>() {
+                    let whole_dice = dice_count.floor() as u32;
+                    let has_fractional = dice_count.fract() > 0.0;
+
+                    // FIXED: Handle 0.5 dice properly
+                    if whole_dice == 0 && has_fractional {
+                        return Some("1d3 hsk".to_string());
+                    }
+
+                    let dice_expr = if has_fractional {
+                        format!("{}d6 + 1d3 hsk", whole_dice)
+                    } else {
+                        format!("{}d6 hsk", whole_dice)
+                    };
+                    return Some(dice_expr);
+                }
+            }
+            "h" => {
+                // To hit roll - always 3d6 regardless of the number (Hero System standard)
+                return Some("3d6 hsh".to_string());
+            }
+            _ => return None,
+        }
     }
 
     // Godbound system - full dice expressions (gb 3d8, gbs 2d10, etc.) using pre-compiled regex
@@ -206,6 +278,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             return Some(format!("{}d10 f1 ie10 t{} {}", count, difficulty, modifier));
         }
     }
+
     // Dark Heresy (dh 4d10 -> 4d10 ie10) using pre-compiled regex
     if let Some(captures) = DH_REGEX.captures(input) {
         let count = &captures[1];
@@ -331,11 +404,11 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some(match (damage_type, fraction) {
             ("k", "1") => {
                 // Killing damage with +0.5 dice: 2hsk1 = 2d6 + 1d3
-                format!("{}d6 + 1d3", dice_count)
+                format!("{}d6 + 1d3 hsk", dice_count)
             }
             ("n", _) => {
                 // Normal damage ignores fraction
-                format!("{}d6", dice_count)
+                format!("{}d6 hsn", dice_count)
             }
             ("h", _) => {
                 // Healing ignores fraction modifier

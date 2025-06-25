@@ -226,6 +226,16 @@ impl RollResult {
             output.push_str(&format!("\n*Note: {}*", note));
         }
     }
+
+    /// Create a simplified copy of the roll result with suppressed comment
+    pub fn create_simplified(&self) -> RollResult {
+        let mut simplified = self.clone();
+        simplified.suppress_comment = true;
+        // Clear the original comment and replace with simplified reason
+        simplified.comment = Some("Simplified roll due to character limit".to_string());
+        simplified.suppress_comment = false; // Allow the new comment to show
+        simplified
+    }
 }
 
 impl fmt::Display for RollResult {
@@ -367,18 +377,6 @@ fn strip_comment_from_expression(expr: &str) -> String {
 }
 
 const DISCORD_MESSAGE_LIMIT: usize = 2000;
-
-impl RollResult {
-    /// Create a simplified copy of the roll result with suppressed comment and simplified output
-    pub fn create_simplified(&self) -> RollResult {
-        let mut simplified = self.clone();
-        simplified.suppress_comment = true;
-        // Clear the original comment and replace with simplified reason
-        simplified.comment = Some("Simplified roll due to character limit".to_string());
-        simplified.suppress_comment = false; // Allow the new comment to show
-        simplified
-    }
-}
 
 pub fn format_multiple_results_with_limit(results: &[RollResult]) -> String {
     let full_output = format_multiple_results(results);

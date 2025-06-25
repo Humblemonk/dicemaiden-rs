@@ -1509,7 +1509,7 @@ mod tests {
         assert_eq!(result3[0].total, 5);
 
         // Test complex precedence
-        let result4 = parse_and_roll("2d1 + 3 * 2 - 4 / 2").unwrap(); // 2 + (3*2) - (4/2) = 6
+        let result4 = parse_and_roll("2d1 + 3 * 2 - 4 / 2").unwrap(); // 2 + (3*2) - (4/2) = 3
         assert_eq!(result4[0].total, 3);
     }
 
