@@ -22,39 +22,9 @@ static OP_REGEX: Lazy<Regex> =
 static DICE_MOD_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^([+\-])(\d+)d(\d+)$").expect("Failed to compile DICE_MOD_REGEX"));
 
-// Modifier patterns
-static WNG_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(wng\d*t?)").expect("Failed to compile WNG_PATTERN"));
-
-static IE_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(ie\d*)").expect("Failed to compile IE_PATTERN"));
-
-static IR_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(ir\d+)").expect("Failed to compile IR_PATTERN"));
-
-static KL_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(kl\d+)").expect("Failed to compile KL_PATTERN"));
-
-static E_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(e\d*)").expect("Failed to compile E_PATTERN"));
-
-static K_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(k\d+)").expect("Failed to compile K_PATTERN"));
-
-static R_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(r\d+)").expect("Failed to compile R_PATTERN"));
-
-static D_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(d\d+)").expect("Failed to compile D_PATTERN"));
-
-static T_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(t\d+)").expect("Failed to compile T_PATTERN"));
-
-static F_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(f\d+)").expect("Failed to compile F_PATTERN"));
-
-static B_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(b\d*)").expect("Failed to compile B_PATTERN"));
+// Fixed label regex for nested parentheses
+static LABEL_NESTED_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\(([^)]+)\)\s*").expect("Failed to compile LABEL_NESTED_REGEX"));
 
 pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     let input = input.trim();
@@ -163,6 +133,11 @@ fn normalize_whitespace(input: &str) -> String {
 
 // FIXED: Better expression parsing that handles combined modifiers
 fn parse_expression_to_parts(input: &str) -> Result<Vec<String>> {
+    // Handle simple cases first
+    if input.is_empty() {
+        return Ok(vec![]);
+    }
+    
     // If the input contains spaces, handle as space-separated
     if input.contains(' ') {
         return parse_space_separated_expression(input);
@@ -265,7 +240,7 @@ fn split_dice_and_modifiers_internal(input: &str) -> Result<Vec<String>> {
     }
 }
 
-// FIXED: Split combined modifiers like "e6k3r1" into ["e6", "k3", "r1"]
+// FIXED: Split combined modifiers like "e6k3" into ["e6", "k3"]
 fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
     let mut modifiers = Vec::new();
     let mut remaining = input;
@@ -396,15 +371,18 @@ fn parse_flags<'a>(dice: &mut DiceRoll, mut remaining: &'a str) -> &'a str {
 }
 
 fn parse_label<'a>(dice: &mut DiceRoll, remaining: &'a str) -> &'a str {
+    // Fixed: Handle labels with nested parentheses more carefully
     if let Some(captures) = LABEL_REGEX.captures(remaining) {
         let label_content = &captures[1];
         if !label_content.is_empty() {
-            dice.label = Some(label_content.to_string());
+            // Don't allow nested parentheses in labels
+            if !label_content.contains('(') && !label_content.contains(')') {
+                dice.label = Some(label_content.to_string());
+                return &remaining[captures.get(0).unwrap().end()..];
+            }
         }
-        &remaining[captures.get(0).unwrap().end()..]
-    } else {
-        remaining
     }
+    remaining
 }
 
 fn parse_comment<'a>(dice: &mut DiceRoll, remaining: &'a str) -> &'a str {
@@ -415,7 +393,7 @@ fn parse_comment<'a>(dice: &mut DiceRoll, remaining: &'a str) -> &'a str {
     if let Some(captures) = COMMENT_REGEX.captures(remaining) {
         let comment_content = captures[1].trim();
         if !comment_content.is_empty() {
-            // Handle semicolon in comments
+            // Handle semicolon in comments - keep everything before first semicolon
             if comment_content.contains(';') {
                 if let Some(first_part) = comment_content.split(';').next() {
                     if !first_part.trim().is_empty() {
@@ -618,6 +596,9 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
     
     if let Some(stripped) = part.strip_prefix('t') {
         let num = stripped.parse().map_err(|_| anyhow!("Invalid target value"))?;
+        if num == 0 {
+            return Err(anyhow!("Target value must be greater than 0"));
+        }
         return Ok(Modifier::Target(num));
     }
     

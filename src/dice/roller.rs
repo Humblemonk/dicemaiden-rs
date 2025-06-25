@@ -65,7 +65,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     result.total = result.kept_rolls.iter().sum();
 
     // 4. Apply mathematical modifiers (add, subtract, multiply, divide)
-    apply_mathematical_modifiers(&mut result, &dice)?;
+    apply_mathematical_modifiers(&mut result, &dice, &mut rng)?;
 
     // 5. Apply special system modifiers (after math modifiers for proper precedence)
     apply_special_system_modifiers(&mut result, &dice, &mut rng)?;
@@ -128,7 +128,7 @@ fn apply_keep_drop_modifiers(result: &mut RollResult, dice: &DiceRoll) -> Result
 }
 
 // FIXED: Mathematical modifiers with proper precedence evaluation
-fn apply_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) -> Result<()> {
+fn apply_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll, rng: &mut impl Rng) -> Result<()> {
     // Build an expression from the modifiers and evaluate it properly
     let mut expression_parts = Vec::new();
     
@@ -292,10 +292,14 @@ fn apply_special_system_modifiers(
         )
     });
 
+    // Track if we've applied a special system (success counting, etc.)
+    let mut has_special_system = false;
+
     for modifier in &dice.modifiers {
         match modifier {
             Modifier::Target(value) => {
                 count_dice_matching(result, |roll| roll >= *value as i32, "successes")?;
+                has_special_system = true;
             }
             Modifier::Failure(value) => {
                 count_failures_and_subtract(result, *value)?;
@@ -320,9 +324,11 @@ fn apply_special_system_modifiers(
             }
             Modifier::WrathGlory(difficulty, use_total) => {
                 count_wrath_glory_successes(result, *difficulty, *use_total)?;
+                has_special_system = true;
             }
             Modifier::Godbound(straight_damage) => {
                 apply_godbound_damage(result, *straight_damage, has_math_modifiers)?;
+                has_special_system = true;
             }
             Modifier::HeroSystem(hero_type) => {
                 apply_hero_system_calculation(result, rng, hero_type)?;
@@ -333,31 +339,41 @@ fn apply_special_system_modifiers(
 
     // FIXED: Apply mathematical modifiers to success counts if applicable
     if result.successes.is_some() && has_math_modifiers {
+        let original_successes = result.successes.unwrap();
+        let mut modified_successes = original_successes;
+        
         for modifier in &dice.modifiers {
             match modifier {
                 Modifier::Add(value) => {
-                    result.successes = Some(result.successes.unwrap() + value);
+                    modified_successes += value;
                 }
                 Modifier::Subtract(value) => {
-                    result.successes = Some(result.successes.unwrap() - value);
+                    modified_successes -= value;
                 }
                 Modifier::Multiply(value) => {
-                    result.successes = Some(result.successes.unwrap() * value);
+                    modified_successes *= value;
                 }
                 Modifier::Divide(value) => {
                     if *value == 0 {
                         return Err(anyhow!("Cannot divide by zero"));
                     }
-                    result.successes = Some(result.successes.unwrap() / value);
+                    modified_successes /= value;
                 }
                 _ => {}
             }
         }
+        
+        result.successes = Some(modified_successes);
     }
 
-    // If target/success system or godbound was used, don't use the dice total
-    if result.successes.is_some() || result.godbound_damage.is_some() {
-        result.total = 0; // Reset total for special systems
+    // If target/success system or godbound was used, don't use the dice total for final result
+    // But keep the mathematical total for systems that need it
+    if has_special_system && result.successes.is_some() {
+        // For success-based systems, the successes are the primary result
+        // Don't reset total to 0 as some systems may need both
+    } else if result.godbound_damage.is_some() {
+        // For Godbound, the damage value is the primary result
+        // Don't reset total to 0 as damage calculation may use it
     }
 
     Ok(())
@@ -389,7 +405,7 @@ where
     F: Fn(i32) -> bool,
 {
     let count = result
-        .individual_rolls
+        .kept_rolls
         .iter()
         .filter(|&&roll| condition(roll))
         .count() as i32;
@@ -409,7 +425,7 @@ where
 // Handle failures with subtraction from successes
 fn count_failures_and_subtract(result: &mut RollResult, threshold: u32) -> Result<()> {
     let failures = result
-        .individual_rolls
+        .kept_rolls
         .iter()
         .filter(|&&roll| roll <= threshold as i32)
         .count() as i32;
@@ -429,13 +445,12 @@ fn handle_additional_dice(
     result: &mut RollResult,
     dice: &DiceRoll,
     modifier_type: &str,
-    multiplier: i32,
+    _multiplier: i32,
 ) -> Result<()> {
     let additional_result = roll_dice(dice.clone())?;
     result
         .individual_rolls
         .extend(additional_result.individual_rolls.clone());
-    result.total += additional_result.total * multiplier;
 
     // Add a new dice group for the additional dice
     let dice_group = DiceGroup {
@@ -458,11 +473,11 @@ fn count_wrath_glory_successes(
 
     if use_total {
         // For soak/damage/exempt rolls, just use the total of dice values
-        result.total = result.individual_rolls.iter().sum();
+        result.total = result.kept_rolls.iter().sum();
         result.successes = None; // Don't show successes for total-based rolls
 
         // Still check wrath die effects (first die only) but don't show critical/glory for soak rolls
-        if let Some(&first_die) = result.individual_rolls.first() {
+        if let Some(&first_die) = result.kept_rolls.first() {
             wrath_die_value = first_die;
             if first_die == 1 {
                 has_complication = true;
@@ -494,7 +509,7 @@ fn count_wrath_glory_successes(
 
         // In Wrath & Glory, one die is designated as the "wrath die"
         // For simplicity, we'll treat the first die as the wrath die
-        for (i, &roll) in result.individual_rolls.iter().enumerate() {
+        for (i, &roll) in result.kept_rolls.iter().enumerate() {
             let successes = match roll {
                 1..=3 => 0, // No successes
                 4..=5 => {
@@ -529,7 +544,6 @@ fn count_wrath_glory_successes(
         result.wng_exalted_icons = Some(exalted_icon_count);
 
         result.successes = Some(total_successes);
-        result.total = 0; // Don't use total for success-based systems
 
         // Check difficulty if specified (comparing successes to difficulty)
         if let Some(dn) = difficulty {
@@ -720,17 +734,10 @@ fn drop_dice(result: &mut RollResult, count: usize) -> Result<()> {
     let available_dice = result.individual_rolls.len();
 
     if count >= available_dice {
-        // Don't allow dropping all dice - that would be an error
-        if count == available_dice {
-            return Err(anyhow!("Cannot drop all dice"));
-        }
-        
-        // Provide context-aware error message
-        result.notes.push(format!(
+        return Err(anyhow!(
             "Cannot drop {} dice - only {} dice available",
             count, available_dice
         ));
-        return Ok(());
     }
 
     let mut rolls = result.individual_rolls.clone();
@@ -916,7 +923,7 @@ fn apply_fudge_conversion(result: &mut RollResult) -> Result<()> {
     let mut symbols = Vec::new();
     let mut fudge_total = 0;
 
-    for &roll in &result.individual_rolls {
+    for &roll in &result.kept_rolls {
         let (symbol, value) = match roll {
             1 => ("-", -1), // Minus
             2 => (" ", 0),  // Blank

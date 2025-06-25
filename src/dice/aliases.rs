@@ -102,6 +102,7 @@ static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| 
     aliases.insert("hsk", "1d6 hsk");
     aliases.insert("hsh", "3d6 hsh");
     aliases.insert("3df", "3d3 fudge");
+    aliases.insert("4df", "4d3 fudge");
     // FIXED: Add missing aliases
     aliases.insert("dh", "1d10 dh"); // Default Dark Heresy
     aliases.insert("wng", "1d6 wng"); // Default Wrath & Glory
@@ -353,46 +354,6 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let count = &captures[1];
         let pips = captures.get(2).map_or("", |m| m.as_str());
         return Some(format!("{}d6 + 1d6 ie{}", count, pips));
-    }
-
-    // Hero System (2hsn, 3hsk, 2.5hsk, 3hsh) using pre-compiled regex
-    if let Some(captures) = HS_REGEX.captures(input) {
-        let dice_count_str = &captures[1];
-        let damage_type = &captures[2];
-
-        match damage_type {
-            "n" => {
-                // Normal damage - XdY
-                let dice_count = dice_count_str.parse::<f64>().ok()?;
-                let whole_dice = dice_count.floor() as u32;
-                let has_fractional = dice_count.fract() > 0.0;
-
-                let dice_expr = if has_fractional {
-                    format!("{}d6 + 1d3 hsn", whole_dice)
-                } else {
-                    format!("{}d6 hsn", whole_dice)
-                };
-                return Some(dice_expr);
-            }
-            "k" => {
-                // Killing damage - XdY
-                let dice_count = dice_count_str.parse::<f64>().ok()?;
-                let whole_dice = dice_count.floor() as u32;
-                let has_fractional = dice_count.fract() > 0.0;
-
-                let dice_expr = if has_fractional {
-                    format!("{}d6 + 1d3 hsk", whole_dice)
-                } else {
-                    format!("{}d6 hsk", whole_dice)
-                };
-                return Some(dice_expr);
-            }
-            "h" => {
-                // To hit roll - always 3d6 regardless of the number (Hero System standard)
-                return Some("3d6 hsh".to_string());
-            }
-            _ => return None,
-        }
     }
 
     // Alternative Hero System notation with explicit fractional dice (2hsk1 = 2.5d6 killing) using pre-compiled regex
