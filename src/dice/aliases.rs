@@ -73,8 +73,9 @@ static EX_REGEX: Lazy<Regex> =
 static ED_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^ed(\d+)$").expect("Failed to compile ED_REGEX"));
 
-static ED4E_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^ed4e(\d+)$").expect("Failed to compile ED4E_REGEX"));
+static ED4E_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^ed4e(\d+)$").expect("Failed to compile ED4E_REGEX")
+});
 
 static DND_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(attack|skill|save)(\s*[+-]\s*\d+)?$").expect("Failed to compile DND_REGEX")
@@ -378,10 +379,10 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         }
     }
 
-    // Earthdawn 4th edition (ed4e1 through ed4e50)
+    // Earthdawn 4th edition (ed4e1 through ed4e100)
     if let Some(captures) = ED4E_REGEX.captures(input) {
         let step: u32 = captures[1].parse().ok()?;
-        if (1..=50).contains(&step) {
+        if (1..=100).contains(&step) {
             return Some(get_earthdawn_4e_step(step));
         }
     }
@@ -395,6 +396,113 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
 
     None
 }
+
+// Earthdawn 4th Edition step mappings - Complete table from steps 1-100
+static EARTHDAWN_4E_STEPS: Lazy<HashMap<u32, &'static str>> = Lazy::new(|| {
+    let mut steps = HashMap::new();
+    // Earthdawn 4th Edition step table based on official FASA 4E rules
+    steps.insert(1, "1d4 ie - 2");
+    steps.insert(2, "1d4 ie - 1");
+    steps.insert(3, "1d4 ie");
+    steps.insert(4, "1d6 ie");
+    steps.insert(5, "1d8 ie");
+    steps.insert(6, "1d10 ie");
+    steps.insert(7, "1d12 ie");
+    steps.insert(8, "2d6 ie");
+    steps.insert(9, "1d8 ie + 1d6 ie");
+    steps.insert(10, "2d8 ie");
+    steps.insert(11, "1d10 ie + 1d8 ie");
+    steps.insert(12, "2d10 ie");
+    steps.insert(13, "1d12 ie + 1d10 ie");
+    steps.insert(14, "2d12 ie");
+    steps.insert(15, "1d12 ie + 2d6 ie");
+    steps.insert(16, "1d12 ie + 1d8 ie + 1d6 ie");
+    steps.insert(17, "1d12 ie + 2d8 ie");
+    steps.insert(18, "1d12 ie + 1d10 ie + 1d8 ie");
+    steps.insert(19, "1d20 ie + 2d6 ie");
+    steps.insert(20, "1d20 ie + 1d8 ie + 1d6 ie");
+    steps.insert(21, "1d20 ie + 2d8 ie");
+    steps.insert(22, "1d20 ie + 1d10 ie + 1d8 ie");
+    steps.insert(23, "1d20 ie + 2d10 ie");
+    steps.insert(24, "1d20 ie + 1d12 ie + 1d10 ie");
+    steps.insert(25, "1d20 ie + 2d12 ie");
+    steps.insert(26, "1d20 ie + 1d12 ie + 2d6 ie");
+    steps.insert(27, "1d20 ie + 1d12 ie + 1d8 ie + 1d6 ie");
+    steps.insert(28, "1d20 ie + 1d12 ie + 2d8 ie");
+    steps.insert(29, "1d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
+    steps.insert(30, "2d20 ie + 2d6 ie");
+    steps.insert(31, "2d20 ie + 1d8 ie + 1d6 ie");
+    steps.insert(32, "2d20 ie + 2d8 ie");
+    steps.insert(33, "2d20 ie + 1d10 ie + 1d8 ie");
+    steps.insert(34, "2d20 ie + 2d10 ie");
+    steps.insert(35, "2d20 ie + 1d12 ie + 1d10 ie");
+    steps.insert(36, "2d20 ie + 2d12 ie");
+    steps.insert(37, "2d20 ie + 1d12 ie + 2d6 ie");
+    steps.insert(38, "2d20 ie + 1d12 ie + 1d8 ie + 1d6 ie");
+    steps.insert(39, "2d20 ie + 1d12 ie + 2d8 ie");
+    steps.insert(40, "2d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
+    steps.insert(41, "3d20 ie + 2d6 ie");
+    steps.insert(42, "3d20 ie + 1d8 ie + 1d6 ie");
+    steps.insert(43, "3d20 ie + 2d8 ie");
+    steps.insert(44, "3d20 ie + 1d10 ie + 1d8 ie");
+    steps.insert(45, "3d20 ie + 2d10 ie");
+    steps.insert(46, "3d20 ie + 1d12 ie + 1d10 ie");
+    steps.insert(47, "3d20 ie + 2d12 ie");
+    steps.insert(48, "3d20 ie + 1d12 ie + 2d6 ie");
+    steps.insert(49, "3d20 ie + 1d12 ie + 1d8 ie + 1d6 ie");
+    steps.insert(50, "3d20 ie + 1d12 ie + 2d8 ie");
+    steps.insert(51, "3d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
+    steps.insert(52, "4d20 ie + 2d6 ie");
+    steps.insert(53, "4d20 ie + 1d8 ie + 1d6 ie");
+    steps.insert(54, "4d20 ie + 2d8 ie");
+    steps.insert(55, "4d20 ie + 1d10 ie + 1d8 ie");
+    steps.insert(56, "4d20 ie + 2d10 ie");
+    steps.insert(57, "4d20 ie + 1d12 ie + 1d10 ie");
+    steps.insert(58, "4d20 ie + 2d12 ie");
+    steps.insert(59, "4d20 ie + 1d12 ie + 2d6 ie");
+    steps.insert(60, "4d20 ie + 1d12 ie + 1d8 ie + 1d6 ie");
+    steps.insert(61, "4d20 ie + 1d12 ie + 2d8 ie");
+    steps.insert(62, "4d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
+    steps.insert(63, "5d20 ie + 2d6 ie");
+    steps.insert(64, "5d20 ie + 1d8 ie + 1d6 ie");
+    steps.insert(65, "5d20 ie + 2d8 ie");
+    steps.insert(66, "5d20 ie + 1d10 ie + 1d8 ie");
+    steps.insert(67, "5d20 ie + 2d10 ie");
+    steps.insert(68, "5d20 ie + 1d12 ie + 1d10 ie");
+    steps.insert(69, "5d20 ie + 2d12 ie");
+    steps.insert(70, "5d20 ie + 1d12 ie + 2d6 ie");
+    steps.insert(71, "5d20 ie + 1d12 ie + 1d8 ie + 1d6 ie");
+    steps.insert(72, "5d20 ie + 1d12 ie + 2d8 ie");
+    steps.insert(73, "5d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
+    steps.insert(74, "6d20 ie + 2d6 ie");
+    steps.insert(75, "6d20 ie + 1d8 ie + 1d6 ie");
+    steps.insert(76, "6d20 ie + 2d8 ie");
+    steps.insert(77, "6d20 ie + 1d10 ie + 1d8 ie");
+    steps.insert(78, "6d20 ie + 2d10 ie");
+    steps.insert(79, "6d20 ie + 1d12 ie + 1d10 ie");
+    steps.insert(80, "6d20 ie + 2d12 ie");
+    steps.insert(81, "6d20 ie + 1d12 ie + 2d6 ie");
+    steps.insert(82, "6d20 ie + 1d12 ie + 1d8 ie + 1d6 ie");
+    steps.insert(83, "6d20 ie + 1d12 ie + 2d8 ie");
+    steps.insert(84, "6d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
+    steps.insert(85, "7d20 ie + 2d6 ie");
+    steps.insert(86, "7d20 ie + 1d8 ie + 1d6 ie");
+    steps.insert(87, "7d20 ie + 2d8 ie");
+    steps.insert(88, "7d20 ie + 1d10 ie + 1d8 ie");
+    steps.insert(89, "7d20 ie + 2d10 ie");
+    steps.insert(90, "7d20 ie + 1d12 ie + 1d10 ie");
+    steps.insert(91, "7d20 ie + 2d12 ie");
+    steps.insert(92, "7d20 ie + 1d12 ie + 2d6 ie");
+    steps.insert(93, "7d20 ie + 1d12 ie + 1d8 ie + 1d6 ie");
+    steps.insert(94, "7d20 ie + 1d12 ie + 2d8 ie");
+    steps.insert(95, "7d20 ie + 1d12 ie + 1d10 ie + 1d8 ie");
+    steps.insert(96, "8d20 ie + 2d6 ie");
+    steps.insert(97, "8d20 ie + 1d8 ie + 1d6 ie");
+    steps.insert(98, "8d20 ie + 2d8 ie");
+    steps.insert(99, "8d20 ie + 1d10 ie + 1d8 ie");
+    steps.insert(100, "8d20 ie + 2d10 ie");
+    steps
+});
 
 // Pre-calculate and store Earthdawn step mappings for better performance
 static EARTHDAWN_STEPS: Lazy<HashMap<u32, &'static str>> = Lazy::new(|| {
@@ -460,7 +568,8 @@ fn get_earthdawn_step(step: u32) -> String {
 }
 
 fn get_earthdawn_4e_step(step: u32) -> String {
-    // Earthdawn 4th edition steps would be similar but potentially different
-    // For now, using the same as standard earthdawn
-    get_earthdawn_step(step)
+    EARTHDAWN_4E_STEPS
+        .get(&step)
+        .map(|&s| s.to_string())
+        .unwrap_or_else(|| "1d6".to_string()) // fallback
 }

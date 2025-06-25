@@ -995,7 +995,6 @@ fn apply_fudge_conversion(result: &mut RollResult) -> Result<()> {
     Ok(())
 }
 
-// New function to apply mathematical modifiers specifically to success counts
 fn apply_mathematical_modifiers_to_successes(
     result: &mut RollResult,
     dice: &DiceRoll,
@@ -1023,8 +1022,6 @@ fn apply_mathematical_modifiers_to_successes(
                     *successes /= value;
                 }
             }
-            // Note: AddDice and SubtractDice modifiers would need special handling
-            // For now, we'll focus on simple mathematical operations
             _ => {}
         }
     }
@@ -1034,6 +1031,11 @@ fn apply_mathematical_modifiers_to_successes(
         if let Some(ref mut successes) = result.successes {
             *successes += success_modifier;
         }
+    }
+
+    // For success-based systems, update total to match final successes
+    if let Some(successes) = result.successes {
+        result.total = successes;
     }
 
     Ok(())
