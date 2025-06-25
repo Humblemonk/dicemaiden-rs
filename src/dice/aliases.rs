@@ -73,9 +73,8 @@ static EX_REGEX: Lazy<Regex> =
 static ED_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^ed(\d+)$").expect("Failed to compile ED_REGEX"));
 
-static ED4E_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^ed4e(\d+)$").expect("Failed to compile ED4E_REGEX")
-});
+static ED4E_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^ed4e(\d+)$").expect("Failed to compile ED4E_REGEX"));
 
 static DND_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(attack|skill|save)(\s*[+-]\s*\d+)?$").expect("Failed to compile DND_REGEX")
