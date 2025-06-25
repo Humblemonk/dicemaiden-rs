@@ -230,11 +230,11 @@ impl RollResult {
     /// Create a simplified copy of the roll result with suppressed comment
     pub fn create_simplified(&self) -> RollResult {
         let mut simplified = self.clone();
-        
+
         // Set suppress_comment but REPLACE the comment
         simplified.suppress_comment = true;
         simplified.comment = Some("Simplified roll due to character limit".to_string());
-        
+
         simplified
     }
 }
@@ -258,11 +258,11 @@ impl fmt::Display for RollResult {
 }
 
 pub fn parse_and_roll(input: &str) -> Result<Vec<RollResult>> {
-    let dice_expressions = parser::parse_dice_string(input)?;
+    let dice_expressions = crate::dice::parser::parse_dice_string(input)?;
     let mut results = Vec::new();
 
     for dice in dice_expressions {
-        let result = roller::roll_dice(dice)?;
+        let result = crate::dice::roller::roll_dice(dice)?;
         results.push(result);
     }
 
@@ -318,13 +318,7 @@ fn format_roll_set_results(results: &[RollResult]) -> String {
         output.push_str(&display_result.to_string());
 
         // Sum based on what type of result this is
-        total_sum += if let Some(gb_damage) = result.godbound_damage {
-            gb_damage
-        } else if let Some(successes) = result.successes {
-            successes
-        } else {
-            result.total
-        };
+        total_sum += calculate_result_value(result);
     }
 
     output.push_str(&format!("\n**Total: {}**", total_sum));
@@ -335,6 +329,17 @@ fn format_roll_set_results(results: &[RollResult]) -> String {
     }
 
     output
+}
+
+/// Helper function to calculate the appropriate value for a result (reducing duplication)
+fn calculate_result_value(result: &RollResult) -> i32 {
+    if let Some(gb_damage) = result.godbound_damage {
+        gb_damage
+    } else if let Some(successes) = result.successes {
+        successes
+    } else {
+        result.total
+    }
 }
 
 /// Helper function to format multiple results with a custom formatter

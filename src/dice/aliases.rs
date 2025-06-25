@@ -116,6 +116,26 @@ pub fn expand_alias(input: &str) -> Option<String> {
     None
 }
 
+// Helper function to reduce duplication in Hero System dice processing
+fn process_hero_system_dice(dice_count_str: &str, _damage_type: &str, dice_type: &str) -> Option<String> {
+    if let Ok(dice_count) = dice_count_str.parse::<f64>() {
+        let whole_dice = dice_count.floor() as u32;
+        let has_fractional = dice_count.fract() > 0.0;
+
+        if whole_dice == 0 && has_fractional {
+            return Some(format!("1d3 {}", dice_type));
+        }
+
+        let dice_expr = if has_fractional {
+            format!("{}d6 + 1d3 {}", whole_dice, dice_type)
+        } else {
+            format!("{}d6 {}", whole_dice, dice_type)
+        };
+        return Some(dice_expr);
+    }
+    None
+}
+
 fn expand_parameterized_alias(input: &str) -> Option<String> {
     // Handle percentile advantage/disadvantage FIRST before general advantage/disadvantage
     if input == "+d%" {
@@ -142,39 +162,11 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         match damage_type {
             "n" => {
                 // Normal damage - XdY
-                if let Ok(dice_count) = dice_count_str.parse::<f64>() {
-                    let whole_dice = dice_count.floor() as u32;
-                    let has_fractional = dice_count.fract() > 0.0;
-
-                    if whole_dice == 0 && has_fractional {
-                        return Some("1d3 hsn".to_string());
-                    }
-
-                    let dice_expr = if has_fractional {
-                        format!("{}d6 + 1d3 hsn", whole_dice)
-                    } else {
-                        format!("{}d6 hsn", whole_dice)
-                    };
-                    return Some(dice_expr);
-                }
+                return process_hero_system_dice(dice_count_str, damage_type, "hsn");
             }
             "k" => {
                 // Killing damage - XdY
-                if let Ok(dice_count) = dice_count_str.parse::<f64>() {
-                    let whole_dice = dice_count.floor() as u32;
-                    let has_fractional = dice_count.fract() > 0.0;
-
-                    if whole_dice == 0 && has_fractional {
-                        return Some("1d3 hsk".to_string());
-                    }
-
-                    let dice_expr = if has_fractional {
-                        format!("{}d6 + 1d3 hsk", whole_dice)
-                    } else {
-                        format!("{}d6 hsk", whole_dice)
-                    };
-                    return Some(dice_expr);
-                }
+                return process_hero_system_dice(dice_count_str, damage_type, "hsk");
             }
             "h" => {
                 // To hit roll - always 3d6 regardless of the number (Hero System standard)

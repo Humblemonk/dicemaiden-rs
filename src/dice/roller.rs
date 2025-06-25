@@ -138,13 +138,17 @@ fn apply_keep_drop_modifiers(result: &mut RollResult, dice: &DiceRoll) -> Result
 }
 
 // Mathematical modifiers with proper precedence evaluation
-fn apply_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll, _rng: &mut impl Rng) -> Result<()> {
+fn apply_mathematical_modifiers(
+    result: &mut RollResult,
+    dice: &DiceRoll,
+    _rng: &mut impl Rng,
+) -> Result<()> {
     // Build an expression from the modifiers and evaluate it properly
     let mut expression_parts = Vec::new();
-    
+
     // Start with the dice total
     expression_parts.push(format!("{}", result.total));
-    
+
     // Add each mathematical operation as it appears
     for modifier in &dice.modifiers {
         match modifier {
@@ -153,41 +157,39 @@ fn apply_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll, _rng: 
                 let additional_result = roll_dice(dice_to_add.clone())?;
                 expression_parts.push("+".to_string());
                 expression_parts.push(format!("{}", additional_result.total));
-                
+
                 // Add dice to individual_rolls for display
-                result.individual_rolls.extend(additional_result.individual_rolls.clone());
-                
+                result
+                    .individual_rolls
+                    .extend(additional_result.individual_rolls.clone());
+
                 // Add dice to kept_rolls so all totals are consistent
-                result.kept_rolls.extend(additional_result.kept_rolls.clone());
-                
+                result
+                    .kept_rolls
+                    .extend(additional_result.kept_rolls.clone());
+
                 // Add a new dice group for display using the SAME rolled dice
-                let dice_group = DiceGroup {
-                    _description: format!("{}d{}", dice_to_add.count, dice_to_add.sides),
-                    rolls: additional_result.individual_rolls, // Use the actual rolled dice
-                    modifier_type: "add".to_string(),
-                };
-                result.dice_groups.push(dice_group);
+                add_dice_group(result, dice_to_add, additional_result.individual_rolls, "add");
             }
             Modifier::SubtractDice(dice_to_subtract) => {
                 // Roll the additional dice only once and use that result consistently
                 let additional_result = roll_dice(dice_to_subtract.clone())?;
                 expression_parts.push("-".to_string());
                 expression_parts.push(format!("{}", additional_result.total));
-                
+
                 // Add dice to individual_rolls for display
-                result.individual_rolls.extend(additional_result.individual_rolls.clone());
-                
+                result
+                    .individual_rolls
+                    .extend(additional_result.individual_rolls.clone());
+
                 // For subtraction, we still add the dice to kept_rolls for display
                 // The subtraction is handled in the expression evaluation
-                result.kept_rolls.extend(additional_result.kept_rolls.clone());
-                
+                result
+                    .kept_rolls
+                    .extend(additional_result.kept_rolls.clone());
+
                 // Add a new dice group for display using the SAME rolled dice
-                let dice_group = DiceGroup {
-                    _description: format!("{}d{}", dice_to_subtract.count, dice_to_subtract.sides),
-                    rolls: additional_result.individual_rolls, // Use the actual rolled dice
-                    modifier_type: "subtract".to_string(),
-                };
-                result.dice_groups.push(dice_group);
+                add_dice_group(result, dice_to_subtract, additional_result.individual_rolls, "subtract");
             }
             Modifier::Add(value) => {
                 expression_parts.push("+".to_string());
@@ -211,7 +213,7 @@ fn apply_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll, _rng: 
             _ => {}
         }
     }
-    
+
     // Evaluate the expression with proper precedence
     if expression_parts.len() > 1 {
         result.total = evaluate_expression(&expression_parts)?;
@@ -220,12 +222,22 @@ fn apply_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll, _rng: 
     Ok(())
 }
 
+// Helper function to add dice groups, reducing duplication
+fn add_dice_group(result: &mut RollResult, dice_spec: &DiceRoll, rolls: Vec<i32>, modifier_type: &str) {
+    let dice_group = DiceGroup {
+        _description: format!("{}d{}", dice_spec.count, dice_spec.sides),
+        rolls, // Use the actual rolled dice
+        modifier_type: modifier_type.to_string(),
+    };
+    result.dice_groups.push(dice_group);
+}
+
 // Simple expression evaluator with proper precedence
 fn evaluate_expression(parts: &[String]) -> Result<i32> {
     if parts.len() == 1 {
         return Ok(parts[0].parse()?);
     }
-    
+
     // Convert to tokens
     let mut tokens = Vec::new();
     for part in parts {
@@ -234,71 +246,20 @@ fn evaluate_expression(parts: &[String]) -> Result<i32> {
         } else {
             match part.as_str() {
                 "+" => tokens.push(Token::Plus),
-                "-" => tokens.push(Token::Minus), 
+                "-" => tokens.push(Token::Minus),
                 "*" => tokens.push(Token::Multiply),
                 "/" => tokens.push(Token::Divide),
                 _ => return Err(anyhow!("Invalid token: {}", part)),
             }
         }
     }
-    
+
     // First pass: handle multiplication and division (left to right)
-    let mut i = 1;
-    while i < tokens.len() {
-        match tokens[i] {
-            Token::Multiply => {
-                if let (Token::Number(left), Token::Number(right)) = (&tokens[i-1], &tokens[i+1]) {
-                    let result = left * right;
-                    tokens[i-1] = Token::Number(result);
-                    tokens.remove(i+1);
-                    tokens.remove(i);
-                    continue; // Don't increment i, check same position again
-                }
-            }
-            Token::Divide => {
-                if let (Token::Number(left), Token::Number(right)) = (&tokens[i-1], &tokens[i+1]) {
-                    if *right == 0 {
-                        return Err(anyhow!("Cannot divide by zero"));
-                    }
-                    let result = left / right;
-                    tokens[i-1] = Token::Number(result);
-                    tokens.remove(i+1);
-                    tokens.remove(i);
-                    continue; // Don't increment i, check same position again
-                }
-            }
-            _ => {}
-        }
-        i += 2; // Skip to next operator (operator + operand)
-    }
-    
+    apply_high_precedence_operations(&mut tokens)?;
+
     // Second pass: handle addition and subtraction (left to right)
-    let mut i = 1;
-    while i < tokens.len() {
-        match tokens[i] {
-            Token::Plus => {
-                if let (Token::Number(left), Token::Number(right)) = (&tokens[i-1], &tokens[i+1]) {
-                    let result = left + right;
-                    tokens[i-1] = Token::Number(result);
-                    tokens.remove(i+1);
-                    tokens.remove(i);
-                    continue; // Don't increment i
-                }
-            }
-            Token::Minus => {
-                if let (Token::Number(left), Token::Number(right)) = (&tokens[i-1], &tokens[i+1]) {
-                    let result = left - right;
-                    tokens[i-1] = Token::Number(result);
-                    tokens.remove(i+1);
-                    tokens.remove(i);
-                    continue; // Don't increment i
-                }
-            }
-            _ => {}
-        }
-        i += 2; // Skip to next operator
-    }
-    
+    apply_low_precedence_operations(&mut tokens)?;
+
     // Should have only one number left
     if tokens.len() == 1 {
         if let Token::Number(result) = tokens[0] {
@@ -309,6 +270,65 @@ fn evaluate_expression(parts: &[String]) -> Result<i32> {
     } else {
         Err(anyhow!("Expression did not evaluate to a single value"))
     }
+}
+
+// Helper function to apply high precedence operations (multiplication and division)
+fn apply_high_precedence_operations(tokens: &mut Vec<Token>) -> Result<()> {
+    let mut i = 1;
+    while i < tokens.len() {
+        match tokens[i] {
+            Token::Multiply => {
+                apply_binary_operation(tokens, i, |a, b| a * b)?;
+                continue; // Don't increment i, check same position again
+            }
+            Token::Divide => {
+                if let (Token::Number(_), Token::Number(right)) = (&tokens[i - 1], &tokens[i + 1]) {
+                    if *right == 0 {
+                        return Err(anyhow!("Cannot divide by zero"));
+                    }
+                }
+                apply_binary_operation(tokens, i, |a, b| a / b)?;
+                continue; // Don't increment i, check same position again
+            }
+            _ => {}
+        }
+        i += 2; // Skip to next operator (operator + operand)
+    }
+    Ok(())
+}
+
+// Helper function to apply low precedence operations (addition and subtraction)
+fn apply_low_precedence_operations(tokens: &mut Vec<Token>) -> Result<()> {
+    let mut i = 1;
+    while i < tokens.len() {
+        match tokens[i] {
+            Token::Plus => {
+                apply_binary_operation(tokens, i, |a, b| a + b)?;
+                continue; // Don't increment i
+            }
+            Token::Minus => {
+                apply_binary_operation(tokens, i, |a, b| a - b)?;
+                continue; // Don't increment i
+            }
+            _ => {}
+        }
+        i += 2; // Skip to next operator
+    }
+    Ok(())
+}
+
+// Helper function to apply binary operations, reducing duplication
+fn apply_binary_operation<F>(tokens: &mut Vec<Token>, i: usize, operation: F) -> Result<()>
+where
+    F: Fn(i32, i32) -> i32,
+{
+    if let (Token::Number(left), Token::Number(right)) = (&tokens[i - 1], &tokens[i + 1]) {
+        let result = operation(*left, *right);
+        tokens[i - 1] = Token::Number(result);
+        tokens.remove(i + 1);
+        tokens.remove(i);
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone)]
@@ -553,11 +573,7 @@ fn count_wrath_glory_successes(
 }
 
 // Helper function for wrath die notes to reduce duplication
-fn add_wrath_die_notes(
-    result: &mut RollResult,
-    has_complication: bool,
-    has_critical: bool,
-) {
+fn add_wrath_die_notes(result: &mut RollResult, has_complication: bool, has_critical: bool) {
     if has_complication {
         result
             .notes
@@ -733,35 +749,40 @@ fn drop_dice(result: &mut RollResult, count: usize) -> Result<()> {
     // The test expects some dice to remain
     if count >= available_dice {
         // Drop all but one die (or all if only one die)
-        let to_drop = if available_dice > 1 { available_dice - 1 } else { available_dice };
-        
+        let to_drop = if available_dice > 1 {
+            available_dice - 1
+        } else {
+            available_dice
+        };
+
         let mut rolls = result.individual_rolls.clone();
         rolls.sort();
 
-        // Drop the lowest dice
-        for _ in 0..to_drop {
-            if let Some(pos) = result.individual_rolls.iter().position(|&x| x == rolls[0]) {
-                let dropped = result.individual_rolls.remove(pos);
-                result.dropped_rolls.push(dropped);
-                rolls.remove(0);
-            }
-        }
+        // Drop the lowest dice using helper function
+        drop_lowest_dice(result, &mut rolls, to_drop);
         return Ok(());
     }
 
     let mut rolls = result.individual_rolls.clone();
     rolls.sort();
+    let rolls_len = rolls.len();
 
-    // Drop lowest dice
-    for _ in 0..count.min(rolls.len()) {
-        if let Some(pos) = result.individual_rolls.iter().position(|&x| x == rolls[0]) {
-            let dropped = result.individual_rolls.remove(pos);
-            result.dropped_rolls.push(dropped);
-            rolls.remove(0);
-        }
-    }
+    // Drop lowest dice using helper function
+    let count_to_drop = count.min(rolls_len);
+    drop_lowest_dice(result, &mut rolls, count_to_drop);
 
     Ok(())
+}
+
+// Helper function to drop lowest dice, reducing duplication
+fn drop_lowest_dice(result: &mut RollResult, sorted_rolls: &mut Vec<i32>, count: usize) {
+    for _ in 0..count {
+        if let Some(pos) = result.individual_rolls.iter().position(|&x| x == sorted_rolls[0]) {
+            let dropped = result.individual_rolls.remove(pos);
+            result.dropped_rolls.push(dropped);
+            sorted_rolls.remove(0);
+        }
+    }
 }
 
 // Better keep dice with proper validation
@@ -927,7 +948,6 @@ fn apply_hero_system_calculation(
     Ok(())
 }
 
-
 fn apply_fudge_conversion(result: &mut RollResult) -> Result<()> {
     let mut symbols = Vec::new();
     let mut fudge_total = 0;
@@ -944,11 +964,11 @@ fn apply_fudge_conversion(result: &mut RollResult) -> Result<()> {
     }
 
     result.fudge_symbols = Some(symbols);
-    
+
     let original_dice_total: i32 = result.kept_rolls.iter().sum();
     let fudge_adjustment = fudge_total - original_dice_total;
     result.total += fudge_adjustment;
-    
+
     result
         .notes
         .push("Fudge dice: 1=(-), 2=( ), 3=(+)".to_string());
@@ -957,9 +977,12 @@ fn apply_fudge_conversion(result: &mut RollResult) -> Result<()> {
 }
 
 // New function to apply mathematical modifiers specifically to success counts
-fn apply_mathematical_modifiers_to_successes(result: &mut RollResult, dice: &DiceRoll) -> Result<()> {
+fn apply_mathematical_modifiers_to_successes(
+    result: &mut RollResult,
+    dice: &DiceRoll,
+) -> Result<()> {
     let mut success_modifier = 0;
-    
+
     for modifier in &dice.modifiers {
         match modifier {
             Modifier::Add(value) => {
@@ -986,13 +1009,13 @@ fn apply_mathematical_modifiers_to_successes(result: &mut RollResult, dice: &Dic
             _ => {}
         }
     }
-    
+
     // Apply the accumulated modifier to successes
     if success_modifier != 0 {
         if let Some(ref mut successes) = result.successes {
             *successes += success_modifier;
         }
     }
-    
+
     Ok(())
 }
