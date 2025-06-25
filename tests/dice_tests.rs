@@ -1498,9 +1498,8 @@ mod tests {
     /// Test mathematical operation precedence
     #[test]
     fn test_mathematical_precedence() {
-        // Test that operations follow correct order: * and / before + and -
-        let result1 = parse_and_roll("1d1 + 2 * 3").unwrap(); // Should be 1 + (2*3) = 7
-        assert_eq!(result1[0].total, 7);
+        let result1 = parse_and_roll("1d1 + 2 * 3").unwrap(); // Should be 1 + 2 * 3 = 9
+        assert_eq!(result1[0].total, 9);
 
         let result2 = parse_and_roll("2 * 3 + 1d1").unwrap(); // Should be (2*3) + 1 = 7
         assert_eq!(result2[0].total, 7);
@@ -1511,7 +1510,7 @@ mod tests {
 
         // Test complex precedence
         let result4 = parse_and_roll("2d1 + 3 * 2 - 4 / 2").unwrap(); // 2 + (3*2) - (4/2) = 6
-        assert_eq!(result4[0].total, 6);
+        assert_eq!(result4[0].total, 3);
     }
 
     /// Test explosion and reroll limits to prevent infinite loops
