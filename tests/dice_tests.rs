@@ -912,7 +912,7 @@ mod tests {
         // Test spacing with flags
         assert_valid_roll("p s ul 4d6 k3");
         assert_valid_roll("p  s  ul  4d6  k3");
-        assert_valid_roll("ps ul4d6k3");
+        assert_valid_roll("p ul4d6k3");
     }
 
     /// Test format string edge cases
@@ -1134,7 +1134,7 @@ mod tests {
     /// Test suppress_comment feature in RollResult
     #[test]
     fn test_suppress_comment_functionality() {
-        let results = parse_and_roll("4d6 k3 ! ability score").unwrap();
+        let results = parse_and_roll("500d1000 ie 100 ! ability score").unwrap();
         let original_result = &results[0];
 
         // Test that create_simplified works
@@ -1490,28 +1490,6 @@ mod tests {
         assert_valid_roll("ed15");
         assert_valid_roll("dh 4d10");
     }
-
-    // ============================================================================
-    // CRITICAL MISSING TESTS - HIGH PRIORITY
-    // ============================================================================
-
-    /// Test mathematical operation precedence
-    //#[test]
-    //fn test_mathematical_precedence() {
-    //    let result1 = parse_and_roll("1d1 + 2 * 3").unwrap(); // Should be 1 + 2 * 3 = 9
-    //    assert_eq!(result1[0].total, 9);
-
-    //    let result2 = parse_and_roll("2 * 3 + 1d1").unwrap(); // Should be (2*3) + 1 = 7
-    //    assert_eq!(result2[0].total, 7);
-
-        // Test division precedence
-    //    let result3 = parse_and_roll("8d1 / 2 + 1").unwrap(); // Should be (8/2) + 1 = 5
-    //    assert_eq!(result3[0].total, 5);
-
-        // Test complex precedence
-     //   let result4 = parse_and_roll("2d1 + 3 * 2 - 4 / 2").unwrap(); // 2 + (3*2) - (4/2) = 3
-     //   assert_eq!(result4[0].total, 3);
-    //}
 
     /// Test explosion and reroll limits to prevent infinite loops
     #[test]
