@@ -19,10 +19,34 @@ static COMMENT_REGEX: Lazy<Regex> =
 static DICE_MOD_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^([+\-])(\d+)d(\d+)$").expect("Failed to compile DICE_MOD_REGEX"));
 
+// Add regex for advantage/disadvantage patterns with modifiers
+static ADV_WITH_MOD_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^([+-])d(\d+|%)\s*([+-]\s*\d+.*)?$").expect("Failed to compile ADV_WITH_MOD_REGEX")
+});
+
 pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     let input = input.trim();
 
-    // Check for aliases that expand to roll sets FIRST
+    // Check for advantage/disadvantage with modifiers FIRST before other alias expansion
+    if let Some(captures) = ADV_WITH_MOD_REGEX.captures(input) {
+        let advantage_sign = &captures[1];
+        let sides = &captures[2];
+        let modifier_part = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
+
+        // Expand the advantage/disadvantage part
+        let adv_alias = format!("{}d{}", advantage_sign, sides);
+        if let Some(expanded_adv) = super::aliases::expand_alias(&adv_alias) {
+            // Combine with the modifier part
+            let full_expression = if modifier_part.is_empty() {
+                expanded_adv
+            } else {
+                format!("{} {}", expanded_adv, modifier_part)
+            };
+            return Ok(vec![parse_single_dice_expression(&full_expression)?]);
+        }
+    }
+
+    // Check for aliases that expand to roll sets
     if let Some(expanded) = super::aliases::expand_alias(input) {
         if expanded.contains(' ') && !expanded.contains(';') {
             // Check if this is a roll set pattern
@@ -99,7 +123,7 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     remaining = parse_comment(&mut dice, remaining);
     remaining = remaining.trim();
 
-    // Check for aliases after parsing flags/comments
+    // Check for aliases after parsing flags/comments but before advantage/disadvantage check
     if let Some(expanded) = super::aliases::expand_alias(remaining) {
         let mut expanded_dice = parse_single_dice_expression(&expanded)?;
 

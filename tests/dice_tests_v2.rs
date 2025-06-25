@@ -526,6 +526,27 @@ mod tests {
     }
 
     #[test]
+    fn test_advantage_with_modifier() {
+        //"+d20 + 1" should parse successfully instead of
+        // throwing "Invalid dice expression: +" error
+        let result = parser::parse_dice_string("+d20 + 1").unwrap();
+        assert_eq!(result.len(), 1);
+
+        let dice = &result[0];
+
+        // Should parse as 2d20 (advantage expands +d20 to 2d20 k1)
+        assert_eq!(dice.count, 2);
+        assert_eq!(dice.sides, 20);
+
+        // Should have exactly 2 modifiers: KeepHigh(1) and Add(1)
+        assert_eq!(dice.modifiers.len(), 2);
+        assert!(dice
+            .modifiers
+            .iter()
+            .any(|m| matches!(m, Modifier::KeepHigh(1))));
+        assert!(dice.modifiers.iter().any(|m| matches!(m, Modifier::Add(1))));
+    }
+    #[test]
     fn test_cod_wod() {
         assert_valid("4cod");
         assert_valid("4cod8");
