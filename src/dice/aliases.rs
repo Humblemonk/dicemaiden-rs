@@ -20,10 +20,6 @@ static WNG_REGEX: Lazy<Regex> = Lazy::new(|| {
 static WNG_SIMPLE_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^wng\s+(\d+)d(\d+)$").expect("Failed to compile WNG_SIMPLE_REGEX"));
 
-// FIXED: Add pattern for standalone wng
-static WNG_STANDALONE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^wng$").expect("Failed to compile WNG_STANDALONE_REGEX"));
-
 static COD_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(\d+)cod([89r]?)(?:\s*([+-]\s*\d+))?$").expect("Failed to compile COD_REGEX")
 });
@@ -34,10 +30,6 @@ static WOD_REGEX: Lazy<Regex> = Lazy::new(|| {
 
 static DH_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^dh\s+(\d+)d(\d+)$").expect("Failed to compile DH_REGEX"));
-
-// FIXED: Add pattern for standalone dh
-static DH_STANDALONE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^dh$").expect("Failed to compile DH_STANDALONE_REGEX"));
 
 static DF_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)df$").expect("Failed to compile DF_REGEX"));
@@ -103,9 +95,8 @@ static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| 
     aliases.insert("hsh", "3d6 hsh");
     aliases.insert("3df", "3d3 fudge");
     aliases.insert("4df", "4d3 fudge");
-    // FIXED: Add missing aliases
-    aliases.insert("dh", "1d10 dh"); // Default Dark Heresy
-    aliases.insert("wng", "1d6 wng"); // Default Wrath & Glory
+    aliases.insert("dh", "1d10 dh");
+    aliases.insert("wng", "1d6 wng");
     aliases
 });
 
@@ -134,7 +125,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some("2d10 k1 * 10 + 1d10 - 10".to_string());
     }
 
-    // FIXED: Handle standalone wng and dh first
+    // Handle standalone wng and dh first
     if input == "wng" {
         return Some("1d6 wng".to_string());
     }
@@ -143,7 +134,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some("1d10 dh".to_string());
     }
 
-    // FIXED: Handle Hero System fractional dice properly
+    // Handle Hero System fractional dice properly
     if let Some(captures) = HS_REGEX.captures(input) {
         let dice_count_str = &captures[1];
         let damage_type = &captures[2];
@@ -155,7 +146,6 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
                     let whole_dice = dice_count.floor() as u32;
                     let has_fractional = dice_count.fract() > 0.0;
 
-                    // FIXED: Handle 0.5 dice properly
                     if whole_dice == 0 && has_fractional {
                         return Some("1d3 hsn".to_string());
                     }
@@ -174,7 +164,6 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
                     let whole_dice = dice_count.floor() as u32;
                     let has_fractional = dice_count.fract() > 0.0;
 
-                    // FIXED: Handle 0.5 dice properly
                     if whole_dice == 0 && has_fractional {
                         return Some("1d3 hsk".to_string());
                     }
@@ -195,7 +184,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         }
     }
 
-    // Godbound system - full dice expressions (gb 3d8, gbs 2d10, etc.) using pre-compiled regex
+    // Godbound system - full dice expressions (gb 3d8, gbs 2d10, etc.)
     if let Some(captures) = GB_DICE_REGEX.captures(input) {
         let gb_type = &captures[1];
         let count = &captures[2];
@@ -205,49 +194,44 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some(format!("{}d{} {}{}", count, sides, gb_type, modifier));
     }
 
-    // Godbound system - simple modifiers (gb+5, gbs-2, etc.) using pre-compiled regex
+    // Godbound system - simple modifiers (gb+5, gbs-2, etc.)
     if let Some(captures) = GB_SIMPLE_REGEX.captures(input) {
         let gb_type = &captures[1];
         let modifier = captures.get(2).map(|m| m.as_str().trim()).unwrap_or("");
         return Some(format!("1d20 {}{}", gb_type, modifier));
     }
 
-    // Wrath & Glory (wng 4d6, wng dn2 4d6, wng 4d6 !soak) using pre-compiled regex
+    // Wrath & Glory (wng 4d6, wng dn2 4d6, wng 4d6 !soak)
     if let Some(captures) = WNG_REGEX.captures(input) {
         let difficulty = captures.get(1).map(|m| m.as_str());
         let count = &captures[2];
         let sides = &captures[3];
         let special = captures.get(4).map(|m| m.as_str());
 
-        // Use the new WrathGlory modifier for proper success counting
         return Some(match (difficulty, special) {
             (Some(dn), Some("soak") | Some("exempt") | Some("dmg")) => {
-                // Use total instead of successes for soak/exempt/dmg rolls
-                format!("{}d{} wng{}t", count, sides, dn)
+                format!("{}d{} wngdn{}t", count, sides, dn)
             }
             (Some(dn), _) => {
-                // Standard wrath & glory with wrath die and difficulty
-                format!("{}d{} wng{}", count, sides, dn)
+                format!("{}d{} wngdn{}", count, sides, dn)
             }
             (None, Some("soak") | Some("exempt") | Some("dmg")) => {
-                // Use total instead of successes for soak/exempt/dmg rolls
                 format!("{}d{} wngt", count, sides)
             }
             (None, _) => {
-                // Standard wrath & glory with wrath die
                 format!("{}d{} wng", count, sides)
             }
         });
     }
 
-    // Simple wng pattern (wng 4d6) using pre-compiled regex
+    // Simple wng pattern (wng 4d6)
     if let Some(captures) = WNG_SIMPLE_REGEX.captures(input) {
         let count = &captures[1];
         let sides = &captures[2];
         return Some(format!("{}d{} wng", count, sides));
     }
 
-    // Chronicles of Darkness (4cod -> 4d10 t8 ie10) using pre-compiled regex
+    // Chronicles of Darkness (4cod -> 4d10 t8 ie10)
     if let Some(captures) = COD_REGEX.captures(input) {
         let count = &captures[1];
         let variant = captures.get(2).map_or("", |m| m.as_str());
@@ -267,7 +251,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         });
     }
 
-    // World of Darkness (4wod8 -> 4d10 f1 ie10 t8) using pre-compiled regex
+    // World of Darkness (4wod8 -> 4d10 f1 ie10 t8)
     if let Some(captures) = WOD_REGEX.captures(input) {
         let count = &captures[1];
         let difficulty = &captures[2];
@@ -280,34 +264,34 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         }
     }
 
-    // Dark Heresy (dh 4d10 -> 4d10 ie10) using pre-compiled regex
+    // Dark Heresy (dh 4d10 -> 4d10 ie10)
     if let Some(captures) = DH_REGEX.captures(input) {
         let count = &captures[1];
         let sides = &captures[2];
         return Some(format!("{}d{} ie{} dh", count, sides, sides));
     }
 
-    // Fudge dice (3df -> 3d3 fudge) using pre-compiled regex
+    // Fudge dice (3df -> 3d3 fudge)
     if let Some(captures) = DF_REGEX.captures(input) {
         let count = &captures[1];
         return Some(format!("{}d3 fudge", count));
     }
 
-    // Warhammer (3wh4+ -> 3d6 t4) using pre-compiled regex
+    // Warhammer (3wh4+ -> 3d6 t4)
     if let Some(captures) = WH_REGEX.captures(input) {
         let count = &captures[1];
         let target = &captures[2];
         return Some(format!("{}d6 t{}", count, target));
     }
 
-    // Double digit (dd34 -> (1d3 * 10) + 1d4) using pre-compiled regex
+    // Double digit (dd34 -> (1d3 * 10) + 1d4)
     if let Some(captures) = DD_REGEX.captures(input) {
         let tens = &captures[1];
         let ones = &captures[2];
         return Some(format!("1d{} * 10 + 1d{}", tens, ones));
     }
 
-    // General advantage/disadvantage (+d20, -d20, etc.) but NOT +d% or -d% using pre-compiled regex
+    // General advantage/disadvantage (+d20, -d20, etc.) but NOT +d% or -d%
     if let Some(captures) = ADV_REGEX.captures(input) {
         let modifier = &captures[1];
         let sides = &captures[2];
@@ -319,44 +303,44 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         });
     }
 
-    // Simple percentile (xd% -> xd100) using pre-compiled regex
+    // Simple percentile (xd% -> xd100)
     if let Some(captures) = PERC_REGEX.captures(input) {
         let count = &captures[1];
         return Some(format!("{}d100", count));
     }
 
-    // Shadowrun (sr6 -> 6d6 t5) using pre-compiled regex
+    // Shadowrun (sr6 -> 6d6 t5)
     if let Some(captures) = SR_REGEX.captures(input) {
         let count = &captures[1];
         return Some(format!("{}d6 t5", count));
     }
 
-    // Storypath (sp4 -> 4d10 t8 ie10) using pre-compiled regex
+    // Storypath (sp4 -> 4d10 t8 ie10)
     if let Some(captures) = SP_REGEX.captures(input) {
         let count = &captures[1];
         return Some(format!("{}d10 t8 ie10", count));
     }
 
-    // Year Zero (6yz -> 6d6 t6) using pre-compiled regex
+    // Year Zero (6yz -> 6d6 t6)
     if let Some(captures) = YZ_REGEX.captures(input) {
         let count = &captures[1];
         return Some(format!("{}d6 t6", count));
     }
 
-    // Sunsails New Millennium (snm5 -> 5d6 ie6 t4) using pre-compiled regex
+    // Sunsails New Millennium (snm5 -> 5d6 ie6 t4)
     if let Some(captures) = SNM_REGEX.captures(input) {
         let count = &captures[1];
         return Some(format!("{}d6 ie6 t4", count));
     }
 
-    // D6 System (d6s4 -> 4d6 + 1d6 ie) using pre-compiled regex
+    // D6 System (d6s4 -> 4d6 + 1d6 ie)
     if let Some(captures) = D6S_REGEX.captures(input) {
         let count = &captures[1];
         let pips = captures.get(2).map_or("", |m| m.as_str());
         return Some(format!("{}d6 + 1d6 ie{}", count, pips));
     }
 
-    // Alternative Hero System notation with explicit fractional dice (2hsk1 = 2.5d6 killing) using pre-compiled regex
+    // Alternative Hero System notation with explicit fractional dice (2hsk1 = 2.5d6 killing)
     if let Some(captures) = HS_FRAC_REGEX.captures(input) {
         let dice_count = &captures[1];
         let damage_type = &captures[2];
@@ -383,14 +367,14 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         });
     }
 
-    // Exalted (ex5 -> 5d10 t7 t10, ex5t8 -> 5d10 t8 t10) using pre-compiled regex
+    // Exalted (ex5 -> 5d10 t7 t10, ex5t8 -> 5d10 t8 t10)
     if let Some(captures) = EX_REGEX.captures(input) {
         let count = &captures[1];
         let target = captures.get(2).map_or("7", |m| m.as_str());
         return Some(format!("{}d10 t{} t10", count, target));
     }
 
-    // Earthdawn system (ed1 through ed50) using pre-compiled regex
+    // Earthdawn system (ed1 through ed50)
     if let Some(captures) = ED_REGEX.captures(input) {
         let step: u32 = captures[1].parse().ok()?;
         if (1..=50).contains(&step) {
@@ -398,7 +382,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         }
     }
 
-    // Earthdawn 4th edition (ed4e1 through ed4e50) using pre-compiled regex
+    // Earthdawn 4th edition (ed4e1 through ed4e50)
     if let Some(captures) = ED4E_REGEX.captures(input) {
         let step: u32 = captures[1].parse().ok()?;
         if (1..=50).contains(&step) {
@@ -406,7 +390,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         }
     }
 
-    // DnD style rolls with modifiers (attack +10, skill -4, save +2) using pre-compiled regex
+    // DnD style rolls with modifiers (attack +10, skill -4, save +2)
     if let Some(captures) = DND_REGEX.captures(input) {
         let _roll_type = &captures[1];
         let modifier = captures.get(2).map_or("", |m| m.as_str().trim());

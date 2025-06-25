@@ -230,10 +230,11 @@ impl RollResult {
     /// Create a simplified copy of the roll result with suppressed comment
     pub fn create_simplified(&self) -> RollResult {
         let mut simplified = self.clone();
+        
+        // Set suppress_comment but REPLACE the comment
         simplified.suppress_comment = true;
-        // Clear the original comment and replace with simplified reason
         simplified.comment = Some("Simplified roll due to character limit".to_string());
-        simplified.suppress_comment = false; // Allow the new comment to show
+        
         simplified
     }
 }
