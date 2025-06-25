@@ -100,7 +100,59 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         return Ok(results);
     }
 
-    // Parse single expression
+    // Try to parse as single expression, but check for alias expansion first
+    let mut remaining = input.trim();
+    
+    // Parse flags first to separate them from the dice expression
+    let mut temp_dice = DiceRoll {
+        count: 1,
+        sides: 6,
+        modifiers: Vec::new(),
+        comment: None,
+        label: None,
+        private: false,
+        simple: false,
+        no_results: false,
+        unsorted: false,
+        original_expression: None,
+    };
+    
+    remaining = parse_flags(&mut temp_dice, remaining);
+    remaining = parse_label(&mut temp_dice, remaining);
+    remaining = parse_comment(&mut temp_dice, remaining);
+    
+    // NOW check if the remaining part (after flags/labels/comments) is an alias that expands to a set
+    if let Some(expanded) = super::aliases::expand_alias(remaining) {
+        if let Some(captures) = SET_REGEX.captures(&expanded) {
+            // This alias expands to a set - handle it as a set
+            let count: u32 = captures[1]
+                .parse()
+                .map_err(|_| anyhow!("Invalid set count in alias expansion"))?;
+            if !(2..=20).contains(&count) {
+                return Err(anyhow!("Set count must be between 2 and 20"));
+            }
+            let dice_expr = &captures[2];
+
+            let mut results = Vec::with_capacity(count as usize);
+            for i in 0..count {
+                let mut dice = parse_single_dice_expression(dice_expr)?;
+                dice.label = Some(format!("Set {}", i + 1));
+                // Apply the flags/labels/comments from the original input
+                dice.private = temp_dice.private;
+                dice.simple = temp_dice.simple;
+                dice.no_results = temp_dice.no_results;
+                dice.unsorted = temp_dice.unsorted;
+                if temp_dice.comment.is_some() {
+                    dice.comment = temp_dice.comment.clone();
+                }
+                // Don't override the "Set X" label with the parsed label
+                results.push(dice);
+            }
+            return Ok(results);
+        }
+    }
+    
+    // Regular single expression parsing
     Ok(vec![parse_single_dice_expression(input)?])
 }
 
@@ -129,197 +181,92 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     // Parse comment (exclamation mark)
     remaining = parse_comment(&mut dice, remaining);
 
-    // NOW check for aliases after flags/comments are stripped
-    if let Some(expanded) = super::aliases::expand_alias(remaining) {
-        // Recursively parse the expanded alias, but preserve the flags/comment from the original
-        let mut expanded_dice = parse_single_dice_expression(&expanded)?;
-
-        // Transfer the parsed flags and comment to the expanded dice
+    // Handle alias expansion for the entire remaining expression
+    // This is a simpler approach that handles "attack + 5" correctly
+    if let Some(expanded) = try_expand_expression_with_alias(remaining) {
+        // Check if this creates a set pattern
+        if let Some(_captures) = SET_REGEX.captures(&expanded) {
+            return Err(anyhow!("NEEDS_SET_PARSING: {}", expanded));
+        }
+        
+        // Parse the expanded expression
+        let mut expanded_dice = parse_expression_without_alias_check(&expanded)?;
+        
+        // Transfer flags and metadata
         expanded_dice.private = dice.private;
         expanded_dice.simple = dice.simple;
         expanded_dice.no_results = dice.no_results;
         expanded_dice.unsorted = dice.unsorted;
         expanded_dice.comment = dice.comment;
         expanded_dice.label = dice.label;
-
+        
         return Ok(expanded_dice);
     }
 
-    // Continue with regular parsing...
-    let parts: Vec<String> = if remaining.contains(' ') {
-        let initial_parts: Vec<&str> = remaining.split_whitespace().collect();
-        split_space_separated_parts(&initial_parts)?
-    } else {
-        split_dice_and_modifiers(remaining)?
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect()
-    };
-
-    if parts.is_empty() {
-        return Err(anyhow!("No dice expression found"));
-    }
-
-    // Parse main dice part
-    parse_base_dice(&mut dice, &parts[0])?;
-
-    // Parse all remaining parts as modifiers
-    let string_parts: Vec<&str> = parts.iter().skip(1).map(|s| s.as_str()).collect();
-    parse_all_modifiers(&mut dice, &string_parts)?;
-
-    Ok(dice)
-}
-
-// Function to handle space-separated parts that might have combined modifiers
-fn split_space_separated_parts(parts: &[&str]) -> Result<Vec<String>> {
-    let mut result = Vec::new();
-
-    for (i, &part) in parts.iter().enumerate() {
-        if i == 0 {
-            // First part should be dice, but might have modifiers attached
-            if part.contains("d") {
-                // This looks like a dice expression, try to split it
-                let split_parts = split_dice_and_modifiers(part)?;
-                result.extend(split_parts.into_iter().map(|s| s.to_string()));
-            } else {
-                result.push(part.to_string());
-            }
-        } else {
-            // Handle subsequent parts - they could be operators, dice expressions, or modifiers
-            if part.starts_with('+')
-                || part.starts_with('-')
-                || part.starts_with('*')
-                || part.starts_with('/')
-            {
-                // Check if this is a dice expression like "+1d6+15" or just a modifier like "+5"
-                if part.contains("d") {
-                    // This contains dice, so we need to split it properly
-                    let split_parts = split_dice_and_modifiers_from_operator(part)?;
-                    result.extend(split_parts.into_iter().map(|s| s.to_string()));
-                } else {
-                    // This is a mathematical operator with possibly attached modifiers like "+8k2"
-                    let split_parts = split_modifier_combinations(part)?;
-                    result.extend(split_parts.into_iter().map(|s| s.to_string()));
-                }
-            } else {
-                // This could be a standalone modifier or number
-                result.push(part.to_string());
-            }
-        }
-    }
-
-    Ok(result)
-}
-
-// New function to handle operator-starting expressions that might contain dice
-fn split_dice_and_modifiers_from_operator(input: &str) -> Result<Vec<String>> {
-    let mut parts = Vec::new();
-
-    // Use the same regex pattern as in split_dice_and_modifiers
-    let modifier_regex = Regex::new(r"([+\-*/]\d*d\d+|[+\-*/]\d+|[a-zA-Z]+\d*)").unwrap();
-    for modifier_match in modifier_regex.find_iter(input) {
-        parts.push(modifier_match.as_str().to_string());
-    }
-
-    // Validate that we've consumed the entire string
-    let reconstructed: String = parts.iter().map(|s| s.as_str()).collect();
-    if reconstructed != input {
-        return Err(anyhow!("Unable to parse modifier expression: {}", input));
-    }
-
-    Ok(parts)
-}
-
-// Function to split combined modifiers like "+8k2" into ["+8", "k2"]
-fn split_modifier_combinations(input: &str) -> Result<Vec<String>> {
-    // Handle mathematical operators with attached modifiers
-    if let Some(first_char) = input.chars().next() {
-        if matches!(first_char, '+' | '-' | '*' | '/') {
-            // Find where the number ends and modifiers begin
-            let mut number_end = 1; // Start after the operator
-            while number_end < input.len()
-                && input.chars().nth(number_end).unwrap().is_ascii_digit()
-            {
-                number_end += 1;
-            }
-
-            if number_end == input.len() {
-                // Just an operator and number, no attached modifiers
-                return Ok(vec![input.to_string()]);
-            }
-
-            // Split into operator+number and remaining modifiers
-            let math_part = &input[..number_end];
-            let modifier_part = &input[number_end..];
-
-            let mut result = vec![math_part.to_string()];
-
-            // Split the remaining modifiers
-            let modifier_regex = Regex::new(r"([a-zA-Z]+\d*)").unwrap();
-            for modifier_match in modifier_regex.find_iter(modifier_part) {
-                result.push(modifier_match.as_str().to_string());
-            }
-
-            return Ok(result);
-        }
-    }
-
-    // If it doesn't start with a mathematical operator, just return as-is
-    Ok(vec![input.to_string()])
+    // No alias expansion needed, parse directly
+    parse_expression_without_alias_check(remaining)
 }
 
 // Function to intelligently split dice expressions like "2d20+8" into ["2d20", "+8"]
 fn split_dice_and_modifiers(input: &str) -> Result<Vec<String>> {
-    // First, try to find standard dice patterns (e.g., "2d20+8")
-    let dice_regex = Regex::new(r"^\d*d\d+").unwrap();
-    if let Some(dice_match) = dice_regex.find(input) {
-        let dice_part = dice_match.as_str();
-        let rest = &input[dice_match.end()..];
+    // Normalize whitespace first - replace tabs and multiple spaces with single spaces
+    let normalized = input
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    
+    // Check if this is a simple dice expression without spaces (like "2d20+8")
+    if !normalized.contains(' ') {
+        // Handle attached modifiers like "2d20+8"
+        let dice_regex = Regex::new(r"^\d*d\d+").unwrap();
+        if let Some(dice_match) = dice_regex.find(&normalized) {
+            let dice_part = dice_match.as_str();
+            let rest = &normalized[dice_match.end()..];
 
-        if rest.is_empty() {
-            return Ok(vec![dice_part.to_string()]);
+            if rest.is_empty() {
+                return Ok(vec![dice_part.to_string()]);
+            }
+
+            let mut parts = vec![dice_part.to_string()];
+            let modifier_regex = Regex::new(r"([+\-*/]\d*d\d+|[+\-*/]\d+|[a-zA-Z]+\d*)").unwrap();
+            
+            for modifier_match in modifier_regex.find_iter(rest) {
+                let modifier = modifier_match.as_str();
+                parts.push(modifier.to_string());
+            }
+
+            // Validate that we consumed the entire rest
+            let reconstructed: String = parts.iter().skip(1).map(|s| s.as_str()).collect();
+            if reconstructed != rest {
+                return Err(anyhow!(
+                    "Unable to parse dice expression: {} (parsed: {} vs original: {})",
+                    input, reconstructed, rest
+                ));
+            }
+
+            return Ok(parts);
         }
+        
+        // Handle alias with modifiers like "4df+1"
+        if let Some(captures) = ALIAS_WITH_MODIFIERS_REGEX.captures(&normalized) {
+            let alias_part = captures[1].to_string();
+            let modifier_part = &captures[2];
 
-        // Now split the rest into modifiers
-        let mut parts = vec![dice_part.to_string()];
+            let mut result_parts = vec![alias_part];
+            let modifier_regex = Regex::new(r"([+\-*/]\d*d\d+|[+\-*/]\d+|[a-zA-Z]+\d*)").unwrap();
+            for modifier_match in modifier_regex.find_iter(modifier_part) {
+                let modifier = modifier_match.as_str();
+                result_parts.push(modifier.to_string());
+            }
 
-        // FIXED: Updated regex to properly handle dice expressions with operators
-        // The key fix: [+\-*/]\d*d\d+ matches dice expressions like +1d6, -2d8
-        let modifier_regex = Regex::new(r"([+\-*/]\d*d\d+|[+\-*/]\d+|[a-zA-Z]+\d*)").unwrap();
-        for modifier_match in modifier_regex.find_iter(rest) {
-            parts.push(modifier_match.as_str().to_string());
+            return Ok(result_parts);
         }
-
-        // Validate that we've consumed the entire string
-        let reconstructed: String = parts.iter().skip(1).map(|s| s.as_str()).collect();
-        if reconstructed != rest {
-            return Err(anyhow!(
-                "Unable to parse dice expression: {} (parsed: {} vs original: {})",
-                input,
-                reconstructed,
-                rest
-            ));
-        }
-
-        Ok(parts)
-    } else if let Some(captures) = ALIAS_WITH_MODIFIERS_REGEX.captures(input) {
-        // Handle fudge dice with modifiers (e.g., "4df+1")
-        let alias_part = captures[1].to_string();
-        let modifier_part = &captures[2];
-
-        let mut parts = vec![alias_part];
-
-        // Split the modifier part - also needs the same fix for dice expressions
-        let modifier_regex = Regex::new(r"([+\-*/]\d*d\d+|[+\-*/]\d+|[a-zA-Z]+\d*)").unwrap();
-        for modifier_match in modifier_regex.find_iter(modifier_part) {
-            parts.push(modifier_match.as_str().to_string());
-        }
-
-        Ok(parts)
-    } else {
-        // If no pattern matched, just return the original as one part
-        Ok(vec![input.to_string()])
+        
+        // Single part, no modifiers
+        return Ok(vec![normalized]);
     }
+    
+    Ok(vec![normalized])
 }
 
 // Helper function to parse flags
@@ -857,4 +804,105 @@ fn parse_dice_expression_only(input: &str) -> Result<DiceRoll> {
     } else {
         Err(anyhow!("Invalid dice expression: {}", input))
     }
+}
+
+// Helper function to try expanding expressions that might start with an alias
+fn try_expand_expression_with_alias(input: &str) -> Option<String> {
+    let words: Vec<&str> = input.split_whitespace().collect();
+    if words.is_empty() {
+        return None;
+    }
+    
+    // Check if the first word is an alias
+    if let Some(expanded) = super::aliases::expand_alias(words[0]) {
+        if words.len() == 1 {
+            // Just the alias, return the expansion
+            return Some(expanded);
+        } else {
+            // Alias + modifiers, combine them
+            let mut result = expanded;
+            result.push(' ');
+            result.push_str(&words[1..].join(" "));
+            return Some(result);
+        }
+    }
+    
+    None
+}
+
+// Helper function to parse expressions without checking for aliases
+fn parse_expression_without_alias_check(input: &str) -> Result<DiceRoll> {
+    let mut dice = DiceRoll {
+        count: 1,
+        sides: 6,
+        modifiers: Vec::new(),
+        comment: None,
+        label: None,
+        private: false,
+        simple: false,
+        no_results: false,
+        unsorted: false,
+        original_expression: None,
+    };
+
+    // Split into parts
+    let parts: Vec<String> = if input.contains(' ') {
+        // Space-separated expression like "1d20 + 5"
+        parse_space_separated_expression(input)?
+    } else {
+        // Single expression like "1d20+5" or just "1d20"
+        split_dice_and_modifiers(input)?
+    };
+
+    if parts.is_empty() {
+        return Err(anyhow!("No dice expression found"));
+    }
+
+    // Parse main dice part
+    parse_base_dice(&mut dice, &parts[0])?;
+
+    // Parse all remaining parts as modifiers
+    let string_parts: Vec<&str> = parts.iter().skip(1).map(|s| s.as_str()).collect();
+    parse_all_modifiers(&mut dice, &string_parts)?;
+
+    Ok(dice)
+}
+
+fn parse_space_separated_expression(input: &str) -> Result<Vec<String>> {
+    let words: Vec<&str> = input.split_whitespace().collect();
+    let mut result = Vec::new();
+    
+    if words.is_empty() {
+        return Ok(result);
+    }
+    
+    // First word should be the dice expression
+    result.push(words[0].to_string());
+    
+    // Process remaining words as operators and operands
+    let mut i = 1;
+    while i < words.len() {
+        let word = words[i];
+        
+        if matches!(word, "+" | "-" | "*" | "/") {
+            // Standalone operator - combine with next word if available
+            if i + 1 < words.len() {
+                let operand = words[i + 1];
+                result.push(format!("{}{}", word, operand));
+                i += 2; // Skip both operator and operand
+            } else {
+                return Err(anyhow!("Operator {} has no operand", word));
+            }
+        } else if word.starts_with('+') || word.starts_with('-') || word.starts_with('*') || word.starts_with('/') {
+            // Operator already attached to operand
+            result.push(word.to_string());
+            i += 1;
+        } else {
+            // Could be a modifier or dice expression
+            result.push(word.to_string());
+            i += 1;
+        }
+    }
+    
+    Ok(result)
 }

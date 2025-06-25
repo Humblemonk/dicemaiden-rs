@@ -258,8 +258,8 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
 • Process Users: ~{}
 • Process Memory: {}"#,
             shard_start,
-            shard_start + shard_count,
-            shard_count,
+            shard_start + shard_count + 1,
+            shard_count + 1,
             total_shards,
             process_server_count,
             process_user_count,

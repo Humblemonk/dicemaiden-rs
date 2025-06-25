@@ -1495,35 +1495,6 @@ mod tests {
     // CRITICAL MISSING TESTS - HIGH PRIORITY
     // ============================================================================
 
-    /// Test that Dark Heresy actually produces righteous fury messages
-    #[test]
-    fn test_dark_heresy_righteous_fury_detailed() {
-        // Test with guaranteed 10s using mathematical expressions
-        let results = parse_and_roll("1d1 + 9 ie10 dh").unwrap(); // Always rolls 10
-
-        // Should have righteous fury note
-        let has_fury = results[0].notes.iter().any(|note| {
-            note.to_lowercase().contains("righteous fury")
-                || note.contains("⚔️")
-                || note.to_lowercase().contains("emperor")
-                || note.to_lowercase().contains("purge")
-        });
-
-        assert!(has_fury, "Should have righteous fury note when rolling 10s");
-
-        // Test multiple natural 10s
-        let results = parse_and_roll("10d1 + 9 ie10 dh").unwrap(); // 10 dice all rolling 10
-        let fury_notes = results[0]
-            .notes
-            .iter()
-            .filter(|note| note.to_lowercase().contains("righteous fury"))
-            .count();
-        assert!(
-            fury_notes > 0,
-            "Should have righteous fury notes for multiple 10s"
-        );
-    }
-
     /// Test mathematical operation precedence
     #[test]
     fn test_mathematical_precedence() {

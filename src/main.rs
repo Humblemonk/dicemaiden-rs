@@ -280,8 +280,8 @@ async fn main() -> Result<()> {
                 info!(
                     "  This process handles shards {} to {} ({} shards)",
                     start,
-                    start + process_shard_count - 1,
-                    process_shard_count
+                    start + process_shard_count + 1,
+                    process_shard_count + 1
                 );
                 info!("  Total shards across all processes: {}", total);
                 info!(
@@ -361,15 +361,6 @@ async fn main() -> Result<()> {
         info!(
             "Verified bot detected with max_concurrency: {}",
             max_concurrency
-        );
-
-        // Calculate optimal startup
-        let startup_batches = shard_count.div_ceil(max_concurrency);
-        let estimated_startup = startup_batches * 5;
-
-        info!(
-            "Startup config: {} shards in {} batches (~{}s)",
-            shard_count, startup_batches, estimated_startup
         );
     } else {
         info!("Unverified bot mode: 1 shard per 5 seconds");
@@ -479,8 +470,8 @@ async fn main() -> Result<()> {
         info!(
             "This process handles shards {} to {} ({} shards)",
             shard_start,
-            shard_start + shard_count - 1,
-            shard_count
+            shard_start + shard_count + 1,
+            shard_count + 1
         );
         info!("Total shards across all processes: {}", total_shards);
         info!("Use 'pkill dicemaiden-rs' to stop all processes");
@@ -578,8 +569,8 @@ async fn start_client_with_shard_strategy(
             info!(
                 "Starting shard range {} to {} ({} shards) out of {} total",
                 shard_start,
-                shard_start + shard_count - 1,
-                shard_count,
+                shard_start + shard_count + 1,
+                shard_count + 1,
                 total_shards
             );
             info!(
@@ -733,7 +724,7 @@ async fn collect_shard_stats_with_shutdown(
                 "Process stats: {} shards ({}-{}), {} servers, {:.2} MB memory",
                 shard_count + 1,
                 shard_start,
-                shard_start + shard_count + 1,
+                shard_start + shard_count,
                 total_guilds,
                 memory_usage
             );
