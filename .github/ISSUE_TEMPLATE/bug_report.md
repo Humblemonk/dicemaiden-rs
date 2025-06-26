@@ -1,3 +1,7 @@
+### PLEASE READ BEFORE SUBMITTING!
+
+**Do not submit any bug report related to Dice Maiden being offline in your Discord server. The maintainers of this bot are unable to assist you with this issue as offline bots are generally due to a Discord backend and caching issue.**
+
 ---
 name: Bug report
 about: Create a report to help us improve
