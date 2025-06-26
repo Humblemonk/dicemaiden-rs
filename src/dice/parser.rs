@@ -51,7 +51,10 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         if expanded.contains(' ') && !expanded.contains(';') {
             // Check if this is a roll set pattern
             if let Some(captures) = SET_REGEX.captures(&expanded) {
-                return create_roll_set(&captures);
+                // Validate that this is actually a roll set before proceeding
+                if is_valid_roll_set_expression(&captures[2]) {
+                    return create_roll_set(&captures);
+                }
             }
         }
         // If alias doesn't expand to roll set, parse normally
@@ -63,13 +66,86 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         return parse_semicolon_separated_rolls(input);
     }
 
-    // Check for roll sets
-    if let Some(captures) = SET_REGEX.captures(input) {
-        return create_roll_set(&captures);
+    // Parse flags early to handle cases like "p 6 4d6"
+    let mut temp_dice = create_default_dice_roll();
+    let after_flags = parse_flags(&mut temp_dice, input);
+    let after_label = parse_label(&mut temp_dice, after_flags);
+    let after_comment = parse_comment(&mut temp_dice, after_label);
+    let remaining_input = after_comment.trim();
+
+    // Check for roll sets AFTER parsing flags
+    if let Some(captures) = SET_REGEX.captures(remaining_input) {
+        let count_str = &captures[1];
+        let expression = &captures[2];
+
+        if let Ok(count) = count_str.parse::<u32>() {
+            if (2..=20).contains(&count) && !expression.starts_with(['+', '-', '*', '/']) {
+                // Check if expression is valid for roll sets (including aliases)
+                if is_valid_roll_set_expression(expression) {
+                    // Try to parse the expression
+                    if let Ok(mut dice) = parse_single_dice_expression(expression) {
+                        // Transfer the parsed flags to each set
+                        transfer_dice_metadata(&temp_dice, &mut dice);
+
+                        // Successfully parsed - create the roll set
+                        let mut results = Vec::with_capacity(count as usize);
+                        for i in 0..count {
+                            let mut set_dice = dice.clone();
+                            set_dice.label = Some(format!("Set {}", i + 1));
+                            results.push(set_dice);
+                        }
+                        return Ok(results);
+                    }
+                }
+            }
+        }
     }
 
     // Parse single expression
     Ok(vec![parse_single_dice_expression(input)?])
+}
+
+// Helper function to validate if an expression is suitable for a roll set
+fn is_valid_roll_set_expression(expr: &str) -> bool {
+    let expr = expr.trim();
+
+    // Check if it starts with a mathematical operator (like "/2d4" or "+ 4d10")
+    if expr.starts_with(['+', '-', '*', '/']) {
+        return false;
+    }
+
+    // Check if it's a valid alias that expands to dice
+    if super::aliases::expand_alias(expr).is_some() {
+        return true; // Aliases are valid for roll sets
+    }
+
+    // Check if it contains 'd' (indicating dice)
+    if !expr.contains('d') {
+        return false;
+    }
+
+    // Special check for number/dice division patterns (like "20/d6", "100/2d4")
+    // These are valid dice expressions for roll sets
+    let number_div_dice_regex = Regex::new(r"^\d+\s*/\s*(d\d+.*|d%.*|\d*d\d+.*)$").unwrap();
+    if number_div_dice_regex.is_match(expr) {
+        return true; // This is a valid number/dice division expression
+    }
+
+    // Check for standard dice expressions (like "2d6", "d20", "4d6+3")
+    let standard_dice_regex = Regex::new(r"^(\d*d\d+|d%|\d*d%)").unwrap();
+    if standard_dice_regex.is_match(expr) {
+        return true; // This starts with a standard dice expression
+    }
+
+    // If it contains mathematical operators but doesn't start with dice or number/dice pattern,
+    // it's probably not a valid roll set expression
+    if expr.contains(['+', '-', '*', '/']) {
+        return false;
+    }
+
+    // As a final fallback, try to parse it
+    // But let's be more conservative here to avoid false positives
+    false
 }
 
 // Helper function to create roll sets, eliminating duplication
@@ -123,7 +199,7 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     remaining = parse_comment(&mut dice, remaining);
     remaining = remaining.trim();
 
-    // Check for aliases after parsing flags/comments but before advantage/disadvantage check
+    // Check for aliases after parsing flags/comments
     if let Some(expanded) = super::aliases::expand_alias(remaining) {
         let mut expanded_dice = parse_single_dice_expression(&expanded)?;
 
@@ -140,7 +216,71 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
         return Err(anyhow!("No dice expression found"));
     }
 
-    // Parse the base dice
+    // Check if this is an expression that starts with a number (like "4 + 4d10" or "5 - 2d1")
+    if parts.len() > 2 && parts[0].parse::<i32>().is_ok() && !parts[0].contains('d') {
+        // Find the first dice expression in the parts
+        let mut dice_index = None;
+        for (i, part) in parts.iter().enumerate() {
+            if part.contains('d') || is_dice_expression(part) {
+                dice_index = Some(i);
+                break;
+            }
+        }
+
+        if let Some(dice_idx) = dice_index {
+            // For expressions like "5 - 2d1", we need to be more careful about the order
+            // The expression should be evaluated as "5 - (result of 2d1)", not "(result of 2d1) + something"
+
+            // Parse the dice part
+            parse_base_dice(&mut dice, &parts[dice_idx])?;
+
+            // Get the initial number and operator
+            let initial_number = parts[0].parse::<i32>().unwrap();
+
+            // Check if there's an operator before the dice
+            if dice_idx > 1 {
+                match parts[dice_idx - 1].as_str() {
+                    "+" => {
+                        // For "5 + 2d1", result should be 5 + dice_result
+                        dice.modifiers.push(Modifier::Add(initial_number));
+                    }
+                    "-" => {
+                        // For "5 - 2d1", result should be 5 - dice_result
+                        // We can achieve this by: -(dice_result) + 5 = 5 - dice_result
+                        dice.modifiers.push(Modifier::Multiply(-1));
+                        dice.modifiers.push(Modifier::Add(initial_number));
+                    }
+                    "*" => {
+                        // For "5 * 2d1", result should be 5 * dice_result
+                        // But this is ambiguous - it could mean (5 * dice_result) or (dice_result * 5)
+                        // We'll treat it as dice_result * 5 for consistency with addition
+                        dice.modifiers.push(Modifier::Multiply(initial_number));
+                    }
+                    "/" => {
+                        // For "5 / 2d1", we need to calculate 5 / dice_result
+                        // Use the special division marker pattern: dice * 0 + number means number / dice
+                        dice.modifiers.push(Modifier::Multiply(0)); // Special marker
+                        dice.modifiers.push(Modifier::Add(initial_number));
+                    }
+                    _ => {
+                        // Unknown operator, default to addition
+                        dice.modifiers.push(Modifier::Add(initial_number));
+                    }
+                }
+            } else {
+                // No operator between number and dice (shouldn't happen in valid input)
+                dice.modifiers.push(Modifier::Add(initial_number));
+            }
+
+            // Parse remaining modifiers after the dice
+            if dice_idx + 1 < parts.len() {
+                parse_all_modifiers(&mut dice, &parts[dice_idx + 1..])?;
+            }
+
+            return Ok(dice);
+        }
+    }
+    // Standard parsing: first part should be dice
     parse_base_dice(&mut dice, &parts[0])?;
 
     // Parse modifiers
@@ -189,8 +329,89 @@ fn parse_expression_to_parts(input: &str) -> Result<Vec<String>> {
     // Normalize whitespace first
     let normalized = normalize_whitespace(input);
 
+    // Special handling for expressions like "200 / 2d4" or "500 / d%" where number comes before dice
+    // BUT NOT for roll set patterns like "4 20/d6"
+    // Also handle cases like "100/2d1 +5" where there's no space around the division but space before additional modifiers
+    let number_op_dice_regex =
+        Regex::new(r"^(\d+)\s*([+\-*/])\s+(d\d+.*|d%.*|\d*d\d+.*)$").unwrap();
+    if let Some(captures) = number_op_dice_regex.captures(&normalized) {
+        let number = &captures[1];
+        let operator = &captures[2];
+        let dice_part = &captures[3];
+
+        // For division, we need to reverse the operation
+        // "200 / 2d4" should become "2d4" with a special modifier that divides 200 by the result
+        if operator == "/" {
+            // Parse the dice part and any additional modifiers separately
+            let dice_parts = parse_dice_and_additional_modifiers(dice_part)?;
+
+            let mut result_parts = vec![
+                dice_parts.dice_part,
+                "*".to_string(),
+                "0".to_string(), // Special marker
+                "+".to_string(),
+                number.to_string(), // The number to divide by dice result
+            ];
+
+            // Add any additional modifiers
+            result_parts.extend(dice_parts.additional_modifiers);
+
+            return Ok(result_parts);
+        } else {
+            // For other operations, keep the original order
+            return Ok(vec![
+                number.to_string(),
+                operator.to_string(),
+                dice_part.to_string(),
+            ]);
+        }
+    }
+
+    // Special case for patterns like "100/2d1 +5" - division without spaces but additional modifiers with spaces
+    let number_div_no_space_regex = Regex::new(r"^(\d+)/(\S+)(\s+.+)$").unwrap();
+    if let Some(captures) = number_div_no_space_regex.captures(&normalized) {
+        let number = &captures[1];
+        let dice_part = &captures[2];
+        let trailing_part = captures[3].trim();
+
+        // Check if the dice part actually contains dice
+        if dice_part.contains('d') {
+            // Parse the dice part and any modifiers attached directly to it
+            let parsed_dice = parse_dice_and_additional_modifiers(dice_part)?;
+
+            // Parse the trailing part as additional modifiers
+            let trailing_modifiers = parse_additional_modifiers(trailing_part)?;
+
+            // Create the base parts for division
+            let mut parts = vec![
+                parsed_dice.dice_part,
+                "*".to_string(),
+                "0".to_string(), // Special marker
+                "+".to_string(),
+                number.to_string(), // The number to divide by dice result
+            ];
+
+            // Add modifiers attached to dice
+            parts.extend(parsed_dice.additional_modifiers);
+
+            // Add trailing modifiers
+            parts.extend(trailing_modifiers);
+
+            return Ok(parts);
+        }
+    }
+
     // Check if this is entirely without spaces and contains dice
     if !normalized.contains(' ') && normalized.contains('d') {
+        return parse_combined_expression(&normalized);
+    }
+
+    // Check if this is a combined expression without spaces but with operators
+    if !normalized.contains(' ')
+        && normalized
+            .chars()
+            .any(|c| matches!(c, '+' | '-' | '*' | '/'))
+    {
         return parse_combined_expression(&normalized);
     }
 
@@ -228,6 +449,73 @@ fn parse_expression_to_parts(input: &str) -> Result<Vec<String>> {
     // Add final token if any
     if !current_token.is_empty() {
         process_final_token(&mut parts, &current_token)?;
+    }
+
+    Ok(parts)
+}
+
+// New struct to hold parsed dice and modifiers
+struct DiceAndModifiers {
+    dice_part: String,
+    additional_modifiers: Vec<String>,
+}
+
+// Helper function to parse dice and additional modifiers
+fn parse_dice_and_additional_modifiers(input: &str) -> Result<DiceAndModifiers> {
+    // Look for the dice expression first
+    let dice_regex = Regex::new(r"^(\d*d\d+|d%|d\d+)(.*)$").unwrap();
+    if let Some(captures) = dice_regex.captures(input) {
+        let dice_part = captures[1].to_string();
+        let remaining = captures[2].trim();
+
+        let additional_modifiers = if remaining.is_empty() {
+            Vec::new()
+        } else {
+            // Parse the remaining modifiers
+            parse_additional_modifiers(remaining)?
+        };
+
+        Ok(DiceAndModifiers {
+            dice_part,
+            additional_modifiers,
+        })
+    } else {
+        // Fallback: treat the whole thing as a dice part
+        Ok(DiceAndModifiers {
+            dice_part: input.to_string(),
+            additional_modifiers: Vec::new(),
+        })
+    }
+}
+
+// Helper function to parse additional modifiers after dice
+fn parse_additional_modifiers(input: &str) -> Result<Vec<String>> {
+    let mut parts = Vec::new();
+    let mut current_token = String::new();
+
+    for ch in input.chars() {
+        match ch {
+            '+' | '-' | '*' | '/' => {
+                if !current_token.is_empty() {
+                    parts.push(current_token.trim().to_string());
+                    current_token.clear();
+                }
+                parts.push(ch.to_string());
+            }
+            ' ' => {
+                if !current_token.is_empty() && current_token.trim() != "" {
+                    parts.push(current_token.trim().to_string());
+                    current_token.clear();
+                }
+            }
+            _ => {
+                current_token.push(ch);
+            }
+        }
+    }
+
+    if !current_token.is_empty() {
+        parts.push(current_token.trim().to_string());
     }
 
     Ok(parts)
@@ -290,27 +578,91 @@ fn has_attached_modifiers(input: &str) -> bool {
     }
 }
 
-// Parse combined expressions like "4d6e6k3+2"
+// Parse combined expressions like "4d6e6k3+2" or "200/d%" or "100/2d1+5"
 fn parse_combined_expression(input: &str) -> Result<Vec<String>> {
-    let mut parts = Vec::new();
+    // Check for number/dice pattern first (e.g., "200/2d4", "500/d%", "100/2d1+5")
+    // But be more careful about capturing only the dice part, not trailing spaces/operators
+    let number_div_dice_regex = Regex::new(r"^(\d+)/(\S+)(.*)$").unwrap();
+    if let Some(captures) = number_div_dice_regex.captures(input) {
+        let number = &captures[1];
+        let dice_part = &captures[2];
+        let trailing_part = captures[3].trim();
 
-    // First, extract any mathematical operators at the end
-    let (main_part, math_part) = split_math_operators(input);
+        // Check if the dice part actually contains dice (basic validation)
+        if dice_part.contains('d') {
+            // Parse the dice part and any modifiers attached to it
+            let parsed = parse_dice_and_additional_modifiers(dice_part)?;
 
-    // Parse the main dice + modifiers part
-    if let Some((dice_part, modifiers_part)) = split_dice_and_modifiers(main_part) {
-        parts.push(dice_part);
+            // Create the base parts for division
+            let mut parts = vec![
+                parsed.dice_part,
+                "*".to_string(),
+                "0".to_string(), // Special marker
+                "+".to_string(),
+                number.to_string(), // The number to divide by dice result
+            ];
 
-        // Split the modifiers part into individual modifiers
-        let modifier_parts = split_combined_modifiers(&modifiers_part)?;
-        parts.extend(modifier_parts);
-    } else {
-        // Not a dice expression, treat as single part
-        parts.push(main_part.to_string());
+            // Add any modifiers that were attached to the dice
+            parts.extend(parsed.additional_modifiers);
+
+            // Handle any trailing part (like " +5" in "100/2d1 +5")
+            if !trailing_part.is_empty() {
+                let trailing_modifiers = parse_additional_modifiers(trailing_part)?;
+                parts.extend(trailing_modifiers);
+            }
+
+            return Ok(parts);
+        }
     }
 
-    // Add any mathematical parts
-    parts.extend(math_part);
+    let mut parts = Vec::new();
+    let mut current_token = String::new();
+
+    for ch in input.chars() {
+        match ch {
+            '+' | '-' | '*' | '/' => {
+                // Mathematical operators - finish current token and add operator
+                if !current_token.is_empty() {
+                    parts.push(current_token.clone());
+                    current_token.clear();
+                }
+                parts.push(ch.to_string());
+            }
+            _ => {
+                // Regular character - add to current token
+                current_token.push(ch);
+            }
+        }
+    }
+
+    // Add final token if any
+    if !current_token.is_empty() {
+        parts.push(current_token);
+    }
+
+    // If we didn't find any operators, try the old logic for dice with modifiers
+    if parts.len() == 1 && parts[0].contains('d') {
+        let input = parts[0].clone(); // Clone to avoid borrow checker issues
+        parts.clear();
+
+        // First, extract any mathematical operators at the end
+        let (main_part, math_part) = split_math_operators(&input);
+
+        // Parse the main dice + modifiers part
+        if let Some((dice_part, modifiers_part)) = split_dice_and_modifiers(main_part) {
+            parts.push(dice_part);
+
+            // Split the modifiers part into individual modifiers
+            let modifier_parts = split_combined_modifiers(&modifiers_part)?;
+            parts.extend(modifier_parts);
+        } else {
+            // Not a dice expression, treat as single part
+            parts.push(main_part.to_string());
+        }
+
+        // Add any mathematical parts
+        parts.extend(math_part);
+    }
 
     Ok(parts)
 }
@@ -788,21 +1140,6 @@ fn parse_complex_dice_expression(input: &str) -> Result<DiceRoll> {
     }
 }
 
-// Helper function to parse exploding dice values, reducing duplication
-fn parse_explode_value(stripped: &str, part: &str, modifier_name: &str) -> Result<Option<u32>> {
-    if stripped.is_empty() {
-        Ok(None)
-    } else {
-        let val = stripped
-            .parse()
-            .map_err(|_| anyhow!("Invalid {} value in '{}'", modifier_name, part))?;
-        if val == 0 {
-            return Err(anyhow!("Cannot explode on 0"));
-        }
-        Ok(Some(val))
-    }
-}
-
 fn parse_single_modifier(part: &str) -> Result<Modifier> {
     // System modifiers
     match part {
@@ -823,12 +1160,38 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
 
     // Handle exploding dice
     if let Some(stripped) = part.strip_prefix("ie") {
-        let num = parse_explode_value(stripped, part, "explode")?;
+        let num = if stripped.is_empty() {
+            None
+        } else {
+            Some(
+                stripped
+                    .parse()
+                    .map_err(|_| anyhow!("Invalid explode value in '{}'", part))?,
+            )
+        };
+        if let Some(val) = num {
+            if val == 0 {
+                return Err(anyhow!("Cannot explode on 0"));
+            }
+        }
         return Ok(Modifier::ExplodeIndefinite(num));
     }
 
     if let Some(stripped) = part.strip_prefix('e') {
-        let num = parse_explode_value(stripped, part, "explode")?;
+        let num = if stripped.is_empty() {
+            None
+        } else {
+            Some(
+                stripped
+                    .parse()
+                    .map_err(|_| anyhow!("Invalid explode value in '{}'", part))?,
+            )
+        };
+        if let Some(val) = num {
+            if val == 0 {
+                return Err(anyhow!("Cannot explode on 0"));
+            }
+        }
         return Ok(Modifier::Explode(num));
     }
 
