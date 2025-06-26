@@ -6,7 +6,6 @@ labels: ''
 assignees: ''
 
 ---
-> **Note:** Do not submit **any** bug report related to Dice Maiden being offline in your Discord server. The maintainers of this bot are unable to assist you with this issue as offline bots are generally due to a Discord backend and caching issue.**
 
 **Describe the bug**
 A clear and concise description of what the bug is.
