@@ -137,12 +137,127 @@ fn apply_keep_drop_modifiers(result: &mut RollResult, dice: &DiceRoll) -> Result
     Ok(())
 }
 
-// Mathematical modifiers with proper precedence evaluation
+// Update apply_mathematical_modifiers to handle the special division case AND continue with remaining modifiers
 fn apply_mathematical_modifiers(
     result: &mut RollResult,
     dice: &DiceRoll,
     _rng: &mut impl Rng,
 ) -> Result<()> {
+    // Check for special division pattern: Multiply(0) followed by Add(number)
+    if dice.modifiers.len() >= 2 {
+        if let (Modifier::Multiply(0), Modifier::Add(number)) =
+            (&dice.modifiers[0], &dice.modifiers[1])
+        {
+            // This is our special "number / dice" case
+            if result.total == 0 {
+                return Err(anyhow!("Cannot divide by zero (dice result was 0)"));
+            }
+            result.total = number / result.total;
+
+            // IMPORTANT: Continue processing remaining modifiers starting from index 2
+            let remaining_modifiers = &dice.modifiers[2..];
+            if !remaining_modifiers.is_empty() {
+                apply_remaining_mathematical_modifiers(result, remaining_modifiers, dice)?;
+            }
+            return Ok(());
+        }
+    }
+
+    // Standard mathematical modifier processing
+    apply_all_mathematical_modifiers(result, dice)?;
+    Ok(())
+}
+
+// New function to apply remaining modifiers after special division
+fn apply_remaining_mathematical_modifiers(
+    result: &mut RollResult,
+    modifiers: &[Modifier],
+    _dice: &DiceRoll,
+) -> Result<()> {
+    // Build an expression from the remaining modifiers
+    let mut expression_parts = Vec::new();
+
+    // Start with current total
+    expression_parts.push(format!("{}", result.total));
+
+    // Add each remaining mathematical operation
+    for modifier in modifiers {
+        match modifier {
+            Modifier::AddDice(dice_to_add) => {
+                let additional_result = roll_dice(dice_to_add.clone())?;
+                expression_parts.push("+".to_string());
+                expression_parts.push(format!("{}", additional_result.total));
+
+                // Add dice to individual_rolls for display
+                result
+                    .individual_rolls
+                    .extend(additional_result.individual_rolls.clone());
+                result
+                    .kept_rolls
+                    .extend(additional_result.kept_rolls.clone());
+
+                // Add a new dice group for display
+                add_dice_group(
+                    result,
+                    dice_to_add,
+                    additional_result.individual_rolls,
+                    "add",
+                );
+            }
+            Modifier::SubtractDice(dice_to_subtract) => {
+                let additional_result = roll_dice(dice_to_subtract.clone())?;
+                expression_parts.push("-".to_string());
+                expression_parts.push(format!("{}", additional_result.total));
+
+                // Add dice to individual_rolls for display
+                result
+                    .individual_rolls
+                    .extend(additional_result.individual_rolls.clone());
+                result
+                    .kept_rolls
+                    .extend(additional_result.kept_rolls.clone());
+
+                // Add a new dice group for display
+                add_dice_group(
+                    result,
+                    dice_to_subtract,
+                    additional_result.individual_rolls,
+                    "subtract",
+                );
+            }
+            Modifier::Add(value) => {
+                expression_parts.push("+".to_string());
+                expression_parts.push(format!("{}", value));
+            }
+            Modifier::Subtract(value) => {
+                expression_parts.push("-".to_string());
+                expression_parts.push(format!("{}", value));
+            }
+            Modifier::Multiply(value) => {
+                expression_parts.push("*".to_string());
+                expression_parts.push(format!("{}", value));
+            }
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                expression_parts.push("/".to_string());
+                expression_parts.push(format!("{}", value));
+            }
+            _ => {} // Skip non-mathematical modifiers
+        }
+    }
+
+    // Evaluate the expression if we have additional operations
+    if expression_parts.len() > 1 {
+        result.total = evaluate_expression(&expression_parts)?;
+    }
+
+    Ok(())
+}
+
+// Function to apply all mathematical modifiers (for standard case)
+fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) -> Result<()> {
     // Build an expression from the modifiers and evaluate it properly
     let mut expression_parts = Vec::new();
 
@@ -210,8 +325,11 @@ fn apply_mathematical_modifiers(
                 expression_parts.push(format!("{}", value));
             }
             Modifier::Multiply(value) => {
-                expression_parts.push("*".to_string());
-                expression_parts.push(format!("{}", value));
+                // Skip the special marker (multiply by 0)
+                if *value != 0 {
+                    expression_parts.push("*".to_string());
+                    expression_parts.push(format!("{}", value));
+                }
             }
             Modifier::Divide(value) => {
                 if *value == 0 {
@@ -247,7 +365,7 @@ fn add_dice_group(
     result.dice_groups.push(dice_group);
 }
 
-// Simple expression evaluator with proper precedence
+// Simple expression evaluator with LEFT-TO-RIGHT evaluation (no PEMDAS)
 fn evaluate_expression(parts: &[String]) -> Result<i32> {
     if parts.len() == 1 {
         return Ok(parts[0].parse()?);
@@ -269,11 +387,8 @@ fn evaluate_expression(parts: &[String]) -> Result<i32> {
         }
     }
 
-    // First pass: handle multiplication and division (left to right)
-    apply_high_precedence_operations(&mut tokens)?;
-
-    // Second pass: handle addition and subtraction (left to right)
-    apply_low_precedence_operations(&mut tokens)?;
+    // Evaluate LEFT-TO-RIGHT (no precedence rules)
+    apply_left_to_right_operations(&mut tokens)?;
 
     // Should have only one number left
     if tokens.len() == 1 {
@@ -287,62 +402,58 @@ fn evaluate_expression(parts: &[String]) -> Result<i32> {
     }
 }
 
-// Helper function to apply high precedence operations (multiplication and division)
-fn apply_high_precedence_operations(tokens: &mut Vec<Token>) -> Result<()> {
-    let mut i = 1;
-    while i < tokens.len() {
-        match tokens[i] {
-            Token::Multiply => {
-                apply_binary_operation(tokens, i, |a, b| a * b)?;
-                continue; // Don't increment i, check same position again
+// Helper function to apply operations strictly left-to-right
+fn apply_left_to_right_operations(tokens: &mut Vec<Token>) -> Result<()> {
+    // Process operations from left to right, one at a time
+    while tokens.len() > 1 {
+        // Find the first operator
+        let mut operator_pos = None;
+        for (i, token) in tokens.iter().enumerate() {
+            if matches!(
+                token,
+                Token::Plus | Token::Minus | Token::Multiply | Token::Divide
+            ) {
+                operator_pos = Some(i);
+                break;
             }
-            Token::Divide => {
-                if let (Token::Number(_), Token::Number(right)) = (&tokens[i - 1], &tokens[i + 1]) {
-                    if *right == 0 {
-                        return Err(anyhow!("Cannot divide by zero"));
+        }
+
+        if let Some(op_pos) = operator_pos {
+            // We need at least one number before and after the operator
+            if op_pos == 0 || op_pos >= tokens.len() - 1 {
+                return Err(anyhow!("Invalid expression structure"));
+            }
+
+            // Get the left operand, operator, and right operand
+            if let (Token::Number(left), op, Token::Number(right)) =
+                (&tokens[op_pos - 1], &tokens[op_pos], &tokens[op_pos + 1])
+            {
+                let result = match op {
+                    Token::Plus => left + right,
+                    Token::Minus => left - right,
+                    Token::Multiply => left * right,
+                    Token::Divide => {
+                        if *right == 0 {
+                            return Err(anyhow!("Cannot divide by zero"));
+                        }
+                        left / right
                     }
-                }
-                apply_binary_operation(tokens, i, |a, b| a / b)?;
-                continue; // Don't increment i, check same position again
-            }
-            _ => {}
-        }
-        i += 2; // Skip to next operator (operator + operand)
-    }
-    Ok(())
-}
+                    _ => return Err(anyhow!("Unexpected token type")),
+                };
 
-// Helper function to apply low precedence operations (addition and subtraction)
-fn apply_low_precedence_operations(tokens: &mut Vec<Token>) -> Result<()> {
-    let mut i = 1;
-    while i < tokens.len() {
-        match tokens[i] {
-            Token::Plus => {
-                apply_binary_operation(tokens, i, |a, b| a + b)?;
-                continue; // Don't increment i
+                // Replace the three tokens (left operand, operator, right operand) with the result
+                tokens[op_pos - 1] = Token::Number(result);
+                tokens.remove(op_pos + 1); // Remove right operand
+                tokens.remove(op_pos); // Remove operator
+            } else {
+                return Err(anyhow!("Invalid operands for operator"));
             }
-            Token::Minus => {
-                apply_binary_operation(tokens, i, |a, b| a - b)?;
-                continue; // Don't increment i
-            }
-            _ => {}
+        } else {
+            // No more operators found but we still have multiple tokens
+            return Err(anyhow!("Expression contains non-operator tokens"));
         }
-        i += 2; // Skip to next operator
     }
-    Ok(())
-}
 
-// Helper function to apply binary operations, reducing duplication
-fn apply_binary_operation<F>(tokens: &mut Vec<Token>, i: usize, operation: F) -> Result<()>
-where
-    F: Fn(i32, i32) -> i32,
-{
-    if let (Token::Number(left), Token::Number(right)) = (&tokens[i - 1], &tokens[i + 1]) {
-        let result = operation(*left, *right);
-        tokens[i - 1] = Token::Number(result);
-        tokens.remove(i + 1);
-        tokens.remove(i);
-    }
     Ok(())
 }
 
