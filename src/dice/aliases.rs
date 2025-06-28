@@ -127,13 +127,13 @@ fn process_hero_system_dice(
         let has_fractional = dice_count.fract() > 0.0;
 
         if whole_dice == 0 && has_fractional {
-            return Some(format!("1d3 {}", dice_type));
+            return Some(format!("1d3 {dice_type}"));
         }
 
         let dice_expr = if has_fractional {
-            format!("{}d6 + 1d3 {}", whole_dice, dice_type)
+            format!("{whole_dice}d6 + 1d3 {dice_type}")
         } else {
-            format!("{}d6 {}", whole_dice, dice_type)
+            format!("{whole_dice}d6 {dice_type}")
         };
         return Some(dice_expr);
     }
@@ -187,14 +187,14 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let sides = &captures[3];
         let modifier = captures.get(4).map(|m| m.as_str().trim()).unwrap_or("");
 
-        return Some(format!("{}d{} {}{}", count, sides, gb_type, modifier));
+        return Some(format!("{count}d{sides} {gb_type}{modifier}"));
     }
 
     // Godbound system - simple modifiers (gb+5, gbs-2, etc.)
     if let Some(captures) = GB_SIMPLE_REGEX.captures(input) {
         let gb_type = &captures[1];
         let modifier = captures.get(2).map(|m| m.as_str().trim()).unwrap_or("");
-        return Some(format!("1d20 {}{}", gb_type, modifier));
+        return Some(format!("1d20 {gb_type}{modifier}"));
     }
 
     // Wrath & Glory (wng 4d6, wng dn2 4d6, wng 4d6 !soak)
@@ -206,16 +206,16 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
 
         return Some(match (difficulty, special) {
             (Some(dn), Some("soak") | Some("exempt") | Some("dmg")) => {
-                format!("{}d{} wngdn{}t", count, sides, dn)
+                format!("{count}d{sides} wngdn{dn}t")
             }
             (Some(dn), _) => {
-                format!("{}d{} wngdn{}", count, sides, dn)
+                format!("{count}d{sides} wngdn{dn}")
             }
             (None, Some("soak") | Some("exempt") | Some("dmg")) => {
-                format!("{}d{} wngt", count, sides)
+                format!("{count}d{sides} wngt")
             }
             (None, _) => {
-                format!("{}d{} wng", count, sides)
+                format!("{count}d{sides} wng")
             }
         });
     }
@@ -224,7 +224,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = WNG_SIMPLE_REGEX.captures(input) {
         let count = &captures[1];
         let sides = &captures[2];
-        return Some(format!("{}d{} wng", count, sides));
+        return Some(format!("{count}d{sides} wng"));
     }
 
     // Chronicles of Darkness (4cod -> 4d10 t8 ie10)
@@ -236,14 +236,14 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let modifier_part = if modifier.is_empty() {
             String::new()
         } else {
-            format!(" {}", modifier)
+            format!(" {modifier}")
         };
 
         return Some(match variant {
-            "8" => format!("{}d10 t7 ie10{}", count, modifier_part), // 8-again
-            "9" => format!("{}d10 t6 ie10{}", count, modifier_part), // 9-again
-            "r" => format!("{}d10 t8 ie10 r1{}", count, modifier_part), // rote quality
-            _ => format!("{}d10 t8 ie10{}", count, modifier_part),   // standard
+            "8" => format!("{count}d10 t7 ie10{modifier_part}"), // 8-again
+            "9" => format!("{count}d10 t6 ie10{modifier_part}"), // 9-again
+            "r" => format!("{count}d10 t8 ie10 r1{modifier_part}"), // rote quality
+            _ => format!("{count}d10 t8 ie10{modifier_part}"),   // standard
         });
     }
 
@@ -254,9 +254,9 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
 
         if modifier.is_empty() {
-            return Some(format!("{}d10 f1 ie10 t{}", count, difficulty));
+            return Some(format!("{count}d10 f1 ie10 t{difficulty}"));
         } else {
-            return Some(format!("{}d10 f1 ie10 t{} {}", count, difficulty, modifier));
+            return Some(format!("{count}d10 f1 ie10 t{difficulty} {modifier}"));
         }
     }
 
@@ -264,27 +264,27 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = DH_REGEX.captures(input) {
         let count = &captures[1];
         let sides = &captures[2];
-        return Some(format!("{}d{} ie{} dh", count, sides, sides));
+        return Some(format!("{count}d{sides} ie{sides} dh"));
     }
 
     // Fudge dice (3df -> 3d3 fudge)
     if let Some(captures) = DF_REGEX.captures(input) {
         let count = &captures[1];
-        return Some(format!("{}d3 fudge", count));
+        return Some(format!("{count}d3 fudge"));
     }
 
     // Warhammer (3wh4+ -> 3d6 t4)
     if let Some(captures) = WH_REGEX.captures(input) {
         let count = &captures[1];
         let target = &captures[2];
-        return Some(format!("{}d6 t{}", count, target));
+        return Some(format!("{count}d6 t{target}"));
     }
 
     // Double digit (dd34 -> (1d3 * 10) + 1d4)
     if let Some(captures) = DD_REGEX.captures(input) {
         let tens = &captures[1];
         let ones = &captures[2];
-        return Some(format!("1d{} * 10 + 1d{}", tens, ones));
+        return Some(format!("1d{tens} * 10 + 1d{ones}"));
     }
 
     // General advantage/disadvantage (+d20, -d20, etc.) but NOT +d% or -d%
@@ -293,8 +293,8 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let sides = &captures[2];
 
         return Some(match modifier {
-            "+" => format!("2d{} k1", sides),  // advantage
-            "-" => format!("2d{} kl1", sides), // disadvantage
+            "+" => format!("2d{sides} k1"),  // advantage
+            "-" => format!("2d{sides} kl1"), // disadvantage
             _ => return None,
         });
     }
@@ -302,38 +302,38 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     // Simple percentile (xd% -> xd100)
     if let Some(captures) = PERC_REGEX.captures(input) {
         let count = &captures[1];
-        return Some(format!("{}d100", count));
+        return Some(format!("{count}d100"));
     }
 
     // Shadowrun (sr6 -> 6d6 t5)
     if let Some(captures) = SR_REGEX.captures(input) {
         let count = &captures[1];
-        return Some(format!("{}d6 t5", count));
+        return Some(format!("{count}d6 t5"));
     }
 
     // Storypath (sp4 -> 4d10 t8 ie10)
     if let Some(captures) = SP_REGEX.captures(input) {
         let count = &captures[1];
-        return Some(format!("{}d10 t8 ie10", count));
+        return Some(format!("{count}d10 t8 ie10"));
     }
 
     // Year Zero (6yz -> 6d6 t6)
     if let Some(captures) = YZ_REGEX.captures(input) {
         let count = &captures[1];
-        return Some(format!("{}d6 t6", count));
+        return Some(format!("{count}d6 t6"));
     }
 
     // Sunsails New Millennium (snm5 -> 5d6 ie6 t4)
     if let Some(captures) = SNM_REGEX.captures(input) {
         let count = &captures[1];
-        return Some(format!("{}d6 ie6 t4", count));
+        return Some(format!("{count}d6 ie6 t4"));
     }
 
     // D6 System (d6s4 -> 4d6 + 1d6 ie)
     if let Some(captures) = D6S_REGEX.captures(input) {
         let count = &captures[1];
         let pips = captures.get(2).map_or("", |m| m.as_str());
-        return Some(format!("{}d6 + 1d6 ie{}", count, pips));
+        return Some(format!("{count}d6 + 1d6 ie{pips}"));
     }
 
     // Alternative Hero System notation with explicit fractional dice (2hsk1 = 2.5d6 killing)
@@ -345,18 +345,18 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some(match (damage_type, fraction) {
             ("k", "1") => {
                 // Killing damage with +0.5 dice: 2hsk1 = 2d6 + 1d3
-                format!("{}d6 + 1d3 hsk", dice_count)
+                format!("{dice_count}d6 + 1d3 hsk")
             }
             ("n", _) => {
                 // Normal damage ignores fraction
-                format!("{}d6 hsn", dice_count)
+                format!("{dice_count}d6 hsn")
             }
             ("h", _) => {
                 // Healing ignores fraction modifier
                 if let Ok(count) = dice_count.parse::<u32>() {
-                    format!("{}d6 + {}", count, count)
+                    format!("{count}d6 + {count}")
                 } else {
-                    format!("{}d6 + {}", dice_count, dice_count)
+                    format!("{dice_count}d6 + {dice_count}")
                 }
             }
             _ => return None,
@@ -367,7 +367,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = EX_REGEX.captures(input) {
         let count = &captures[1];
         let target = captures.get(2).map_or("7", |m| m.as_str());
-        return Some(format!("{}d10 t{} t10", count, target));
+        return Some(format!("{count}d10 t{target} t10"));
     }
 
     // Earthdawn system (ed1 through ed50)
@@ -390,7 +390,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = DND_REGEX.captures(input) {
         let _roll_type = &captures[1];
         let modifier = captures.get(2).map_or("", |m| m.as_str().trim());
-        return Some(format!("1d20{}", modifier));
+        return Some(format!("1d20{modifier}"));
     }
 
     None

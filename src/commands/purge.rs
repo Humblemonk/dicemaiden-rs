@@ -106,7 +106,6 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<String> 
     };
 
     Ok(format!(
-        "🗑️ Successfully deleted {} message(s).",
-        deleted_count
+        "🗑️ Successfully deleted {deleted_count} message(s)."
     ))
 }
