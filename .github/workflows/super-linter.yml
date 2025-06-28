@@ -43,3 +43,5 @@ jobs:
           VALIDATE_MARKDOWN: false
           VALIDATE_CHECKOV: false
           VALIDATE_YAML_PRETTIER: false
+          VALIDATE_MARKDOWN_PRETTIER: false
+          VALIDATE_RUST_CLIPPY: false
