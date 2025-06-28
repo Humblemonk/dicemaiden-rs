@@ -153,15 +153,11 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
                 } else if results.len() > 1 {
                     // For roll sets, strip comment from request display
                     let clean_expr = strip_comment_from_expression(dice_expr);
-                    format!(
-                        "🎲 **{display_name}** Request: `{clean_expr}`\n{formatted}"
-                    )
+                    format!("🎲 **{display_name}** Request: `{clean_expr}`\n{formatted}")
                 } else {
                     // Single result, strip comment from request display
                     let clean_expr = strip_comment_from_expression(dice_expr);
-                    format!(
-                        "🎲 **{display_name}** Request: `{clean_expr}` {formatted}"
-                    )
+                    format!("🎲 **{display_name}** Request: `{clean_expr}` {formatted}")
                 };
 
                 // Check if final content exceeds Discord limit
@@ -190,9 +186,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
         }
         Err(e) => {
             let clean_expr = strip_comment_from_expression(dice_expr);
-            let content = format!(
-                "🎲 **{display_name}** used `{clean_expr}` - ❌ **Error**: {e}"
-            );
+            let content = format!("🎲 **{display_name}** used `{clean_expr}` - ❌ **Error**: {e}");
             Ok(CommandResponse::public(content))
         }
     }

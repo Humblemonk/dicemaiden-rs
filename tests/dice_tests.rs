@@ -2846,7 +2846,7 @@ mod tests {
             "10d6 e6 k8 +4",        // Complex modifiers
             "+d20 + 2d6 * 3 - 1d4", // Complex advantage expression
             "p s 5 -d%/2",          // Flags + roll sets + disadvantage
-            "4cod8+3",       // Game system + advantage
+            "4cod8+3",              // Game system + advantage
         ];
 
         for expr in &complex_expressions {
