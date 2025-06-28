@@ -95,7 +95,7 @@ You can customize the build further by modifying `Cargo.toml` dependencies.
 
 
 ### Requirements
-- Rust 1.85+
+- Rust 1.87+
 - Discord bot token
 - SQLite database (automatically created for bot statistics)
 - Dependencies - For a detailed list, review [Cargo.toml](Cargo.toml)
@@ -141,7 +141,7 @@ src/
 
 ### Docker
 ```dockerfile
-FROM rust:1.70-slim-bookworm as builder
+FROM rust:1.87-slim-bookworm as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
