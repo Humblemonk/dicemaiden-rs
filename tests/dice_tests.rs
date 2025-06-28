@@ -171,6 +171,115 @@ mod tests {
     }
 
     #[test]
+    fn test_dice_multiplication_and_division() {
+        // Test dice multiplication and division that were previously failing
+        assert_valid("3d6 * 2d6");
+        assert_valid("3d6 / 2d6");
+        assert_valid("6d8 * 1d4");
+        assert_valid("4d10 / 2d6");
+
+        // Test with whitespace variations
+        assert_valid("3d6*2d6");
+        assert_valid("3d6 *2d6");
+        assert_valid("3d6* 2d6");
+        assert_valid("3d6 * 2d6");
+        assert_valid("6d8/2d4");
+        assert_valid("6d8 / 2d4");
+    }
+
+    #[test]
+    fn test_dice_multiplication_parsing() {
+        // Test that multiplication with dice creates the correct modifier
+        let result = parser::parse_dice_string("3d6 * 2d4").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].count, 3);
+        assert_eq!(result[0].sides, 6);
+        assert_eq!(result[0].modifiers.len(), 1);
+
+        // Verify we have a MultiplyDice modifier
+        match &result[0].modifiers[0] {
+            Modifier::MultiplyDice(dice_roll) => {
+                assert_eq!(dice_roll.count, 2);
+                assert_eq!(dice_roll.sides, 4);
+            }
+            _ => panic!("Expected MultiplyDice modifier"),
+        }
+    }
+
+    #[test]
+    fn test_dice_division_parsing() {
+        // Test that division with dice creates the correct modifier
+        let result = parser::parse_dice_string("6d8 / 3d6").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].count, 6);
+        assert_eq!(result[0].sides, 8);
+        assert_eq!(result[0].modifiers.len(), 1);
+
+        // Verify we have a DivideDice modifier
+        match &result[0].modifiers[0] {
+            Modifier::DivideDice(dice_roll) => {
+                assert_eq!(dice_roll.count, 3);
+                assert_eq!(dice_roll.sides, 6);
+            }
+            _ => panic!("Expected DivideDice modifier"),
+        }
+    }
+
+    #[test]
+    fn test_dice_multiplication_with_fixed_dice() {
+        // Use 1d1 for predictable results (always rolls 1)
+        let result = parse_and_roll("3d1 * 2d1").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // 3d1 = 3, 2d1 = 2, so 3 * 2 = 6
+        assert_eq!(result[0].total, 6, "3d1 * 2d1 should equal 6");
+
+        // Verify dice groups are created correctly
+        assert_eq!(result[0].dice_groups.len(), 2, "Should have 2 dice groups");
+        assert_eq!(result[0].dice_groups[0].modifier_type, "base");
+        assert_eq!(result[0].dice_groups[1].modifier_type, "multiply");
+    }
+
+    #[test]
+    fn test_dice_division_with_fixed_dice() {
+        // Use 1d1 for predictable results
+        let result = parse_and_roll("8d1 / 2d1").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // 8d1 = 8, 2d1 = 2, so 8 / 2 = 4
+        assert_eq!(result[0].total, 4, "8d1 / 2d1 should equal 4");
+
+        // Verify dice groups are created correctly
+        assert_eq!(result[0].dice_groups.len(), 2, "Should have 2 dice groups");
+        assert_eq!(result[0].dice_groups[0].modifier_type, "base");
+        assert_eq!(result[0].dice_groups[1].modifier_type, "divide");
+    }
+
+    #[test]
+    fn test_dice_operations_display_format() {
+        // Test that the display format includes the correct operators between dice groups
+        let result = parse_and_roll("2d1 * 3d1").unwrap();
+        let formatted = result[0].to_string();
+
+        // Should contain the multiplication symbol between dice groups
+        assert!(
+            formatted.contains("*"),
+            "Display should contain * symbol between dice groups"
+        );
+        assert!(formatted.contains("**6**"), "Should show final result");
+
+        let result = parse_and_roll("6d1 / 2d1").unwrap();
+        let formatted = result[0].to_string();
+
+        // Should contain the division symbol between dice groups
+        assert!(
+            formatted.contains("/"),
+            "Display should contain / symbol between dice groups"
+        );
+        assert!(formatted.contains("**3**"), "Should show final result");
+    }
+
+    #[test]
     fn test_math_edge_cases() {
         // Roll sets with division syntax
         let result = parse_and_roll("4 20/2d1").unwrap();
@@ -1372,6 +1481,55 @@ mod tests {
         // Test reasonable complex expressions
         assert_valid("2d6+3d8-1d4*2/3+5-2");
         assert_valid("1d20+1d6+1d4+1d3+1");
+    }
+
+    #[test]
+    fn test_complex_dice_math_operations() {
+        // Test left-to-right evaluation with dice multiplication/division
+        let result = parse_and_roll("2d1 + 3d1 * 2d1").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // Left-to-right: (2 + 3) * 2 = 10
+        assert_eq!(
+            result[0].total, 10,
+            "Should evaluate left-to-right: (2+3)*2=10"
+        );
+
+        // Should have 3 dice groups: base, add, multiply
+        assert_eq!(result[0].dice_groups.len(), 3);
+        assert_eq!(result[0].dice_groups[0].modifier_type, "base");
+        assert_eq!(result[0].dice_groups[1].modifier_type, "add");
+        assert_eq!(result[0].dice_groups[2].modifier_type, "multiply");
+    }
+
+    #[test]
+    fn test_mixed_dice_and_number_operations() {
+        // Test combinations of dice operations and number operations
+        assert_valid("2d6 * 3 + 1d4"); // (dice * number) + dice
+        assert_valid("1d8 + 2d6 / 2"); // dice + (dice / number)
+        assert_valid("3d6 * 2d4 + 5"); // (dice * dice) + number
+        assert_valid("4d10 - 1d6 * 3"); // dice - (dice * number)
+
+        // Test complex mixed expressions with numbers and dice operations
+        assert_valid("3d6 + 15 / 2d4"); // dice + (number / dice)
+        assert_valid("2d8 - 10 * 1d6"); // dice - (number * dice)
+        assert_valid("1d20 * 5 / 2d4"); // (dice * number) / dice
+        assert_valid("4d6 / 3 + 2d8"); // (dice / number) + dice
+
+        // Test with predictable results using fixed dice
+        let result = parse_and_roll("2d1 * 3 + 1d1").unwrap();
+        // Left-to-right: (2 * 3) + 1 = 7
+        assert_eq!(result[0].total, 7, "Should be (2*3)+1=7");
+
+        // Test complex expression with number/dice division
+        let result = parse_and_roll("3d1 + 15 / 3d1").unwrap();
+        // Left-to-right: (3 + 15) / 3 = 18 / 3 = 6
+        assert_eq!(result[0].total, 6, "Should be (3+15)/3=6");
+
+        // Test that all dice groups are displayed correctly
+        assert_eq!(result[0].dice_groups.len(), 2, "Should have 2 dice groups");
+        assert_eq!(result[0].dice_groups[0].modifier_type, "base");
+        assert_eq!(result[0].dice_groups[1].modifier_type, "divide");
     }
 
     // ============================================================================

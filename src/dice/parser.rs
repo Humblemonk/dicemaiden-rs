@@ -1101,6 +1101,16 @@ fn try_parse_operator_pair(
             if let Ok(num) = second.parse::<i32>() {
                 dice.modifiers.push(Modifier::Multiply(num));
                 return Ok(Some(2));
+            } else if is_dice_expression(second) {
+                // NEW: Handle dice multiplication
+                let dice_roll = parse_dice_expression_only(second)?;
+                dice.modifiers.push(Modifier::MultiplyDice(dice_roll));
+                return Ok(Some(2));
+            } else if second.contains('d') {
+                // NEW: Handle complex dice expressions for multiplication
+                let dice_roll = parse_complex_dice_expression(second)?;
+                dice.modifiers.push(Modifier::MultiplyDice(dice_roll));
+                return Ok(Some(2));
             }
         }
         "/" => {
@@ -1109,6 +1119,16 @@ fn try_parse_operator_pair(
                     return Err(anyhow!("Cannot divide by zero"));
                 }
                 dice.modifiers.push(Modifier::Divide(num));
+                return Ok(Some(2));
+            } else if is_dice_expression(second) {
+                // NEW: Handle dice division
+                let dice_roll = parse_dice_expression_only(second)?;
+                dice.modifiers.push(Modifier::DivideDice(dice_roll));
+                return Ok(Some(2));
+            } else if second.contains('d') {
+                // NEW: Handle complex dice expressions for division
+                let dice_roll = parse_complex_dice_expression(second)?;
+                dice.modifiers.push(Modifier::DivideDice(dice_roll));
                 return Ok(Some(2));
             }
         }
