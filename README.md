@@ -257,5 +257,5 @@ This project is licensed under the GPLv3 License
 ## Support
 
 - Create an issue for bugs or feature requests
-- Check the original DiceMaiden documentation for dice syntax questions
+- Check the documentation for dice syntax questions
 - Join the [Discord community](https://discord.gg/AYNcxc9NeU) for help and discussion
