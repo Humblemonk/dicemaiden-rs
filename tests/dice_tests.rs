@@ -1,6 +1,6 @@
 // tests/dice_tests.rs - Comprehensive Dice Maiden test suite
 use dicemaiden_rs::{
-    dice::{aliases, parser, roller, DiceRoll, HeroSystemType, Modifier, RollResult},
+    dice::{DiceRoll, HeroSystemType, Modifier, RollResult, aliases, parser, roller},
     format_multiple_results_with_limit, help_text, parse_and_roll,
 };
 
@@ -557,14 +557,18 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].modifiers.len(), 2);
 
-        assert!(result[0]
-            .modifiers
-            .iter()
-            .any(|m| matches!(m, Modifier::Target(8))));
-        assert!(result[0]
-            .modifiers
-            .iter()
-            .any(|m| matches!(m, Modifier::Failure(1))));
+        assert!(
+            result[0]
+                .modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::Target(8)))
+        );
+        assert!(
+            result[0]
+                .modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::Failure(1)))
+        );
     }
 
     #[test]
@@ -1314,10 +1318,11 @@ mod tests {
 
         // Should have exactly 2 modifiers: KeepHigh(1) and Add(1)
         assert_eq!(dice.modifiers.len(), 2);
-        assert!(dice
-            .modifiers
-            .iter()
-            .any(|m| matches!(m, Modifier::KeepHigh(1))));
+        assert!(
+            dice.modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::KeepHigh(1)))
+        );
         assert!(dice.modifiers.iter().any(|m| matches!(m, Modifier::Add(1))));
     }
     #[test]
@@ -1592,10 +1597,12 @@ mod tests {
         assert_eq!(result[0].count, 4);
         assert_eq!(result[0].sides, 6);
         // Should have WrathGlory modifier with difficulty 3
-        assert!(result[0]
-            .modifiers
-            .iter()
-            .any(|m| matches!(m, Modifier::WrathGlory(Some(3), false))));
+        assert!(
+            result[0]
+                .modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::WrathGlory(Some(3), false)))
+        );
     }
 
     #[test]
@@ -1795,10 +1802,12 @@ mod tests {
         assert_eq!(roll_result.total, fudge_sum + 1);
 
         // Check that fudge note is present
-        assert!(roll_result
-            .notes
-            .iter()
-            .any(|note| note.contains("Fudge dice")));
+        assert!(
+            roll_result
+                .notes
+                .iter()
+                .any(|note| note.contains("Fudge dice"))
+        );
     }
 
     #[test]
@@ -1813,10 +1822,12 @@ mod tests {
 
         // Hero System
         let result = parse_and_roll("3d6 hsn").unwrap();
-        assert!(result[0]
-            .notes
-            .iter()
-            .any(|note| note.contains("Normal damage")));
+        assert!(
+            result[0]
+                .notes
+                .iter()
+                .any(|note| note.contains("Normal damage"))
+        );
 
         // Wrath & Glory
         let result = parse_and_roll("4d6 wng").unwrap();
@@ -1856,25 +1867,31 @@ mod tests {
         // Test that system-specific modifiers parse correctly
         let wng_result = parser::parse_dice_string("wng dn3 4d6 !soak").unwrap();
         assert_eq!(wng_result.len(), 1);
-        assert!(wng_result[0]
-            .modifiers
-            .iter()
-            .any(|m| matches!(m, Modifier::WrathGlory(Some(3), true))));
+        assert!(
+            wng_result[0]
+                .modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::WrathGlory(Some(3), true)))
+        );
 
         let hero_result = parser::parse_dice_string("2hsk1").unwrap();
         assert_eq!(hero_result.len(), 1);
         // Should expand according to Hero System rules
-        assert!(hero_result[0]
-            .modifiers
-            .iter()
-            .any(|m| matches!(m, Modifier::HeroSystem(HeroSystemType::Killing))));
+        assert!(
+            hero_result[0]
+                .modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::HeroSystem(HeroSystemType::Killing)))
+        );
 
         let gb_result = parser::parse_dice_string("gb").unwrap();
         assert_eq!(gb_result.len(), 1);
-        assert!(gb_result[0]
-            .modifiers
-            .iter()
-            .any(|m| matches!(m, Modifier::Godbound(false))));
+        assert!(
+            gb_result[0]
+                .modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::Godbound(false)))
+        );
     }
 
     // ============================================================================
@@ -1903,22 +1920,28 @@ mod tests {
         assert_eq!(result[0].modifiers.len(), 3);
 
         // Check for explode modifier
-        assert!(result[0]
-            .modifiers
-            .iter()
-            .any(|m| matches!(m, Modifier::Explode(Some(6)))));
+        assert!(
+            result[0]
+                .modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::Explode(Some(6))))
+        );
 
         // Check for keep high modifier
-        assert!(result[0]
-            .modifiers
-            .iter()
-            .any(|m| matches!(m, Modifier::KeepHigh(8))));
+        assert!(
+            result[0]
+                .modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::KeepHigh(8)))
+        );
 
         // Check for add modifier
-        assert!(result[0]
-            .modifiers
-            .iter()
-            .any(|m| matches!(m, Modifier::Add(4))));
+        assert!(
+            result[0]
+                .modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::Add(4)))
+        );
     }
 
     #[test]
@@ -2578,10 +2601,12 @@ mod tests {
         let results = parse_and_roll("2d6 + 3").unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].individual_rolls.len(), 2);
-        assert!(results[0]
-            .individual_rolls
-            .iter()
-            .all(|&x| x >= 1 && x <= 6));
+        assert!(
+            results[0]
+                .individual_rolls
+                .iter()
+                .all(|&x| x >= 1 && x <= 6)
+        );
         assert_eq!(
             results[0].total,
             results[0].individual_rolls.iter().sum::<i32>() + 3

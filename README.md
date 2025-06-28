@@ -95,7 +95,7 @@ You can customize the build further by modifying `Cargo.toml` dependencies.
 
 
 ### Requirements
-- Rust 1.75+
+- Rust 1.85+
 - Discord bot token
 - SQLite database (automatically created for bot statistics)
 - Dependencies - For a detailed list, review [Cargo.toml](Cargo.toml)

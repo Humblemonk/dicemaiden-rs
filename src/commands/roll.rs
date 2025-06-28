@@ -1,6 +1,6 @@
+use crate::DatabaseContainer;
 use crate::dice;
 use crate::help_text; // Import the shared help text module from src root
-use crate::DatabaseContainer;
 use anyhow::Result;
 use regex::Regex;
 use serenity::{
