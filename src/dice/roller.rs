@@ -1,5 +1,5 @@
 use super::{DiceGroup, DiceRoll, HeroSystemType, Modifier, RollResult};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use rand::Rng;
 
 pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {

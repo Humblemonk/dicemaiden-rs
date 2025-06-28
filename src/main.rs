@@ -1,14 +1,14 @@
 use anyhow::Result;
-use dicemaiden_rs::{commands, database, DatabaseContainer, ShardManagerContainer};
+use dicemaiden_rs::{DatabaseContainer, ShardManagerContainer, commands, database};
 use serenity::{
     all::*, async_trait, cache::Settings as CacheSettings, gateway::ShardManager, http::Http,
     model::gateway::Ready, prelude::*,
 };
 use std::{collections::HashSet, env, sync::Arc, time::Duration};
-use sysinfo::{Pid, System};
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use tokio::{
     select,
-    signal::unix::{signal, SignalKind},
+    signal::unix::{SignalKind, signal},
     sync::broadcast,
     time::interval,
 };
@@ -229,7 +229,9 @@ async fn main() -> Result<()> {
             }
 
             if discord_max_concurrency == 1 {
-                warn!("Discord reports max_concurrency=1. Your bot may not have large bot sharding approved.");
+                warn!(
+                    "Discord reports max_concurrency=1. Your bot may not have large bot sharding approved."
+                );
                 warn!("Even verified bots need separate approval for higher concurrency limits.");
             } else {
                 info!(
@@ -368,7 +370,10 @@ async fn main() -> Result<()> {
 
     // Validate that shard count is a multiple of 16 for large bot sharding
     if shard_count >= 16 && shard_count % 16 != 0 {
-        warn!("SHARD_COUNT ({}) is not a multiple of 16. This is required for Discord's large bot sharding.", shard_count);
+        warn!(
+            "SHARD_COUNT ({}) is not a multiple of 16. This is required for Discord's large bot sharding.",
+            shard_count
+        );
         warn!(
             "Consider using 16, 32, 48, 64, etc. shards if you need large bot sharding approval."
         );
@@ -662,7 +667,7 @@ async fn collect_shard_stats_with_shutdown(
         }
 
         // Only refresh our specific process memory usage instead of scanning all system processes
-        system.refresh_process(current_pid);
+        system.refresh_processes(ProcessesToUpdate::Some(&[current_pid]), false);
 
         let shard_info = shard_manager.runners.lock().await;
         if shard_info.is_empty() {
