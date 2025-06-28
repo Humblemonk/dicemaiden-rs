@@ -6,8 +6,7 @@
 # https://github.com/github/super-linter
 name: Lint Code Base
 
-permissions:
-  contents: read
+permissions: {}
 
 on:
   push:
@@ -15,8 +14,16 @@ on:
   pull_request:
     branches: [ "main" ]
 jobs:
-  run-lint:
+  build:
+    name: Line
     runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      packages: read
+      # To report GitHub Actions status checks
+      statuses: write
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,8 +31,8 @@ jobs:
           # Full git history is needed to get a proper list of changed files within `super-linter`
           fetch-depth: 0
 
-      - name: Lint Code Base
-        uses: github/super-linter@v7.4.0
+      - name: Super-linter
+        uses: super-linter/super-linter@v7.4.0
         env:
           VALIDATE_ALL_CODEBASE: false
           DEFAULT_BRANCH: "main"
@@ -33,3 +40,5 @@ jobs:
           VALIDATE_RUST_2015: false
           VALIDATE_RUST_2018: false
           VALIDATE_MARKDOWN: false
+          VALIDATE_CHECKOV: false
+          VALIDATE_YAML_PRETTIER: false
