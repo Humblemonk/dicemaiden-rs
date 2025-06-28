@@ -161,23 +161,22 @@ impl RollResult {
         {
             let exalted_value = exalted_icons * 2;
             return format!(
-                "Wrath: `{}` | TOTAL - Icons: `{}` Exalted Icons: `{}` (Value:{})",
-                wrath_die, icons, exalted_icons, exalted_value
+                "Wrath: `{wrath_die}` | TOTAL - Icons: `{icons}` Exalted Icons: `{exalted_icons}` (Value:{exalted_value})"
             );
         }
 
         if let Some(gb_damage) = self.godbound_damage {
-            format!("**{}** damage", gb_damage)
+            format!("**{gb_damage}** damage")
         } else if let Some(successes) = self.successes {
-            let mut result = format!("**{}** successes", successes);
+            let mut result = format!("**{successes}** successes");
             if let Some(failures) = self.failures {
                 if failures > 0 {
-                    result.push_str(&format!(" ({} failures)", failures));
+                    result.push_str(&format!(" ({failures} failures)"));
                 }
             }
             if let Some(botches) = self.botches {
                 if botches > 0 {
-                    result.push_str(&format!(" ({} botches)", botches));
+                    result.push_str(&format!(" ({botches} botches)"));
                 }
             }
             result
@@ -193,7 +192,7 @@ impl RollResult {
         let mut output = String::new();
 
         if let Some(label) = &self.label {
-            output.push_str(&format!("**{}**: ", label));
+            output.push_str(&format!("**{label}**: "));
         }
 
         if show_dice {
@@ -208,9 +207,9 @@ impl RollResult {
         if show_result {
             let result_value = self.format_result_value();
             if show_dice && !self.format_dice_display().is_empty() {
-                output.push_str(&format!(" = {}", result_value));
+                output.push_str(&format!(" = {result_value}"));
             } else {
-                output.push_str(&format!("= {}", result_value));
+                output.push_str(&format!("= {result_value}"));
             }
         }
 
@@ -222,12 +221,12 @@ impl RollResult {
         // Only add comment if not suppressed
         if !self.suppress_comment {
             if let Some(comment) = &self.comment {
-                output.push_str(&format!(" Reason: `{}`", comment));
+                output.push_str(&format!(" Reason: `{comment}`"));
             }
         }
 
         for note in &self.notes {
-            output.push_str(&format!("\n*Note: {}*", note));
+            output.push_str(&format!("\n*Note: {note}*"));
         }
     }
 
@@ -257,7 +256,7 @@ impl fmt::Display for RollResult {
         };
 
         self.add_comment_and_notes(&mut output);
-        write!(f, "{}", output)
+        write!(f, "{output}")
     }
 }
 
@@ -325,11 +324,11 @@ fn format_roll_set_results(results: &[RollResult]) -> String {
         total_sum += calculate_result_value(result);
     }
 
-    output.push_str(&format!("\n**Total: {}**", total_sum));
+    output.push_str(&format!("\n**Total: {total_sum}**"));
 
     // Add the comment once for the entire set
     if let Some(comment) = set_comment {
-        output.push_str(&format!(" Reason: `{}`", comment));
+        output.push_str(&format!(" Reason: `{comment}`"));
     }
 
     output
@@ -367,7 +366,7 @@ fn format_semicolon_separated_results(results: &[RollResult]) -> String {
         // Show the request for each individual roll (without /roll prefix and without comment)
         if let Some(expr) = &result.original_expression {
             let clean_expr = strip_comment_from_expression(expr);
-            format!("Request: `{}` {}", clean_expr, result)
+            format!("Request: `{clean_expr}` {result}")
         } else {
             result.to_string()
         }

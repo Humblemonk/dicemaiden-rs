@@ -272,22 +272,22 @@ fn apply_remaining_mathematical_modifiers(
             }
             Modifier::Add(value) => {
                 expression_parts.push("+".to_string());
-                expression_parts.push(format!("{}", value));
+                expression_parts.push(format!("{value}"));
             }
             Modifier::Subtract(value) => {
                 expression_parts.push("-".to_string());
-                expression_parts.push(format!("{}", value));
+                expression_parts.push(format!("{value}"));
             }
             Modifier::Multiply(value) => {
                 expression_parts.push("*".to_string());
-                expression_parts.push(format!("{}", value));
+                expression_parts.push(format!("{value}"));
             }
             Modifier::Divide(value) => {
                 if *value == 0 {
                     return Err(anyhow!("Cannot divide by zero"));
                 }
                 expression_parts.push("/".to_string());
-                expression_parts.push(format!("{}", value));
+                expression_parts.push(format!("{value}"));
             }
             _ => {} // Skip non-mathematical modifiers
         }
@@ -417,17 +417,17 @@ fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) ->
             }
             Modifier::Add(value) => {
                 expression_parts.push("+".to_string());
-                expression_parts.push(format!("{}", value));
+                expression_parts.push(format!("{value}"));
             }
             Modifier::Subtract(value) => {
                 expression_parts.push("-".to_string());
-                expression_parts.push(format!("{}", value));
+                expression_parts.push(format!("{value}"));
             }
             Modifier::Multiply(value) => {
                 // Skip the special marker (multiply by 0)
                 if *value != 0 {
                     expression_parts.push("*".to_string());
-                    expression_parts.push(format!("{}", value));
+                    expression_parts.push(format!("{value}"));
                 }
             }
             Modifier::Divide(value) => {
@@ -435,7 +435,7 @@ fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) ->
                     return Err(anyhow!("Cannot divide by zero"));
                 }
                 expression_parts.push("/".to_string());
-                expression_parts.push(format!("{}", value));
+                expression_parts.push(format!("{value}"));
             }
             _ => {}
         }
@@ -735,7 +735,7 @@ fn count_wrath_glory_successes(
             result
                 .notes
                 .push("Wrath die rolled 1 - Complication!".to_string());
-            result.notes.push(format!("Wrath die: {}", wrath_die_value));
+            result.notes.push(format!("Wrath die: {wrath_die_value}"));
         }
     } else {
         // Standard Wrath & Glory success counting
@@ -787,7 +787,7 @@ fn count_wrath_glory_successes(
             let status = if passed { "PASS" } else { "FAIL" };
             result
                 .notes
-                .push(format!("Difficulty {}: {} (needed {})", dn, status, dn));
+                .push(format!("Difficulty {dn}: {status} (needed {dn})"));
         }
 
         // Add notes for wrath die effects
@@ -838,7 +838,7 @@ fn apply_godbound_damage(
             for &roll in &result.kept_rolls {
                 let damage = convert_to_godbound_damage(roll);
                 total_damage += damage;
-                chart_conversions.push(format!("{} → {}", roll, damage));
+                chart_conversions.push(format!("{roll} → {damage}"));
             }
 
             result.godbound_damage = Some(total_damage);
@@ -945,8 +945,7 @@ fn add_explosion_notes(
                 .push("⚔️ **RIGHTEOUS FURY!** Natural 10 rolled - Purge the heretics!".to_string());
         } else {
             result.notes.push(format!(
-                "⚔️ **RIGHTEOUS FURY!** {} natural 10s - Emperor's wrath unleashed!",
-                explosion_count
+                "⚔️ **RIGHTEOUS FURY!** {explosion_count} natural 10s - Emperor's wrath unleashed!"
             ));
         }
     } else {
@@ -956,7 +955,7 @@ fn add_explosion_notes(
         } else {
             result
                 .notes
-                .push(format!("{} dice exploded", explosion_count));
+                .push(format!("{explosion_count} dice exploded"));
         }
     }
 }
@@ -1123,14 +1122,12 @@ fn reroll_dice(
         let reroll_type = if indefinite { "indefinitely" } else { "once" };
         if total_rerolls > 10 {
             result.notes.push(format!(
-                "{} total rerolls (dice ≤ {}, reroll {})",
-                total_rerolls, threshold, reroll_type
+                "{total_rerolls} total rerolls (dice ≤ {threshold}, reroll {reroll_type})"
             ));
         } else if result.notes.len() <= 1 {
             // Only add summary if we don't already have detailed notes
             result.notes.push(format!(
-                "{} dice rerolled (≤ {}, reroll {})",
-                total_rerolls, threshold, reroll_type
+                "{total_rerolls} dice rerolled (≤ {threshold}, reroll {reroll_type})"
             ));
         }
     }
@@ -1156,8 +1153,7 @@ fn apply_hero_system_calculation(
             let stun_damage = body_damage * stun_multiplier;
 
             result.notes.push(format!(
-                "Killing damage: {} BODY, {} STUN (×{})",
-                body_damage, stun_damage, stun_multiplier
+                "Killing damage: {body_damage} BODY, {stun_damage} STUN (×{stun_multiplier})"
             ));
 
             // Override the total to show STUN damage (more commonly used)

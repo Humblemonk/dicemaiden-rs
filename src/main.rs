@@ -353,7 +353,7 @@ async fn main() -> Result<()> {
             }
             (owners, info.id)
         }
-        Err(why) => panic!("Could not access application info: {:?}", why),
+        Err(why) => panic!("Could not access application info: {why:?}"),
     };
 
     // Validate shard configuration for verified bots
@@ -633,7 +633,7 @@ async fn collect_shard_stats_with_shutdown(
     let process_id = if is_multi_process {
         let shard_start = env::var("SHARD_START").unwrap_or_default();
         let process_pid = std::process::id();
-        format!("process_{}_{}", shard_start, process_pid)
+        format!("process_{shard_start}_{process_pid}")
     } else {
         "single_process".to_string()
     };

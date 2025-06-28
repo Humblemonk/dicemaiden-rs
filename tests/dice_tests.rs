@@ -848,9 +848,407 @@ mod tests {
         assert_valid("10d6e6k8+4!fireball; 6d10t7!shadowrun; 4d6k3!ability");
     }
 
+    #[test]
+    fn test_roll_sets_advantage_with_mathematical_modifiers() {
+        // Test roll sets with advantage/disadvantage patterns that have mathematical modifiers
+        // This specific combination is not covered by existing tests
+
+        // Test advantage with subtraction in roll sets
+        let result = parse_and_roll("4 +d20 -2").unwrap();
+        assert_eq!(result.len(), 4, "Should create 4 roll sets");
+        for (i, roll) in result.iter().enumerate() {
+            assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
+            // Each should be advantage d20 (1-20) minus 2, so range -1 to 18
+            assert!(
+                roll.total >= -1 && roll.total <= 18,
+                "Roll {} should be in range for advantage d20 - 2, got {}",
+                i + 1,
+                roll.total
+            );
+        }
+
+        // Test advantage with multiplication in roll sets
+        let result = parse_and_roll("3 +d20*2").unwrap();
+        assert_eq!(result.len(), 3, "Should create 3 roll sets");
+        for roll in &result {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            // Each should be advantage d20 (1-20) times 2, so range 2 to 40
+            assert!(
+                roll.total >= 2 && roll.total <= 40,
+                "Roll should be in range for advantage d20 * 2, got {}",
+                roll.total
+            );
+        }
+
+        // Test disadvantage with addition in roll sets
+        let result = parse_and_roll("2 -d% +10").unwrap();
+        assert_eq!(result.len(), 2, "Should create 2 roll sets");
+        for roll in &result {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            // Each should be disadvantage d% (1-100) plus 10, so range 11 to 110
+            assert!(
+                roll.total >= 11 && roll.total <= 110,
+                "Roll should be in range for disadvantage d% + 10, got {}",
+                roll.total
+            );
+        }
+    }
+
+    #[test]
+    fn test_roll_sets_vs_single_expression_with_modifiers_distinction() {
+        // Test the critical distinction between roll sets and single mathematical expressions
+        // when both involve advantage patterns with modifiers
+
+        // ROLL SET: "3 +d20 +5" should create 3 sets of (advantage d20 + 5)
+        let roll_sets = parse_and_roll("3 +d20 +5").unwrap();
+        assert_eq!(roll_sets.len(), 3, "Should create 3 roll sets");
+        assert!(
+            roll_sets
+                .iter()
+                .all(|r| r.label.is_some() && r.label.as_ref().unwrap().contains("Set")),
+            "All results should have 'Set X' labels"
+        );
+
+        // SINGLE EXPRESSION: "+d20 +5" should create 1 advantage roll with +5 modifier
+        let single_expr = parse_and_roll("+d20 +5").unwrap();
+        assert_eq!(single_expr.len(), 1, "Should create 1 single expression");
+        assert!(
+            single_expr[0].label.is_none(),
+            "Single expression should not have set label"
+        );
+
+        // SINGLE COMPLEX: "+d20 + d10 +5" should create 1 complex expression
+        let complex_expr = parse_and_roll("+d20 + d10 +5").unwrap();
+        assert_eq!(complex_expr.len(), 1, "Should create 1 complex expression");
+        assert!(
+            complex_expr[0].label.is_none(),
+            "Complex expression should not have set label"
+        );
+        assert!(
+            complex_expr[0].dice_groups.len() >= 2,
+            "Should have multiple dice groups"
+        );
+
+        // Verify the parser correctly distinguishes these patterns
+        assert!(
+            roll_sets.len() > single_expr.len(),
+            "Roll sets should create more results than single expressions"
+        );
+        assert!(
+            roll_sets.len() > complex_expr.len(),
+            "Roll sets should create more results than complex expressions"
+        );
+    }
+
+    #[test]
+    fn test_roll_sets_advantage_modifier_edge_cases() {
+        // Test edge cases for roll sets with advantage patterns and modifiers
+        // that could break the parser
+
+        // Test with different operators
+        let operators_tests = [
+            ("2 +d20-1", 2),  // No space before operator
+            ("2 +d20 *3", 2), // Space before operator
+            ("2 +d20/ 2", 2), // Space after operator
+            ("2 -d%+15", 2),  // No space, addition
+            ("2 -d% *2", 2),  // Space, multiplication
+        ];
+
+        for (expr, expected_count) in &operators_tests {
+            let result = parse_and_roll(expr);
+            assert!(result.is_ok(), "'{}' should parse successfully", expr);
+
+            let results = result.unwrap();
+            assert_eq!(
+                results.len(),
+                *expected_count,
+                "'{}' should create {} roll sets",
+                expr,
+                expected_count
+            );
+
+            // Verify each has a set label (confirming it's a roll set, not single expression)
+            for roll in &results {
+                assert!(
+                    roll.label.as_ref().unwrap().starts_with("Set "),
+                    "'{}' should create roll sets with labels",
+                    expr
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_roll_sets_advantage_with_flags_and_modifiers() {
+        // Test roll sets that combine flags, advantage patterns, and mathematical modifiers
+        // This specific combination is not covered elsewhere
+
+        // Private roll sets with advantage and modifiers
+        let result = parse_and_roll("p 3 +d20 +2").unwrap();
+        assert_eq!(result.len(), 3, "Should create 3 roll sets");
+        for roll in &result {
+            assert!(roll.private, "Each roll should be private");
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            // Should be advantage d20 (1-20) + 2, so range 3 to 22
+            assert!(roll.total >= 3 && roll.total <= 22);
+        }
+
+        // Simple output roll sets with disadvantage and modifiers
+        let result = parse_and_roll("s 2 -d% -5").unwrap();
+        assert_eq!(result.len(), 2, "Should create 2 roll sets");
+        for roll in &result {
+            assert!(roll.simple, "Each roll should have simple flag");
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            // Should be disadvantage d% (1-100) - 5, so range -4 to 95
+            assert!(roll.total >= -4 && roll.total <= 95);
+        }
+    }
+
+    #[test]
+    fn test_roll_set_advantage_pattern_comprehensive() {
+        // Test comprehensive combinations of roll sets with advantage patterns
+        // This ensures all parser paths work correctly
+
+        let test_cases = [
+            // Format: (expression, expected_count, min_total, max_total)
+            ("2 +d20+5", 2, 6, 25),  // 2 sets of (adv d20 + 5)
+            ("3 -d20-3", 3, -2, 17), // 3 sets of (dis d20 - 3)
+            ("4 +d%*2", 4, 2, 200),  // 4 sets of (adv d% * 2)
+            ("5 -d%/10", 5, 0, 10),  // 5 sets of (dis d% / 10)
+        ];
+
+        for (expr, expected_count, min_total, max_total) in &test_cases {
+            let result = parse_and_roll(expr).unwrap();
+            assert_eq!(
+                result.len(),
+                *expected_count,
+                "Expression '{}' should create {} roll sets",
+                expr,
+                expected_count
+            );
+
+            for (i, roll) in result.iter().enumerate() {
+                assert_eq!(
+                    roll.label,
+                    Some(format!("Set {}", i + 1)),
+                    "Roll {} should have correct label",
+                    i + 1
+                );
+                assert!(
+                    roll.total >= *min_total && roll.total <= *max_total,
+                    "Roll {} total {} should be in range {}-{}",
+                    i + 1,
+                    roll.total,
+                    min_total,
+                    max_total
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_roll_set_advantage_with_complex_modifiers() {
+        // Test roll sets with advantage patterns that have more complex scenarios
+
+        // Test with flags
+        let result = parse_and_roll("p 2 +d20*3").unwrap();
+        assert_eq!(result.len(), 2, "Should create 2 private roll sets");
+        for roll in &result {
+            assert!(roll.private, "Each roll should be private");
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            assert!(roll.total >= 3 && roll.total <= 60); // adv d20 * 3
+        }
+
+        // Test with different advantage types
+        let result = parse_and_roll("3 -d%+50").unwrap();
+        assert_eq!(result.len(), 3, "Should create 3 disadvantage roll sets");
+        for roll in &result {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            assert!(roll.total >= 51 && roll.total <= 150); // dis d% + 50
+        }
+    }
+
+    #[test]
+    fn test_roll_set_advantage_pattern_error_prevention() {
+        // Test that roll set advantage patterns don't interfere with other valid syntax
+
+        // Should still work: basic roll sets without advantage
+        let result = parse_and_roll("4 2d6").unwrap();
+        assert_eq!(result.len(), 4, "Basic roll sets should still work");
+
+        // Should still work: single advantage without numbers
+        let result = parse_and_roll("+d20").unwrap();
+        assert_eq!(result.len(), 1, "Single advantage should still work");
+        assert!(
+            result[0].label.is_none(),
+            "Single advantage should not have set label"
+        );
+
+        // Should still work: complex advantage expressions
+        let result = parse_and_roll("+d20 + d10 + 5").unwrap();
+        assert_eq!(result.len(), 1, "Complex advantage should still work");
+        assert!(
+            result[0].dice_groups.len() >= 2,
+            "Should have multiple dice groups"
+        );
+    }
+
     // ============================================================================
     // GAME SYSTEM ALIASES
     // ============================================================================
+
+    #[test]
+    fn test_advantage_disadvantage_regex_pattern_specificity() {
+        // Test that the regex correctly handles all mathematical operators
+        // These should be parsed as single advantage/disadvantage expressions with modifiers
+
+        // Addition patterns
+        assert_valid("+d20+1");
+        assert_valid("+d20 + 1");
+        assert_valid("-d%+15");
+        assert_valid("-d% + 15");
+
+        // Subtraction patterns
+        assert_valid("+d20-3");
+        assert_valid("+d20 - 3");
+        assert_valid("-d%-8");
+        assert_valid("-d% - 8");
+
+        // Multiplication patterns
+        assert_valid("+d20*4");
+        assert_valid("+d20 * 4");
+        assert_valid("-d%*2");
+        assert_valid("-d% * 2");
+
+        // Division patterns
+        assert_valid("+d20/2");
+        assert_valid("+d20 / 2");
+        assert_valid("-d%/5");
+        assert_valid("-d% / 5");
+    }
+
+    #[test]
+    fn test_advantage_disadvantage_regex_boundary_conditions() {
+        // Test edge cases for the regex pattern
+
+        // Should match: single operator with number
+        let result = parse_and_roll("+d20*10").unwrap();
+        assert_eq!(result.len(), 1, "Should create single expression");
+        assert!(result[0].label.is_none(), "Should not have set label");
+
+        // Should NOT match: multiple operators (complex expressions)
+        let result = parse_and_roll("+d20 + 5 - 2").unwrap();
+        assert_eq!(result.len(), 1, "Should still parse but via different path");
+
+        // Should NOT match: additional dice
+        let result = parse_and_roll("+d20 + d10").unwrap();
+        assert_eq!(result.len(), 1, "Should parse but not via simple regex");
+        assert!(
+            result[0].dice_groups.len() >= 2,
+            "Should have multiple dice groups"
+        );
+    }
+
+    #[test]
+    fn test_advantage_disadvantage_regex_vs_roll_sets() {
+        // Test the critical distinction between single expressions and roll sets
+
+        // Single expression (should use regex shortcut)
+        let single = parse_and_roll("+d20+5").unwrap();
+        assert_eq!(single.len(), 1, "Should be single expression");
+        assert!(single[0].label.is_none(), "Should not have set label");
+
+        // Roll set (should create multiple results)
+        let roll_set = parse_and_roll("3 +d20+5").unwrap();
+        assert_eq!(roll_set.len(), 3, "Should be roll set");
+        assert!(roll_set[0].label.is_some(), "Should have set labels");
+
+        // Verify they produce different results but same individual calculations
+        // Both should calculate advantage d20 + 5, but one creates sets
+        for roll in &roll_set {
+            // Each roll set item should be in same range as single expression
+            assert!(
+                roll.total >= 3 && roll.total <= 25,
+                "Should be in range for adv d20 + 5"
+            );
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+        }
+
+        assert!(
+            single[0].total >= 3 && single[0].total <= 25,
+            "Should be in range for adv d20 + 5"
+        );
+    }
+
+    #[test]
+    fn test_advantage_disadvantage_regex_whitespace_handling() {
+        // Test that the regex handles various whitespace patterns correctly
+
+        let whitespace_variants = [
+            "+d20+5",     // No spaces
+            "+d20 +5",    // Space before operator
+            "+d20+ 5",    // Space after operator
+            "+d20 + 5",   // Spaces around operator
+            "+d20  +  5", // Multiple spaces
+            "+d20\t+\t5", // Tabs
+        ];
+
+        for variant in &whitespace_variants {
+            let result = parse_and_roll(variant).unwrap();
+            assert_eq!(
+                result.len(),
+                1,
+                "Variant '{}' should parse as single expression",
+                variant
+            );
+            assert!(
+                result[0].label.is_none(),
+                "Variant '{}' should not have set label",
+                variant
+            );
+            // All should produce the same calculation (advantage d20 + 5)
+            assert!(
+                result[0].total >= 3 && result[0].total <= 25,
+                "Variant '{}' should be in correct range",
+                variant
+            );
+        }
+    }
+
+    #[test]
+    fn test_advantage_disadvantage_regex_operator_precedence() {
+        // Test that different operators work correctly in the regex pattern
+
+        // Test each operator with predictable dice (using d20 range validation)
+        let operators = [
+            ("+d20+10", 11, 30), // advantage (1-20) + 10 = 11-30
+            ("+d20-5", -4, 15),  // advantage (1-20) - 5 = -4-15
+            ("+d20*3", 3, 60),   // advantage (1-20) * 3 = 3-60
+            ("+d20/2", 0, 10),   // advantage (1-20) / 2 = 0-10 (integer division)
+            ("-d20+15", 16, 35), // disadvantage (1-20) + 15 = 16-35
+            ("-d20-2", -1, 18),  // disadvantage (1-20) - 2 = -1-18
+            ("-d20*2", 2, 40),   // disadvantage (1-20) * 2 = 2-40
+            ("-d20/4", 0, 5),    // disadvantage (1-20) / 4 = 0-5
+        ];
+
+        for (expr, min_expected, max_expected) in &operators {
+            let result = parse_and_roll(expr).unwrap();
+            assert_eq!(
+                result.len(),
+                1,
+                "Expression '{}' should create single result",
+                expr
+            );
+            assert!(
+                result[0].total >= *min_expected && result[0].total <= *max_expected,
+                "Expression '{}' got {}, expected range {}-{}",
+                expr,
+                result[0].total,
+                min_expected,
+                max_expected
+            );
+        }
+    }
 
     #[test]
     fn test_dnd_aliases() {
@@ -921,6 +1319,72 @@ mod tests {
             .iter()
             .any(|m| matches!(m, Modifier::KeepHigh(1))));
         assert!(dice.modifiers.iter().any(|m| matches!(m, Modifier::Add(1))));
+    }
+    #[test]
+    fn test_advantage_with_additional_dice_bug_fix() {
+        // Test the specific bug report case: "+d20 + d10"
+        // This was failing with "Invalid dice expression: +" error
+        assert_valid("+d20 + d10");
+        assert_valid("+d20 + d6");
+        assert_valid("-d20 + d8");
+        assert_valid("+d20 + 2d4");
+
+        // Test that these parse and roll correctly
+        let result = parse_and_roll("+d20 + d10").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // Should have dice groups for both the advantage roll and the additional d10
+        assert!(
+            result[0].dice_groups.len() >= 2,
+            "Should have at least 2 dice groups"
+        );
+
+        // Verify advantage expansion worked (should have 2d20 keep 1)
+        let first_group = &result[0].dice_groups[0];
+        assert_eq!(
+            first_group.rolls.len(),
+            2,
+            "First group should have 2d20 for advantage"
+        );
+
+        // Verify additional dice were added
+        let second_group = &result[0].dice_groups[1];
+        assert_eq!(
+            second_group.rolls.len(),
+            1,
+            "Second group should have 1d10 addition"
+        );
+        assert_eq!(second_group.modifier_type, "add");
+
+        // Test with various operators
+        assert_valid("+d20 - d6");
+        assert_valid("-d20 * d4");
+        assert_valid("+d20 / d8");
+    }
+
+    #[test]
+    fn test_disadvantage_with_additional_dice_bug_fix() {
+        // Test disadvantage with additional dice (related to the same bug)
+        assert_valid("-d20 + d6");
+        assert_valid("-d20 - d4");
+        assert_valid("-d20 + 5");
+
+        let result = parse_and_roll("-d20 + d6").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // Should have dice groups for both the disadvantage roll and the additional d6
+        assert!(
+            result[0].dice_groups.len() >= 2,
+            "Should have at least 2 dice groups"
+        );
+
+        // Verify disadvantage expansion worked (should have 2d20 keep lowest 1)
+        let first_group = &result[0].dice_groups[0];
+        assert_eq!(
+            first_group.rolls.len(),
+            2,
+            "First group should have 2d20 for disadvantage"
+        );
     }
 
     #[test]
@@ -1828,6 +2292,255 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[test]
+    fn test_roll_sets_with_advantage_disadvantage_bug_fix() {
+        // Test the specific bug cases that were failing:
+        // These should create roll sets, NOT single mathematical expressions
+
+        // Test advantage percentile roll sets
+        let result = parse_and_roll("4 +d%").unwrap();
+        assert_eq!(result.len(), 4, "4 +d% should create 4 roll sets");
+        for (i, roll) in result.iter().enumerate() {
+            assert_eq!(
+                roll.label,
+                Some(format!("Set {}", i + 1)),
+                "Each roll should have a set label"
+            );
+            assert!(
+                roll.total >= 1 && roll.total <= 100,
+                "Each roll should be a valid percentile result"
+            );
+            // Verify it's actually an advantage roll by checking dice groups
+            assert!(
+                roll.dice_groups.len() >= 1,
+                "Should have dice groups from advantage expansion"
+            );
+        }
+
+        // Test disadvantage percentile roll sets
+        let result = parse_and_roll("5 -d%").unwrap();
+        assert_eq!(result.len(), 5, "5 -d% should create 5 roll sets");
+        for roll in &result {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            assert!(roll.total >= 1 && roll.total <= 100);
+        }
+
+        // Test advantage d20 roll sets
+        let result = parse_and_roll("2 +d20").unwrap();
+        assert_eq!(result.len(), 2, "2 +d20 should create 2 roll sets");
+        for roll in &result {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            assert!(roll.total >= 1 && roll.total <= 20);
+        }
+
+        // Test disadvantage d20 roll sets
+        let result = parse_and_roll("3 -d20").unwrap();
+        assert_eq!(result.len(), 3, "3 -d20 should create 3 roll sets");
+        for roll in &result {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            assert!(roll.total >= 1 && roll.total <= 20);
+        }
+    }
+
+    #[test]
+    fn test_roll_sets_vs_mathematical_expressions_distinction() {
+        // Ensure we can distinguish between roll sets and mathematical expressions
+
+        // These should be ROLL SETS (multiple results with labels)
+        let roll_set_cases = ["4 +d%", "2 +d20", "3 -d%", "5 -d20"];
+
+        for case in &roll_set_cases {
+            let result = parse_and_roll(case).unwrap();
+            let expected_count = case.chars().next().unwrap().to_digit(10).unwrap() as usize;
+
+            assert_eq!(
+                result.len(),
+                expected_count,
+                "{} should create {} roll sets",
+                case,
+                expected_count
+            );
+            assert!(
+                result.iter().all(|r| r.label.is_some()),
+                "{} should create labeled roll sets",
+                case
+            );
+            assert!(
+                result
+                    .iter()
+                    .all(|r| r.label.as_ref().unwrap().starts_with("Set ")),
+                "{} should have 'Set X' labels",
+                case
+            );
+        }
+
+        // These should be SINGLE MATHEMATICAL EXPRESSIONS (one result, no labels)
+        let math_cases = ["+d% + 10", "+d20 + 5", "-d% - 5", "-d20 + 3"];
+
+        for case in &math_cases {
+            let result = parse_and_roll(case).unwrap();
+
+            assert_eq!(
+                result.len(),
+                1,
+                "{} should create one mathematical result",
+                case
+            );
+            assert!(
+                result[0].label.is_none(),
+                "{} should not have set labels",
+                case
+            );
+        }
+    }
+
+    #[test]
+    fn test_edge_cases_roll_set_advantage_parsing() {
+        // Test edge cases that could break the parser
+
+        // Minimum and maximum roll set counts
+        assert_valid("2 +d%"); // Minimum roll sets
+        assert_valid("20 +d%"); // Maximum roll sets
+
+        // Mixed with flags
+        let result = parse_and_roll("p 3 +d20").unwrap();
+        assert_eq!(result.len(), 3, "Private flag should work with roll sets");
+        assert!(
+            result[0].private,
+            "Private flag should be transferred to each set"
+        );
+
+        // Mixed with other patterns
+        assert_valid("s 4 -d%"); // Simple flag
+        assert_valid("ul 2 +d20"); // Unsorted flag
+
+        // Whitespace variations
+        let whitespace_cases = [
+            "4 +d%",   // Normal
+            "4  +d%",  // Extra space
+            " 4 +d% ", // Leading/trailing spaces
+            "4\t+d%",  // Tab character
+        ];
+
+        for case in &whitespace_cases {
+            let result = parse_and_roll(case);
+            assert!(result.is_ok(), "'{}' should parse successfully", case);
+            let results = result.unwrap();
+            assert_eq!(results.len(), 4, "'{}' should create 4 roll sets", case);
+        }
+    }
+
+    #[test]
+    fn test_roll_set_advantage_vs_complex_advantage_distinction() {
+        // Verify that complex advantage expressions don't get confused with roll sets
+
+        // This should be a roll set: 6 sets of advantage d20
+        let roll_sets = parse_and_roll("6 +d20").unwrap();
+        assert_eq!(roll_sets.len(), 6, "Should create 6 roll sets");
+        assert!(
+            roll_sets.iter().all(|r| r.label.is_some()),
+            "All should have set labels"
+        );
+
+        // This should be a single complex advantage expression
+        let complex_adv = parse_and_roll("+d20 + d10 + 5").unwrap();
+        assert_eq!(complex_adv.len(), 1, "Should create one complex result");
+        assert!(complex_adv[0].label.is_none(), "Should not have set label");
+        assert!(
+            complex_adv[0].dice_groups.len() >= 2,
+            "Should have multiple dice groups"
+        );
+
+        // Verify they produce different result structures
+        assert_ne!(
+            roll_sets.len(),
+            complex_adv.len(),
+            "Roll sets and complex expressions should have different structures"
+        );
+    }
+
+    #[test]
+    fn test_roll_sets_advantage_with_mathematical_modifiers_corrected() {
+        // Test roll sets with advantage/disadvantage patterns that have mathematical modifiers
+
+        // Test advantage with subtraction in roll sets
+        let result = parse_and_roll("4 +d20 -2").unwrap();
+        assert_eq!(result.len(), 4, "Should create 4 roll sets");
+        for (i, roll) in result.iter().enumerate() {
+            assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
+            // Each should be advantage d20 (1-20) minus 2, so range -1 to 18
+            assert!(
+                roll.total >= -1 && roll.total <= 18,
+                "Roll {} should be in range for advantage d20 - 2, got {}",
+                i + 1,
+                roll.total
+            );
+        }
+
+        // Test advantage with spaces around operators
+        let result = parse_and_roll("3 +d20 * 2").unwrap();
+        assert_eq!(result.len(), 3, "Should create 3 roll sets");
+        for roll in &result {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            // Each should be advantage d20 (1-20) times 2, so range 2 to 40
+            assert!(
+                roll.total >= 2 && roll.total <= 40,
+                "Roll should be in range for advantage d20 * 2, got {}",
+                roll.total
+            );
+        }
+
+        // Test disadvantage with addition in roll sets
+        let result = parse_and_roll("2 -d% + 10").unwrap();
+        assert_eq!(result.len(), 2, "Should create 2 roll sets");
+        for roll in &result {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            // Each should be disadvantage d% (1-100) plus 10, so range 11 to 110
+            assert!(
+                roll.total >= 11 && roll.total <= 110,
+                "Roll should be in range for disadvantage d% + 10, got {}",
+                roll.total
+            );
+        }
+    }
+
+    #[test]
+    fn test_roll_sets_advantage_modifier_edge_cases_corrected() {
+        // Test edge cases for roll sets with advantage patterns and modifiers
+        // Focus on cases that should definitely work
+
+        let operators_tests = [
+            ("2 +d20 - 1", 2), // Spaces around operator
+            ("2 +d20 * 3", 2), // Spaces around operator
+            ("2 +d20 / 2", 2), // Spaces around operator
+            ("2 -d% + 15", 2), // Spaces around operator
+            ("2 -d% * 2", 2),  // Spaces around operator
+        ];
+
+        for (expr, expected_count) in &operators_tests {
+            let result = parse_and_roll(expr);
+            assert!(result.is_ok(), "'{}' should parse successfully", expr);
+
+            let results = result.unwrap();
+            assert_eq!(
+                results.len(),
+                *expected_count,
+                "'{}' should create {} roll sets",
+                expr,
+                expected_count
+            );
+
+            // Verify each has a set label (confirming it's a roll set, not single expression)
+            for roll in &results {
+                assert!(
+                    roll.label.as_ref().unwrap().starts_with("Set "),
+                    "'{}' should create roll sets with labels",
+                    expr
+                );
+            }
+        }
+    }
+
     // ============================================================================
     // BEHAVIOR VERIFICATION TESTS
     // ============================================================================
@@ -2094,5 +2807,79 @@ mod tests {
     fn assert_invalid(input: &str) {
         let result = parse_and_roll(input);
         assert!(result.is_err(), "Expected error for: '{}'", input);
+    }
+    #[test]
+    fn test_parser_regex_integration_paths() {
+        // Test that the parser correctly routes expressions through different code paths
+
+        // Path 1: Direct alias expansion (no regex needed)
+        let result = parse_and_roll("+d20").unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].total >= 1 && result[0].total <= 20);
+
+        // Path 2: Regex pattern match for simple modifiers
+        let result = parse_and_roll("+d20+10").unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].total >= 11 && result[0].total <= 30);
+
+        // Path 3: Complex expression parsing (multiple parts)
+        let result = parse_and_roll("+d20 + d10 + 5").unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].dice_groups.len() >= 2);
+
+        // Path 4: Roll set with regex pattern
+        let result = parse_and_roll("2 +d20+5").unwrap();
+        assert_eq!(result.len(), 2);
+        assert!(result[0].label.is_some());
+    }
+
+    #[test]
+    fn test_parser_regex_performance_characteristics() {
+        // Test that the regex changes don't break performance or introduce bugs
+
+        // Should handle many roll sets efficiently
+        let result = parse_and_roll("20 +d20+1").unwrap();
+        assert_eq!(result.len(), 20, "Should handle maximum roll sets");
+
+        // Should handle complex nested expressions
+        let complex_expressions = [
+            "10d6 e6 k8 +4",        // Complex modifiers
+            "+d20 + 2d6 * 3 - 1d4", // Complex advantage expression
+            "p s 5 -d%/2",          // Flags + roll sets + disadvantage
+            "4cod8+3",       // Game system + advantage
+        ];
+
+        for expr in &complex_expressions {
+            let result = parse_and_roll(expr);
+            assert!(
+                result.is_ok(),
+                "Complex expression '{}' should parse successfully",
+                expr
+            );
+        }
+    }
+
+    #[test]
+    fn test_parser_regex_edge_case_coverage() {
+        // Test edge cases that could potentially break the regex or parser
+
+        // Maximum values
+        assert_valid("+d%*100"); // Large multiplication
+        assert_valid("-d20/1"); // Division by 1
+        assert_valid("20 +d%+99"); // Max roll sets with large modifier
+
+        // Minimum values
+        assert_valid("+d20-20"); // Could result in 0 or negative
+        assert_valid("-d%-99"); // Large negative modifier
+        assert_valid("2 +d20/20"); // Small division result
+
+        // Boundary conditions
+        assert_valid("+d1000+1000"); // Max dice size with large modifier
+        assert_valid("-d1+1"); // Min dice size
+
+        // Should not break existing functionality
+        assert_valid("dndstats"); // Game system aliases
+        assert_valid("4d6 k3 + 2"); // Standard complex expressions
+        assert_valid("1d20; 2d6"); // Semicolon separation
     }
 }

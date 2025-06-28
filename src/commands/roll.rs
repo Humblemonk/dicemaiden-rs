@@ -137,8 +137,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
                 // For private rolls, strip comment from request display
                 let clean_expr = strip_comment_from_expression(dice_expr);
                 Ok(CommandResponse::private(format!(
-                    "🎲 **Private Roll** `{}` {}",
-                    clean_expr, formatted
+                    "🎲 **Private Roll** `{clean_expr}` {formatted}"
                 )))
             } else {
                 // Check if this has multiple results that are semicolon-separated
@@ -150,20 +149,18 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
 
                 let content = if is_semicolon_separated {
                     // For semicolon-separated rolls, the formatted string already contains individual requests
-                    format!("🎲 **{}** {}", display_name, formatted)
+                    format!("🎲 **{display_name}** {formatted}")
                 } else if results.len() > 1 {
                     // For roll sets, strip comment from request display
                     let clean_expr = strip_comment_from_expression(dice_expr);
                     format!(
-                        "🎲 **{}** Request: `{}`\n{}",
-                        display_name, clean_expr, formatted
+                        "🎲 **{display_name}** Request: `{clean_expr}`\n{formatted}"
                     )
                 } else {
                     // Single result, strip comment from request display
                     let clean_expr = strip_comment_from_expression(dice_expr);
                     format!(
-                        "🎲 **{}** Request: `{}` {}",
-                        display_name, clean_expr, formatted
+                        "🎲 **{display_name}** Request: `{clean_expr}` {formatted}"
                     )
                 };
 
@@ -183,8 +180,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
                     };
 
                     let simplified_content = format!(
-                        "🎲 **{}** Request: `{}` {}",
-                        display_name, clean_expr, simplified_result
+                        "🎲 **{display_name}** Request: `{clean_expr}` {simplified_result}"
                     );
                     Ok(CommandResponse::public(simplified_content))
                 } else {
@@ -195,8 +191,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
         Err(e) => {
             let clean_expr = strip_comment_from_expression(dice_expr);
             let content = format!(
-                "🎲 **{}** used `{}` - ❌ **Error**: {}",
-                display_name, clean_expr, e
+                "🎲 **{display_name}** used `{clean_expr}` - ❌ **Error**: {e}"
             );
             Ok(CommandResponse::public(content))
         }
@@ -223,7 +218,7 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
     let memory_display = if memory_usage > 1000.0 {
         format!("{:.2} GB", memory_usage / 1024.0)
     } else {
-        format!("{:.2} MB", memory_usage)
+        format!("{memory_usage:.2} MB")
     };
 
     // Get database stats first to determine if we should show partial or total stats
@@ -271,20 +266,18 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
 
         format!(
             r#"**Current Stats:**
-• Servers: {}
-• Estimated Users: {}
-• Memory Usage: {}"#,
-            server_count, user_count, memory_display
+• Servers: {server_count}
+• Estimated Users: {user_count}
+• Memory Usage: {memory_display}"#
         )
     };
 
     Ok(format!(
         r#"🤖 **Dice Maiden Bot Info** 🤖
 
-{}
+{stats_section}
 
-{}"#,
-        stats_section, db_stats_result
+{db_stats_result}"#
     ))
 }
 
@@ -325,12 +318,11 @@ async fn get_database_stats(ctx: &Context) -> String {
                     let memory_display = if total_memory > 1000.0 {
                         format!("{:.2} GB", total_memory / 1024.0)
                     } else {
-                        format!("{:.2} MB", total_memory)
+                        format!("{total_memory:.2} MB")
                     };
 
                     format!(
-                        "**Total Stats (All Processes):**\n• Last update: {}\n• Total servers: {} (across {} shards)\n• Total memory: {}\n• Active processes: {} (multi-process sharding)\n",
-                        most_recent_timestamp, total_servers, total_shards, memory_display, active_processes
+                        "**Total Stats (All Processes):**\n• Last update: {most_recent_timestamp}\n• Total servers: {total_servers} (across {total_shards} shards)\n• Total memory: {memory_display}\n• Active processes: {active_processes} (multi-process sharding)\n"
                     )
                 }
                 Err(_) => "**Total Stats (All Processes):** Error reading data\n".to_string(),
@@ -363,15 +355,14 @@ async fn get_database_stats(ctx: &Context) -> String {
                     let memory_display = if shard_0_memory > 1000.0 {
                         format!("{:.2} GB", shard_0_memory / 1024.0)
                     } else {
-                        format!("{:.2} MB", shard_0_memory)
+                        format!("{shard_0_memory:.2} MB")
                     };
 
                     // Count how many shards we have data for
                     let shard_count = stats.len();
 
                     format!(
-                        "**Database Stats:**\n• Last update: {}\n• Total recorded servers: {} (across {} shards)\n• Recorded memory: {}\n",
-                        most_recent_timestamp, total_servers, shard_count, memory_display
+                        "**Database Stats:**\n• Last update: {most_recent_timestamp}\n• Total recorded servers: {total_servers} (across {shard_count} shards)\n• Recorded memory: {memory_display}\n"
                     )
                 }
                 Err(_) => "**Database Stats:** Error reading data\n".to_string(),
