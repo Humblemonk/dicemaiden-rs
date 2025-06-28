@@ -225,6 +225,51 @@ fn apply_remaining_mathematical_modifiers(
                     "subtract",
                 );
             }
+            Modifier::MultiplyDice(dice_to_multiply) => {
+                // NEW: Handle dice multiplication in remaining modifiers
+                let additional_result = roll_dice(dice_to_multiply.clone())?;
+                expression_parts.push("*".to_string());
+                expression_parts.push(format!("{}", additional_result.total));
+
+                result
+                    .individual_rolls
+                    .extend(additional_result.individual_rolls.clone());
+                result
+                    .kept_rolls
+                    .extend(additional_result.kept_rolls.clone());
+
+                add_dice_group(
+                    result,
+                    dice_to_multiply,
+                    additional_result.individual_rolls,
+                    "multiply",
+                );
+            }
+            Modifier::DivideDice(dice_to_divide) => {
+                // NEW: Handle dice division in remaining modifiers
+                let additional_result = roll_dice(dice_to_divide.clone())?;
+
+                if additional_result.total == 0 {
+                    return Err(anyhow!("Cannot divide by zero (dice result was 0)"));
+                }
+
+                expression_parts.push("/".to_string());
+                expression_parts.push(format!("{}", additional_result.total));
+
+                result
+                    .individual_rolls
+                    .extend(additional_result.individual_rolls.clone());
+                result
+                    .kept_rolls
+                    .extend(additional_result.kept_rolls.clone());
+
+                add_dice_group(
+                    result,
+                    dice_to_divide,
+                    additional_result.individual_rolls,
+                    "divide",
+                );
+            }
             Modifier::Add(value) => {
                 expression_parts.push("+".to_string());
                 expression_parts.push(format!("{}", value));
@@ -314,6 +359,60 @@ fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) ->
                     dice_to_subtract,
                     additional_result.individual_rolls,
                     "subtract",
+                );
+            }
+            Modifier::MultiplyDice(dice_to_multiply) => {
+                // NEW: Handle dice multiplication
+                let additional_result = roll_dice(dice_to_multiply.clone())?;
+                expression_parts.push("*".to_string());
+                expression_parts.push(format!("{}", additional_result.total));
+
+                // Add dice to individual_rolls for display
+                result
+                    .individual_rolls
+                    .extend(additional_result.individual_rolls.clone());
+
+                // Add dice to kept_rolls for display
+                result
+                    .kept_rolls
+                    .extend(additional_result.kept_rolls.clone());
+
+                // Add a new dice group for display
+                add_dice_group(
+                    result,
+                    dice_to_multiply,
+                    additional_result.individual_rolls,
+                    "multiply",
+                );
+            }
+            Modifier::DivideDice(dice_to_divide) => {
+                // NEW: Handle dice division
+                let additional_result = roll_dice(dice_to_divide.clone())?;
+
+                // Check for division by zero
+                if additional_result.total == 0 {
+                    return Err(anyhow!("Cannot divide by zero (dice result was 0)"));
+                }
+
+                expression_parts.push("/".to_string());
+                expression_parts.push(format!("{}", additional_result.total));
+
+                // Add dice to individual_rolls for display
+                result
+                    .individual_rolls
+                    .extend(additional_result.individual_rolls.clone());
+
+                // Add dice to kept_rolls for display
+                result
+                    .kept_rolls
+                    .extend(additional_result.kept_rolls.clone());
+
+                // Add a new dice group for display
+                add_dice_group(
+                    result,
+                    dice_to_divide,
+                    additional_result.individual_rolls,
+                    "divide",
                 );
             }
             Modifier::Add(value) => {

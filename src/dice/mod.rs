@@ -45,10 +45,12 @@ pub enum Modifier {
     Botch(Option<u32>),             // b or b#
     AddDice(DiceRoll),              // Additional dice
     SubtractDice(DiceRoll),         // Subtract dice result
-    WrathGlory(Option<u32>, bool),  // Wrath & Glory: (difficulty, use_total_instead_of_successes)
-    Godbound(bool),                 // gb (false) or gbs (true for straight damage)
-    HeroSystem(HeroSystemType),     // Hero System damage/hit calculations
-    Fudge,                          // df - Fudge dice with symbol display
+    MultiplyDice(DiceRoll),
+    DivideDice(DiceRoll),
+    WrathGlory(Option<u32>, bool), // Wrath & Glory: (difficulty, use_total_instead_of_successes)
+    Godbound(bool),                // gb (false) or gbs (true for straight damage)
+    HeroSystem(HeroSystemType),    // Hero System damage/hit calculations
+    Fudge,                         // df - Fudge dice with symbol display
     DarkHeresy,
 }
 
@@ -117,6 +119,8 @@ impl RollResult {
                 match group.modifier_type.as_str() {
                     "add" => output.push_str(" + "),
                     "subtract" => output.push_str(" - "),
+                    "multiply" => output.push_str(" * "),
+                    "divide" => output.push_str(" / "),
                     _ => output.push(' '),
                 }
             }

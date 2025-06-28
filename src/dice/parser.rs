@@ -20,31 +20,32 @@ static DICE_MOD_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^([+\-])(\d+)d(\d+)$").expect("Failed to compile DICE_MOD_REGEX"));
 
 // Add regex for advantage/disadvantage patterns with modifiers
-static ADV_WITH_MOD_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^([+-])d(\d+|%)\s*([+-]\s*\d+.*)?$").expect("Failed to compile ADV_WITH_MOD_REGEX")
+static ADV_WITH_SIMPLE_MOD_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^([+-])d(\d+|%)\s*([+-]\s*\d+)$")
+        .expect("Failed to compile ADV_WITH_SIMPLE_MOD_REGEX")
 });
 
 pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     let input = input.trim();
 
-    // Check for advantage/disadvantage with modifiers FIRST before other alias expansion
-    if let Some(captures) = ADV_WITH_MOD_REGEX.captures(input) {
+    // Check for advantage/disadvantage with SIMPLE numeric modifiers ONLY
+    // This handles cases like "+d20+5" or "-d20-3" but NOT "+d20 + d10"
+    if let Some(captures) = ADV_WITH_SIMPLE_MOD_REGEX.captures(input) {
         let advantage_sign = &captures[1];
         let sides = &captures[2];
-        let modifier_part = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
+        let modifier_part = &captures[3];
 
         // Expand the advantage/disadvantage part
         let adv_alias = format!("{}d{}", advantage_sign, sides);
         if let Some(expanded_adv) = super::aliases::expand_alias(&adv_alias) {
-            // Combine with the modifier part
-            let full_expression = if modifier_part.is_empty() {
-                expanded_adv
-            } else {
-                format!("{} {}", expanded_adv, modifier_part)
-            };
+            // Combine with the numeric modifier part
+            let full_expression = format!("{} {}", expanded_adv, modifier_part);
             return Ok(vec![parse_single_dice_expression(&full_expression)?]);
         }
     }
+
+    // For more complex expressions like "+d20 + d10", don't try to handle them as special cases
+    // Instead, let them fall through to the normal parsing logic that can handle multiple dice
 
     // Check for aliases that expand to roll sets
     if let Some(expanded) = super::aliases::expand_alias(input) {
@@ -101,7 +102,7 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         }
     }
 
-    // Parse single expression
+    // Parse single expression - this will handle complex cases like "+d20 + d10"
     Ok(vec![parse_single_dice_expression(input)?])
 }
 
@@ -199,13 +200,11 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     remaining = parse_comment(&mut dice, remaining);
     remaining = remaining.trim();
 
-    // Check for aliases after parsing flags/comments
+    // Check for simple advantage/disadvantage patterns (without additional modifiers)
     if let Some(expanded) = super::aliases::expand_alias(remaining) {
         let mut expanded_dice = parse_single_dice_expression(&expanded)?;
-
         // Transfer flags and metadata
         transfer_dice_metadata(&dice, &mut expanded_dice);
-
         return Ok(expanded_dice);
     }
 
@@ -214,6 +213,25 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
 
     if parts.is_empty() {
         return Err(anyhow!("No dice expression found"));
+    }
+
+    // Check for advantage/disadvantage as the first part of a larger expression
+    if parts.len() > 2
+        && (parts[0] == "+d20" || parts[0] == "-d20" || parts[0] == "+d%" || parts[0] == "-d%")
+    {
+        // This is an advantage/disadvantage pattern with additional modifiers
+        // Expand the first part and then handle the rest
+        if let Some(expanded_first) = super::aliases::expand_alias(&parts[0]) {
+            // Parse the expanded advantage/disadvantage
+            let mut adv_dice = parse_single_dice_expression(&expanded_first)?;
+
+            // Apply remaining modifiers
+            parse_all_modifiers(&mut adv_dice, &parts[1..])?;
+
+            // Transfer metadata
+            transfer_dice_metadata(&dice, &mut adv_dice);
+            return Ok(adv_dice);
+        }
     }
 
     // Check if this is an expression that starts with a number (like "4 + 4d10" or "5 - 2d1")
@@ -228,9 +246,6 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
         }
 
         if let Some(dice_idx) = dice_index {
-            // For expressions like "5 - 2d1", we need to be more careful about the order
-            // The expression should be evaluated as "5 - (result of 2d1)", not "(result of 2d1) + something"
-
             // Parse the dice part
             parse_base_dice(&mut dice, &parts[dice_idx])?;
 
@@ -241,34 +256,24 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
             if dice_idx > 1 {
                 match parts[dice_idx - 1].as_str() {
                     "+" => {
-                        // For "5 + 2d1", result should be 5 + dice_result
                         dice.modifiers.push(Modifier::Add(initial_number));
                     }
                     "-" => {
-                        // For "5 - 2d1", result should be 5 - dice_result
-                        // We can achieve this by: -(dice_result) + 5 = 5 - dice_result
                         dice.modifiers.push(Modifier::Multiply(-1));
                         dice.modifiers.push(Modifier::Add(initial_number));
                     }
                     "*" => {
-                        // For "5 * 2d1", result should be 5 * dice_result
-                        // But this is ambiguous - it could mean (5 * dice_result) or (dice_result * 5)
-                        // We'll treat it as dice_result * 5 for consistency with addition
                         dice.modifiers.push(Modifier::Multiply(initial_number));
                     }
                     "/" => {
-                        // For "5 / 2d1", we need to calculate 5 / dice_result
-                        // Use the special division marker pattern: dice * 0 + number means number / dice
                         dice.modifiers.push(Modifier::Multiply(0)); // Special marker
                         dice.modifiers.push(Modifier::Add(initial_number));
                     }
                     _ => {
-                        // Unknown operator, default to addition
                         dice.modifiers.push(Modifier::Add(initial_number));
                     }
                 }
             } else {
-                // No operator between number and dice (shouldn't happen in valid input)
                 dice.modifiers.push(Modifier::Add(initial_number));
             }
 
@@ -280,6 +285,7 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
             return Ok(dice);
         }
     }
+
     // Standard parsing: first part should be dice
     parse_base_dice(&mut dice, &parts[0])?;
 
@@ -321,6 +327,7 @@ fn normalize_whitespace(input: &str) -> String {
 }
 
 // Handle both spaced and combined expressions
+
 fn parse_expression_to_parts(input: &str) -> Result<Vec<String>> {
     if input.is_empty() {
         return Ok(vec![]);
@@ -328,6 +335,23 @@ fn parse_expression_to_parts(input: &str) -> Result<Vec<String>> {
 
     // Normalize whitespace first
     let normalized = normalize_whitespace(input);
+
+    // Special check: if the input starts with advantage/disadvantage patterns, handle them specially
+    let adv_disadv_regex = Regex::new(r"^([+-]d(?:\d+|%))(.*)$").unwrap();
+    if let Some(captures) = adv_disadv_regex.captures(&normalized) {
+        let adv_part = &captures[1]; // "+d20" or "-d20" etc.
+        let remaining = captures[2].trim();
+
+        let mut parts = vec![adv_part.to_string()];
+
+        if !remaining.is_empty() {
+            // Parse the remaining part normally
+            let remaining_parts = parse_expression_to_parts(remaining)?;
+            parts.extend(remaining_parts);
+        }
+
+        return Ok(parts);
+    }
 
     // Special handling for expressions like "200 / 2d4" or "500 / d%" where number comes before dice
     // BUT NOT for roll set patterns like "4 20/d6"
@@ -433,7 +457,17 @@ fn parse_expression_to_parts(input: &str) -> Result<Vec<String>> {
                 }
             }
             '+' | '-' | '*' | '/' => {
-                // Mathematical operators - finish current token and add operator
+                // Mathematical operators - but check if this is part of a dice expression first
+                if current_token.is_empty() && (ch == '+' || ch == '-') {
+                    // This might be the start of an advantage/disadvantage pattern
+                    // Look ahead to see if it's followed by 'd'
+                    if chars.peek() == Some(&'d') {
+                        current_token.push(ch);
+                        continue;
+                    }
+                }
+
+                // Regular operator - finish current token and add operator
                 if !current_token.is_empty() {
                     process_current_token(&mut parts, &mut current_token)?;
                 }
@@ -883,7 +917,7 @@ fn parse_comment<'a>(dice: &mut DiceRoll, remaining: &'a str) -> &'a str {
 }
 
 fn parse_base_dice(dice: &mut DiceRoll, part: &str) -> Result<()> {
-    // Try alias expansion first
+    // Try alias expansion first (this handles +d20, -d20, etc.)
     if let Some(expanded) = super::aliases::expand_alias(part) {
         let expanded_dice = parse_single_dice_expression(&expanded)?;
         dice.count = expanded_dice.count;
@@ -895,6 +929,14 @@ fn parse_base_dice(dice: &mut DiceRoll, part: &str) -> Result<()> {
     // Check if this is a simple dice expression
     if DICE_ONLY_REGEX.is_match(part) {
         return parse_simple_dice_part(dice, part);
+    }
+
+    // Handle simple dice expressions that start with 'd' (like "d10", "d20")
+    if part.starts_with('d') && part.len() > 1 {
+        let full_dice = format!("1{}", part); // Convert "d10" to "1d10"
+        if DICE_ONLY_REGEX.is_match(&full_dice) {
+            return parse_simple_dice_part(dice, &full_dice);
+        }
     }
 
     // If it's not a simple dice expression, it might be a combined expression
@@ -1076,7 +1118,7 @@ fn try_parse_operator_pair(
                 dice.modifiers.push(Modifier::AddDice(dice_roll));
                 return Ok(Some(2));
             } else if second.contains('d') {
-                // This might be a complex dice expression like "1d4e4"
+                // This might be a complex dice expression like "1d4e4" or just "d10"
                 let dice_roll = parse_complex_dice_expression(second)?;
                 dice.modifiers.push(Modifier::AddDice(dice_roll));
                 return Ok(Some(2));
@@ -1091,7 +1133,7 @@ fn try_parse_operator_pair(
                 dice.modifiers.push(Modifier::SubtractDice(dice_roll));
                 return Ok(Some(2));
             } else if second.contains('d') {
-                // This might be a complex dice expression like "1d4e4"
+                // This might be a complex dice expression like "1d4e4" or just "d10"
                 let dice_roll = parse_complex_dice_expression(second)?;
                 dice.modifiers.push(Modifier::SubtractDice(dice_roll));
                 return Ok(Some(2));
@@ -1101,6 +1143,16 @@ fn try_parse_operator_pair(
             if let Ok(num) = second.parse::<i32>() {
                 dice.modifiers.push(Modifier::Multiply(num));
                 return Ok(Some(2));
+            } else if is_dice_expression(second) {
+                // Handle dice multiplication
+                let dice_roll = parse_dice_expression_only(second)?;
+                dice.modifiers.push(Modifier::MultiplyDice(dice_roll));
+                return Ok(Some(2));
+            } else if second.contains('d') {
+                // Handle complex dice expressions for multiplication
+                let dice_roll = parse_complex_dice_expression(second)?;
+                dice.modifiers.push(Modifier::MultiplyDice(dice_roll));
+                return Ok(Some(2));
             }
         }
         "/" => {
@@ -1109,6 +1161,16 @@ fn try_parse_operator_pair(
                     return Err(anyhow!("Cannot divide by zero"));
                 }
                 dice.modifiers.push(Modifier::Divide(num));
+                return Ok(Some(2));
+            } else if is_dice_expression(second) {
+                // Handle dice division
+                let dice_roll = parse_dice_expression_only(second)?;
+                dice.modifiers.push(Modifier::DivideDice(dice_roll));
+                return Ok(Some(2));
+            } else if second.contains('d') {
+                // Handle complex dice expressions for division
+                let dice_roll = parse_complex_dice_expression(second)?;
+                dice.modifiers.push(Modifier::DivideDice(dice_roll));
                 return Ok(Some(2));
             }
         }
@@ -1337,10 +1399,35 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
 }
 
 fn is_dice_expression(input: &str) -> bool {
-    DICE_ONLY_REGEX.is_match(input)
+    // Check for basic dice patterns
+    if DICE_ONLY_REGEX.is_match(input) {
+        return true;
+    }
+
+    // Check for advantage/disadvantage patterns
+    if input == "+d20" || input == "-d20" || input == "+d%" || input == "-d%" {
+        return true;
+    }
+
+    // Check for dice expressions that start with 'd' (like "d10", "d20", "d%")
+    if input.starts_with('d') && input.len() > 1 {
+        let after_d = &input[1..];
+        // Check if it's just numbers or '%'
+        if after_d == "%" || after_d.chars().all(|c| c.is_ascii_digit()) {
+            return true;
+        }
+    }
+
+    false
 }
 
 fn parse_dice_expression_only(input: &str) -> Result<DiceRoll> {
+    // Handle cases like "d10", "d20", "d%"
+    if input.starts_with('d') && !input.contains(char::is_alphabetic) {
+        let full_dice = format!("1{}", input); // Convert "d10" to "1d10"
+        return parse_dice_expression_only(&full_dice);
+    }
+
     if let Some(captures) = DICE_ONLY_REGEX.captures(input) {
         let count = captures
             .get(1)
