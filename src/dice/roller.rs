@@ -11,7 +11,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         return Err(anyhow!("Cannot roll 0 dice"));
     }
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut result = RollResult {
         individual_rolls: Vec::new(),
         kept_rolls: Vec::new(),
@@ -39,7 +39,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
 
     // Initial dice rolls
     for _ in 0..dice.count {
-        let roll = rng.gen_range(1..=dice.sides as i32);
+        let roll = rng.random_range(1..=dice.sides as i32);
         result.individual_rolls.push(roll);
     }
 
@@ -891,7 +891,7 @@ fn explode_dice(
     let mut i = 0;
     while i < result.individual_rolls.len() && explosion_count < max_explosions {
         if result.individual_rolls[i] >= explode_on as i32 {
-            let new_roll = rng.gen_range(1..=dice_sides as i32);
+            let new_roll = rng.random_range(1..=dice_sides as i32);
             result.individual_rolls.push(new_roll);
             explosion_count += 1;
 
@@ -1075,7 +1075,7 @@ fn reroll_dice(
             && total_rerolls < max_total_rerolls
         {
             let old_roll = result.individual_rolls[i];
-            result.individual_rolls[i] = rng.gen_range(1..=dice_sides as i32);
+            result.individual_rolls[i] = rng.random_range(1..=dice_sides as i32);
             rerolls_for_this_die += 1;
             total_rerolls += 1;
 
@@ -1149,7 +1149,7 @@ fn apply_hero_system_calculation(
         HeroSystemType::Killing => {
             // Killing damage: BODY = dice total, STUN = BODY × multiplier (1d3)
             let body_damage = result.total;
-            let stun_multiplier = rng.gen_range(1..=3);
+            let stun_multiplier = rng.random_range(1..=3);
             let stun_damage = body_damage * stun_multiplier;
 
             result.notes.push(format!(
