@@ -5,7 +5,7 @@ use serenity::{
     model::gateway::Ready, prelude::*,
 };
 use std::{collections::HashSet, env, sync::Arc, time::Duration};
-use sysinfo::{Pid, System};
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use tokio::{
     select,
     signal::unix::{signal, SignalKind},
@@ -662,7 +662,7 @@ async fn collect_shard_stats_with_shutdown(
         }
 
         // Only refresh our specific process memory usage instead of scanning all system processes
-        system.refresh_process(current_pid);
+        system.refresh_processes(ProcessesToUpdate::Some(&[current_pid]), false);
 
         let shard_info = shard_manager.runners.lock().await;
         if shard_info.is_empty() {
