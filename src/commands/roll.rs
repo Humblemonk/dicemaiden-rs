@@ -134,8 +134,8 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
             let is_private = results.iter().any(|r| r.private);
 
             if is_private {
-                // For private rolls, strip comment from request display
-                let clean_expr = strip_comment_from_expression(dice_expr);
+                // For private rolls, strip comment and label from request display
+                let clean_expr = strip_label_and_comment_from_expression(dice_expr);
                 Ok(CommandResponse::private(format!(
                     "🎲 **Private Roll** `{clean_expr}` {formatted}"
                 )))
@@ -151,19 +151,19 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
                     // For semicolon-separated rolls, the formatted string already contains individual requests
                     format!("🎲 **{display_name}** {formatted}")
                 } else if results.len() > 1 {
-                    // For roll sets, strip comment from request display
-                    let clean_expr = strip_comment_from_expression(dice_expr);
+                    // For roll sets, strip comment and label from request display
+                    let clean_expr = strip_label_and_comment_from_expression(dice_expr);
                     format!("🎲 **{display_name}** Request: `{clean_expr}`\n{formatted}")
                 } else {
-                    // Single result, strip comment from request display
-                    let clean_expr = strip_comment_from_expression(dice_expr);
+                    // Single result, strip comment and label from request display
+                    let clean_expr = strip_label_and_comment_from_expression(dice_expr);
                     format!("🎲 **{display_name}** Request: `{clean_expr}` {formatted}")
                 };
 
                 // Check if final content exceeds Discord limit
                 if content.len() > 2000 {
                     // Final fallback - just show the simplified result
-                    let clean_expr = strip_comment_from_expression(dice_expr);
+                    let clean_expr = strip_label_and_comment_from_expression(dice_expr);
                     let simplified_result = if results.len() == 1 {
                         let mut simplified = results[0].create_simplified();
                         simplified.simple = true; // Show only result, no dice breakdown
@@ -185,7 +185,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
             }
         }
         Err(e) => {
-            let clean_expr = strip_comment_from_expression(dice_expr);
+            let clean_expr = strip_label_and_comment_from_expression(dice_expr);
             let content = format!("🎲 **{display_name}** used `{clean_expr}` - ❌ **Error**: {e}");
             Ok(CommandResponse::public(content))
         }
@@ -367,8 +367,26 @@ async fn get_database_stats(ctx: &Context) -> String {
     }
 }
 
-fn strip_comment_from_expression(expr: &str) -> String {
-    // Use regex to remove comment (everything after ! including the !)
+/// Strip both labels and comments from dice expression for clean request display
+///
+/// This function removes:
+/// - Labels in parentheses at the beginning: (label) dice_expression -> dice_expression
+/// - Comments after exclamation mark: dice_expression ! comment -> dice_expression
+///
+/// Examples:
+/// - "(roll to hit) 1d20+2" -> "1d20+2"
+/// - "2d6 ! fire damage" -> "2d6"
+/// - "(attack) 1d20+5 ! with sword" -> "1d20+5"
+fn strip_label_and_comment_from_expression(expr: &str) -> String {
+    let mut cleaned = expr.to_string();
+
+    // Remove labels in parentheses at the beginning: (label) dice_expression
+    let label_regex = Regex::new(r"^\s*\([^)]*\)\s*").unwrap();
+    cleaned = label_regex.replace(&cleaned, "").to_string();
+
+    // Remove comments (everything after ! including the !)
     let comment_regex = Regex::new(r"\s*!\s*.*$").unwrap();
-    comment_regex.replace(expr, "").trim().to_string()
+    cleaned = comment_regex.replace(&cleaned, "").to_string();
+
+    cleaned.trim().to_string()
 }
