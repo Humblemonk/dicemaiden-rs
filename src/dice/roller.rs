@@ -36,6 +36,16 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         suppress_comment: false,
     };
 
+    // Check if this is a D6 System roll - handle it specially
+    let has_d6_system = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::D6System(_, _)));
+
+    if has_d6_system {
+        return handle_d6_system_roll(dice, &mut rng);
+    }
+
     // Check if this is a Savage Worlds roll - handle it specially
     let has_savage_worlds = dice
         .modifiers
@@ -639,6 +649,9 @@ fn apply_special_system_modifiers(
             Modifier::SavageWorlds(_) => {
                 // Savage Worlds is handled in the main roll_dice function
                 // Don't process it here
+            }
+            Modifier::D6System(_, _) => {
+                // D6 System is handled in the main roll_dice function
             }
             _ => {} // Skip modifiers already handled above
         }
@@ -1437,6 +1450,142 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
     result
         .notes
         .push("Savage Worlds: Trait die + Wild die, keep highest".to_string());
+
+    Ok(result)
+}
+
+// 5. ADD handle_d6_system_roll function to roller.rs:
+fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
+    let mut result = RollResult {
+        individual_rolls: Vec::new(),
+        kept_rolls: Vec::new(),
+        dropped_rolls: Vec::new(),
+        total: 0,
+        successes: None,
+        failures: None,
+        botches: None,
+        comment: dice.comment.clone(),
+        label: dice.label.clone(),
+        notes: Vec::new(),
+        dice_groups: Vec::new(),
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
+        godbound_damage: None,
+        fudge_symbols: None,
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
+        suppress_comment: false,
+    };
+
+    // Find the D6 System modifier
+    let (count, pips_str) = dice
+        .modifiers
+        .iter()
+        .find_map(|m| {
+            if let Modifier::D6System(count, pips) = m {
+                Some((*count, pips.clone()))
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| anyhow!("Expected D6 System modifier"))?;
+
+    // Roll base dice (non-exploding)
+    let mut base_rolls = Vec::new();
+    for _ in 0..count {
+        base_rolls.push(rng.random_range(1..=6));
+    }
+    let base_total: i32 = base_rolls.iter().sum();
+
+    // Roll wild die (exploding on 6)
+    let mut wild_rolls = vec![rng.random_range(1..=6)];
+    let mut wild_explosions = 0;
+    while wild_rolls.last().copied().unwrap_or(0) >= 6 && wild_explosions < 100 {
+        wild_rolls.push(rng.random_range(1..=6));
+        wild_explosions += 1;
+    }
+    let wild_total: i32 = wild_rolls.iter().sum();
+
+    // Create dice groups for display
+    result.dice_groups.push(DiceGroup {
+        _description: format!("{count}d6"),
+        rolls: base_rolls.clone(),
+        modifier_type: "base".to_string(),
+    });
+
+    result.dice_groups.push(DiceGroup {
+        _description: "1d6 ie6".to_string(),
+        rolls: wild_rolls.clone(),
+        modifier_type: "add".to_string(),
+    });
+
+    // Add all rolls to individual_rolls and kept_rolls
+    result.individual_rolls.extend(base_rolls);
+    result.individual_rolls.extend(wild_rolls);
+    result.kept_rolls = result.individual_rolls.clone();
+
+    // Calculate total
+    let dice_total = base_total + wild_total;
+
+    // Apply pips modifier if any
+    let pips_modifier = if !pips_str.is_empty() {
+        pips_str.parse::<i32>().unwrap_or(0)
+    } else {
+        0
+    };
+
+    result.total = dice_total + pips_modifier;
+
+    // Apply other mathematical modifiers
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::Add(value) => {
+                result.total += value;
+            }
+            Modifier::Subtract(value) => {
+                result.total -= value;
+            }
+            Modifier::Multiply(value) => {
+                result.total *= value;
+            }
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                result.total /= value;
+            }
+            Modifier::D6System(_, _) => {
+                // Already handled above
+            }
+            _ => {
+                // Ignore other modifiers for D6 System
+            }
+        }
+    }
+
+    // Add notes
+    if wild_explosions > 0 {
+        result
+            .notes
+            .push(format!("Wild die exploded {wild_explosions} times"));
+    }
+
+    if pips_modifier != 0 {
+        if pips_modifier > 0 {
+            result
+                .notes
+                .push(format!("Pips modifier: +{pips_modifier}"));
+        } else {
+            result.notes.push(format!("Pips modifier: {pips_modifier}"));
+        }
+    }
+
+    result
+        .notes
+        .push(format!("D6 System: {count}d6 + 1d6 exploding wild die"));
 
     Ok(result)
 }

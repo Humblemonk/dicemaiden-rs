@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.1] - 2025-06-29
+
+## Added
+
+- Resolved an issue with the d6 system alias
+
 ## [1.2.0] - 2025-06-29
 
 ### Added

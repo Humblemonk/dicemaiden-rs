@@ -332,11 +332,13 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some(format!("{count}d6 ie6 t4"));
     }
 
-    // D6 System (d6s4 -> 4d6 + 1d6 ie)
+    // D6 System (d6s4 -> use custom modifier instead of parsing)
     if let Some(captures) = D6S_REGEX.captures(input) {
         let count = &captures[1];
         let pips = captures.get(2).map_or("", |m| m.as_str());
-        return Some(format!("{count}d6 + 1d6 ie{pips}"));
+
+        // Use a dummy roll that triggers the D6System modifier
+        return Some(format!("1d1 d6s{count}{pips}"));
     }
 
     // Alternative Hero System notation with explicit fractional dice (2hsk1 = 2.5d6 killing)

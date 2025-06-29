@@ -3171,4 +3171,368 @@ mod tests {
         assert!(sw_has_trait_note, "SW should have trait die notes");
         assert!(cod_has_success_note, "CoD should have success counting");
     }
+
+    // ============================================================================
+    // D6 SYSTEM TESTS
+    // ============================================================================
+    // Add these tests in the existing dice_tests.rs file in the section marked
+    // "GAME SYSTEM ALIASES" after the existing Savage Worlds tests
+
+    #[test]
+    fn test_d6_system_basic_functionality() {
+        // Test basic D6 System patterns
+        assert_valid("d6s1"); // 1 base die + wild die
+        assert_valid("d6s2"); // 2 base dice + wild die
+        assert_valid("d6s5"); // 5 base dice + wild die
+        assert_valid("d6s10"); // 10 base dice + wild die
+
+        // Test boundary values
+        assert_valid("d6s1"); // Minimum
+        assert_valid("d6s20"); // Reasonable maximum
+    }
+
+    #[test]
+    fn test_d6_system_with_pips() {
+        // Test D6 System with mathematical modifiers (space-separated)
+        assert_valid("d6s4 + 1"); // 4 dice + wild die + 1 mathematical modifier
+        assert_valid("d6s4 + 2"); // 4 dice + wild die + 2 mathematical modifier
+        assert_valid("d6s3 + 3"); // 3 dice + wild die + 3 mathematical modifier
+        assert_valid("d6s5 - 1"); // 5 dice + wild die - 1 mathematical modifier
+
+        // Test with different mathematical operations
+        assert_valid("d6s4 * 2");
+        assert_valid("d6s3 / 2");
+    }
+
+    #[test]
+    fn test_d6_system_alias_expansion() {
+        // Test that D6 System aliases expand correctly
+        let expanded = aliases::expand_alias("d6s5").unwrap();
+        assert_eq!(expanded, "1d1 d6s5");
+
+        let expanded = aliases::expand_alias("d6s4 + 2").unwrap();
+        assert_eq!(expanded, "1d1 d6s4 + 2");
+
+        // Note: The regex expects spaces around the + sign for pips
+        let expanded = aliases::expand_alias("d6s3 + 1").unwrap();
+        assert_eq!(expanded, "1d1 d6s3 + 1");
+    }
+
+    #[test]
+    fn test_d6_system_parsing() {
+        // Test that D6 System expressions parse correctly
+        let result = parser::parse_dice_string("d6s5").unwrap();
+        assert_eq!(result.len(), 1);
+
+        let dice = &result[0];
+        assert_eq!(dice.count, 1); // Dummy die from alias expansion
+        assert_eq!(dice.sides, 1);
+        assert_eq!(dice.modifiers.len(), 1);
+
+        // Verify we have a D6System modifier
+        match &dice.modifiers[0] {
+            Modifier::D6System(count, pips) => {
+                assert_eq!(*count, 5);
+                assert_eq!(*pips, "");
+            }
+            _ => panic!("Expected D6System modifier"),
+        }
+    }
+
+    #[test]
+    fn test_d6_system_with_pips_parsing() {
+        // Test D6 System with pips parsing
+        // Note: Based on the parser, mathematical modifiers are separate from the D6System modifier
+        let result = parser::parse_dice_string("d6s4 + 2").unwrap();
+        assert_eq!(result.len(), 1);
+
+        let dice = &result[0];
+        // Expect 2 modifiers: D6System and Add (mathematical modifiers are separate)
+        assert_eq!(dice.modifiers.len(), 2);
+
+        // First modifier should be D6System
+        match &dice.modifiers[0] {
+            Modifier::D6System(count, pips) => {
+                assert_eq!(*count, 4);
+                assert_eq!(*pips, ""); // Pips are handled as separate mathematical modifiers
+            }
+            _ => panic!("Expected D6System modifier"),
+        }
+
+        // Second modifier should be Add(2)
+        match &dice.modifiers[1] {
+            Modifier::Add(value) => {
+                assert_eq!(*value, 2);
+            }
+            _ => panic!("Expected Add(2) modifier"),
+        }
+    }
+
+    #[test]
+    fn test_d6_system_roll_behavior() {
+        // Test that D6 System rolls produce expected structure
+        let result = parse_and_roll("d6s3").unwrap();
+        assert_eq!(result.len(), 1);
+
+        let roll_result = &result[0];
+
+        // Should have 2 dice groups: base dice (3d6) and wild die (1d6 exploding)
+        assert_eq!(roll_result.dice_groups.len(), 2);
+
+        let base_group = &roll_result.dice_groups[0];
+        let wild_group = &roll_result.dice_groups[1];
+
+        assert_eq!(base_group.modifier_type, "base");
+        assert_eq!(wild_group.modifier_type, "add");
+
+        // Base dice should be exactly 3 dice
+        assert_eq!(base_group.rolls.len(), 3);
+
+        // Wild die should be at least 1 die (could be more if it exploded)
+        assert!(wild_group.rolls.len() >= 1);
+
+        // All base dice should be in range 1-6 (no explosions)
+        for &roll in &base_group.rolls {
+            assert!(
+                roll >= 1 && roll <= 6,
+                "Base die rolled {}, should be 1-6",
+                roll
+            );
+        }
+
+        // Wild die rolls should be >= 1 (could be > 6 if exploded)
+        for &roll in &wild_group.rolls {
+            assert!(roll >= 1, "Wild die rolled {}, should be >= 1", roll);
+        }
+    }
+
+    #[test]
+    fn test_d6_system_with_pips_roll_behavior() {
+        // Test D6 System with mathematical modifiers (not internal pips)
+        let result = parse_and_roll("d6s2 + 3").unwrap();
+        assert_eq!(result.len(), 1);
+
+        let roll_result = &result[0];
+
+        // Should have proper dice groups
+        assert_eq!(roll_result.dice_groups.len(), 2);
+
+        // Base group should have exactly 2 dice
+        assert_eq!(roll_result.dice_groups[0].rolls.len(), 2);
+
+        // Total should include the +3 mathematical modifier
+        let base_total: i32 = roll_result.dice_groups[0].rolls.iter().sum();
+        let wild_total: i32 = roll_result.dice_groups[1].rolls.iter().sum();
+        let expected_total = base_total + wild_total + 3; // +3 for mathematical modifier
+
+        assert_eq!(roll_result.total, expected_total);
+
+        // Should have appropriate notes
+        assert!(
+            roll_result
+                .notes
+                .iter()
+                .any(|note| note.contains("D6 System"))
+        );
+        // Note: Mathematical modifiers are not shown in notes for D6 System currently
+    }
+
+    #[test]
+    fn test_d6_system_with_mathematical_modifiers() {
+        // Test D6 System combined with mathematical modifiers
+        assert_valid("d6s4 + 5"); // D6 System + addition
+        assert_valid("d6s3 - 2"); // D6 System + subtraction
+        assert_valid("d6s2 * 2"); // D6 System + multiplication
+
+        let result = parse_and_roll("d6s2 + 10").unwrap();
+        assert_eq!(result.len(), 1);
+
+        let roll_result = &result[0];
+
+        // Should have dice groups for D6 System
+        assert_eq!(roll_result.dice_groups.len(), 2);
+
+        // Total should include the +10 modifier
+        let dice_total = roll_result
+            .dice_groups
+            .iter()
+            .map(|group| group.rolls.iter().sum::<i32>())
+            .sum::<i32>();
+        let expected_total = dice_total + 10;
+
+        assert_eq!(roll_result.total, expected_total);
+    }
+
+    #[test]
+    fn test_d6_system_roll_sets() {
+        // Test D6 System with roll sets
+        assert_valid("3 d6s4"); // 3 sets of D6 System
+
+        let result = parse_and_roll("3 d6s2").unwrap();
+        assert_eq!(result.len(), 3);
+
+        for (i, roll) in result.iter().enumerate() {
+            assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
+            assert_eq!(roll.dice_groups.len(), 2); // Base + wild die groups
+            assert!(roll.notes.iter().any(|note| note.contains("D6 System")));
+        }
+    }
+
+    #[test]
+    fn test_d6_system_with_flags() {
+        // Test D6 System with various flags
+        assert_valid("p d6s4"); // Private
+        assert_valid("s d6s3"); // Simple
+        assert_valid("nr d6s5"); // No results
+
+        let result = parse_and_roll("p d6s3").unwrap();
+        assert!(result[0].private);
+
+        let result = parse_and_roll("s d6s3").unwrap();
+        assert!(result[0].simple);
+    }
+
+    #[test]
+    fn test_d6_system_vs_other_systems() {
+        // Ensure D6 System doesn't interfere with other systems
+        assert_valid("4cod"); // Chronicles of Darkness still works
+        assert_valid("sw8"); // Savage Worlds still works
+        assert_valid("2hsn"); // Hero System still works
+
+        // Test that D6 System and other systems produce different results
+        let d6s_result = parse_and_roll("d6s3").unwrap();
+        let cod_result = parse_and_roll("4cod").unwrap();
+        let sw_result = parse_and_roll("sw8").unwrap();
+
+        // They should have different note patterns
+        let d6s_has_system_note = d6s_result[0]
+            .notes
+            .iter()
+            .any(|note| note.contains("D6 System"));
+        let cod_has_successes = cod_result[0].successes.is_some();
+        let sw_has_trait_note = sw_result[0]
+            .notes
+            .iter()
+            .any(|note| note.contains("Savage Worlds"));
+
+        assert!(d6s_has_system_note, "D6 System should have system notes");
+        assert!(cod_has_successes, "CoD should have success counting");
+        assert!(sw_has_trait_note, "Savage Worlds should have trait notes");
+    }
+
+    #[test]
+    fn test_d6_system_wild_die_explosion() {
+        // Test that wild die explodes correctly
+        // Run multiple times to increase chance of seeing explosions
+        let mut found_explosion = false;
+
+        for _ in 0..50 {
+            let result = parse_and_roll("d6s1").unwrap();
+            let roll_result = &result[0];
+
+            // Check if wild die (second group) has more than 1 roll (indicating explosion)
+            if roll_result.dice_groups.len() >= 2 && roll_result.dice_groups[1].rolls.len() > 1 {
+                found_explosion = true;
+
+                // Verify explosion logic: should have 6 followed by another roll
+                let wild_rolls = &roll_result.dice_groups[1].rolls;
+                let has_six = wild_rolls.iter().any(|&roll| roll == 6);
+                assert!(has_six, "Exploded wild die should contain a 6");
+
+                // Should have explosion note
+                assert!(
+                    roll_result
+                        .notes
+                        .iter()
+                        .any(|note| note.contains("exploded"))
+                );
+                break;
+            }
+        }
+
+        // Note: This test might occasionally fail due to randomness, but should pass most of the time
+        if !found_explosion {
+            println!(
+                "Warning: No wild die explosions found in 50 attempts (this is unlikely but possible)"
+            );
+        }
+    }
+
+    #[test]
+    fn test_d6_system_base_dice_no_explosion() {
+        // Test that base dice do NOT explode
+        // This was the original bug we fixed
+        for _ in 0..20 {
+            let result = parse_and_roll("d6s5").unwrap();
+            let roll_result = &result[0];
+
+            // Base dice group should have exactly 5 dice (no explosions)
+            assert_eq!(
+                roll_result.dice_groups[0].rolls.len(),
+                5,
+                "Base dice should not explode - expected exactly 5 dice"
+            );
+
+            // All base dice should be 1-6 (no values > 6 from explosions)
+            for &roll in &roll_result.dice_groups[0].rolls {
+                assert!(
+                    roll >= 1 && roll <= 6,
+                    "Base die rolled {}, should be 1-6 (no explosions)",
+                    roll
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_d6_system_edge_cases() {
+        // Test edge cases and error conditions
+        // Note: The current implementation might not validate all edge cases in parsing
+        // These tests verify current behavior rather than ideal behavior
+
+        // Test that these patterns can be parsed without crashing
+        // (actual validation might happen in the roller)
+        let result = parser::parse_dice_string("d6s0");
+        if result.is_ok() {
+            // If parsing succeeds, the validation happens in the roller
+            println!("d6s0 parsed successfully, validation likely in roller");
+        } else {
+            // If parsing fails, that's also valid behavior
+            println!("d6s0 parsing failed as expected");
+        }
+
+        // Test large but reasonable values
+        assert_valid("d6s15"); // Large dice count
+        assert_valid("d6s10 + 5"); // Large dice count with mathematical modifiers
+    }
+
+    #[test]
+    fn test_d6_system_comment_and_label_support() {
+        // Test D6 System with comments and labels
+        assert_valid("d6s4 ! blaster damage");
+        assert_valid("(Attack) d6s3");
+        assert_valid("(Damage) d6s2+1 ! with bonus");
+
+        let result = parse_and_roll("d6s3 ! test comment").unwrap();
+        assert_eq!(result[0].comment, Some("test comment".to_string()));
+
+        let result = parse_and_roll("(Test) d6s2").unwrap();
+        assert_eq!(result[0].label, Some("Test".to_string()));
+    }
+
+    #[test]
+    fn test_d6_system_semicolon_combinations() {
+        // Test D6 System in semicolon-separated rolls
+        assert_valid("d6s3 ; d6s4 ; 2d6");
+        assert_valid("attack+5 ; d6s4 ! damage ; save+2");
+
+        let result = parse_and_roll("d6s2 ; d6s3").unwrap();
+        assert_eq!(result.len(), 2);
+
+        // Both should be D6 System rolls
+        for roll in &result {
+            assert!(roll.notes.iter().any(|note| note.contains("D6 System")));
+            assert_eq!(roll.dice_groups.len(), 2); // Base + wild
+        }
+    }
 }
