@@ -54,6 +54,7 @@ pub enum Modifier {
     DarkHeresy,
     SavageWorlds(u32),
     D6System(u32, String),
+    Shadowrun(u32),
 }
 
 #[derive(Debug, Clone)]

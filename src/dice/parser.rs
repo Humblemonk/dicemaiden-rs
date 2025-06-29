@@ -1450,6 +1450,17 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::SavageWorlds(sides));
     }
 
+    // Shadowrun handling
+    if let Some(stripped) = part.strip_prefix("shadowrun") {
+        let dice_count = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid Shadowrun dice count in '{}'", part))?;
+        if dice_count == 0 {
+            return Err(anyhow!("Shadowrun dice count must be greater than 0"));
+        }
+        return Ok(Modifier::Shadowrun(dice_count));
+    }
+
     // Additional dice modifiers
     if let Some(captures) = DICE_MOD_REGEX.captures(part) {
         let count: u32 = captures[2].parse()?;

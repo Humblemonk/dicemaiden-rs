@@ -161,6 +161,11 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some("1d10 dh".to_string());
     }
 
+    if let Some(captures) = SR_REGEX.captures(input) {
+        let count = &captures[1];
+        return Some(format!("{count}d6 t5 shadowrun{count}"));
+    }
+
     // Handle Hero System fractional dice properly
     if let Some(captures) = HS_REGEX.captures(input) {
         let dice_count_str = &captures[1];

@@ -12,6 +12,7 @@
 
 - Start of new feature development!
 - New alias added : Savage worlds /roll sw8
+- Added critical glitch reporting to shadowrun
 
 ## [1.1.1] - 2025-06-28
 
