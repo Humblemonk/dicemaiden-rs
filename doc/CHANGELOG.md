@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0] - 2025-06-29
+
+### Added
+
+- Start of new feature development!
+- New alias added : Savage worlds /roll sw8
+
 ## [1.1.1] - 2025-06-28
 
 ### Added

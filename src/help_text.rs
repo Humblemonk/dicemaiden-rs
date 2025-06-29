@@ -49,6 +49,11 @@ pub fn generate_alias_help() -> String {
 • Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
 • If you experience a bug, please report the issue on GitHub!
 
+**Savage Worlds:**
+• `sw8` → 1d8 ie8 + 1d6 ie6 k1 (d8 trait + d6 wild, keep highest)
+• `sw10` → 1d10 ie10 + 1d6 ie6 k1 (d10 trait + d6 wild, keep highest)
+• Snake Eyes: Critical failure when both dice roll natural 1
+
 **World/Chronicles of Darkness:**
 • `4cod` → 4d10 t8 ie10 (Chronicles of Darkness)
 • `4cod8` → 4d10 t7 ie10 (8-again)

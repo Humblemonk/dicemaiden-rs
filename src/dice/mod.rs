@@ -52,6 +52,7 @@ pub enum Modifier {
     HeroSystem(HeroSystemType),    // Hero System damage/hit calculations
     Fudge,                         // df - Fudge dice with symbol display
     DarkHeresy,
+    SavageWorlds(u32),
 }
 
 #[derive(Debug, Clone)]

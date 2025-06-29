@@ -1382,6 +1382,19 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Err(anyhow!("Invalid Wrath & Glory modifier: {}", part));
     }
 
+    // Savage Worlds handling (ADD THIS BEFORE the final error return)
+    if let Some(stripped) = part.strip_prefix("sw") {
+        let sides = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid Savage Worlds trait die in '{}'", part))?;
+        if !(4..=12).contains(&sides) || sides % 2 != 0 {
+            return Err(anyhow!(
+                "Savage Worlds trait die must be d4, d6, d8, d10, or d12"
+            ));
+        }
+        return Ok(Modifier::SavageWorlds(sides));
+    }
+
     // Additional dice modifiers
     if let Some(captures) = DICE_MOD_REGEX.captures(part) {
         let count: u32 = captures[2].parse()?;
