@@ -29,6 +29,14 @@
 
 ## Game System Aliases
 
+### Savage Worlds
+- `sw4` → 1d4 trait + 1d6 wild, keep highest, both explode
+- `sw6` → 1d6 trait + 1d6 wild, keep highest, both explode
+- `sw8` → 1d8 trait + 1d6 wild, keep highest, both explode
+- `sw10` → 1d10 trait + 1d6 wild, keep highest, both explode
+- `sw12` → 1d12 trait + 1d6 wild, keep highest, both explode
+- Snake Eyes: Critical failure when both dice roll natural
+
 ### D&D/Pathfinder
 - `dndstats` → 6 4d6 k3 (ability score generation)
 - `attack +5` → 1d20 +5 (attack roll)

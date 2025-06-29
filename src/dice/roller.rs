@@ -30,13 +30,24 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         private: dice.private,
         godbound_damage: None,
         fudge_symbols: None,
-        // Initialize Wrath & Glory fields
         wng_wrath_die: None,
         wng_icons: None,
         wng_exalted_icons: None,
         suppress_comment: false,
     };
 
+    // Check if this is a Savage Worlds roll - handle it specially
+    let has_savage_worlds = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::SavageWorlds(_)));
+
+    if has_savage_worlds {
+        // For Savage Worlds, handle it completely differently
+        return handle_savage_worlds_roll(dice, &mut rng);
+    }
+
+    // Normal dice rolling flow for non-Savage Worlds dice
     // Initial dice rolls
     for _ in 0..dice.count {
         let roll = rng.random_range(1..=dice.sides as i32);
@@ -624,6 +635,10 @@ fn apply_special_system_modifiers(
             }
             Modifier::HeroSystem(hero_type) => {
                 apply_hero_system_calculation(result, rng, hero_type)?;
+            }
+            Modifier::SavageWorlds(_) => {
+                // Savage Worlds is handled in the main roll_dice function
+                // Don't process it here
             }
             _ => {} // Skip modifiers already handled above
         }
@@ -1245,4 +1260,183 @@ fn apply_mathematical_modifiers_to_successes(
     }
 
     Ok(())
+}
+
+fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
+    let mut result = RollResult {
+        individual_rolls: Vec::new(),
+        kept_rolls: Vec::new(),
+        dropped_rolls: Vec::new(),
+        total: 0,
+        successes: None,
+        failures: None,
+        botches: None,
+        comment: dice.comment.clone(),
+        label: dice.label.clone(),
+        notes: Vec::new(),
+        dice_groups: Vec::new(),
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
+        godbound_damage: None,
+        fudge_symbols: None,
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
+        suppress_comment: false,
+    };
+
+    // Find the Savage Worlds modifier
+    let trait_sides = dice
+        .modifiers
+        .iter()
+        .find_map(|m| {
+            if let Modifier::SavageWorlds(sides) = m {
+                Some(*sides)
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| anyhow!("Expected Savage Worlds modifier"))?;
+
+    // Roll trait die (exploding on max)
+    let mut trait_rolls = vec![rng.random_range(1..=trait_sides as i32)];
+    let mut trait_explosions = 0;
+    while trait_rolls.last().copied().unwrap_or(0) >= trait_sides as i32 && trait_explosions < 100 {
+        trait_rolls.push(rng.random_range(1..=trait_sides as i32));
+        trait_explosions += 1;
+    }
+    let trait_total: i32 = trait_rolls.iter().sum();
+
+    // Roll wild die (d6, exploding on 6)
+    let mut wild_rolls = vec![rng.random_range(1..=6)];
+    let mut wild_explosions = 0;
+    while wild_rolls.last().copied().unwrap_or(0) >= 6 && wild_explosions < 100 {
+        wild_rolls.push(rng.random_range(1..=6));
+        wild_explosions += 1;
+    }
+    let wild_total: i32 = wild_rolls.iter().sum();
+
+    // Create dice groups for display
+    result.dice_groups.push(DiceGroup {
+        _description: format!("1d{trait_sides} ie{trait_sides}"),
+        rolls: trait_rolls.clone(),
+        modifier_type: "trait".to_string(),
+    });
+
+    result.dice_groups.push(DiceGroup {
+        _description: "1d6 ie6".to_string(),
+        rolls: wild_rolls.clone(),
+        modifier_type: "wild".to_string(),
+    });
+
+    // Add all rolls to individual_rolls for display
+    result.individual_rolls.extend(trait_rolls);
+    result.individual_rolls.extend(wild_rolls);
+
+    // Keep the highest total (trait vs wild)
+    let base_result = if trait_total >= wild_total {
+        result.kept_rolls = vec![trait_total];
+        trait_total
+    } else {
+        result.kept_rolls = vec![wild_total];
+        wild_total
+    };
+
+    result.total = base_result;
+
+    // NOW apply mathematical modifiers to the Savage Worlds result
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::Add(value) => {
+                result.total += value;
+            }
+            Modifier::Subtract(value) => {
+                result.total -= value;
+            }
+            Modifier::Multiply(value) => {
+                result.total *= value;
+            }
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                result.total /= value;
+            }
+            Modifier::SavageWorlds(_) => {
+                // Already handled above
+            }
+            _ => {
+                // For now, ignore other modifiers in Savage Worlds
+                // (we could add support for AddDice, etc. later if needed)
+            }
+        }
+    }
+
+    // Check for Snake Eyes (both dice show natural 1)
+    let trait_natural = result.dice_groups[0].rolls.first().copied().unwrap_or(0);
+    let wild_natural = result.dice_groups[1].rolls.first().copied().unwrap_or(0);
+
+    if trait_natural == 1 && wild_natural == 1 {
+        result
+            .notes
+            .push("🐍 **SNAKE EYES!** Critical Failure - both dice rolled 1".to_string());
+    }
+
+    // Add explanatory notes
+    if trait_total > wild_total {
+        result.notes.push(format!(
+            "Trait die (d{trait_sides}) kept: {trait_total} beats Wild die (d6): {wild_total}"
+        ));
+    } else if wild_total > trait_total {
+        result.notes.push(format!(
+            "Wild die (d6) kept: {wild_total} beats Trait die (d{trait_sides}): {trait_total}"
+        ));
+    } else {
+        result.notes.push(format!(
+            "Tie: both Trait die (d{trait_sides}) and Wild die (d6) rolled {trait_total}"
+        ));
+    }
+
+    // Add explosion notes if any occurred
+    if trait_explosions > 0 {
+        result
+            .notes
+            .push(format!("Trait die exploded {trait_explosions} times"));
+    }
+    if wild_explosions > 0 {
+        result
+            .notes
+            .push(format!("Wild die exploded {wild_explosions} times"));
+    }
+
+    // Show mathematical modifiers that were applied - commenting this out for now
+    // let math_modifier_total: i32 = dice
+    //    .modifiers
+    //    .iter()
+    //    .map(|m| match m {
+    //        Modifier::Add(v) => *v,
+    //        Modifier::Subtract(v) => -*v,
+    //        _ => 0,
+    //    })
+    //    .sum();
+
+    //if math_modifier_total != 0 {
+    //    if math_modifier_total > 0 {
+    //        result.notes.push(format!(
+    //            "Mathematical modifier: +{math_modifier_total} applied"
+    //        ));
+    //    } else {
+    //        result.notes.push(format!(
+    //            "Mathematical modifier: {math_modifier_total} applied"
+    //        ));
+    //    }
+    //}
+
+    result
+        .notes
+        .push("Savage Worlds: Trait die + Wild die, keep highest".to_string());
+
+    Ok(result)
 }
