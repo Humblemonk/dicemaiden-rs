@@ -2907,4 +2907,100 @@ mod tests {
         assert_valid("4d6 k3 + 2"); // Standard complex expressions
         assert_valid("1d20; 2d6"); // Semicolon separation
     }
+    #[test]
+    fn test_savage_worlds_system() {
+        // Test all valid Savage Worlds trait dice
+        assert_valid("sw4"); // d4 trait die
+        assert_valid("sw6"); // d6 trait die
+        assert_valid("sw8"); // d8 trait die
+        assert_valid("sw10"); // d10 trait die
+        assert_valid("sw12"); // d12 trait die
+
+        // Test invalid trait dice
+        assert_invalid("sw3"); // Odd number
+        assert_invalid("sw5"); // Odd number
+        assert_invalid("sw14"); // Too high
+        assert_invalid("sw2"); // Too low
+    }
+
+    #[test]
+    fn test_savage_worlds_alias_expansion() {
+        let expanded = aliases::expand_alias("sw8").unwrap();
+        assert_eq!(expanded, "2d1 sw8");
+
+        let expanded = aliases::expand_alias("sw10").unwrap();
+        assert_eq!(expanded, "2d1 sw10");
+    }
+
+    #[test]
+    fn test_savage_worlds_with_modifiers() {
+        assert_valid("sw8 + 2");
+        assert_valid("sw10 - 1");
+
+        let result = parse_and_roll("sw8 + 5").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // Should still have Savage Worlds functionality
+        assert!(
+            result[0]
+                .notes
+                .iter()
+                .any(|note| note.contains("Savage Worlds"))
+        );
+
+        // Total should include the +5 modifier (minimum would be 1 + 5 = 6)
+        assert!(
+            result[0].total >= 6,
+            "Total should be at least 6 (minimum roll 1 + modifier 5)"
+        );
+    }
+
+    #[test]
+    fn test_savage_worlds_with_roll_sets() {
+        assert_valid("3 sw8");
+        let result = parse_and_roll("3 sw8").unwrap();
+        assert_eq!(result.len(), 3);
+
+        for roll in &result {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            assert!(roll.notes.iter().any(|note| note.contains("Savage Worlds")));
+        }
+    }
+
+    #[test]
+    fn test_savage_worlds_edge_cases() {
+        // Test boundary conditions
+        assert_valid("sw4"); // Minimum valid
+        assert_valid("sw12"); // Maximum valid
+
+        // Test with flags
+        assert_valid("p sw8"); // Private roll
+        assert_valid("s sw6"); // Simple output
+
+        // Test with complex modifiers
+        assert_valid("sw8 * 2");
+        assert_valid("sw10 / 2");
+    }
+
+    #[test]
+    fn test_savage_worlds_vs_other_systems() {
+        // Make sure SW doesn't interfere with other systems
+        assert_valid("4cod"); // Chronicles of Darkness still works
+        assert_valid("sr6"); // Shadowrun still works
+        assert_valid("3wh4+"); // Warhammer still works
+
+        // And other systems don't interfere with SW
+        let sw_result = parse_and_roll("sw8").unwrap();
+        let cod_result = parse_and_roll("4cod").unwrap();
+
+        // They should produce different note patterns
+        let sw_has_trait_note = sw_result[0]
+            .notes
+            .iter()
+            .any(|note| note.contains("Trait die"));
+        let cod_has_success_note = cod_result[0].successes.is_some();
+
+        assert!(sw_has_trait_note, "SW should have trait die notes");
+        assert!(cod_has_success_note, "CoD should have success counting");
+    }
 }
