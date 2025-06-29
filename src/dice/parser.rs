@@ -268,7 +268,7 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     remaining = parse_comment(&mut dice, remaining);
     remaining = remaining.trim();
 
-    // CRITICAL FIX: Handle D6 System alias expansion BEFORE general alias expansion
+    // Handle D6 System alias expansion BEFORE general alias expansion
     // This prevents the "d6s5" -> "5d6 + 1d6ie" from being mis-parsed
     if remaining.starts_with("d6s") {
         if let Some(expanded) = super::aliases::expand_alias(remaining) {
@@ -281,7 +281,7 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     }
 
     // Check for simple advantage/disadvantage patterns (without additional modifiers)
-    // THIS IS THE CRITICAL FIX: Only do alias expansion, don't try to be clever about advantage detection here
+    // Only do alias expansion, don't try to be clever about advantage detection here
     if let Some(expanded) = super::aliases::expand_alias(remaining) {
         let mut expanded_dice = parse_single_dice_expression(&expanded)?;
         // Transfer flags and metadata
@@ -786,7 +786,7 @@ fn split_math_operators(input: &str) -> (&str, Vec<String>) {
 
 // Split dice expression from modifiers: "4d6e6k3" -> ("4d6", "e6k3")
 fn split_dice_and_modifiers(input: &str) -> Option<(String, String)> {
-    // CRITICAL FIX: Don't split D6 System expressions like "d6s5"
+    // Don't split D6 System expressions like "d6s5"
     // These should be treated as single modifiers, not dice + modifiers
     if input.starts_with("d6s") {
         return None; // Don't split D6 System expressions
@@ -845,7 +845,7 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
             r"^(hs[nkh])",          // Hero System
             r"^(dh)",               // Dark Heresy
             r"^(fudge|df)",         // Fudge
-            r"^(d6s\d+(?:\+\d+)?)", // D6 System - CRITICAL FIX: Add this pattern
+            r"^(d6s\d+(?:\+\d+)?)", // D6 System
         ];
 
         let mut found = false;
@@ -1291,7 +1291,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::Explode(num));
     }
 
-    // CRITICAL FIX: Handle D6 System BEFORE drop modifier to avoid conflicts
+    // Handle D6 System BEFORE drop modifier to avoid conflicts
     // D6 System handling (Handle BEFORE drop modifier since both start with 'd')
     if let Some(stripped) = part.strip_prefix("d6s") {
         // Parse count and optional pips like "5" or "5+2"
