@@ -1612,10 +1612,6 @@ fn apply_shadowrun_critical_glitch_check(result: &mut RollResult, dice_count: u3
         } else {
             result.notes.push("💀 **CRITICAL GLITCH!** More than half the dice pool rolled 1s - catastrophic failure!".to_string());
         }
-
-        result.notes.push(format!(
-            "Glitch analysis: {ones_count} ones out of {dice_count} dice (threshold: >{half_dice_pool})"
-        ));
     }
 
     Ok(())
