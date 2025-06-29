@@ -646,6 +646,10 @@ fn apply_special_system_modifiers(
             Modifier::HeroSystem(hero_type) => {
                 apply_hero_system_calculation(result, rng, hero_type)?;
             }
+            Modifier::Shadowrun(dice_count) => {
+                apply_shadowrun_critical_glitch_check(result, *dice_count)?;
+                has_special_system = true;
+            }
             Modifier::SavageWorlds(_) => {
                 // Savage Worlds is handled in the main roll_dice function
                 // Don't process it here
@@ -1588,4 +1592,31 @@ fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResul
         .push(format!("D6 System: {count}d6 + 1d6 exploding wild die"));
 
     Ok(result)
+}
+
+fn apply_shadowrun_critical_glitch_check(result: &mut RollResult, dice_count: u32) -> Result<()> {
+    // Count the number of 1s in the kept rolls
+    let ones_count = result.kept_rolls.iter().filter(|&&roll| roll == 1).count();
+
+    // Critical glitch occurs when more than half the dice pool shows 1s
+    let half_dice_pool = (dice_count as f64 / 2.0).floor() as usize;
+
+    if ones_count > half_dice_pool {
+        // Critical glitch detected
+        if let Some(successes) = result.successes {
+            if successes == 0 {
+                result.notes.push("💀 **CRITICAL GLITCH!** More than half the dice pool rolled 1s with no successes - catastrophic failure!".to_string());
+            } else {
+                result.notes.push("⚠️ **GLITCH!** More than half the dice pool rolled 1s but successes were achieved - complications arise!".to_string());
+            }
+        } else {
+            result.notes.push("💀 **CRITICAL GLITCH!** More than half the dice pool rolled 1s - catastrophic failure!".to_string());
+        }
+
+        result.notes.push(format!(
+            "Glitch analysis: {ones_count} ones out of {dice_count} dice (threshold: >{half_dice_pool})"
+        ));
+    }
+
+    Ok(())
 }

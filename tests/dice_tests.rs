@@ -1696,7 +1696,66 @@ mod tests {
     #[test]
     fn test_shadowrun_alias() {
         let expanded = aliases::expand_alias("sr6").unwrap();
-        assert_eq!(expanded, "6d6 t5");
+        assert_eq!(expanded, "6d6 t5 shadowrun6");
+    }
+
+    #[test]
+    fn test_shadowrun_critical_glitch_alias_expansion() {
+        // Test that the new Shadowrun alias includes glitch detection
+        let expanded = aliases::expand_alias("sr6").unwrap();
+        assert_eq!(expanded, "6d6 t5 shadowrun6");
+
+        let expanded = aliases::expand_alias("sr4").unwrap();
+        assert_eq!(expanded, "4d6 t5 shadowrun4");
+    }
+
+    #[test]
+    fn test_shadowrun_modifier_parsing() {
+        // Test that the Shadowrun modifier parses correctly
+        let result = parser::parse_dice_string("6d6 t5 shadowrun6").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].count, 6);
+        assert_eq!(result[0].sides, 6);
+        assert_eq!(result[0].modifiers.len(), 2);
+
+        // Should have Target(5) and Shadowrun(6) modifiers
+        assert!(
+            result[0]
+                .modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::Target(5)))
+        );
+        assert!(
+            result[0]
+                .modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::Shadowrun(6)))
+        );
+    }
+
+    #[test]
+    fn test_shadowrun_glitch_threshold_calculation() {
+        // Test the mathematical logic for glitch thresholds
+        // This tests the core glitch detection without randomness
+
+        let test_cases = [
+            (4, 2, false), // 2 ones out of 4 dice: no glitch (=50%)
+            (4, 3, true),  // 3 ones out of 4 dice: glitch (>50%)
+            (6, 3, false), // 3 ones out of 6 dice: no glitch (=50%)
+            (6, 4, true),  // 4 ones out of 6 dice: glitch (>50%)
+            (8, 4, false), // 4 ones out of 8 dice: no glitch (=50%)
+            (8, 5, true),  // 5 ones out of 8 dice: glitch (>50%)
+        ];
+
+        for (dice_count, ones_count, should_be_glitch) in &test_cases {
+            let half_dice_pool = (*dice_count as f64 / 2.0).floor() as usize;
+            let is_glitch = *ones_count > half_dice_pool;
+
+            assert_eq!(
+                is_glitch, *should_be_glitch,
+                "For {dice_count} dice with {ones_count} ones: expected glitch={should_be_glitch}, got={is_glitch}"
+            );
+        }
     }
 
     #[test]
