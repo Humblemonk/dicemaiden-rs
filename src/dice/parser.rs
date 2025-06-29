@@ -268,6 +268,18 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     remaining = parse_comment(&mut dice, remaining);
     remaining = remaining.trim();
 
+    // CRITICAL FIX: Handle D6 System alias expansion BEFORE general alias expansion
+    // This prevents the "d6s5" -> "5d6 + 1d6ie" from being mis-parsed
+    if remaining.starts_with("d6s") {
+        if let Some(expanded) = super::aliases::expand_alias(remaining) {
+            // D6 System expansion: "d6s5" -> "1d1 d6s5"
+            // This creates a dummy roll that triggers the D6System modifier
+            let mut expanded_dice = parse_single_dice_expression(&expanded)?;
+            transfer_dice_metadata(&dice, &mut expanded_dice);
+            return Ok(expanded_dice);
+        }
+    }
+
     // Check for simple advantage/disadvantage patterns (without additional modifiers)
     // THIS IS THE CRITICAL FIX: Only do alias expansion, don't try to be clever about advantage detection here
     if let Some(expanded) = super::aliases::expand_alias(remaining) {
@@ -774,6 +786,12 @@ fn split_math_operators(input: &str) -> (&str, Vec<String>) {
 
 // Split dice expression from modifiers: "4d6e6k3" -> ("4d6", "e6k3")
 fn split_dice_and_modifiers(input: &str) -> Option<(String, String)> {
+    // CRITICAL FIX: Don't split D6 System expressions like "d6s5"
+    // These should be treated as single modifiers, not dice + modifiers
+    if input.starts_with("d6s") {
+        return None; // Don't split D6 System expressions
+    }
+
     // Match basic dice pattern
     let dice_regex = Regex::new(r"^(\d*d\d+)(.*)$").unwrap();
     if let Some(captures) = dice_regex.captures(input) {
@@ -812,21 +830,22 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
 
         // Try to extract known modifier patterns
         let patterns = [
-            r"^(ie\d*)",    // Indefinite explode first (longer pattern)
-            r"^(ir\d+)",    // Indefinite reroll
-            r"^(kl\d+)",    // Keep lowest
-            r"^(e\d*)",     // Explode (after ie)
-            r"^(k\d+)",     // Keep highest
-            r"^(r\d+)",     // Reroll (after ir)
-            r"^(d\d+)",     // Drop
-            r"^(t\d+)",     // Target
-            r"^(f\d+)",     // Failure
-            r"^(b\d*)",     // Botch
-            r"^(wng\d*t?)", // Wrath & Glory
-            r"^(gb|gbs)",   // Godbound
-            r"^(hs[nkh])",  // Hero System
-            r"^(dh)",       // Dark Heresy
-            r"^(fudge|df)", // Fudge
+            r"^(ie\d*)",            // Indefinite explode first (longer pattern)
+            r"^(ir\d+)",            // Indefinite reroll
+            r"^(kl\d+)",            // Keep lowest
+            r"^(e\d*)",             // Explode (after ie)
+            r"^(k\d+)",             // Keep highest
+            r"^(r\d+)",             // Reroll (after ir)
+            r"^(d\d+)",             // Drop
+            r"^(t\d+)",             // Target
+            r"^(f\d+)",             // Failure
+            r"^(b\d*)",             // Botch
+            r"^(wng\d*t?)",         // Wrath & Glory
+            r"^(gb|gbs)",           // Godbound
+            r"^(hs[nkh])",          // Hero System
+            r"^(dh)",               // Dark Heresy
+            r"^(fudge|df)",         // Fudge
+            r"^(d6s\d+(?:\+\d+)?)", // D6 System - CRITICAL FIX: Add this pattern
         ];
 
         let mut found = false;
@@ -1105,6 +1124,7 @@ fn is_modifier_start(input: &str) -> bool {
         r"^dh",
         r"^fudge",
         r"^df",
+        r"^d6s",
     ];
 
     for pattern in &modifier_starts {
@@ -1271,8 +1291,43 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::Explode(num));
     }
 
-    // Handle drop modifier
+    // CRITICAL FIX: Handle D6 System BEFORE drop modifier to avoid conflicts
+    // D6 System handling (Handle BEFORE drop modifier since both start with 'd')
+    if let Some(stripped) = part.strip_prefix("d6s") {
+        // Parse count and optional pips like "5" or "5+2"
+        let count_and_pips = stripped.to_string();
+
+        // Extract count (before any +/-)
+        let count_str = if let Some(pos) = count_and_pips.find(['+', '-']) {
+            &count_and_pips[..pos]
+        } else {
+            &count_and_pips
+        };
+
+        let count = count_str
+            .parse()
+            .map_err(|_| anyhow!("Invalid D6 System count in '{}'", part))?;
+
+        // Extract pips part (everything after count)
+        let pips = if let Some(pos) = count_and_pips.find(['+', '-']) {
+            count_and_pips[pos..].to_string()
+        } else {
+            String::new()
+        };
+
+        return Ok(Modifier::D6System(count, pips));
+    }
+
+    // Handle drop modifier (AFTER D6 System to avoid conflicts)
     if let Some(stripped) = part.strip_prefix('d') {
+        // Make sure this isn't a D6 System expression that somehow got through
+        if stripped.starts_with("6s") {
+            return Err(anyhow!(
+                "D6 System expressions should be handled earlier: {}",
+                part
+            ));
+        }
+
         let num = stripped
             .parse()
             .map_err(|_| anyhow!("Invalid drop value in '{}'", part))?;
@@ -1382,7 +1437,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Err(anyhow!("Invalid Wrath & Glory modifier: {}", part));
     }
 
-    // Savage Worlds handling (ADD THIS BEFORE the final error return)
+    // Savage Worlds handling (AFTER D6 System but before other modifiers)
     if let Some(stripped) = part.strip_prefix("sw") {
         let sides = stripped
             .parse()

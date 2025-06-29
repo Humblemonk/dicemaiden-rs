@@ -53,6 +53,7 @@ pub enum Modifier {
     Fudge,                         // df - Fudge dice with symbol display
     DarkHeresy,
     SavageWorlds(u32),
+    D6System(u32, String),
 }
 
 #[derive(Debug, Clone)]
