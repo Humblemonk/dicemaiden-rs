@@ -1,5 +1,5 @@
 use super::{DiceRoll, HeroSystemType, Modifier};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
