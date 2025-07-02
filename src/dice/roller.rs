@@ -1,5 +1,5 @@
 use super::{DiceGroup, DiceRoll, HeroSystemType, Modifier, RollResult};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use rand::Rng;
 
 pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
@@ -1095,51 +1095,32 @@ fn reroll_dice(
 ) -> Result<()> {
     let mut total_rerolls = 0;
     let max_total_rerolls = 100;
-    let mut reroll_notes = Vec::new();
 
     for i in 0..result.individual_rolls.len() {
         let mut rerolls_for_this_die = 0;
         let max_rerolls_per_die = if indefinite { 100 } else { 1 };
-        let original_roll = result.individual_rolls[i];
 
         while result.individual_rolls[i] <= threshold as i32
             && rerolls_for_this_die < max_rerolls_per_die
             && total_rerolls < max_total_rerolls
         {
-            let old_roll = result.individual_rolls[i];
             result.individual_rolls[i] = rng.random_range(1..=dice_sides as i32);
             rerolls_for_this_die += 1;
             total_rerolls += 1;
 
             if !indefinite {
-                // For single rerolls, show the immediate result
-                reroll_notes.push(format!(
-                    "Rerolled {} → {}",
-                    old_roll, result.individual_rolls[i]
-                ));
                 break;
-            }
-        }
-
-        // For indefinite rerolls, show original → final if any rerolls happened
-        if indefinite && rerolls_for_this_die > 0 {
-            if rerolls_for_this_die == 1 {
-                reroll_notes.push(format!(
-                    "Rerolled {} → {}",
-                    original_roll, result.individual_rolls[i]
-                ));
-            } else {
-                reroll_notes.push(format!(
-                    "Rerolled {} → {} ({} rerolls)",
-                    original_roll, result.individual_rolls[i], rerolls_for_this_die
-                ));
             }
         }
     }
 
-    // Add reroll notes to result
-    for note in reroll_notes {
-        result.notes.push(note);
+    // Add single summary note if any rerolls happened
+    if total_rerolls > 0 {
+        if total_rerolls == 1 {
+            result.notes.push("1 die rerolled".to_string());
+        } else {
+            result.notes.push(format!("{total_rerolls} dice rerolled"));
+        }
     }
 
     // Safety check note
@@ -1147,21 +1128,6 @@ fn reroll_dice(
         result
             .notes
             .push("Maximum rerolls reached (100)".to_string());
-    }
-
-    // Always show summary if rerolls happened, regardless of count
-    if total_rerolls > 0 {
-        let reroll_type = if indefinite { "indefinitely" } else { "once" };
-        if total_rerolls > 10 {
-            result.notes.push(format!(
-                "{total_rerolls} total rerolls (dice ≤ {threshold}, reroll {reroll_type})"
-            ));
-        } else if result.notes.len() <= 1 {
-            // Only add summary if we don't already have detailed notes
-            result.notes.push(format!(
-                "{total_rerolls} dice rerolled (≤ {threshold}, reroll {reroll_type})"
-            ));
-        }
     }
 
     Ok(())
