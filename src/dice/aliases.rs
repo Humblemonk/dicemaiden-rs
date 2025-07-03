@@ -248,9 +248,9 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         };
 
         return Some(match variant {
-            "8" => format!("{count}d10 t7 ie10{modifier_part}"), // 8-again
-            "9" => format!("{count}d10 t6 ie10{modifier_part}"), // 9-again
-            "r" => format!("{count}d10 t8 ie10 r1{modifier_part}"), // rote quality
+            "8" => format!("{count}d10 t8 ie8{modifier_part}"), // 8-again
+            "9" => format!("{count}d10 t8 ie9{modifier_part}"), // 9-again
+            "r" => format!("{count}d10 t8 ie10 r7{modifier_part}"), // rote quality
             _ => format!("{count}d10 t8 ie10{modifier_part}"),   // standard
         });
     }
@@ -262,9 +262,9 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
 
         if modifier.is_empty() {
-            return Some(format!("{count}d10 f1 ie10 t{difficulty}"));
+            return Some(format!("{count}d10 f1 t{difficulty}"));
         } else {
-            return Some(format!("{count}d10 f1 ie10 t{difficulty} {modifier}"));
+            return Some(format!("{count}d10 f1 t{difficulty} {modifier}"));
         }
     }
 

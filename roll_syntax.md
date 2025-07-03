@@ -49,10 +49,10 @@
 
 ### World of Darkness / Chronicles of Darkness
 - `4cod` → 4d10 t8 ie10 (Chronicles of Darkness)
-- `4cod8` → 4d10 t7 ie10 (8-again rule)
-- `4cod9` → 4d10 t6 ie10 (9-again rule)
-- `4codr` → 4d10 t8 ie10 r1 (rote quality)
-- `4wod8` → 4d10 f1 ie10 t8 (World of Darkness, difficulty 8)
+- `4cod8` → 4d10 t8 ie8 (8-again rule)
+- `4cod9` → 4d10 t8 ie9 (9-again rule)
+- `4codr` → 4d10 t8 ie10 r7 (rote quality)
+- `4wod8` → 4d10 f1 t8 (World of Darkness, difficulty 8)
 
 ### Hero System 5th Edition
 - `2hsn` → 2d6 hsn (normal damage)
