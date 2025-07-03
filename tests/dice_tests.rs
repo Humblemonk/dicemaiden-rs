@@ -1883,6 +1883,100 @@ mod tests {
         assert_valid("3hsh+8");
     }
 
+    #[test]
+    fn test_marvel_multiverse_basic() {
+        let result = parse_and_roll("mm").unwrap();
+        assert_eq!(result.len(), 1);
+        let roll = &result[0];
+
+        assert_eq!(roll.dice_groups.len(), 2); // base + result
+        assert!(roll.total >= 3 && roll.total <= 18);
+        assert_eq!(roll.individual_rolls.len(), 3);
+    }
+
+    #[test]
+    fn test_marvel_multiverse_with_edges() {
+        let result = parse_and_roll("mm 2e").unwrap();
+        let roll = &result[0];
+
+        assert!(roll.notes.iter().any(|note| note.contains("2 edges")));
+        // Should have one consolidated reroll note, not individual ones
+        let reroll_notes: Vec<_> = roll
+            .notes
+            .iter()
+            .filter(|note| note.contains("→"))
+            .collect();
+        assert_eq!(reroll_notes.len(), 1);
+    }
+
+    #[test]
+    fn test_marvel_multiverse_with_troubles() {
+        let result = parse_and_roll("mm 2t").unwrap();
+        let roll = &result[0];
+
+        assert!(roll.notes.iter().any(|note| note.contains("2 troubles")));
+        // Should have one consolidated reroll note, not individual ones
+        let reroll_notes: Vec<_> = roll
+            .notes
+            .iter()
+            .filter(|note| note.contains("→"))
+            .collect();
+        assert_eq!(reroll_notes.len(), 1);
+    }
+
+    #[test]
+    fn test_marvel_multiverse_edge_trouble_cancellation() {
+        let result = parse_and_roll("mm 3e 3t").unwrap();
+        let roll = &result[0];
+
+        // When they cancel out, no edge/trouble notes should exist
+        let has_edge_trouble_notes = roll
+            .notes
+            .iter()
+            .any(|note| note.contains("edge") || note.contains("trouble"));
+        assert!(!has_edge_trouble_notes);
+    }
+
+    #[test]
+    fn test_marvel_multiverse_alias_expansion() {
+        let expanded = aliases::expand_alias("mm 2e 3t").unwrap();
+        assert_eq!(expanded, "3d6 mmt1"); // Net 1 trouble
+
+        let expanded = aliases::expand_alias("mm 3e 2t").unwrap();
+        assert_eq!(expanded, "3d6 mme1"); // Net 1 edge
+    }
+
+    #[test]
+    fn test_marvel_multiverse_with_modifiers() {
+        let result = parse_and_roll("mm + 5").unwrap();
+        let roll = &result[0];
+
+        assert!(roll.total >= 8 && roll.total <= 23); // 3d6 + 5
+    }
+
+    #[test]
+    fn test_marvel_multiverse_fantastic_detection() {
+        // Test that the Fantastic mechanic can be triggered (just verify test runs without errors)
+        for _ in 0..10 {
+            let result = parse_and_roll("mm").unwrap();
+            assert!(result[0].total >= 3 && result[0].total <= 18);
+            // If Fantastic occurs, verify the note format is correct
+            if result[0]
+                .notes
+                .iter()
+                .any(|note| note.contains("Fantastic"))
+            {
+                assert!(
+                    result[0]
+                        .notes
+                        .iter()
+                        .any(|note| note.contains("Marvel symbol"))
+                );
+                break;
+            }
+        }
+    }
+
     // ============================================================================
     // SPECIAL SYSTEMS
     // ============================================================================

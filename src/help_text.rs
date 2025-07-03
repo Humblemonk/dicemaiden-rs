@@ -131,6 +131,11 @@ pub fn generate_system_help() -> String {
 • `/roll wng dn2 4d6` - Difficulty 2 test (shows PASS/FAIL)
 • `/roll wng 4d6 !soak` - Damage/soak roll (no wrath die)
 
+**Marvel Multiverse:**
+• `/roll mm` - Basic 3d6 roll (Marvel die in middle)
+• `/roll mm 2e` - 3d6 with 2 edges
+• `/roll mm 3t` - 3d6 with 3 troubles
+
 **Other Systems:**
 • `/roll dh 4d10` - Dark Heresy (righteous fury on 10s)
 • `/roll ed15` - Earthdawn step 15 (steps 1-50 available)

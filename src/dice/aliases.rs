@@ -83,6 +83,10 @@ static DND_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(attack|skill|save)(\s*[+-]\s*\d+)?$").expect("Failed to compile DND_REGEX")
 });
 
+static MM_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^mm(?:\s+(\d*)([et])(?:\s+(\d*)([et]))?)?$").expect("Failed to compile MM_REGEX")
+});
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -251,7 +255,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             "8" => format!("{count}d10 t8 ie8{modifier_part}"), // 8-again
             "9" => format!("{count}d10 t8 ie9{modifier_part}"), // 9-again
             "r" => format!("{count}d10 t8 ie10 r7{modifier_part}"), // rote quality
-            _ => format!("{count}d10 t8 ie10{modifier_part}"),   // standard
+            _ => format!("{count}d10 t8 ie10{modifier_part}"),  // standard
         });
     }
 
@@ -412,6 +416,10 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             // This requires a different approach than simple addition
             return Some(format!("2d1 sw{sides}"));
         }
+    }
+
+    if let Some(result) = expand_marvel_multiverse_alias(input) {
+        return Some(result);
     }
 
     None
@@ -593,4 +601,91 @@ fn get_earthdawn_4e_step(step: u32) -> String {
     }
 
     "1d6".to_string() // fallback
+}
+
+fn expand_marvel_multiverse_alias(input: &str) -> Option<String> {
+    if input == "mm" {
+        return Some("3d6 mm".to_string());
+    }
+
+    // IMPORTANT: Use the existing MM_REGEX first - it's stricter than our custom parsing
+    if let Some(captures) = MM_REGEX.captures(input) {
+        let mut edges = 0i32;
+        let mut troubles = 0i32;
+
+        // Parse first modifier
+        if let Some(first_num) = captures.get(1) {
+            let num = if first_num.as_str().is_empty() {
+                1
+            } else {
+                first_num.as_str().parse().unwrap_or(1)
+            };
+            if let Some(first_type) = captures.get(2) {
+                match first_type.as_str() {
+                    "e" => edges += num,
+                    "t" => troubles += num,
+                    _ => {}
+                }
+            }
+        }
+
+        // Parse second modifier
+        if let Some(second_num) = captures.get(3) {
+            let num = if second_num.as_str().is_empty() {
+                1
+            } else {
+                second_num.as_str().parse().unwrap_or(1)
+            };
+            if let Some(second_type) = captures.get(4) {
+                match second_type.as_str() {
+                    "e" => edges += num,
+                    "t" => troubles += num,
+                    _ => {}
+                }
+            }
+        }
+
+        let net_edges = if edges > troubles {
+            edges - troubles
+        } else {
+            0
+        };
+        let net_troubles = if troubles > edges {
+            troubles - edges
+        } else {
+            0
+        };
+
+        // Create format that's easier for parser to handle
+        if net_edges > 0 {
+            return Some(format!("3d6 mme{net_edges}"));
+        } else if net_troubles > 0 {
+            return Some(format!("3d6 mmt{net_troubles}"));
+        } else {
+            return Some("3d6 mm".to_string());
+        }
+    }
+
+    // ONLY handle mathematical modifiers if we have a clear pattern
+    // This is more conservative - only handle obvious mathematical expressions
+    if input.starts_with("mm ") {
+        // Look for patterns like "mm 5e - 3" or "mm + 5"
+        // Split on mathematical operators but be very conservative
+        if let Some(op_pos) = input
+            .find(" + ")
+            .or_else(|| input.find(" - "))
+            .or_else(|| input.find(" * "))
+            .or_else(|| input.find(" / "))
+        {
+            let mm_part = &input[..op_pos];
+            let math_part = &input[op_pos..];
+
+            // Try to expand the MM part using the strict regex
+            if let Some(expanded_mm) = expand_marvel_multiverse_alias(mm_part) {
+                return Some(format!("{expanded_mm}{math_part}"));
+            }
+        }
+    }
+
+    None
 }
