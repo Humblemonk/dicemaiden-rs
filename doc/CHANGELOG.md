@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.0] - 2025-07-03
+
+## Added
+
+- Added support for Marvel Multiverse game system
+
 ## [1.2.2] - 2025-07-02
 
 ## Added

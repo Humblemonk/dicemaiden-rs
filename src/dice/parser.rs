@@ -1,5 +1,5 @@
 use super::{DiceRoll, HeroSystemType, Modifier};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
@@ -1488,6 +1488,20 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::Add(num));
     }
 
+    // Marvel Multiverse handling
+    if part == "mm" {
+        return Ok(Modifier::MarvelMultiverse(0, 0));
+    }
+
+    if let Some(stripped) = part.strip_prefix("mme") {
+        let edges = stripped.parse().unwrap_or(0);
+        return Ok(Modifier::MarvelMultiverse(edges, 0));
+    }
+
+    if let Some(stripped) = part.strip_prefix("mmt") {
+        let troubles = stripped.parse().unwrap_or(0);
+        return Ok(Modifier::MarvelMultiverse(0, troubles));
+    }
     Err(anyhow!("Unknown modifier: {}", part))
 }
 

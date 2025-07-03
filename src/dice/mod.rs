@@ -55,6 +55,7 @@ pub enum Modifier {
     SavageWorlds(u32),
     D6System(u32, String),
     Shadowrun(u32),
+    MarvelMultiverse(i32, i32), // (edges, troubles) - already calculated net values
 }
 
 #[derive(Debug, Clone)]
@@ -124,18 +125,23 @@ impl RollResult {
                     "subtract" => output.push_str(" - "),
                     "multiply" => output.push_str(" * "),
                     "divide" => output.push_str(" / "),
+                    "result" => output.push_str(" → "),
                     _ => output.push(' '),
                 }
             }
-            output.push_str(&format!(
-                "`[{}]`",
-                group
-                    .rolls
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
+            let formatted_rolls: Vec<String> = group
+                .rolls
+                .iter()
+                .map(|&roll| {
+                    if roll == -1 {
+                        "**M**".to_string() // Marvel logo in bold
+                    } else {
+                        roll.to_string()
+                    }
+                })
+                .collect();
+
+            output.push_str(&format!("`[{}]`", formatted_rolls.join(", ")));
         }
         output
     }

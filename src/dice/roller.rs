@@ -1,5 +1,5 @@
 use super::{DiceGroup, DiceRoll, HeroSystemType, Modifier, RollResult};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use rand::Rng;
 
 pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
@@ -44,6 +44,15 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
 
     if has_d6_system {
         return handle_d6_system_roll(dice, &mut rng);
+    }
+
+    let has_marvel_multiverse = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::MarvelMultiverse(_, _)));
+
+    if has_marvel_multiverse {
+        return handle_marvel_multiverse_roll(dice, &mut rng);
     }
 
     // Check if this is a Savage Worlds roll - handle it specially
@@ -656,6 +665,10 @@ fn apply_special_system_modifiers(
             }
             Modifier::D6System(_, _) => {
                 // D6 System is handled in the main roll_dice function
+            }
+            Modifier::MarvelMultiverse(_, _) => {
+                *result = handle_marvel_multiverse_roll(dice.clone(), rng)?;
+                return Ok(());
             }
             _ => {} // Skip modifiers already handled above
         }
@@ -1581,4 +1594,234 @@ fn apply_shadowrun_critical_glitch_check(result: &mut RollResult, dice_count: u3
     }
 
     Ok(())
+}
+
+fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
+    let mut result = RollResult {
+        individual_rolls: Vec::new(),
+        kept_rolls: Vec::new(),
+        dropped_rolls: Vec::new(),
+        total: 0,
+        successes: None,
+        failures: None,
+        botches: None,
+        comment: dice.comment.clone(),
+        label: dice.label.clone(),
+        notes: Vec::new(),
+        dice_groups: Vec::new(),
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
+        godbound_damage: None,
+        fudge_symbols: None,
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
+        suppress_comment: false,
+    };
+
+    // Find the Marvel Multiverse modifier
+    let (edges, troubles) = dice
+        .modifiers
+        .iter()
+        .find_map(|m| {
+            if let Modifier::MarvelMultiverse(e, t) = m {
+                Some((*e, *t))
+            } else {
+                None
+            }
+        })
+        .unwrap_or((0, 0));
+
+    // Roll initial 3d6 (treating middle die as Marvel die)
+    let regular_die_1 = rng.random_range(1..=6);
+    let mut marvel_die = rng.random_range(1..=6);
+    let regular_die_2 = rng.random_range(1..=6);
+
+    // Track if Marvel die is showing Marvel logo (1)
+    let is_marvel_fantastic = marvel_die == 1;
+
+    // Create initial dice group showing initial roll with Marvel symbol
+    let initial_rolls = vec![regular_die_1, marvel_die, regular_die_2];
+    let initial_display_rolls: Vec<i32> = initial_rolls
+        .iter()
+        .enumerate()
+        .map(|(i, &roll)| {
+            if i == 1 && roll == 1 {
+                -1 // Show Marvel symbol in initial roll
+            } else {
+                roll
+            }
+        })
+        .collect();
+
+    let base_group = DiceGroup {
+        _description: "3d6 Marvel Multiverse".to_string(),
+        rolls: initial_display_rolls,
+        modifier_type: "base".to_string(),
+    };
+    result.dice_groups.push(base_group);
+
+    // Store individual rolls for processing
+    result.individual_rolls = initial_rolls.clone();
+
+    // Handle Fantastic result (Marvel die showing 1)
+    if is_marvel_fantastic {
+        marvel_die = 6; // Marvel die becomes 6 when Fantastic
+        result
+            .notes
+            .push("Fantastic! Marvel die rolled Marvel symbol, counts as 6".to_string());
+    }
+
+    // Process edges and troubles with consolidated notes
+    let mut final_rolls = [regular_die_1, marvel_die, regular_die_2];
+
+    // Add edge/trouble count notes that tests expect - but only if there are edges/troubles
+    if edges > 0 {
+        result.notes.push(format!(
+            "{} edge{}",
+            edges,
+            if edges == 1 { "" } else { "s" }
+        ));
+    }
+    if troubles > 0 {
+        result.notes.push(format!(
+            "{} trouble{}",
+            troubles,
+            if troubles == 1 { "" } else { "s" }
+        ));
+    }
+
+    // Process edges with consolidated reporting
+    if edges > 0 {
+        let mut edge_details = Vec::new();
+
+        for _ in 0..edges {
+            // Find lowest die value and its index
+            let (min_value, min_index) = final_rolls
+                .iter()
+                .enumerate()
+                .min_by_key(|&(_, value)| value)
+                .map(|(index, &value)| (value, index))
+                .unwrap();
+
+            // Reroll the lowest die
+            let new_roll = rng.random_range(1..=6);
+
+            // Keep the higher of the two
+            if new_roll > min_value {
+                final_rolls[min_index] = new_roll;
+                edge_details.push(format!("{min_value} → {new_roll}"));
+            } else {
+                edge_details.push(format!("{min_value} → {new_roll} (kept {min_value})"));
+            }
+        }
+
+        // Consolidate all edge rerolls into a single note
+        if edges == 1 {
+            result
+                .notes
+                .push(format!("Edge 1: Rerolled {}", edge_details[0]));
+        } else {
+            result.notes.push(format!(
+                "Edge rerolls: {}",
+                edge_details
+                    .iter()
+                    .enumerate()
+                    .map(|(i, detail)| format!("#{}: {}", i + 1, detail))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+    }
+
+    // Process troubles with consolidated reporting
+    if troubles > 0 {
+        let mut trouble_details = Vec::new();
+
+        for _ in 0..troubles {
+            // Find highest die value and its index
+            let (max_value, max_index) = final_rolls
+                .iter()
+                .enumerate()
+                .max_by_key(|&(_, value)| value)
+                .map(|(index, &value)| (value, index))
+                .unwrap();
+
+            // Reroll the highest die
+            let new_roll = rng.random_range(1..=6);
+
+            // Keep the lower of the two
+            if new_roll < max_value {
+                final_rolls[max_index] = new_roll;
+                trouble_details.push(format!("{max_value} → {new_roll}"));
+            } else {
+                trouble_details.push(format!("{max_value} → {new_roll} (kept {max_value})"));
+            }
+        }
+
+        // Consolidate all trouble rerolls into a single note
+        if troubles == 1 {
+            result
+                .notes
+                .push(format!("Trouble 1: Rerolled {}", trouble_details[0]));
+        } else {
+            result.notes.push(format!(
+                "Trouble rerolls: {}",
+                trouble_details
+                    .iter()
+                    .enumerate()
+                    .map(|(i, detail)| format!("#{}: {}", i + 1, detail))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+    }
+
+    // Create result dice group with proper Marvel symbol display
+    let final_display_rolls: Vec<i32> = final_rolls
+        .iter()
+        .enumerate()
+        .map(|(i, &roll)| {
+            if i == 1 && is_marvel_fantastic {
+                -1 // Use -1 to represent Marvel symbol for display
+            } else {
+                roll
+            }
+        })
+        .collect();
+
+    let result_group = DiceGroup {
+        _description: "3d6 Marvel Multiverse result".to_string(),
+        rolls: final_display_rolls,
+        modifier_type: "result".to_string(),
+    };
+    result.dice_groups.push(result_group);
+
+    // Calculate total
+    result.total = final_rolls.iter().sum::<i32>();
+
+    // Apply mathematical modifiers - INCLUDING DIVISION BY ZERO CHECK
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::Add(value) => result.total += value,
+            Modifier::Subtract(value) => result.total -= value,
+            Modifier::Multiply(value) => result.total *= value,
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                result.total /= value;
+            }
+            Modifier::MarvelMultiverse(_, _) => {
+                // Already handled above
+            }
+            _ => {
+                // Handle other modifier types as needed
+            }
+        }
+    }
+
+    Ok(result)
 }

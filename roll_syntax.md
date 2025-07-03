@@ -74,6 +74,16 @@
 - `wng 4d6 !soak` → 4d6 soak roll (uses total, not successes)
 - `wng dn4 6d6 !exempt` → 6d6 exempt test without wrath die
 
+### Marvel Multiverse RPG
+- `mm` → 3d6 Marvel Multiverse basic roll
+- `mm e` → 3d6 with 1 edge (reroll lowest die, keep higher)
+- `mm 2e` → 3d6 with 2 edges
+- `mm t` → 3d6 with 1 trouble (reroll highest die, keep lower)
+- `mm 3t` → 3d6 with 3 troubles
+- `mm 2e 3t` → 3d6 with 2 edges and 3 troubles (net 1 trouble)
+- Fantastic: Marvel die (middle) showing 1 becomes 6
+- Edges and troubles cancel each other out
+
 ### Dark Heresy 2nd Edition
 - `dh 4d10` → 4d10 ie10 (righteous fury on natural 10s)
 
@@ -128,6 +138,14 @@
 /roll wng dn3 5d6          # Difficulty 3 test
 /roll wng 4d6 !soak        # Soak test (total damage, not successes)
 /roll wng dn2 6d6 !exempt  # Exempt test without wrath die
+```
+
+### Marvel Multiverse Examples
+```text
+/roll mm                   # Basic 3d6 Marvel Multiverse roll
+/roll mm e                 # 3d6 with 1 edge (reroll lowest)
+/roll mm t                 # 3d6 with 1 trouble (reroll highest)
+/roll mm 2e 3t             # 2 edges + 3 troubles = net 1 trouble
 ```
 
 ### Complex Examples
