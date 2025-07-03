@@ -1419,9 +1419,28 @@ mod tests {
     }
 
     #[test]
-    fn test_cod_alias() {
-        let expanded = aliases::expand_alias("4cod").unwrap();
-        assert_eq!(expanded, "4d10 t8 ie10");
+    fn test_cod_aliases() {
+        // Fix 8-again: should explode on 8+, target stays 8
+        let result = parse_and_roll("4cod8").unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].successes.is_some());
+
+        // Fix 9-again: should explode on 9+, target stays 8
+        let result = parse_and_roll("4cod9").unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].successes.is_some());
+
+        // Fix rote quality: should reroll failures ≤7
+        let result = parse_and_roll("4codr").unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].successes.is_some());
+        // Should have reroll notes
+        assert!(result[0].notes.iter().any(|note| note.contains("rerolled")));
+
+        // Standard CoD should remain: 4d10 t8 ie10
+        let result = parse_and_roll("4cod").unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].successes.is_some());
     }
 
     #[test]
@@ -1450,9 +1469,59 @@ mod tests {
     }
 
     #[test]
-    fn test_wod_alias() {
-        let expanded = aliases::expand_alias("4wod8").unwrap();
-        assert_eq!(expanded, "4d10 f1 ie10 t8");
+    fn test_wod_aliases() {
+        // Fix WoD: should NOT have exploding dice
+        let result = parse_and_roll("4wod8").unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].successes.is_some());
+        assert!(result[0].failures.is_some());
+
+        // Verify no explosion notes appear in results
+        assert!(!result[0].notes.iter().any(|note| note.contains("exploded")));
+
+        let result = parse_and_roll("5wod6").unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].successes.is_some());
+        assert!(result[0].failures.is_some());
+
+        // Verify no explosion notes appear in results
+        assert!(!result[0].notes.iter().any(|note| note.contains("exploded")));
+    }
+
+    #[test]
+    fn test_cod_mechanics_correct() {
+        // Test that CoD always uses target 8, regardless of again-rule
+        let cod8_result = parse_and_roll("5cod8").unwrap();
+        let cod9_result = parse_and_roll("5cod9").unwrap();
+        let cod_result = parse_and_roll("5cod").unwrap();
+
+        // All should have successes (target number 8)
+        assert!(cod8_result[0].successes.is_some());
+        assert!(cod9_result[0].successes.is_some());
+        assert!(cod_result[0].successes.is_some());
+
+        // Verify these are success-counting rolls (not simple totals)
+        assert!(cod8_result[0].successes.is_some());
+        assert!(cod9_result[0].successes.is_some());
+        assert!(cod_result[0].successes.is_some());
+    }
+
+    #[test]
+    fn test_wod_no_exploding() {
+        // Test that WoD does not explode dice by default
+        let wod_result = parse_and_roll("5wod6").unwrap();
+
+        // Should have failures (f1) and successes (t6)
+        assert!(wod_result[0].failures.is_some());
+        assert!(wod_result[0].successes.is_some());
+
+        // Should not have any explosion-related notes
+        assert!(
+            !wod_result[0]
+                .notes
+                .iter()
+                .any(|note| note.contains("exploded") || note.contains("explode"))
+        );
     }
 
     #[test]
@@ -3016,6 +3085,22 @@ mod tests {
         // Test semicolon handling in various contexts
         assert_invalid("1d6!test;more"); // Semicolon breaks comment
         assert_valid("1d6!test"); // But comment without semicolon works
+    }
+
+    #[test]
+    fn test_alias_expansions() {
+        // Use the correct import path for the crate structure
+        use dicemaiden_rs::dice::aliases::expand_alias;
+
+        // Chronicles of Darkness - corrected expansions
+        assert_eq!(expand_alias("4cod"), Some("4d10 t8 ie10".to_string()));
+        assert_eq!(expand_alias("4cod8"), Some("4d10 t8 ie8".to_string()));
+        assert_eq!(expand_alias("4cod9"), Some("4d10 t8 ie9".to_string()));
+        assert_eq!(expand_alias("4codr"), Some("4d10 t8 ie10 r7".to_string()));
+
+        // World of Darkness - remove exploding dice
+        assert_eq!(expand_alias("4wod8"), Some("4d10 f1 t8".to_string()));
+        assert_eq!(expand_alias("5wod6"), Some("5d10 f1 t6".to_string()));
     }
 
     #[test]

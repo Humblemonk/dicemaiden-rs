@@ -52,12 +52,11 @@ pub fn generate_alias_help() -> String {
 **Savage Worlds:**
 • `sw8` → 1d8 ie8 + 1d6 ie6 k1 (d8 trait + d6 wild, keep highest)
 • `sw10` → 1d10 ie10 + 1d6 ie6 k1 (d10 trait + d6 wild, keep highest)
-• Snake Eyes: Critical failure when both dice roll natural 1
 
 **World/Chronicles of Darkness:**
-• `4cod` → 4d10 t8 ie10 (Chronicles of Darkness)
-• `4cod8` → 4d10 t7 ie10 (8-again)
-• `4wod8` → 4d10 f1 ie10 t8 (World of Darkness difficulty 8)
+• `4cod` → 4d10 t8 ie10 (Chronicles of Darkness standard)
+• `4codr` → 4d10 t8 ie10 r7 (rote quality: reroll failures)
+• `4wod8` → 4d10 f1 t8 (World of Darkness difficulty 8)
 
 **D&D/Pathfinder:**
 • `dndstats` → 6 4d6 k3 (ability score generation)
@@ -72,7 +71,6 @@ pub fn generate_alias_help() -> String {
 **Hero System 5th Edition:**
 • `2hsn` → 2d6 hsn (normal damage)
 • `3hsk` → 3d6 hsk (killing damage)
-• `2.5hsk` → 2d6 + 1d3 hsk (2½ dice killing damage)
 • `2hsk1` → 2d6 + 1d3 hsk (alternative fractional notation)
 • `3hsh` → 3d6 hsh (to-hit roll)
 • `hsn`, `hsk`, `hsh` → 1d6 hsn, 1d6 hsk, 3d6 hsh (single die versions)
@@ -96,10 +94,7 @@ pub fn generate_alias_help() -> String {
 • `6yz` → 6d6 t6 (Year Zero)
 • `age` → 2d6 + 1d6 (AGE system)
 • `dd34` → 1d3*10 + 1d4 (double-digit d66 style)
-
-**Special Systems:**
 • `ed15` → Earthdawn step 15
-• `2hsn` → Hero System normal damage
 
 Use `/roll help system` for specific examples!"#
         .to_string()

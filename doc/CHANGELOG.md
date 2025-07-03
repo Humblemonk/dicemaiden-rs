@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.2] - 2025-07-02
+
+## Added
+
+- Resolved an issue related to WoD/CoD roll syntax
+
 ## [1.2.1] - 2025-06-29
 
 ## Added
