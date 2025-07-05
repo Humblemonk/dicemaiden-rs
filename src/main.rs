@@ -116,10 +116,7 @@ impl EventHandler for Handler {
             let response = match command.data.name.as_str() {
                 "roll" => commands::roll::run(&ctx, &command).await,
                 "r" => commands::roll::run(&ctx, &command).await,
-                "help" => match commands::help::run(&ctx, &command).await {
-                    Ok(content) => Ok(commands::CommandResponse::public(content)),
-                    Err(e) => Err(e),
-                },
+                "help" => commands::help::run(&ctx, &command).await,
                 "purge" => match commands::purge::run(&ctx, &command).await {
                     Ok(content) => Ok(commands::CommandResponse::public(content)),
                     Err(e) => Err(e),

@@ -1246,6 +1246,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         "fudge" | "df" => return Ok(Modifier::Fudge),
         "gb" => return Ok(Modifier::Godbound(false)),
         "gbs" => return Ok(Modifier::Godbound(true)),
+        "cpr" => return Ok(Modifier::CyberpunkRed),
         _ => {}
     }
 

@@ -54,6 +54,13 @@
 - `4codr` → 4d10 t8 ie10 r7 (rote quality)
 - `4wod8` → 4d10 f1 t8 (World of Darkness, difficulty 8)
 
+### Cyberpunk Red
+- `cpr` → 1d10 cpr (critical success on 10, critical failure on 1)
+- `cpr + 5` → 1d10 cpr + 5 (with modifier)
+- Critical Success (10): Roll another d10 and add to total
+- Critical Failure (1): Roll another d10 and subtract from total
+- Each explosion happens only once per roll
+
 ### Hero System 5th Edition
 - `2hsn` → 2d6 hsn (normal damage)
 - `3hsk` → 3d6 hsk (killing damage with STUN multiplier)

@@ -670,6 +670,10 @@ fn apply_special_system_modifiers(
                 *result = handle_marvel_multiverse_roll(dice.clone(), rng)?;
                 return Ok(());
             }
+            Modifier::CyberpunkRed => {
+                apply_cyberpunk_red_mechanics(result, rng)?;
+                has_special_system = true;
+            }
             _ => {} // Skip modifiers already handled above
         }
     }
@@ -1824,4 +1828,80 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
     }
 
     Ok(result)
+}
+
+fn apply_cyberpunk_red_mechanics(result: &mut RollResult, rng: &mut impl Rng) -> Result<()> {
+    // CPR only works with exactly 1d10
+    if result.individual_rolls.len() != 1 {
+        return Err(anyhow!("Cyberpunk Red mechanics only work with 1d10"));
+    }
+
+    let original_roll = result.individual_rolls[0];
+    let mut total_result = original_roll;
+    let mut additional_rolls = Vec::new();
+    let mut explosion_notes = Vec::new();
+
+    match original_roll {
+        10 => {
+            // Critical Success: Roll another d10 and add it
+            let additional_roll = rng.random_range(1..=10);
+            additional_rolls.push(additional_roll);
+            total_result += additional_roll;
+            explosion_notes.push(format!(
+                "💥 **CRITICAL SUCCESS!** Rolled 10, added {additional_roll}"
+            ));
+        }
+        1 => {
+            // Critical Failure: Roll another d10 and subtract it
+            let additional_roll = rng.random_range(1..=10);
+            additional_rolls.push(-additional_roll); // Store as negative for display
+            total_result -= additional_roll;
+            explosion_notes.push(format!(
+                "💀 **CRITICAL FAILURE!** Rolled 1, subtracted {additional_roll}"
+            ));
+        }
+        _ => {
+            // Normal roll, no explosion
+        }
+    }
+
+    // Update the result
+    if !additional_rolls.is_empty() {
+        // Create dice groups to show the explosion
+        let base_group = DiceGroup {
+            _description: "1d10".to_string(),
+            rolls: vec![original_roll],
+            modifier_type: "base".to_string(),
+        };
+
+        let explosion_group = DiceGroup {
+            _description: if original_roll == 10 {
+                "Critical Success"
+            } else {
+                "Critical Failure"
+            }
+            .to_string(),
+            rolls: additional_rolls.clone(),
+            modifier_type: if original_roll == 10 {
+                "add"
+            } else {
+                "subtract"
+            }
+            .to_string(),
+        };
+
+        result.dice_groups = vec![base_group, explosion_group];
+
+        // Add the actual additional roll to individual_rolls for display
+        result.individual_rolls.push(additional_rolls[0].abs());
+    }
+
+    // Update totals and kept rolls
+    result.total = total_result;
+    result.kept_rolls = vec![total_result];
+
+    // Add explosion notes only (no system note)
+    result.notes.extend(explosion_notes);
+
+    Ok(())
 }

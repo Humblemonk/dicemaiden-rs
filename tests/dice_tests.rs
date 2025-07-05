@@ -1102,6 +1102,287 @@ mod tests {
     // ============================================================================
 
     #[test]
+    fn test_cyberpunk_red_basic() {
+        // Test basic CPR alias
+        assert_valid("cpr");
+        assert_valid("cpr + 5");
+        assert_valid("cpr - 3");
+        assert_valid("cpr * 2");
+        assert_valid("cpr / 2");
+    }
+
+    #[test]
+    fn test_cyberpunk_red_alias_expansion() {
+        // Test CPR alias expansion
+        let expanded = aliases::expand_alias("cpr").unwrap();
+        assert_eq!(expanded, "1d10 cpr");
+
+        let expanded = aliases::expand_alias("cpr + 5").unwrap();
+        assert_eq!(expanded, "1d10 cpr + 5");
+
+        let expanded = aliases::expand_alias("cpr - 3").unwrap();
+        assert_eq!(expanded, "1d10 cpr - 3");
+    }
+
+    #[test]
+    fn test_cyberpunk_red_modifier_parsing() {
+        // Test that CPR modifier parses correctly
+        let result = parser::parse_dice_string("1d10 cpr").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].count, 1);
+        assert_eq!(result[0].sides, 10);
+        assert_eq!(result[0].modifiers.len(), 1);
+
+        // Verify we have a CyberpunkRed modifier
+        match &result[0].modifiers[0] {
+            Modifier::CyberpunkRed => {}
+            _ => panic!("Expected CyberpunkRed modifier"),
+        }
+    }
+
+    #[test]
+    fn test_cyberpunk_red_with_modifiers() {
+        // Test CPR with mathematical modifiers
+        assert_valid("cpr + 10");
+        assert_valid("cpr - 4");
+        assert_valid("cpr * 3");
+
+        let result = parse_and_roll("cpr + 5").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // Total should include the +5 modifier
+        // Range: Critical failure (1-10) - 9 + 5 = -4 to Critical success (10+10) + 5 = 25
+        assert!(
+            result[0].total >= -4 && result[0].total <= 25,
+            "Total should be in valid CPR range with +5 modifier, got {}",
+            result[0].total
+        );
+    }
+
+    #[test]
+    fn test_cyberpunk_red_roll_sets() {
+        // Test CPR with roll sets
+        assert_valid("3 cpr");
+        let result = parse_and_roll("3 cpr").unwrap();
+        assert_eq!(result.len(), 3);
+
+        for (i, roll) in result.iter().enumerate() {
+            assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
+            // Each roll should be within CPR range (-9 to 20)
+            assert!(
+                roll.total >= -9 && roll.total <= 20,
+                "Roll {} total {} should be in CPR range",
+                i + 1,
+                roll.total
+            );
+        }
+    }
+
+    #[test]
+    fn test_cyberpunk_red_vs_other_systems() {
+        // Make sure CPR doesn't interfere with other systems
+        assert_valid("4cod"); // Chronicles of Darkness still works
+        assert_valid("sw8"); // Savage Worlds still works
+        assert_valid("sr6"); // Shadowrun still works
+
+        // Test that CPR and other systems produce different results
+        let cpr_result = parse_and_roll("cpr").unwrap();
+        let cod_result = parse_and_roll("4cod").unwrap();
+
+        // CPR should not have successes (it's a total-based system)
+        assert!(
+            cpr_result[0].successes.is_none(),
+            "CPR should not have success counting"
+        );
+
+        // CoD should have successes (it's a success-based system)
+        assert!(
+            cod_result[0].successes.is_some(),
+            "CoD should have success counting"
+        );
+    }
+
+    #[test]
+    fn test_cyberpunk_red_edge_cases() {
+        // Test edge cases and error conditions
+
+        // Test with flags
+        assert_valid("p cpr"); // Private roll
+        assert_valid("s cpr"); // Simple output
+
+        // Test with comments and labels
+        assert_valid("cpr ! interface check");
+        assert_valid("(Interface) cpr");
+        assert_valid("(Hacking) cpr + 3 ! with deck bonus");
+
+        // Test in semicolon combinations
+        assert_valid("cpr ; 2d6 ; attack + 5");
+    }
+
+    #[test]
+    fn test_cyberpunk_red_critical_success_behavior() {
+        // Test critical success mechanics with fixed dice (using 1d1 for predictable testing)
+        // We can't directly test the random nature, but we can test the structure
+
+        for _ in 0..20 {
+            let result = parse_and_roll("cpr").unwrap();
+            assert_eq!(result.len(), 1);
+            let roll_result = &result[0];
+
+            // Check if this was a critical success
+            if roll_result
+                .notes
+                .iter()
+                .any(|note| note.contains("CRITICAL SUCCESS"))
+            {
+                // Should have 2 dice groups for critical success
+                assert_eq!(roll_result.dice_groups.len(), 2);
+                assert_eq!(roll_result.dice_groups[0].modifier_type, "base");
+                assert_eq!(roll_result.dice_groups[1].modifier_type, "add");
+
+                // Total should be between 11-20 (10 + 1-10)
+                assert!(
+                    roll_result.total >= 11 && roll_result.total <= 20,
+                    "Critical success should be 11-20, got {}",
+                    roll_result.total
+                );
+                break; // Found one, test passes
+            }
+        }
+    }
+
+    #[test]
+    fn test_cyberpunk_red_critical_failure_behavior() {
+        // Test critical failure mechanics
+
+        for _ in 0..20 {
+            let result = parse_and_roll("cpr").unwrap();
+            assert_eq!(result.len(), 1);
+            let roll_result = &result[0];
+
+            // Check if this was a critical failure
+            if roll_result
+                .notes
+                .iter()
+                .any(|note| note.contains("CRITICAL FAILURE"))
+            {
+                // Should have 2 dice groups for critical failure
+                assert_eq!(roll_result.dice_groups.len(), 2);
+                assert_eq!(roll_result.dice_groups[0].modifier_type, "base");
+                assert_eq!(roll_result.dice_groups[1].modifier_type, "subtract");
+
+                // Total should be between -9 to 0 (1 - 1-10)
+                assert!(
+                    roll_result.total >= -9 && roll_result.total <= 0,
+                    "Critical failure should be -9 to 0, got {}",
+                    roll_result.total
+                );
+                break; // Found one, test passes
+            }
+        }
+    }
+
+    #[test]
+    fn test_cyberpunk_red_normal_roll_behavior() {
+        // Test normal roll mechanics (no explosion)
+
+        for _ in 0..20 {
+            let result = parse_and_roll("cpr").unwrap();
+            assert_eq!(result.len(), 1);
+            let roll_result = &result[0];
+
+            // Check if this was a normal roll (no critical notes)
+            if !roll_result
+                .notes
+                .iter()
+                .any(|note| note.contains("CRITICAL"))
+            {
+                // Should have 0 or 1 dice groups for normal roll
+                assert!(roll_result.dice_groups.len() <= 1);
+
+                // Total should be between 2-9 (no explosion)
+                assert!(
+                    roll_result.total >= 2 && roll_result.total <= 9,
+                    "Normal roll should be 2-9, got {}",
+                    roll_result.total
+                );
+
+                // Should have no explosion notes
+                assert!(
+                    !roll_result
+                        .notes
+                        .iter()
+                        .any(|note| note.contains("exploded")),
+                    "Normal roll should not have explosion notes"
+                );
+                break; // Found one, test passes
+            }
+        }
+    }
+
+    #[test]
+    fn test_cyberpunk_red_no_system_note() {
+        // Test that CPR doesn't add the verbose system note
+        let result = parse_and_roll("cpr").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // Should NOT have the system explanation note
+        assert!(
+            !result[0]
+                .notes
+                .iter()
+                .any(|note| note.contains("10s explode up, 1s explode down")),
+            "CPR should not have verbose system note"
+        );
+
+        // Should NOT have the robot emoji system note
+        assert!(
+            !result[0].notes.iter().any(|note| note.contains("🤖")),
+            "CPR should not have robot emoji system note"
+        );
+    }
+
+    #[test]
+    fn test_cyberpunk_red_with_complex_modifiers() {
+        // Test CPR with more complex scenarios
+
+        // Test with multiplication
+        let result = parse_and_roll("cpr * 2").unwrap();
+        assert_eq!(result.len(), 1);
+        // Range should be doubled: (-9 * 2) to (20 * 2) = -18 to 40
+        assert!(
+            result[0].total >= -18 && result[0].total <= 40,
+            "CPR * 2 should be in range -18 to 40, got {}",
+            result[0].total
+        );
+
+        // Test with division
+        let result = parse_and_roll("cpr / 2").unwrap();
+        assert_eq!(result.len(), 1);
+        // Range should be halved: (-9 / 2) to (20 / 2) = -4 to 10 (integer division)
+        assert!(
+            result[0].total >= -4 && result[0].total <= 10,
+            "CPR / 2 should be in range -4 to 10, got {}",
+            result[0].total
+        );
+    }
+
+    #[test]
+    fn test_cyberpunk_red_error_conditions() {
+        // Test that CPR only works with 1d10
+        // This should be tested if we implement validation, but currently
+        // the alias ensures it's always 1d10, so this test documents expected behavior
+
+        // These should all work because they go through the alias system
+        assert_valid("cpr");
+        assert_valid("cpr + 5");
+
+        // Direct usage with wrong dice should theoretically error, but alias prevents this
+        // If someone manually creates "2d10 cpr", it should error in the roller
+        // This is documented behavior rather than tested behavior since normal usage prevents it
+    }
+
+    #[test]
     fn test_advantage_disadvantage_regex_pattern_specificity() {
         // Test that the regex correctly handles all mathematical operators
         // These should be parsed as single advantage/disadvantage expressions with modifiers
