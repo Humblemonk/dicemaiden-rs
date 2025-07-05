@@ -674,16 +674,24 @@ fn apply_special_system_modifiers(
                 apply_cyberpunk_red_mechanics(result, rng)?;
                 has_special_system = true;
             }
+            Modifier::Witcher => {
+                apply_witcher_mechanics(result, rng)?;
+                has_special_system = true;
+            }
             _ => {} // Skip modifiers already handled above
         }
     }
 
-    // For CPR (total-based special system), apply mathematical modifiers to total
+    // For CPR and Witcher (total-based special systems), apply mathematical modifiers to total
     let has_cpr = dice
         .modifiers
         .iter()
         .any(|m| matches!(m, Modifier::CyberpunkRed));
-    if has_cpr && has_math_modifiers {
+    let has_witcher = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::Witcher));
+    if (has_cpr || has_witcher) && has_math_modifiers {
         apply_mathematical_modifiers_to_cpr_total(result, dice)?;
     }
 
@@ -1946,6 +1954,125 @@ fn apply_mathematical_modifiers_to_cpr_total(
     if modifier_total != 0 {
         result.total += modifier_total;
     }
+
+    Ok(())
+}
+
+fn apply_witcher_mechanics(result: &mut RollResult, rng: &mut impl Rng) -> Result<()> {
+    // Witcher only works with exactly 1d10
+    if result.individual_rolls.len() != 1 {
+        return Err(anyhow!("Witcher mechanics only work with 1d10"));
+    }
+
+    let original_roll = result.individual_rolls[0];
+    let mut total_result = original_roll;
+    let mut additional_rolls = Vec::new();
+    let mut explosion_notes = Vec::new();
+    let mut explosion_count = 0;
+    const MAX_EXPLOSIONS: usize = 100;
+
+    // Handle indefinite explosions - key difference from Cyberpunk Red
+    let mut current_roll = original_roll;
+
+    loop {
+        if explosion_count >= MAX_EXPLOSIONS {
+            explosion_notes.push("Maximum explosions reached (100)".to_string());
+            break;
+        }
+
+        match current_roll {
+            10 => {
+                // Critical Success: Roll another d10 and add it
+                let additional_roll = rng.random_range(1..=10);
+                additional_rolls.push(additional_roll);
+                total_result += additional_roll;
+                explosion_count += 1;
+
+                if explosion_count == 1 {
+                    explosion_notes.push(format!(
+                        "⚔️ **CRITICAL SUCCESS!** Rolled 10, added {additional_roll}"
+                    ));
+                } else {
+                    explosion_notes.push(format!(
+                        "🔥 **EXPLOSION CONTINUES!** Added {additional_roll}"
+                    ));
+                }
+
+                current_roll = additional_roll;
+                // Continue loop if we rolled another 10 (indefinite explosion)
+                if current_roll != 10 {
+                    break;
+                }
+            }
+            1 => {
+                // Critical Failure: Roll another d10 and subtract it
+                let additional_roll = rng.random_range(1..=10);
+                additional_rolls.push(-additional_roll); // Store as negative for display
+                total_result -= additional_roll;
+                explosion_count += 1;
+
+                if explosion_count == 1 {
+                    explosion_notes.push(format!(
+                        "💀 **CRITICAL FAILURE!** Rolled 1, subtracted {additional_roll}"
+                    ));
+                } else {
+                    explosion_notes.push(format!(
+                        "💥 **FAILURE CONTINUES!** Subtracted {additional_roll}"
+                    ));
+                }
+
+                current_roll = additional_roll;
+                // Continue loop if we rolled another 1 (indefinite explosion)
+                if current_roll != 1 {
+                    break;
+                }
+            }
+            _ => {
+                // Normal roll, no explosion
+                break;
+            }
+        }
+    }
+
+    // Update the result if we had explosions
+    if !additional_rolls.is_empty() {
+        // Create dice groups to show the explosion
+        let base_group = DiceGroup {
+            _description: "1d10".to_string(),
+            rolls: vec![original_roll],
+            modifier_type: "base".to_string(),
+        };
+
+        let explosion_group = DiceGroup {
+            _description: if original_roll == 10 {
+                "Critical Success"
+            } else {
+                "Critical Failure"
+            }
+            .to_string(),
+            rolls: additional_rolls.clone(),
+            modifier_type: if original_roll == 10 {
+                "add"
+            } else {
+                "subtract"
+            }
+            .to_string(),
+        };
+
+        result.dice_groups = vec![base_group, explosion_group];
+
+        // Add the actual additional rolls to individual_rolls for display
+        for &roll in &additional_rolls {
+            result.individual_rolls.push(roll.abs());
+        }
+    }
+
+    // Update totals and kept rolls
+    result.total = total_result;
+    result.kept_rolls = vec![total_result];
+
+    // Add explosion notes
+    result.notes.extend(explosion_notes);
 
     Ok(())
 }

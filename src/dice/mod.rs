@@ -57,6 +57,7 @@ pub enum Modifier {
     Shadowrun(u32),
     MarvelMultiverse(i32, i32), // (edges, troubles) - already calculated net values
     CyberpunkRed,
+    Witcher,
 }
 
 #[derive(Debug, Clone)]

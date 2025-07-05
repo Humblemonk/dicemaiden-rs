@@ -6,6 +6,7 @@
 
 - Made help commands respond in private message to reduce chat spam
 - Added support for Cyberpunk RED game system
+- Added support for Witcher game system
 
 ## [1.3.0] - 2025-07-03
 

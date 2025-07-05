@@ -1247,6 +1247,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         "gb" => return Ok(Modifier::Godbound(false)),
         "gbs" => return Ok(Modifier::Godbound(true)),
         "cpr" => return Ok(Modifier::CyberpunkRed),
+        "wit" => return Ok(Modifier::Witcher),
         _ => {}
     }
 

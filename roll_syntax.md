@@ -91,6 +91,13 @@
 - Fantastic: Marvel die (middle) showing 1 becomes 6
 - Edges and troubles cancel each other out
 
+### Witcher d10 System
+- `wit` → 1d10 wit (basic Witcher skill check)
+- `wit + 5` → 1d10 wit with +5 modifier
+- Critical Success (10): Roll another d10 and add to total
+- Critical Failure (1): Roll another d10 and subtract from total
+- Indefinite Explosions: If the additional die also shows 1 or 10, the explosion continues
+
 ### Dark Heresy 2nd Edition
 - `dh 4d10` → 4d10 ie10 (righteous fury on natural 10s)
 

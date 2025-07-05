@@ -43,7 +43,7 @@ Type `/roll help alias` for game system shortcuts!"#
 }
 
 pub fn generate_alias_help() -> String {
-    r#"🎲 **Game System Aliases** 🎲\
+    r#"🎲 **Game System Aliases** 🎲
 
 **Note:**
 • Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
@@ -136,6 +136,10 @@ pub fn generate_system_help() -> String {
 • `/roll mm` - Basic 3d6 roll (Marvel die in middle)
 • `/roll mm 2e` - 3d6 with 2 edges
 • `/roll mm 3t` - 3d6 with 3 troubles
+
+**Witcher d10 System:**
+• `wit` → 1d10 wit (basic Witcher skill check)
+• `wit + 5` → 1d10 wit with +5 modifier
 
 **Other Systems:**
 • `/roll dh 4d10` - Dark Heresy (righteous fury on 10s)
