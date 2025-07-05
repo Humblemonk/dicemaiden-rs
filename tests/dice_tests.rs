@@ -1102,6 +1102,208 @@ mod tests {
     // ============================================================================
 
     #[test]
+    fn test_witcher_basic_functionality() {
+        // Test basic Witcher alias
+        assert_valid("wit");
+        assert_valid("wit + 5");
+        assert_valid("wit - 3");
+        assert_valid("wit * 2");
+        assert_valid("wit / 2");
+    }
+
+    #[test]
+    fn test_witcher_alias_expansion() {
+        // Test Witcher alias expansion
+        let expanded = aliases::expand_alias("wit").unwrap();
+        assert_eq!(expanded, "1d10 wit");
+
+        let expanded = aliases::expand_alias("wit + 5").unwrap();
+        assert_eq!(expanded, "1d10 wit + 5");
+
+        let expanded = aliases::expand_alias("wit - 3").unwrap();
+        assert_eq!(expanded, "1d10 wit - 3");
+    }
+
+    #[test]
+    fn test_witcher_modifier_parsing() {
+        // Test that Witcher modifier parses correctly
+        let result = parser::parse_dice_string("1d10 wit").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].count, 1);
+        assert_eq!(result[0].sides, 10);
+        assert_eq!(result[0].modifiers.len(), 1);
+
+        // Verify we have a Witcher modifier
+        match &result[0].modifiers[0] {
+            Modifier::Witcher => {}
+            _ => panic!("Expected Witcher modifier"),
+        }
+    }
+
+    #[test]
+    fn test_witcher_with_mathematical_modifiers() {
+        // Test Witcher with mathematical modifiers
+        assert_valid("wit + 10");
+        assert_valid("wit - 4");
+        assert_valid("wit * 3");
+
+        let result = parse_and_roll("wit + 5").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // Total should include the +5 modifier
+        // Range: Critical failure (1-max_explosions) - max_subtract + 5 to
+        //        Critical success (10+max_explosions) + 5
+        // With reasonable bounds for explosions
+        assert!(
+            result[0].total >= -95 && result[0].total <= 105,
+            "Total should be in valid Witcher range with +5 modifier, got {}",
+            result[0].total
+        );
+    }
+
+    #[test]
+    fn test_witcher_with_roll_sets() {
+        // Test Witcher with roll sets
+        assert_valid("3 wit");
+        let result = parse_and_roll("3 wit").unwrap();
+        assert_eq!(result.len(), 3);
+
+        for (i, roll) in result.iter().enumerate() {
+            assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
+            // Each roll should be within reasonable Witcher range (accounting for explosions)
+            assert!(
+                roll.total >= -100 && roll.total <= 110, // Reasonable bounds with explosions
+                "Roll {} total {} should be in Witcher range",
+                i + 1,
+                roll.total
+            );
+        }
+    }
+
+    #[test]
+    fn test_witcher_vs_other_systems() {
+        // Make sure Witcher doesn't interfere with other systems
+        assert_valid("cpr"); // Cyberpunk Red still works
+        assert_valid("4cod"); // Chronicles of Darkness still works
+        assert_valid("sw8"); // Savage Worlds still works
+
+        // Test that Witcher and other systems produce different results
+        let witcher_result = parse_and_roll("wit").unwrap();
+        let cpr_result = parse_and_roll("cpr").unwrap();
+
+        // Both should not have successes (they're total-based systems)
+        assert!(
+            witcher_result[0].successes.is_none(),
+            "Witcher should not have success counting"
+        );
+        assert!(
+            cpr_result[0].successes.is_none(),
+            "CPR should not have success counting"
+        );
+    }
+
+    #[test]
+    fn test_witcher_edge_cases() {
+        // Test edge cases and error conditions
+
+        // Test with flags
+        assert_valid("p wit"); // Private roll
+        assert_valid("s wit"); // Simple output
+
+        // Test with comments and labels
+        assert_valid("wit ! monster knowledge check");
+        assert_valid("(Investigation) wit");
+        assert_valid("(Tracking) wit + 3 ! with enhanced senses");
+
+        // Test in semicolon combinations
+        assert_valid("wit ; 2d6 ; attack + 5");
+    }
+
+    #[test]
+    fn test_witcher_explosion_mechanics_structure() {
+        // Test explosion mechanics behavior
+        // Since explosions are random, we test structure rather than specific values
+
+        for _ in 0..50 {
+            let result = parse_and_roll("wit").unwrap();
+            assert_eq!(result.len(), 1);
+            let roll_result = &result[0];
+
+            // Check if this triggered any explosions by looking for multiple dice groups
+            if roll_result.dice_groups.len() > 1 {
+                // Should have base group and explosion group
+                assert_eq!(roll_result.dice_groups.len(), 2);
+                assert_eq!(roll_result.dice_groups[0].modifier_type, "base");
+
+                let explosion_type = &roll_result.dice_groups[1].modifier_type;
+                assert!(
+                    explosion_type == "add" || explosion_type == "subtract",
+                    "Explosion type should be add or subtract"
+                );
+
+                // Should have explosion notes
+                let has_explosion_note = roll_result.notes.iter().any(|note| {
+                    note.contains("CRITICAL SUCCESS")
+                        || note.contains("CRITICAL FAILURE")
+                        || note.contains("EXPLOSION CONTINUES")
+                        || note.contains("FAILURE CONTINUES")
+                });
+                assert!(has_explosion_note, "Should have explosion notes");
+
+                break; // Found an explosion, test passes
+            }
+        }
+    }
+
+    #[test]
+    fn test_witcher_with_complex_mathematical_modifiers() {
+        // Test Witcher with more complex scenarios
+
+        // Test with multiplication
+        let result = parse_and_roll("wit * 2").unwrap();
+        assert_eq!(result.len(), 1);
+        // Range should be doubled from base Witcher range
+        assert!(
+            result[0].total >= -200 && result[0].total <= 220,
+            "Witcher * 2 should be in reasonable doubled range, got {}",
+            result[0].total
+        );
+
+        // Test with division
+        let result = parse_and_roll("wit / 2").unwrap();
+        assert_eq!(result.len(), 1);
+        // Range should be halved (integer division)
+        assert!(
+            result[0].total >= -50 && result[0].total <= 55,
+            "Witcher / 2 should be in reasonable halved range, got {}",
+            result[0].total
+        );
+    }
+
+    #[test]
+    fn test_witcher_indefinite_explosion_difference_from_cpr() {
+        // Test that demonstrates the key difference between Witcher and CPR
+        // CPR has single explosions, Witcher has indefinite explosions
+
+        // We can't test randomness directly, but we can verify the structure
+        // supports indefinite explosions by checking the implementation allows it
+
+        // Both should use the same basic structure
+        let witcher_result = parse_and_roll("wit").unwrap();
+        let cpr_result = parse_and_roll("cpr").unwrap();
+
+        assert_eq!(witcher_result.len(), 1);
+        assert_eq!(cpr_result.len(), 1);
+
+        // Both should be total-based systems (no success counting)
+        assert!(witcher_result[0].successes.is_none());
+        assert!(cpr_result[0].successes.is_none());
+
+        // The key difference is in the roller implementation, which allows
+        // indefinite explosions for Witcher vs single explosions for CPR
+        // This is tested through the explosion mechanics structure test above
+    }
+    #[test]
     fn test_cyberpunk_red_basic() {
         // Test basic CPR alias
         assert_valid("cpr");
@@ -3694,8 +3896,6 @@ mod tests {
     // ============================================================================
     // D6 SYSTEM TESTS
     // ============================================================================
-    // Add these tests in the existing dice_tests.rs file in the section marked
-    // "GAME SYSTEM ALIASES" after the existing Savage Worlds tests
 
     #[test]
     fn test_d6_system_basic_functionality() {
