@@ -1,3 +1,4 @@
+use crate::commands::CommandResponse; // Import CommandResponse
 use crate::help_text; // Import the shared help text module from src root
 use anyhow::Result;
 use serenity::{
@@ -22,7 +23,7 @@ pub fn register() -> CreateCommand {
         )
 }
 
-pub async fn run(_ctx: &Context, command: &CommandInteraction) -> Result<String> {
+pub async fn run(_ctx: &Context, command: &CommandInteraction) -> Result<CommandResponse> {
     let topic = command
         .data
         .options
@@ -39,5 +40,6 @@ pub async fn run(_ctx: &Context, command: &CommandInteraction) -> Result<String>
         _ => help_text::generate_basic_help(),
     };
 
-    Ok(help_text)
+    // Return as private response
+    Ok(CommandResponse::private(help_text))
 }

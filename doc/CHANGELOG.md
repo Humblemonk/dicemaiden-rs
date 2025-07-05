@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0] - 2025-07-05
+
+## Added
+
+- Made help commands respond in private message to reduce chat spam
+- Added support for Cyberpunk RED game system
+
 ## [1.3.0] - 2025-07-03
 
 ## Added

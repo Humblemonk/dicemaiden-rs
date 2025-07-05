@@ -58,6 +58,9 @@ pub fn generate_alias_help() -> String {
 • `4codr` → 4d10 t8 ie10 r7 (rote quality: reroll failures)
 • `4wod8` → 4d10 f1 t8 (World of Darkness difficulty 8)
 
+**Cyberpunk Red:**
+• `cpr` → 1d10 cpr (critical success on 10, critical failure on 1)
+
 **D&D/Pathfinder:**
 • `dndstats` → 6 4d6 k3 (ability score generation)
 • `attack +5` → 1d20 +5
@@ -71,9 +74,7 @@ pub fn generate_alias_help() -> String {
 **Hero System 5th Edition:**
 • `2hsn` → 2d6 hsn (normal damage)
 • `3hsk` → 3d6 hsk (killing damage)
-• `2hsk1` → 2d6 + 1d3 hsk (alternative fractional notation)
 • `3hsh` → 3d6 hsh (to-hit roll)
-• `hsn`, `hsk`, `hsh` → 1d6 hsn, 1d6 hsk, 3d6 hsh (single die versions)
 
 **Godbound:**
 • `gb` → 1d20 gb (basic d20 with damage chart)
@@ -139,6 +140,7 @@ pub fn generate_system_help() -> String {
 **Other Systems:**
 • `/roll dh 4d10` - Dark Heresy (righteous fury on 10s)
 • `/roll ed15` - Earthdawn step 15 (steps 1-50 available)
+• `/roll cpr + 5` - Skill check with +5 modifier
 
 **Multiple Rolls:**
 • `/roll 4d6 ; 3d8 + 2 ; 1d20` - Up to 4 separate rolls
