@@ -678,6 +678,15 @@ fn apply_special_system_modifiers(
         }
     }
 
+    // For CPR (total-based special system), apply mathematical modifiers to total
+    let has_cpr = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::CyberpunkRed));
+    if has_cpr && has_math_modifiers {
+        apply_mathematical_modifiers_to_cpr_total(result, dice)?;
+    }
+
     // For success-based systems, apply mathematical modifiers to successes
     if has_special_system && has_math_modifiers && result.successes.is_some() {
         apply_mathematical_modifiers_to_successes(result, dice)?;
@@ -1902,6 +1911,41 @@ fn apply_cyberpunk_red_mechanics(result: &mut RollResult, rng: &mut impl Rng) ->
 
     // Add explosion notes only (no system note)
     result.notes.extend(explosion_notes);
+
+    Ok(())
+}
+
+fn apply_mathematical_modifiers_to_cpr_total(
+    result: &mut RollResult,
+    dice: &DiceRoll,
+) -> Result<()> {
+    let mut modifier_total = 0;
+
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::Add(value) => {
+                modifier_total += value;
+            }
+            Modifier::Subtract(value) => {
+                modifier_total -= value;
+            }
+            Modifier::Multiply(value) => {
+                result.total *= value;
+            }
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                result.total /= value;
+            }
+            _ => {} // Skip non-mathematical modifiers
+        }
+    }
+
+    // Apply accumulated add/subtract modifiers
+    if modifier_total != 0 {
+        result.total += modifier_total;
+    }
 
     Ok(())
 }
