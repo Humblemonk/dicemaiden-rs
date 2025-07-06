@@ -33,6 +33,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         wng_wrath_die: None,
         wng_icons: None,
         wng_exalted_icons: None,
+        wng_wrath_dice: None,
         suppress_comment: false,
     };
 
@@ -644,8 +645,8 @@ fn apply_special_system_modifiers(
             Modifier::Fudge => {
                 apply_fudge_conversion(result)?;
             }
-            Modifier::WrathGlory(difficulty, use_total) => {
-                count_wrath_glory_successes(result, *difficulty, *use_total)?;
+            Modifier::WrathGlory(difficulty, use_total, wrath_dice_count) => {
+                count_wrath_glory_successes(result, *difficulty, *use_total, *wrath_dice_count)?;
                 has_special_system = true;
             }
             Modifier::Godbound(straight_damage) => {
@@ -768,8 +769,9 @@ fn count_wrath_glory_successes(
     result: &mut RollResult,
     difficulty: Option<u32>,
     use_total: bool,
+    wrath_dice_count: u32,
 ) -> Result<()> {
-    let mut wrath_die_value = 0;
+    let mut wrath_dice_values = Vec::new();
     let mut has_complication = false;
     let mut has_critical = false;
 
@@ -778,12 +780,18 @@ fn count_wrath_glory_successes(
         result.total = result.kept_rolls.iter().sum();
         result.successes = None; // Don't show successes for total-based rolls
 
-        // Still check wrath die effects (first die only) but don't show critical/glory for soak rolls
-        if let Some(&first_die) = result.kept_rolls.first() {
-            wrath_die_value = first_die;
-            if first_die == 1 {
+        // Check wrath dice effects (first N dice based on wrath_dice_count)
+        for (_i, &die_value) in result // FIXED: Added underscore to silence warning
+            .kept_rolls
+            .iter()
+            .enumerate()
+            .take(wrath_dice_count as usize)
+        {
+            wrath_dice_values.push(die_value);
+            if die_value == 1 {
                 has_complication = true;
             }
+            // Note: Glory effects don't apply to soak rolls in W&G
         }
 
         // Check difficulty if specified (comparing total to difficulty)
@@ -796,12 +804,18 @@ fn count_wrath_glory_successes(
             ));
         }
 
-        // Add notes for wrath die effects (only complications for soak rolls)
+        // Add notes for wrath dice effects (only complications for soak rolls)
         if has_complication {
-            result
-                .notes
-                .push("Wrath die rolled 1 - Complication!".to_string());
-            result.notes.push(format!("Wrath die: {wrath_die_value}"));
+            let complication_count = wrath_dice_values.iter().filter(|&&x| x == 1).count();
+            if complication_count == 1 {
+                result
+                    .notes
+                    .push("Wrath die rolled 1 - Complication!".to_string());
+            } else {
+                result.notes.push(format!(
+                    "{complication_count} Wrath dice rolled 1 - Complications!"
+                ));
+            }
         }
     } else {
         // Standard Wrath & Glory success counting
@@ -809,8 +823,7 @@ fn count_wrath_glory_successes(
         let mut icon_count = 0;
         let mut exalted_icon_count = 0;
 
-        // In Wrath & Glory, one die is designated as the "wrath die"
-        // For simplicity, we'll treat the first die as the wrath die
+        // Process all dice, with first N being wrath dice
         for (i, &roll) in result.kept_rolls.iter().enumerate() {
             let successes = match roll {
                 1..=3 => 0, // No successes
@@ -829,9 +842,9 @@ fn count_wrath_glory_successes(
 
             total_successes += successes;
 
-            // Check wrath die effects (first die only)
-            if i == 0 {
-                wrath_die_value = roll;
+            // Check wrath dice effects (first N dice based on wrath_dice_count)
+            if i < wrath_dice_count as usize {
+                wrath_dice_values.push(roll);
                 if roll == 1 {
                     has_complication = true;
                 } else if roll == 6 {
@@ -841,10 +854,13 @@ fn count_wrath_glory_successes(
         }
 
         // Set Wrath & Glory specific fields
-        result.wng_wrath_die = Some(wrath_die_value);
+        if !wrath_dice_values.is_empty() {
+            result.wng_wrath_die = Some(wrath_dice_values[0]); // Keep for backwards compatibility
+            result.wng_wrath_dice = Some(wrath_dice_values.clone()); // NEW: Store all wrath dice
+        }
+
         result.wng_icons = Some(icon_count);
         result.wng_exalted_icons = Some(exalted_icon_count);
-
         result.successes = Some(total_successes);
 
         // Check difficulty if specified (comparing successes to difficulty)
@@ -856,24 +872,51 @@ fn count_wrath_glory_successes(
                 .push(format!("Difficulty {dn}: {status} (needed {dn})"));
         }
 
-        // Add notes for wrath die effects
-        add_wrath_die_notes(result, has_complication, has_critical);
+        // Add notes for wrath dice effects
+        add_wrath_die_notes(
+            result,
+            has_complication,
+            has_critical,
+            &wrath_dice_values,
+            wrath_dice_count,
+        );
     }
 
     Ok(())
 }
 
 // Helper function for wrath die notes to reduce duplication
-fn add_wrath_die_notes(result: &mut RollResult, has_complication: bool, has_critical: bool) {
+fn add_wrath_die_notes(
+    result: &mut RollResult,
+    has_complication: bool,
+    has_critical: bool,
+    wrath_dice_values: &[i32],
+    _wrath_dice_count: u32,
+) {
     if has_complication {
-        result
-            .notes
-            .push("Wrath die rolled 1 - Complication!".to_string());
+        let complication_count = wrath_dice_values.iter().filter(|&&x| x == 1).count();
+        if complication_count == 1 {
+            result
+                .notes
+                .push("Wrath die rolled 1 - Complication!".to_string());
+        } else {
+            result.notes.push(format!(
+                "{complication_count} Wrath dice rolled 1 - Complications!"
+            ));
+        }
     }
+
     if has_critical {
-        result
-            .notes
-            .push("Wrath die rolled 6 - Critical/Glory!".to_string());
+        let critical_count = wrath_dice_values.iter().filter(|&&x| x == 6).count();
+        if critical_count == 1 {
+            result
+                .notes
+                .push("Wrath die rolled 6 - Critical/Glory!".to_string());
+        } else {
+            result.notes.push(format!(
+                "{critical_count} Wrath dice rolled 6 - Glory potential!"
+            ));
+        }
     }
 }
 
@@ -1301,6 +1344,7 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
         wng_wrath_die: None,
         wng_icons: None,
         wng_exalted_icons: None,
+        wng_wrath_dice: None,
         suppress_comment: false,
     };
 
@@ -1481,6 +1525,7 @@ fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResul
         wng_wrath_die: None,
         wng_icons: None,
         wng_exalted_icons: None,
+        wng_wrath_dice: None,
         suppress_comment: false,
     };
 
@@ -1639,6 +1684,7 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
         wng_wrath_die: None,
         wng_icons: None,
         wng_exalted_icons: None,
+        wng_wrath_dice: None,
         suppress_comment: false,
     };
 

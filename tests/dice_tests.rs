@@ -2113,7 +2113,7 @@ mod tests {
     #[test]
     fn test_wrath_glory_alias() {
         let expanded = aliases::expand_alias("wng 4d6").unwrap();
-        assert_eq!(expanded, "4d6 wng");
+        assert_eq!(expanded, "4d6 wngw1");
     }
 
     #[test]
@@ -2124,9 +2124,168 @@ mod tests {
         assert_eq!(result[0].sides, 6);
         assert_eq!(result[0].modifiers.len(), 1);
         match &result[0].modifiers[0] {
-            Modifier::WrathGlory(None, false) => {}
+            Modifier::WrathGlory(None, false, _) => {}
             _ => panic!("Expected WrathGlory modifier"),
         }
+    }
+
+    #[test]
+    fn test_wrath_glory_multiple_wrath_dice_basic() {
+        // Test basic multiple wrath dice syntax
+        assert_valid("wng w2 4d6");
+        assert_valid("wng w3 5d6");
+        assert_valid("wng w4 6d6");
+        assert_valid("wng w5 4d6"); // Maximum allowed
+
+        // Test that w1 is equivalent to no w parameter
+        let single_wrath = parse_and_roll("wng w1 4d6").unwrap();
+        let default_wrath = parse_and_roll("wng 4d6").unwrap();
+
+        // Both should have the same structure (1 wrath die)
+        assert_eq!(single_wrath.len(), 1);
+        assert_eq!(default_wrath.len(), 1);
+        // Both should have wrath die tracking
+        assert!(single_wrath[0].wng_wrath_die.is_some());
+        assert!(default_wrath[0].wng_wrath_die.is_some());
+    }
+
+    #[test]
+    fn test_wrath_glory_multiple_wrath_dice_with_difficulty() {
+        // Test multiple wrath dice with difficulty tests
+        assert_valid("wng w2 dn3 4d6");
+        assert_valid("wng w3 dn2 5d6");
+        assert_valid("wng w4 dn4 6d6");
+
+        let result = parse_and_roll("wng w2 dn3 4d6").unwrap();
+        assert_eq!(result.len(), 1);
+
+        let roll_result = &result[0];
+        assert!(roll_result.successes.is_some());
+
+        // Should have difficulty check note
+        let has_difficulty_note = roll_result
+            .notes
+            .iter()
+            .any(|note| note.contains("Difficulty 3"));
+        assert!(has_difficulty_note, "Should have difficulty note");
+    }
+
+    #[test]
+    fn test_wrath_glory_multiple_wrath_dice_with_soak() {
+        // Test multiple wrath dice with soak tests (use total instead of successes)
+        assert_valid("wng w2 4d6 !soak");
+        assert_valid("wng w3 dn2 4d6 !soak");
+        assert_valid("wng w2 4d6 !exempt");
+
+        let result = parse_and_roll("wng w2 4d6 !soak").unwrap();
+        assert_eq!(result.len(), 1);
+
+        let roll_result = &result[0];
+        // Soak tests use total, not successes
+        assert!(roll_result.successes.is_some());
+        assert!(roll_result.total > 0);
+    }
+
+    #[test]
+    fn test_wrath_glory_multiple_wrath_dice_alias_expansion() {
+        // Test alias expansion with multiple wrath dice
+        let expanded = aliases::expand_alias("wng w2 4d6").unwrap();
+        assert_eq!(expanded, "4d6 wngw2");
+
+        let expanded = aliases::expand_alias("wng w3 dn2 5d6").unwrap();
+        assert_eq!(expanded, "5d6 wngw3dn2");
+
+        let expanded = aliases::expand_alias("wng w2 4d6 !soak").unwrap();
+        assert_eq!(expanded, "4d6 wngw2t");
+    }
+
+    #[test]
+    fn test_wrath_glory_multiple_wrath_dice_modifier_parsing() {
+        // Test that multiple wrath dice modifiers parse correctly
+        let result = parser::parse_dice_string("4d6 wngw3").unwrap();
+        assert_eq!(result.len(), 1);
+
+        let dice = &result[0];
+        assert_eq!(dice.count, 4);
+        assert_eq!(dice.sides, 6);
+        assert_eq!(dice.modifiers.len(), 1);
+
+        // Verify we have the correct WrathGlory modifier
+        match &dice.modifiers[0] {
+            Modifier::WrathGlory(None, false, 3) => {
+                // Correct: no difficulty, standard test, 3 wrath dice
+            }
+            _ => panic!("Expected WrathGlory(None, false, 3) modifier"),
+        }
+    }
+
+    #[test]
+    fn test_wrath_glory_multiple_wrath_dice_validation() {
+        // Test validation limits
+        assert_invalid("wng w0 4d6"); // Below minimum
+        assert_invalid("wng w6 4d6"); // Above maximum  
+        assert_invalid("wng w10 4d6"); // Way above maximum
+
+        // Test that valid range works
+        assert_valid("wng w1 4d6"); // Minimum
+        assert_valid("wng w5 4d6"); // Maximum
+    }
+
+    #[test]
+    fn test_wrath_glory_multiple_wrath_dice_backwards_compatibility() {
+        // Ensure existing syntax still works exactly the same
+        let old_syntax = parse_and_roll("wng 4d6").unwrap();
+        let new_explicit = parse_and_roll("wng w1 4d6").unwrap();
+
+        // Both should have same structure
+        assert_eq!(old_syntax.len(), 1);
+        assert_eq!(new_explicit.len(), 1);
+
+        // Both should have wrath die tracking
+        assert!(old_syntax[0].wng_wrath_die.is_some());
+        assert!(new_explicit[0].wng_wrath_die.is_some());
+
+        // Both should have same success tracking
+        assert!(old_syntax[0].successes.is_some());
+        assert!(new_explicit[0].successes.is_some());
+    }
+
+    #[test]
+    fn test_wrath_glory_multiple_wrath_dice_edge_cases() {
+        // Test edge cases and complex combinations
+
+        // With flags
+        assert_valid("p wng w2 4d6"); // Private roll
+        assert_valid("s wng w3 4d6"); // Simple output
+
+        // With roll sets
+        assert_valid("3 wng w2 4d6"); // Roll sets with multiple wrath dice
+
+        // With comments and labels
+        assert_valid("wng w2 4d6 ! psychic test");
+        assert_valid("(Psychic Power) wng w3 dn3 5d6");
+
+        // In semicolon combinations
+        assert_valid("wng w2 4d6 ; attack + 5 ; 2d6");
+    }
+
+    #[test]
+    fn test_wrath_glory_psyker_power_examples() {
+        // Test realistic psyker power usage patterns
+
+        // Bound power (default 1 wrath die)
+        assert_valid("wng dn4 5d6"); // Basic psyker test
+
+        // Unbound power (+1 wrath die)
+        assert_valid("wng w2 dn4 5d6"); // Unbound psyker test
+
+        // Transcendent power (multiple wrath dice based on rank)
+        assert_valid("wng w3 dn4 5d6"); // Rank 3 transcendent
+        assert_valid("wng w4 dn4 5d6"); // Rank 4 transcendent
+        assert_valid("wng w5 dn4 5d6"); // Rank 5 transcendent (max)
+
+        // With soak tests for psychic phenomena
+        assert_valid("wng w3 4d6 !soak"); // Transcendent soak test
     }
 
     #[test]
@@ -2153,7 +2312,7 @@ mod tests {
             result[0]
                 .modifiers
                 .iter()
-                .any(|m| matches!(m, Modifier::WrathGlory(Some(3), false)))
+                .any(|m| matches!(m, Modifier::WrathGlory(Some(3), false, _)))
         );
     }
 
@@ -2576,7 +2735,7 @@ mod tests {
             wng_result[0]
                 .modifiers
                 .iter()
-                .any(|m| matches!(m, Modifier::WrathGlory(Some(3), true)))
+                .any(|m| matches!(m, Modifier::WrathGlory(Some(3), true, _)))
         );
 
         let hero_result = parser::parse_dice_string("2hsk1").unwrap();
@@ -3341,6 +3500,7 @@ mod tests {
             wng_wrath_die: None,
             wng_icons: None,
             wng_exalted_icons: None,
+            wng_wrath_dice: None,
             suppress_comment: false,
         };
 

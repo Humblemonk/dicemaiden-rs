@@ -47,10 +47,10 @@ pub enum Modifier {
     SubtractDice(DiceRoll),         // Subtract dice result
     MultiplyDice(DiceRoll),
     DivideDice(DiceRoll),
-    WrathGlory(Option<u32>, bool), // Wrath & Glory: (difficulty, use_total_instead_of_successes)
-    Godbound(bool),                // gb (false) or gbs (true for straight damage)
-    HeroSystem(HeroSystemType),    // Hero System damage/hit calculations
-    Fudge,                         // df - Fudge dice with symbol display
+    WrathGlory(Option<u32>, bool, u32), // Wrath & Glory: (difficulty, use_total_instead_of_successes)
+    Godbound(bool),                     // gb (false) or gbs (true for straight damage)
+    HeroSystem(HeroSystemType),         // Hero System damage/hit calculations
+    Fudge,                              // df - Fudge dice with symbol display
     DarkHeresy,
     SavageWorlds(u32),
     D6System(u32, String),
@@ -90,6 +90,7 @@ pub struct RollResult {
     pub wng_wrath_die: Option<i32>, // Value of the wrath die (first die)
     pub wng_icons: Option<i32>,     // Count of icons (4-5 results)
     pub wng_exalted_icons: Option<i32>, // Count of exalted icons (6 results)
+    pub wng_wrath_dice: Option<Vec<i32>>, // All wrath dice values (for multiple dice)
     pub suppress_comment: bool,
 }
 
@@ -167,12 +168,29 @@ impl RollResult {
     /// Format the result value (damage, successes, or total)
     fn format_result_value(&self) -> String {
         // Special handling for Wrath & Glory
-        if let (Some(wrath_die), Some(icons), Some(exalted_icons)) =
-            (self.wng_wrath_die, self.wng_icons, self.wng_exalted_icons)
-        {
+        if let (Some(wrath_dice), Some(icons), Some(exalted_icons)) = (
+            self.wng_wrath_dice.as_ref(),
+            self.wng_icons,
+            self.wng_exalted_icons,
+        ) {
             let exalted_value = exalted_icons * 2;
+
+            // Format wrath dice display
+            let wrath_display = if wrath_dice.len() == 1 {
+                format!("Wrath: `{}`", wrath_dice[0])
+            } else {
+                format!(
+                    "Wrath: `[{}]`",
+                    wrath_dice
+                        .iter()
+                        .map(|d| d.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            };
+
             return format!(
-                "Wrath: `{wrath_die}` | TOTAL - Icons: `{icons}` Exalted Icons: `{exalted_icons}` (Value:{exalted_value})"
+                "{wrath_display} | TOTAL - Icons: `{icons}` Exalted Icons: `{exalted_icons}` (Value:{exalted_value})"
             );
         }
 
