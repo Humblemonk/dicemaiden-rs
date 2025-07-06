@@ -98,6 +98,9 @@ static CS_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^cs\s+(\d+)(?:\s*([+-]\s*\d+))?$").expect("Failed to compile CS_REGEX")
 });
 
+static BNW_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^bnw(\d+)$").expect("Failed to compile BNW_REGEX"));
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -464,6 +467,12 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         } else {
             return Some(format!("1d20 cs{level} {modifier}"));
         }
+    }
+
+    // Brave New World (bnw3 -> 3d6 bnw)
+    if let Some(captures) = BNW_REGEX.captures(input) {
+        let pool_size = &captures[1];
+        return Some(format!("{pool_size}d6 bnw"));
     }
 
     None

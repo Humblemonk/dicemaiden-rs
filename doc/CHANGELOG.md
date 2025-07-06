@@ -9,6 +9,7 @@
 - Added support for Witcher d10
 - Added support for additional wrath dice for wrath and glory
 - Added support for Cypher System
+- Added support for Brave New World
 
 ## [1.3.0] - 2025-07-03
 
