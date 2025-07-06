@@ -13,15 +13,16 @@ static GB_SIMPLE_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 static WNG_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^wng(?:\s+dn(\d+))?\s+(\d+)d(\d+)(?:\s*!\s*(\w+))?$")
+    Regex::new(r"^wng(?:\s+w(\d+))?(?:\s+dn(\d+))?\s+(\d+)d(\d+)(?:\s*!\s*(\w+))?$")
         .expect("Failed to compile WNG_REGEX")
 });
 
 static SW_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^sw(\d+)$").expect("Failed to compile SW_REGEX"));
 
-static WNG_SIMPLE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^wng\s+(\d+)d(\d+)$").expect("Failed to compile WNG_SIMPLE_REGEX"));
+static WNG_SIMPLE_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^wng(?:\s+w(\d+))?\s+(\d+)d(\d+)$").expect("Failed to compile WNG_SIMPLE_REGEX")
+});
 
 static COD_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(\d+)cod([89r]?)(?:\s*([+-]\s*\d+))?$").expect("Failed to compile COD_REGEX")
@@ -217,32 +218,34 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
 
     // Wrath & Glory (wng 4d6, wng dn2 4d6, wng 4d6 !soak)
     if let Some(captures) = WNG_REGEX.captures(input) {
-        let difficulty = captures.get(1).map(|m| m.as_str());
-        let count = &captures[2];
-        let sides = &captures[3];
-        let special = captures.get(4).map(|m| m.as_str());
+        let wrath_count = captures.get(1).map(|m| m.as_str()).unwrap_or("1");
+        let difficulty = captures.get(2).map(|m| m.as_str());
+        let count = &captures[3];
+        let sides = &captures[4];
+        let special = captures.get(5).map(|m| m.as_str());
 
         return Some(match (difficulty, special) {
             (Some(dn), Some("soak") | Some("exempt") | Some("dmg")) => {
-                format!("{count}d{sides} wngdn{dn}t")
+                format!("{count}d{sides} wngw{wrath_count}dn{dn}t")
             }
             (Some(dn), _) => {
-                format!("{count}d{sides} wngdn{dn}")
+                format!("{count}d{sides} wngw{wrath_count}dn{dn}")
             }
             (None, Some("soak") | Some("exempt") | Some("dmg")) => {
-                format!("{count}d{sides} wngt")
+                format!("{count}d{sides} wngw{wrath_count}t")
             }
             (None, _) => {
-                format!("{count}d{sides} wng")
+                format!("{count}d{sides} wngw{wrath_count}")
             }
         });
     }
 
     // Simple wng pattern (wng 4d6)
     if let Some(captures) = WNG_SIMPLE_REGEX.captures(input) {
-        let count = &captures[1];
-        let sides = &captures[2];
-        return Some(format!("{count}d{sides} wng"));
+        let wrath_count = captures.get(1).map(|m| m.as_str()).unwrap_or("1");
+        let count = &captures[2];
+        let sides = &captures[3];
+        return Some(format!("{count}d{sides} wngw{wrath_count}"));
     }
 
     // Chronicles of Darkness (4cod -> 4d10 t8 ie10)

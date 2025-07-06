@@ -82,11 +82,6 @@ pub fn generate_alias_help() -> String {
 • `gb 3d8` → 3d8 gb (3d8 with damage chart conversion)
 • `gbs 2d10` → 2d10 gbs (2d10 straight damage)
 
-**Warhammer 40k Wrath & Glory:**
-• `wng 4d6` → 4d6 with wrath die and success counting
-• `wng dn3 5d6` → 5d6 with difficulty 3 test (shows PASS/FAIL)
-• `wng 4d6 !soak` → 4d6 without wrath die
-
 **Other Systems:**
 • `3df` → 3d3 fudge (Fudge dice showing +/blank/- symbols)
 • `3wh4+` → 3d6 t4 (Warhammer 40k/AoS)
@@ -129,6 +124,7 @@ pub fn generate_system_help() -> String {
 
 **Wrath & Glory:**
 • `/roll wng 4d6` - Standard roll with wrath die
+• `/roll wng w2 4d6` - Standard roll with 2 wrath dice
 • `/roll wng dn2 4d6` - Difficulty 2 test (shows PASS/FAIL)
 • `/roll wng 4d6 !soak` - Damage/soak roll (no wrath die)
 

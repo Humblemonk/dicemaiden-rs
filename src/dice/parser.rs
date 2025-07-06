@@ -1413,27 +1413,66 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
     // Wrath & Glory handling
     if let Some(stripped) = part.strip_prefix("wng") {
         if stripped.is_empty() {
-            return Ok(Modifier::WrathGlory(None, false));
-        } else if stripped == "t" {
-            return Ok(Modifier::WrathGlory(None, true));
-        } else if let Some(dn_part) = stripped.strip_prefix("dn") {
+            return Ok(Modifier::WrathGlory(None, false, 1)); // Default 1 wrath die
+        }
+
+        // Parse wrath dice count first
+        let mut remaining = stripped;
+        let mut wrath_count = 1u32;
+
+        if let Some(w_stripped) = remaining.strip_prefix("w") {
+            // Extract wrath count
+            let mut chars = w_stripped.chars();
+            let mut count_str = String::new();
+
+            for ch in chars.by_ref() {
+                if ch.is_ascii_digit() {
+                    count_str.push(ch);
+                } else {
+                    remaining = &w_stripped[count_str.len()..];
+                    break;
+                }
+            }
+
+            if chars.as_str().is_empty() && !count_str.is_empty() {
+                remaining = "";
+            }
+
+            if !count_str.is_empty() {
+                wrath_count = count_str
+                    .parse()
+                    .map_err(|_| anyhow!("Invalid wrath dice count in '{}'", part))?;
+
+                // Validate reasonable range (1-5 wrath dice max)
+                if !(1..=5).contains(&wrath_count) {
+                    return Err(anyhow!("Wrath dice count must be 1-5, got {}", wrath_count));
+                }
+            }
+        }
+
+        // Parse difficulty and special modes
+        if remaining == "t" {
+            return Ok(Modifier::WrathGlory(None, true, wrath_count));
+        } else if let Some(dn_part) = remaining.strip_prefix("dn") {
             if let Some(dn_str) = dn_part.strip_suffix('t') {
                 let dn = dn_str
                     .parse()
                     .map_err(|_| anyhow!("Invalid difficulty value in '{}'", part))?;
-                return Ok(Modifier::WrathGlory(Some(dn), true));
+                return Ok(Modifier::WrathGlory(Some(dn), true, wrath_count));
             } else {
                 let dn = dn_part
                     .parse()
                     .map_err(|_| anyhow!("Invalid difficulty value in '{}'", part))?;
-                return Ok(Modifier::WrathGlory(Some(dn), false));
+                return Ok(Modifier::WrathGlory(Some(dn), false, wrath_count));
             }
-        } else if let Some(dn_str) = stripped.strip_suffix('t') {
+        } else if let Some(dn_str) = remaining.strip_suffix('t') {
             if let Ok(dn) = dn_str.parse::<u32>() {
-                return Ok(Modifier::WrathGlory(Some(dn), true));
+                return Ok(Modifier::WrathGlory(Some(dn), true, wrath_count));
             }
-        } else if let Ok(dn) = stripped.parse::<u32>() {
-            return Ok(Modifier::WrathGlory(Some(dn), false));
+        } else if let Ok(dn) = remaining.parse::<u32>() {
+            return Ok(Modifier::WrathGlory(Some(dn), false, wrath_count));
+        } else if remaining.is_empty() {
+            return Ok(Modifier::WrathGlory(None, false, wrath_count));
         }
 
         return Err(anyhow!("Invalid Wrath & Glory modifier: {}", part));

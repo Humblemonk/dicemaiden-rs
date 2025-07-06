@@ -77,6 +77,7 @@
 
 ### Warhammer 40k Wrath & Glory
 - `wng 4d6` → 4d6 with wrath die and success counting
+- `wng w2 4d6` → 4d6 with 2 wrath dice (unbound psyker powers)
 - `wng dn3 5d6` → 5d6 with difficulty 3 (shows PASS/FAIL)
 - `wng 4d6 !soak` → 4d6 soak roll (uses total, not successes)
 - `wng dn4 6d6 !exempt` → 6d6 exempt test without wrath die
