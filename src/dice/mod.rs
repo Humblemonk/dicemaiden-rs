@@ -59,6 +59,7 @@ pub enum Modifier {
     CyberpunkRed,
     Witcher,
     CypherSystem(u32),
+    BraveNewWorld(u32),
 }
 
 #[derive(Debug, Clone)]

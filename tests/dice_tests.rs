@@ -4467,4 +4467,60 @@ mod tests {
         assert!(result[0].failures.is_none());
         assert!(result[0].botches.is_none());
     }
+    #[test]
+    fn test_brave_new_world_basic() {
+        assert_valid("bnw3");
+        assert_valid("bnw5");
+        assert_valid("bnw1");
+
+        let result = parse_and_roll("bnw3").unwrap();
+        assert_eq!(result.len(), 1);
+
+        let roll = &result[0];
+        assert!(roll.total >= 1); // Should have some result
+        assert!(
+            roll.notes
+                .iter()
+                .any(|note| note.contains("Brave New World"))
+        );
+    }
+
+    #[test]
+    fn test_brave_new_world_alias_expansion() {
+        let expanded = aliases::expand_alias("bnw4").unwrap();
+        assert_eq!(expanded, "4d6 bnw");
+    }
+
+    #[test]
+    fn test_brave_new_world_with_modifiers() {
+        assert_valid("bnw3 + 5");
+        assert_valid("bnw4 - 2");
+
+        let result = parse_and_roll("bnw3 + 10").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // Total should be at least 11 (minimum 1 + 10)
+        assert!(result[0].total >= 11);
+    }
+
+    #[test]
+    fn test_brave_new_world_vs_other_systems() {
+        // Ensure BNW doesn't interfere with other systems
+        assert_valid("4cod"); // Chronicles of Darkness still works
+        assert_valid("sw8"); // Savage Worlds still works
+        assert_valid("d6s4"); // D6 System still works
+
+        let bnw_result = parse_and_roll("bnw3").unwrap();
+        let cod_result = parse_and_roll("4cod").unwrap();
+
+        // They should have different note patterns
+        let bnw_has_system_note = bnw_result[0]
+            .notes
+            .iter()
+            .any(|note| note.contains("Brave New World"));
+        let cod_has_successes = cod_result[0].successes.is_some();
+
+        assert!(bnw_has_system_note, "BNW should have system notes");
+        assert!(cod_has_successes, "CoD should have success counting");
+    }
 }

@@ -67,6 +67,15 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         return handle_savage_worlds_roll(dice, &mut rng);
     }
 
+    let has_brave_new_world = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::BraveNewWorld(_)));
+
+    if has_brave_new_world {
+        return handle_brave_new_world_roll(dice, &mut rng);
+    }
+
     // Normal dice rolling flow for non-Savage Worlds dice
     // Initial dice rolls
     for _ in 0..dice.count {
@@ -2176,4 +2185,129 @@ fn apply_cypher_system_mechanics(result: &mut RollResult, level: u32) -> Result<
         .push(format!("Cypher System - Level {level} Task"));
 
     Ok(())
+}
+
+pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
+    let mut result = RollResult {
+        individual_rolls: Vec::new(),
+        kept_rolls: Vec::new(),
+        dropped_rolls: Vec::new(),
+        total: 0,
+        successes: None,
+        failures: None,
+        botches: None,
+        comment: dice.comment.clone(),
+        label: dice.label.clone(),
+        notes: Vec::new(),
+        dice_groups: Vec::new(),
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
+        godbound_damage: None,
+        fudge_symbols: None,
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
+        wng_wrath_dice: None,
+        suppress_comment: false,
+    };
+
+    // Find the BraveNewWorld modifier to get pool size
+    let pool_size = dice.count;
+
+    dice.modifiers
+        .iter()
+        .find(|m| matches!(m, Modifier::BraveNewWorld(_)))
+        .ok_or_else(|| anyhow!("Expected Brave New World modifier"))?;
+
+    // Roll the initial dice pool
+    let mut all_results = Vec::new();
+    for _ in 0..pool_size {
+        all_results.push(rng.random_range(1..=6));
+    }
+
+    // Handle exploding 6s - each 6 creates a new result option
+    let mut explosion_count = 0;
+    let mut i = 0;
+    while i < all_results.len() && explosion_count < 100 {
+        if all_results[i] == 6 {
+            let explosion = rng.random_range(1..=6);
+            // BNW explosions create separate results, not additions
+            all_results.push(all_results[i] + explosion);
+            explosion_count += 1;
+        }
+        i += 1;
+    }
+
+    // Check for disaster (majority of 1s in original pool)
+    let ones_count = all_results[..pool_size as usize]
+        .iter()
+        .filter(|&&roll| roll == 1)
+        .count();
+    let is_disaster = ones_count > (pool_size as usize / 2);
+
+    // Take the highest result (BNW uses highest, not sum)
+    let highest_result = *all_results.iter().max().unwrap_or(&1);
+
+    // Store all rolls for display
+    result.individual_rolls = all_results.clone();
+    result.kept_rolls = vec![highest_result];
+
+    // Set the total to the highest result
+    result.total = highest_result;
+
+    // Create dice group for display
+    result.dice_groups.push(DiceGroup {
+        _description: format!("{pool_size}d6 bnw"),
+        rolls: all_results,
+        modifier_type: "base".to_string(),
+    });
+
+    // Add notes about the system and special results
+    if is_disaster {
+        result
+            .notes
+            .push("Disaster! Majority of dice rolled 1s - automatic failure".to_string());
+        result.total = 0; // Disasters always fail regardless of other dice
+    }
+
+    if explosion_count > 0 {
+        result
+            .notes
+            .push(format!("{explosion_count} dice exploded on 6s"));
+    }
+
+    result.notes.push(format!(
+        "Brave New World: {pool_size}-die pool, highest result: {highest_result}"
+    ));
+
+    // Apply any mathematical modifiers after the core BNW mechanics
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::Add(value) => {
+                result.total += value;
+            }
+            Modifier::Subtract(value) => {
+                result.total -= value;
+            }
+            Modifier::Multiply(value) => {
+                result.total *= value;
+            }
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                result.total /= value;
+            }
+            Modifier::BraveNewWorld(_) => {
+                // Already handled above
+            }
+            _ => {
+                // Ignore other modifiers for BNW
+            }
+        }
+    }
+
+    Ok(result)
 }

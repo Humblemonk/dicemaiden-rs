@@ -81,6 +81,10 @@
 - `gb 3d8` → 3d8 gb (3d8 with damage chart)
 - `gbs 2d10 +5` → 2d10 straight damage +5
 
+### Brave New World Pool System
+- `bnw3` → 3-die pool: roll 3d6, take highest die, 6s explode
+- `bnw4 + 2` → 4-die pool with +2 modifier applied to final result
+
 ### Warhammer 40k Wrath & Glory
 - `wng 4d6` → 4d6 with wrath die and success counting
 - `wng w2 4d6` → 4d6 with 2 wrath dice (unbound psyker powers)

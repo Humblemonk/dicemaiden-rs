@@ -138,6 +138,10 @@ pub fn generate_system_help() -> String {
 • `wit` → 1d10 wit (basic Witcher skill check)
 • `wit + 5` → 1d10 wit with +5 modifier
 
+**Brave New World**
+• `bnw3` → 3d6 pool, take highest die, 6s explode into new results
+• `bnw5 + 2` → 5-die pool with +2 modifier (applied after taking highest)
+
 **Other Systems:**
 • `/roll dh 4d10` - Dark Heresy (righteous fury on 10s)
 • `/roll ed15` - Earthdawn step 15 (steps 1-50 available)
