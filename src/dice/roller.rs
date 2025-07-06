@@ -2213,9 +2213,9 @@ pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result
         suppress_comment: false,
     };
 
-    // Find the BraveNewWorld modifier to get pool size
     let pool_size = dice.count;
 
+    // Verify we have the BNW modifier
     dice.modifiers
         .iter()
         .find(|m| matches!(m, Modifier::BraveNewWorld(_)))
@@ -2241,11 +2241,11 @@ pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result
     }
 
     // Check for disaster (majority of 1s in original pool)
-    let ones_count = all_results[..pool_size as usize]
+    let bnw_ones_count = all_results[..pool_size as usize]
         .iter()
         .filter(|&&roll| roll == 1)
         .count();
-    let is_disaster = ones_count > (pool_size as usize / 2);
+    let is_disaster = pool_size >= 4 && bnw_ones_count > (pool_size as usize / 2);
 
     // Take the highest result (BNW uses highest, not sum)
     let highest_result = *all_results.iter().max().unwrap_or(&1);
@@ -2279,7 +2279,9 @@ pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result
     }
 
     result.notes.push(format!(
-        "Brave New World: {pool_size}-die pool, highest result: {highest_result}"
+        "Brave New World: {}-die pool, highest result: {}",
+        pool_size,
+        if is_disaster { 0 } else { highest_result }
     ));
 
     // Apply any mathematical modifiers after the core BNW mechanics
