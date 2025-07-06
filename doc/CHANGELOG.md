@@ -5,9 +5,10 @@
 ## Added
 
 - Made help commands respond in private message to reduce chat spam
-- Added support for Cyberpunk RED game system
-- Added support for Witcher game system
+- Added support for Cyberpunk RED
+- Added support for Witcher d10
 - Added support for additional wrath dice for wrath and glory
+- Added support for Cypher System
 
 ## [1.3.0] - 2025-07-03
 

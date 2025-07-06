@@ -679,6 +679,11 @@ fn apply_special_system_modifiers(
                 apply_witcher_mechanics(result, rng)?;
                 has_special_system = true;
             }
+            Modifier::CypherSystem(level) => {
+                apply_cypher_system_mechanics(result, *level)?;
+                has_special_system = true;
+            }
+
             _ => {} // Skip modifiers already handled above
         }
     }
@@ -2119,6 +2124,56 @@ fn apply_witcher_mechanics(result: &mut RollResult, rng: &mut impl Rng) -> Resul
 
     // Add explosion notes
     result.notes.extend(explosion_notes);
+
+    Ok(())
+}
+
+fn apply_cypher_system_mechanics(result: &mut RollResult, level: u32) -> Result<()> {
+    if result.individual_rolls.is_empty() {
+        return Err(anyhow!("No dice rolled for Cypher System"));
+    }
+
+    let roll = result.individual_rolls[0];
+    let target_number = level * 3;
+    let success = roll >= target_number as i32;
+
+    // Clear any existing success/failure counts - Cypher is binary success/fail
+    result.successes = None;
+    result.failures = None;
+    result.botches = None;
+
+    // Add success/failure note
+    if success {
+        result.notes.push(format!(
+            "**SUCCESS** (rolled {roll} vs target {target_number})"
+        ));
+    } else {
+        result.notes.push(format!(
+            "**FAILURE** (rolled {roll} vs target {target_number})"
+        ));
+    }
+
+    // Add special result notes
+    match roll {
+        1 => {
+            result
+                .notes
+                .push("**GM INTRUSION** (Natural 1)".to_string());
+        }
+        17..=19 => {
+            result.notes.push("**MINOR EFFECT** (17-19)".to_string());
+        }
+        20 => {
+            result
+                .notes
+                .push("**MAJOR EFFECT** (Natural 20)".to_string());
+        }
+        _ => {}
+    }
+
+    result
+        .notes
+        .push(format!("Cypher System - Level {level} Task"));
 
     Ok(())
 }

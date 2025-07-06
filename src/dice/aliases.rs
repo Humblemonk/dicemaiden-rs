@@ -94,6 +94,10 @@ static CPR_REGEX: Lazy<Regex> =
 static WIT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^wit(?:\s*([+-]\s*\d+))?$").expect("Failed to compile WIT_REGEX"));
 
+static CS_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^cs\s+(\d+)(?:\s*([+-]\s*\d+))?$").expect("Failed to compile CS_REGEX")
+});
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -448,6 +452,17 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             return Some("1d10 wit".to_string());
         } else {
             return Some(format!("1d10 wit {modifier}"));
+        }
+    }
+
+    if let Some(captures) = CS_REGEX.captures(input) {
+        let level = &captures[1];
+        let modifier = captures.get(2).map(|m| m.as_str().trim()).unwrap_or("");
+
+        if modifier.is_empty() {
+            return Some(format!("1d20 cs{level}"));
+        } else {
+            return Some(format!("1d20 cs{level} {modifier}"));
         }
     }
 

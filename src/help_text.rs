@@ -91,6 +91,7 @@ pub fn generate_alias_help() -> String {
 • `age` → 2d6 + 1d6 (AGE system)
 • `dd34` → 1d3*10 + 1d4 (double-digit d66 style)
 • `ed15` → Earthdawn step 15
+• `cs 3` → Cypher System 1d20 cs3 (Level 3 task, target 9+)
 
 Use `/roll help system` for specific examples!"#
         .to_string()

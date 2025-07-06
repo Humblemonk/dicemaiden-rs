@@ -1251,6 +1251,20 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         _ => {}
     }
 
+    // Cypher System handling (cs1, cs3, cs10, etc.)
+    if let Some(stripped) = part.strip_prefix("cs") {
+        let level = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid Cypher System level in '{}'", part))?;
+        if !(1..=10).contains(&level) {
+            return Err(anyhow!(
+                "Cypher System difficulty level must be 1-10, got {}",
+                level
+            ));
+        }
+        return Ok(Modifier::CypherSystem(level));
+    }
+
     // Check for invalid characters before parsing numbers
     if part.contains(['+', '-', '*', '/']) {
         return Err(anyhow!("Invalid modifier '{}' - contains operator", part));
