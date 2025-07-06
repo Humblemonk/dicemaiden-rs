@@ -4414,4 +4414,57 @@ mod tests {
             assert_eq!(roll.dice_groups.len(), 2); // Base + wild
         }
     }
+    #[test]
+    fn test_cypher_system_basic() {
+        assert_valid("cs 1");
+        assert_valid("cs 5");
+        assert_valid("cs 10");
+        assert_valid("cs 3 + 2");
+        assert_valid("cs 7 - 1");
+
+        // Test invalid levels
+        assert_invalid("cs 0");
+        assert_invalid("cs 11");
+    }
+
+    #[test]
+    fn test_cypher_system_alias_expansion() {
+        let expanded = aliases::expand_alias("cs 3").unwrap();
+        assert_eq!(expanded, "1d20 cs3");
+
+        let expanded = aliases::expand_alias("cs 5 + 2").unwrap();
+        assert_eq!(expanded, "1d20 cs5 + 2");
+    }
+
+    #[test]
+    fn test_cypher_system_mechanics() {
+        let result = parse_and_roll("cs 3").unwrap();
+        assert_eq!(result.len(), 1);
+
+        let roll = &result[0];
+        assert_eq!(roll.individual_rolls.len(), 1);
+        assert!(roll.total >= 1 && roll.total <= 20);
+
+        // Should have result note and system note
+        assert!(roll.notes.iter().any(|note| note.contains("vs target 9")));
+        assert!(
+            roll.notes
+                .iter()
+                .any(|note| note.contains("Cypher System - Level 3"))
+        );
+    }
+
+    #[test]
+    fn test_cypher_system_special_results() {
+        // We can't test random results directly, but we can test the structure
+        // supports the special results by checking they don't interfere with normal mechanics
+
+        let result = parse_and_roll("cs 1").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // Should not have success counting (binary system)
+        assert!(result[0].successes.is_none());
+        assert!(result[0].failures.is_none());
+        assert!(result[0].botches.is_none());
+    }
 }

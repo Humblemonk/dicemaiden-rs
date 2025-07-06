@@ -58,6 +58,7 @@ pub enum Modifier {
     MarvelMultiverse(i32, i32), // (edges, troubles) - already calculated net values
     CyberpunkRed,
     Witcher,
+    CypherSystem(u32),
 }
 
 #[derive(Debug, Clone)]
