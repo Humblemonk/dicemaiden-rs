@@ -111,9 +111,9 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
 
     // Handle special commands using shared help text
     match dice_expr.trim().to_lowercase().as_str() {
-        "help" => return Ok(CommandResponse::public(help_text::generate_basic_help())),
-        "help alias" => return Ok(CommandResponse::public(help_text::generate_alias_help())),
-        "help system" => return Ok(CommandResponse::public(help_text::generate_system_help())),
+        "help" => return Ok(CommandResponse::private(help_text::generate_basic_help())),
+        "help alias" => return Ok(CommandResponse::private(help_text::generate_alias_help())),
+        "help system" => return Ok(CommandResponse::private(help_text::generate_system_help())),
         "donate" => return Ok(CommandResponse::public(generate_donate_text())),
         "bot-info" => {
             let bot_info = generate_bot_info(ctx).await?;
