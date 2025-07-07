@@ -93,6 +93,8 @@ pub fn generate_alias_help() -> String {
 • `dd34` → 1d3*10 + 1d4 (double-digit d66 style)
 • `ed15` → Earthdawn step 15
 • `cs 3` → Cypher System 1d20 cs3 (Level 3 task, target 9+)
+• `conan3` → 3d20 conan (3d20 skill roll)
+• `conan2cd4` → 2d20 + 4d6 custom combined attack
 
 Use `/roll help system` for specific examples!"#
         .to_string()

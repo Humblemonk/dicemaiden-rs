@@ -61,6 +61,8 @@ pub enum Modifier {
     Witcher,
     CypherSystem(u32),
     BraveNewWorld(u32),
+    ConanSkill(u32),  // conan, conan3, conan4, conan5 - d20 skill rolls
+    ConanCombat(u32), // cd, cd4, cd5 - combat dice interpretation
 }
 
 #[derive(Debug, Clone)]

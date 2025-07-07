@@ -1266,6 +1266,47 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::CypherSystem(level));
     }
 
+    // Conan skill roll handling (conan, conan3, conan4, conan5)
+    if part == "conan" {
+        return Ok(Modifier::ConanSkill(2)); // Default 2d20
+    }
+    if let Some(stripped) = part.strip_prefix("conan") {
+        if let Ok(dice_count) = stripped.parse::<u32>() {
+            if (2..=5).contains(&dice_count) {
+                return Ok(Modifier::ConanSkill(dice_count));
+            } else {
+                return Err(anyhow!(
+                    "Conan skill rolls support 2-5 dice, got {}",
+                    dice_count
+                ));
+            }
+        }
+    }
+
+    // Conan combat dice handling (cd, cd4, cd10, etc.)
+    if part == "cd" {
+        return Ok(Modifier::ConanCombat(1)); // Default 1d6
+    }
+    if let Some(stripped) = part.strip_prefix("cd") {
+        if let Ok(dice_count) = stripped.parse::<u32>() {
+            if dice_count > 0 && dice_count <= 100 {
+                // Reasonable limit
+                return Ok(Modifier::ConanCombat(dice_count));
+            } else {
+                return Err(anyhow!(
+                    "Conan combat dice count must be 1-100, got {}",
+                    dice_count
+                ));
+            }
+        }
+    }
+
+    if is_multi_sided_dice_expression(part) {
+        // This is additional dice that should be added to the roll
+        let dice_roll = parse_dice_expression_only(part)?;
+        return Ok(Modifier::AddDice(dice_roll));
+    }
+
     // Check for invalid characters before parsing numbers
     if part.contains(['+', '-', '*', '/']) {
         return Err(anyhow!("Invalid modifier '{}' - contains operator", part));
@@ -1628,4 +1669,45 @@ fn parse_dice_expression_only(input: &str) -> Result<DiceRoll> {
     } else {
         Err(anyhow!("Invalid dice expression: {}", input))
     }
+}
+
+fn is_multi_sided_dice_expression(part: &str) -> bool {
+    // Only detect dice expressions that are clearly additional dice, not modifiers
+
+    // Pattern 1: Multi-digit count + d + sides (like "3d6", "2d10", "10d6")
+    // 2+ digit count is clearly dice, not a drop modifier
+    if Regex::new(r"^(\d{2,})d(\d+)$").unwrap().is_match(part) {
+        return true;
+    }
+
+    // Pattern 2: Single digit count + d + multi-digit sides (like "1d20", "3d100")
+    // Multi-digit sides is clearly dice, not a drop modifier
+    if Regex::new(r"^(\d)d(\d{2,})$").unwrap().is_match(part) {
+        return true;
+    }
+
+    // Pattern 3: Common multi-die patterns that aren't drop modifiers
+    if let Some(caps) = Regex::new(r"^(\d+)d([46]|8|10|12|20|100)$")
+        .unwrap()
+        .captures(part)
+    {
+        if let (Ok(count), Ok(sides)) = (caps[1].parse::<u32>(), caps[2].parse::<u32>()) {
+            // If count > 1, it's clearly additional dice, not a drop modifier
+            if count > 1 {
+                return true;
+            }
+            // For count=1, check sides - d4, d6, d8, d10, d12, d20, d100 are likely dice
+            // Exclude d1, d2, d3 which are likely drop modifiers
+            if sides >= 4 {
+                return true;
+            }
+        }
+    }
+
+    // Pattern 4: Percentile dice (d% patterns)
+    if part == "d%" || part.ends_with("d%") {
+        return true;
+    }
+
+    false // Default to not a dice expression - let normal modifier parsing handle it
 }

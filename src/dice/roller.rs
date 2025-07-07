@@ -12,30 +12,25 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     }
 
     let mut rng = rand::rng();
-    let mut result = RollResult {
-        individual_rolls: Vec::new(),
-        kept_rolls: Vec::new(),
-        dropped_rolls: Vec::new(),
-        total: 0,
-        successes: None,
-        failures: None,
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
-        notes: Vec::new(),
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-    };
+
+    // Check for Conan system handlers
+    let has_conan_skill = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::ConanSkill(_)));
+
+    if has_conan_skill {
+        return handle_conan_skill_roll(dice, &mut rng);
+    }
+
+    let has_conan_combat = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::ConanCombat(_)));
+
+    if has_conan_combat {
+        return handle_conan_combat_roll(dice, &mut rng);
+    }
 
     // Check if this is a D6 System roll - handle it specially
     let has_d6_system = dice
@@ -75,6 +70,31 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     if has_brave_new_world {
         return handle_brave_new_world_roll(dice, &mut rng);
     }
+
+    let mut result = RollResult {
+        individual_rolls: Vec::new(),
+        kept_rolls: Vec::new(),
+        dropped_rolls: Vec::new(),
+        total: 0,
+        successes: None,
+        failures: None,
+        botches: None,
+        comment: dice.comment.clone(),
+        label: dice.label.clone(),
+        notes: Vec::new(),
+        dice_groups: Vec::new(),
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
+        godbound_damage: None,
+        fudge_symbols: None,
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
+        wng_wrath_dice: None,
+        suppress_comment: false,
+    };
 
     // Normal dice rolling flow for non-Savage Worlds dice
     // Initial dice rolls
@@ -695,6 +715,14 @@ fn apply_special_system_modifiers(
             Modifier::CypherSystem(level) => {
                 apply_cypher_system_mechanics(result, *level)?;
                 has_special_system = true;
+            }
+            Modifier::ConanSkill(_) => {
+                // Conan skill rolls are handled in the main roll_dice function
+                // Don't process them here
+            }
+            Modifier::ConanCombat(_) => {
+                // Conan combat dice are handled in the main roll_dice function
+                // Don't process them here
             }
 
             _ => {} // Skip modifiers already handled above
@@ -2314,6 +2342,292 @@ pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result
             }
         }
     }
+
+    Ok(result)
+}
+
+fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
+    let mut result = RollResult {
+        individual_rolls: Vec::new(),
+        kept_rolls: Vec::new(),
+        dropped_rolls: Vec::new(),
+        total: 0,
+        successes: None,
+        failures: None,
+        botches: None,
+        comment: dice.comment.clone(),
+        label: dice.label.clone(),
+        notes: Vec::new(),
+        dice_groups: Vec::new(),
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
+        godbound_damage: None,
+        fudge_symbols: None,
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
+        wng_wrath_dice: None,
+        suppress_comment: false,
+    };
+
+    // Find the ConanSkill modifier to get dice count
+    let dice_count = dice
+        .modifiers
+        .iter()
+        .find_map(|m| {
+            if let Modifier::ConanSkill(count) = m {
+                Some(*count)
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| anyhow!("Expected ConanSkill modifier"))?;
+
+    // 1. Roll the base skill dice (d20s)
+    for _ in 0..dice_count {
+        result.individual_rolls.push(rng.random_range(1..=20));
+    }
+
+    // Count successes for skill dice (simple approach: count = successes)
+    let skill_successes = result.individual_rolls.len() as i32;
+    result.successes = Some(skill_successes);
+    result.total = skill_successes;
+    result.kept_rolls = result.individual_rolls.clone();
+
+    // Create dice group for skill dice
+    result.dice_groups.push(DiceGroup {
+        _description: format!("{dice_count}d20"),
+        rolls: result.individual_rolls.clone(),
+        modifier_type: "base".to_string(),
+    });
+
+    // 2. Process AddDice modifiers (this is where the 5d6 comes from)
+    let mut combat_dice_total = 0;
+    let mut has_combat_dice = false;
+    let mut combat_specials = 0;
+
+    for modifier in &dice.modifiers {
+        if let Modifier::AddDice(additional_dice) = modifier {
+            // Roll the additional dice
+            let additional_result = roll_dice(additional_dice.clone())?;
+
+            // Check if these are d6 dice that should use Conan combat interpretation
+            if additional_dice.sides == 6 {
+                // Apply Conan combat dice interpretation to the d6 results
+                let combat_damage =
+                    apply_conan_combat_interpretation(&additional_result.individual_rolls);
+                combat_dice_total += combat_damage;
+                has_combat_dice = true;
+
+                // Count special effects (5s and 6s) for notes
+                for &roll in &additional_result.individual_rolls {
+                    if roll == 5 || roll == 6 {
+                        combat_specials += 1;
+                    }
+                }
+
+                // Add combat dice to display
+                result
+                    .individual_rolls
+                    .extend(additional_result.individual_rolls.clone());
+                result
+                    .kept_rolls
+                    .extend(additional_result.kept_rolls.clone());
+
+                // Create dice group for combat dice
+                result.dice_groups.push(DiceGroup {
+                    _description: format!("{}d6", additional_dice.count),
+                    rolls: additional_result.individual_rolls.clone(),
+                    modifier_type: "add".to_string(),
+                });
+            } else {
+                // Regular additional dice (not combat)
+                result.total += additional_result.total;
+                result
+                    .individual_rolls
+                    .extend(additional_result.individual_rolls.clone());
+                result
+                    .kept_rolls
+                    .extend(additional_result.kept_rolls.clone());
+
+                result.dice_groups.push(DiceGroup {
+                    _description: format!("{}d{}", additional_dice.count, additional_dice.sides),
+                    rolls: additional_result.individual_rolls.clone(),
+                    modifier_type: "add".to_string(),
+                });
+            }
+        }
+    }
+
+    // 3. Add combat damage to total
+    if has_combat_dice {
+        result.total += combat_dice_total;
+        let current_successes = result.successes.unwrap_or(0);
+        result.successes = Some(current_successes + combat_dice_total);
+    }
+
+    // 4. Apply regular mathematical modifiers (if any)
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::Add(value) => {
+                result.total += value;
+            }
+            Modifier::Subtract(value) => {
+                result.total -= value;
+            }
+            Modifier::Multiply(value) => {
+                result.total *= value;
+            }
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                result.total /= value;
+            }
+            _ => {} // Skip modifiers already handled
+        }
+    }
+
+    // 5. Add notes for combat dice (NEW SECTION)
+    if has_combat_dice {
+        // Add special effects note if applicable
+        if combat_specials > 0 {
+            result
+                .notes
+                .push(format!("{combat_specials} special effects"));
+        }
+
+        // Add the interpretation rule note
+        result
+            .notes
+            .push("1=1, 2=2, 3-4=0, 5-6=1+special".to_string());
+    }
+
+    Ok(result)
+}
+
+// Helper function to apply Conan combat dice interpretation
+fn apply_conan_combat_interpretation(rolls: &[i32]) -> i32 {
+    let mut damage = 0;
+
+    for &roll in rolls {
+        match roll {
+            1 => damage += 1,
+            2 => damage += 2,
+            3 | 4 => { /* no damage */ }
+            5 | 6 => {
+                damage += 1;
+                // Note: 5-6 also grant special effects in actual play
+            }
+            _ => {}
+        }
+    }
+
+    damage
+}
+
+fn handle_conan_combat_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
+    let mut result = RollResult {
+        individual_rolls: Vec::new(),
+        kept_rolls: Vec::new(),
+        dropped_rolls: Vec::new(),
+        total: 0,
+        successes: None,
+        failures: None,
+        botches: None,
+        comment: dice.comment.clone(),
+        label: dice.label.clone(),
+        notes: Vec::new(),
+        dice_groups: Vec::new(),
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
+        godbound_damage: None,
+        fudge_symbols: None,
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
+        wng_wrath_dice: None,
+        suppress_comment: false,
+    };
+
+    // Find the ConanCombat modifier to get dice count
+    let dice_count = dice
+        .modifiers
+        .iter()
+        .find_map(|m| {
+            if let Modifier::ConanCombat(count) = m {
+                Some(*count)
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| anyhow!("Expected ConanCombat modifier"))?;
+
+    // Roll the combat dice (d6s)
+    for _ in 0..dice_count {
+        result.individual_rolls.push(rng.random_range(1..=6));
+    }
+
+    // Apply Conan combat dice interpretation
+    let mut successes = 0;
+    let mut specials = 0;
+
+    for &roll in &result.individual_rolls {
+        match roll {
+            1 => successes += 1,
+            2 => successes += 2,
+            3 | 4 => { /* no effect */ }
+            5 | 6 => {
+                successes += 1;
+                specials += 1;
+            }
+            _ => {}
+        }
+    }
+
+    result.successes = Some(successes);
+    result.total = successes;
+    result.kept_rolls = result.individual_rolls.clone();
+
+    // Create dice group for display
+    result.dice_groups.push(DiceGroup {
+        _description: format!("{dice_count}d6"),
+        rolls: result.individual_rolls.clone(),
+        modifier_type: "base".to_string(),
+    });
+
+    // Apply mathematical modifiers to the final total
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::Add(value) => {
+                result.total += value;
+            }
+            Modifier::Subtract(value) => {
+                result.total -= value;
+            }
+            Modifier::Multiply(value) => {
+                result.total *= value;
+            }
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                result.total /= value;
+            }
+            _ => {}
+        }
+    }
+
+    if specials > 0 {
+        result.notes.push(format!("{specials} special effects"));
+    }
+    result
+        .notes
+        .push("1=1, 2=2, 3-4=0, 5-6=1+special".to_string());
 
     Ok(result)
 }

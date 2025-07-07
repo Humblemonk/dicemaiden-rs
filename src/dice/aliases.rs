@@ -101,6 +101,17 @@ static CS_REGEX: Lazy<Regex> = Lazy::new(|| {
 static BNW_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^bnw(\d+)$").expect("Failed to compile BNW_REGEX"));
 
+static CONAN_SKILL_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^conan([345])$").expect("Failed to compile CONAN_SKILL_REGEX"));
+
+static CONAN_COMBAT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^cd(\d+)$").expect("Failed to compile CONAN_COMBAT_REGEX"));
+
+// Combined attack patterns (conan3cd4 = 3d20 skill + 4d6 combat)
+static CONAN_COMBINED_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^conan([2-5])cd(\d+)$").expect("Failed to compile CONAN_COMBINED_REGEX")
+});
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -118,6 +129,8 @@ static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| 
     aliases.insert("4df", "4d3 fudge");
     aliases.insert("dh", "1d10 dh");
     aliases.insert("wng", "1d6 wng");
+    aliases.insert("conan", "2d20 conan");
+    aliases.insert("cd", "1d6 cd");
     aliases
 });
 
@@ -473,6 +486,27 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = BNW_REGEX.captures(input) {
         let pool_size = &captures[1];
         return Some(format!("{pool_size}d6 bnw"));
+    }
+
+    // Handle Conan combined patterns first (most specific)
+    if let Some(captures) = CONAN_COMBINED_REGEX.captures(input) {
+        let skill_dice = &captures[1];
+        let combat_dice = &captures[2];
+        return Some(format!(
+            "{skill_dice}d20 conan{skill_dice} {combat_dice}d6 cd{combat_dice}"
+        ));
+    }
+
+    // Handle Conan skill dice patterns
+    if let Some(captures) = CONAN_SKILL_REGEX.captures(input) {
+        let dice_count = &captures[1];
+        return Some(format!("{dice_count}d20 conan{dice_count}"));
+    }
+
+    // Handle Conan combat dice patterns
+    if let Some(captures) = CONAN_COMBAT_REGEX.captures(input) {
+        let dice_count = &captures[1];
+        return Some(format!("{dice_count}d6 cd{dice_count}"));
     }
 
     None
