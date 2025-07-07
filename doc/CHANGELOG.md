@@ -5,6 +5,7 @@
 ## Added
 
 - Made help commands respond in private message to reduce chat spam
+- Added target lower modifier (tl) 
 - Added support for Cyberpunk RED
 - Added support for Witcher d10
 - Added support for additional wrath dice for wrath and glory

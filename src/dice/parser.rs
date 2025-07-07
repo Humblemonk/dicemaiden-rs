@@ -1395,6 +1395,17 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::KeepHigh(num));
     }
 
+    // Target Lower (tl) must be checked BEFORE Target (t) to avoid conflicts
+    if let Some(stripped) = part.strip_prefix("tl") {
+        let num = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid target lower value in '{}'", part))?;
+        if num == 0 {
+            return Err(anyhow!("Target lower value must be greater than 0"));
+        }
+        return Ok(Modifier::TargetLower(num));
+    }
+
     if let Some(stripped) = part.strip_prefix('t') {
         let num = stripped
             .parse()
