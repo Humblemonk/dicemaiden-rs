@@ -37,6 +37,15 @@
 - `sw12` → 1d12 trait + 1d6 wild, keep highest, both explode
 - Snake Eyes: Critical failure when both dice roll natural
 
+### Conan
+- `conan` → 2d20 skill roll (default)
+- `conan4` → 4d20 skill roll (momentum spent for extra dice)
+- `cd` → 1d6 combat dice (default)
+- `cd4` → 4d6 combat dice (massive damage)
+- `conan3cd5` → 3d20 skill + 5d6 combat (combined attack)
+- Skill Rolls: Roll d20s, count successes (target number varies by difficulty)
+- Combat Dice: Special interpretation - 1=1 damage, 2=2 damage, 3-4=0 damage, 5-6=1 damage + special effect
+
 ### D&D/Pathfinder
 - `dndstats` → 6 4d6 k3 (ability score generation)
 - `attack +5` → 1d20 +5 (attack roll)
