@@ -633,6 +633,10 @@ fn apply_special_system_modifiers(
                 count_dice_matching(result, |roll| roll >= *value as i32, "successes")?;
                 has_special_system = true;
             }
+            Modifier::TargetLower(value) => {
+                count_dice_matching(result, |roll| roll <= *value as i32, "successes")?;
+                has_special_system = true;
+            }
             Modifier::Failure(value) => {
                 count_failures_and_subtract(result, *value)?;
             }

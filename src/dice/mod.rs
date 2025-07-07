@@ -40,7 +40,8 @@ pub enum Modifier {
     KeepLow(u32),                   // kl#
     Reroll(u32),                    // r#
     RerollIndefinite(u32),          // ir#
-    Target(u32),                    // t#
+    Target(u32),                    // t#  - count successes >= target
+    TargetLower(u32),               // tl# - count successes <= target
     Failure(u32),                   // f#
     Botch(Option<u32>),             // b or b#
     AddDice(DiceRoll),              // Additional dice

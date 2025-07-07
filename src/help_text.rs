@@ -22,6 +22,7 @@ pub fn generate_basic_help() -> String {
 • `r2` - Reroll dice ≤ 2 once
 • `ir2` - Reroll dice ≤ 2 indefinitely
 • `t7` - Count successes (≥ 7)
+• `tl6` - Count successes (≤ 6)
 • `f1` - Count failures (≤ 1)
 • `b1` - Count botches (≤ 1)
 • `gb` - Godbound damage chart (1-=0, 2-5=1, 6-9=2, 10+=4)

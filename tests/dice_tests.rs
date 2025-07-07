@@ -580,6 +580,105 @@ mod tests {
         assert_eq!(result[0].modifiers.len(), 3);
     }
 
+    // Add these tests to the TARGET SYSTEM TESTS section in tests/dice_tests.rs
+    // Place them after the existing target tests but before the next section
+
+    #[test]
+    fn test_target_lower_parsing() {
+        let result = parser::parse_dice_string("6d10 tl7").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].count, 6);
+        assert_eq!(result[0].sides, 10);
+        assert_eq!(result[0].modifiers.len(), 1);
+        match &result[0].modifiers[0] {
+            Modifier::TargetLower(7) => {}
+            _ => panic!("Expected TargetLower(7) modifier"),
+        }
+    }
+
+    #[test]
+    fn test_target_lower_validation() {
+        // Should fail with 0 target
+        assert!(parser::parse_dice_string("6d10 tl0").is_err());
+
+        // Should succeed with valid targets
+        assert!(parser::parse_dice_string("6d10 tl1").is_ok());
+        assert!(parser::parse_dice_string("6d10 tl5").is_ok());
+        assert!(parser::parse_dice_string("6d10 tl10").is_ok());
+    }
+
+    #[test]
+    fn test_target_lower_vs_target_parsing() {
+        // Test that both can coexist and parse correctly
+        let tl_result = parser::parse_dice_string("6d10 tl7").unwrap();
+        let t_result = parser::parse_dice_string("6d10 t7").unwrap();
+
+        match &tl_result[0].modifiers[0] {
+            Modifier::TargetLower(7) => {}
+            _ => panic!("Expected TargetLower(7) modifier"),
+        }
+
+        match &t_result[0].modifiers[0] {
+            Modifier::Target(7) => {}
+            _ => panic!("Expected Target(7) modifier"),
+        }
+    }
+
+    #[test]
+    fn test_target_lower_success_counting() {
+        let tl_result = parse_and_roll("6d10 tl7").unwrap();
+        assert_eq!(tl_result.len(), 1);
+        assert!(tl_result[0].successes.is_some());
+
+        let t_result = parse_and_roll("6d10 t7").unwrap();
+        assert_eq!(t_result.len(), 1);
+        assert!(t_result[0].successes.is_some());
+
+        // Both should have success counts (we can't predict exact values with random dice)
+        let tl_successes = tl_result[0].successes.unwrap();
+        let t_successes = t_result[0].successes.unwrap();
+
+        // Validate that both are reasonable values (0-6 for 6d10)
+        assert!((0..=6).contains(&tl_successes));
+        assert!((0..=6).contains(&t_successes));
+    }
+
+    #[test]
+    fn test_target_lower_combined_modifiers() {
+        // Test TargetLower with other modifiers
+        assert_valid("6d10 tl7 +2");
+        assert_valid("6d10 ie10 tl7");
+        assert_valid("6d10 k4 tl7");
+
+        let result = parse_and_roll("6d10 tl7 +2").unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].successes.is_some());
+
+        // For success-counting systems, total should equal successes (modifiers applied to successes)
+        let successes = result[0].successes.unwrap();
+        assert_eq!(
+            result[0].total, successes,
+            "Total should equal successes for success-based systems"
+        );
+
+        // The +2 modifier should have been applied to the success count
+        // We can't test exact values due to randomness, but we can verify structure
+        assert!(successes >= 0, "Successes should be non-negative");
+    }
+
+    #[test]
+    fn test_target_lower_system_validation() {
+        // Test that tl can be used in target system section
+        assert_valid("6d10tl7");
+        assert_valid("6d10 tl7");
+        assert_valid("4d6tl3");
+        assert_valid("4d6 tl3");
+
+        // Test combined target and target lower
+        assert_valid("6d10 t8 tl3");
+        assert_valid("6d10 tl5 t9");
+    }
+
     // ============================================================================
     // FLAGS
     // ============================================================================
