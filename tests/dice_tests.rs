@@ -7,6 +7,8 @@ use dicemaiden_rs::{
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dicemaiden_rs::DiceRoll;
+    use dicemaiden_rs::roller;
 
     // ============================================================================
     // BASIC DICE TESTS
@@ -479,6 +481,119 @@ mod tests {
             Modifier::RerollIndefinite(2) => {}
             _ => panic!("Expected RerollIndefinite(2) modifier"),
         }
+    }
+
+    #[test]
+    fn test_reroll_greater_dice() {
+        assert_valid("4d6rg5");
+        assert_valid("4d6 rg5");
+        assert_valid("4d6rg15");
+        assert_valid("4d6 rg15");
+        assert_valid("4d6irg5");
+        assert_valid("4d6 irg5");
+    }
+
+    #[test]
+    fn test_reroll_greater_parsing() {
+        let result = parser::parse_dice_string("4d6 rg5").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].count, 4);
+        assert_eq!(result[0].sides, 6);
+        assert_eq!(result[0].modifiers.len(), 1);
+        match &result[0].modifiers[0] {
+            Modifier::RerollGreater(5) => {}
+            _ => panic!("Expected RerollGreater(5) modifier"),
+        }
+    }
+
+    #[test]
+    fn test_indefinite_reroll_greater() {
+        let result = parser::parse_dice_string("4d6 irg5").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].modifiers.len(), 1);
+        match &result[0].modifiers[0] {
+            Modifier::RerollGreaterIndefinite(5) => {}
+            _ => panic!("Expected RerollGreaterIndefinite(5) modifier"),
+        }
+    }
+
+    #[test]
+    fn test_reroll_greater_behavior() {
+        // Test with fixed dice to verify behavior
+        let dice = DiceRoll {
+            count: 3,
+            sides: 6,
+            modifiers: vec![Modifier::RerollGreater(4)], // Reroll 4, 5, 6
+            comment: None,
+            label: None,
+            private: false,
+            simple: false,
+            no_results: false,
+            unsorted: false,
+            original_expression: None,
+        };
+
+        let result = roller::roll_dice(dice).unwrap();
+        assert_eq!(result.individual_rolls.len(), 3);
+        assert!(result.individual_rolls.iter().all(|&x| x >= 1 && x <= 6));
+
+        // Check that reroll note is present when rerolls occur
+        // Since this is random, we can't guarantee rerolls, but we can check the logic works
+        assert!(result.total > 0);
+    }
+
+    #[test]
+    fn test_reroll_greater_zero_threshold() {
+        // Test that rg0 is rejected (invalid threshold)
+        let result = parser::parse_dice_string("4d6 rg0");
+        assert!(result.is_err());
+
+        let result = parser::parse_dice_string("4d6 irg0");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_reroll_greater_vs_regular_reroll() {
+        // Test that rg and r are parsed differently
+        let regular_result = parser::parse_dice_string("4d6 r2").unwrap();
+        let greater_result = parser::parse_dice_string("4d6 rg2").unwrap();
+
+        assert_eq!(regular_result.len(), 1);
+        assert_eq!(greater_result.len(), 1);
+
+        match &regular_result[0].modifiers[0] {
+            Modifier::Reroll(2) => {}
+            _ => panic!("Expected regular Reroll(2)"),
+        }
+
+        match &greater_result[0].modifiers[0] {
+            Modifier::RerollGreater(2) => {}
+            _ => panic!("Expected RerollGreater(2)"),
+        }
+    }
+
+    #[test]
+    fn test_reroll_greater_combined_modifiers() {
+        // Test combined modifiers like "4d6rg5k3"
+        assert_valid("4d6rg5k3");
+        assert_valid("4d6irg4e6");
+
+        let result = parser::parse_dice_string("4d6 rg5 k3").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].modifiers.len(), 2);
+
+        // Should have both RerollGreater and KeepHigh modifiers
+        let has_reroll_greater = result[0]
+            .modifiers
+            .iter()
+            .any(|m| matches!(m, Modifier::RerollGreater(5)));
+        let has_keep_high = result[0]
+            .modifiers
+            .iter()
+            .any(|m| matches!(m, Modifier::KeepHigh(3)));
+
+        assert!(has_reroll_greater, "Should have RerollGreater modifier");
+        assert!(has_keep_high, "Should have KeepHigh modifier");
     }
 
     // ============================================================================

@@ -831,10 +831,12 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
         // Try to extract known modifier patterns
         let patterns = [
             r"^(ie\d*)",            // Indefinite explode first (longer pattern)
+            r"^(irg\d+)",           // Indefinite reroll greater (before ir)
             r"^(ir\d+)",            // Indefinite reroll
             r"^(kl\d+)",            // Keep lowest
             r"^(e\d*)",             // Explode (after ie)
             r"^(k\d+)",             // Keep highest
+            r"^(rg\d+)",            // Reroll greater (before r)
             r"^(r\d+)",             // Reroll (after ir)
             r"^(d\d+)",             // Drop
             r"^(t\d+)",             // Target
@@ -1074,6 +1076,8 @@ fn is_combined_modifiers_token(input: &str) -> bool {
         r"^(k\d+)",
         r"^(kl\d+)",
         r"^(d\d+)",
+        r"^(rg\d+)",
+        r"^(irg\d+)",
         r"^(r\d+)",
         r"^(ir\d+)",
         r"^(t\d+)",
@@ -1112,6 +1116,8 @@ fn is_modifier_start(input: &str) -> bool {
         r"^k\d+",
         r"^kl\d+",
         r"^d\d+",
+        r"^rg\d+",
+        r"^irg\d+",
         r"^r\d+",
         r"^ir\d+",
         r"^t\d+",
@@ -1393,6 +1399,27 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             return Err(anyhow!("Cannot drop 0 dice"));
         }
         return Ok(Modifier::Drop(num));
+    }
+
+    // Check indefinite reroll greater (irg) BEFORE regular reroll greater (rg)
+    if let Some(stripped) = part.strip_prefix("irg") {
+        let num = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid indefinite reroll greater value in '{}'", part))?;
+        if num == 0 {
+            return Err(anyhow!("Cannot reroll on 0 - invalid threshold"));
+        }
+        return Ok(Modifier::RerollGreaterIndefinite(num));
+    }
+
+    if let Some(stripped) = part.strip_prefix("rg") {
+        let num = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid reroll greater value in '{}'", part))?;
+        if num == 0 {
+            return Err(anyhow!("Cannot reroll on 0 - invalid threshold"));
+        }
+        return Ok(Modifier::RerollGreater(num));
     }
 
     // Continue with other modifiers...
