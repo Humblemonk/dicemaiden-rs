@@ -1,4 +1,12 @@
 // tests/dice_tests.rs - Comprehensive Dice Maiden test suite
+//
+// This file contains comprehensive tests for the Dice Maiden dice rolling system.
+// Tests are organized by functionality and cover parsing, rolling mechanics,
+// game systems, and edge cases.
+//
+// IMPORTANT: All tests validate critical functionality. Do not remove or consolidate
+// tests without careful analysis as each test covers specific edge cases or behaviors.
+
 use dicemaiden_rs::{
     dice::{Modifier, RollResult, aliases, parser},
     format_multiple_results_with_limit, help_text, parse_and_roll,
@@ -9,14 +17,17 @@ mod tests {
     use super::*;
     use dicemaiden_rs::DiceRoll;
     use dicemaiden_rs::roller;
+    use std::time::Instant;
 
     // ============================================================================
     // BASIC DICE TESTS
+    // Tests fundamental dice parsing and rolling functionality
     // ============================================================================
 
     #[test]
     fn test_left_to_right_math_evaluation() {
         // Test left-to-right vs PEMDAS differences using both numbers and dice expressions
+        // This is critical for ensuring mathematical operations follow the expected order
 
         // Pure number expressions with 1d1 (always rolls 1)
         // This should be (1 + 2) * 3 = 9, not 1 + (2 * 3) = 7
@@ -61,6 +72,8 @@ mod tests {
 
     #[test]
     fn test_basic_dice() {
+        // Test fundamental dice notation parsing
+
         // Basic formats
         assert_valid("1d6");
         assert_valid("2d6");
@@ -75,7 +88,36 @@ mod tests {
     }
 
     #[test]
+    fn test_malformed_input_recovery() {
+        // Test that malformed input is properly rejected to prevent crashes
+
+        assert_invalid("d"); // Just 'd'
+        assert_invalid("1d"); // Missing sides
+        // Note: "d6d6" is actually valid - it parses as "1d6 d6" (1d6 drop 6 dice)
+        assert_invalid("1dd6"); // Double 'd'
+        assert_invalid("1d6+"); // Trailing operator
+        assert_invalid("1d6++5"); // Double operator
+        assert_invalid("1d6 + + 5"); // Spaced double operator
+        // Note: "1d6 5" is actually valid - it parses as "1d6 + 5" (implicit addition)
+        assert_invalid("1d6+5+"); // Trailing operator
+        assert_invalid(""); // Empty
+        assert_invalid("   "); // Whitespace only
+        assert_invalid("\t\n"); // Tabs/newlines
+        // Note: "d6d6d6" is actually valid - it parses as "1d6 + (1d6 drop 6)"
+        assert_invalid("1d6 abc"); // Non-numeric modifier that doesn't match any pattern
+        assert_invalid("abc"); // No dice at all
+        assert_invalid("1d6xyz"); // Invalid modifier suffix
+        // Note: "1d6e" is actually valid - it means explode on max value (6 for d6)
+        assert_invalid("1d6k"); // Incomplete keep modifier (requires count)
+        assert_invalid("1d6d"); // Incomplete drop modifier (requires count)
+        assert_invalid("1d6r"); // Incomplete reroll modifier (requires threshold)
+        assert_invalid("1d6t"); // Incomplete target modifier (requires number)
+        assert_invalid("dd6"); // Double 'd' at start
+    }
+
+    #[test]
     fn test_basic_dice_parsing() {
+        // Test that basic dice expressions parse correctly with expected values
         let result = parser::parse_dice_string("2d6").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 2);
@@ -85,6 +127,8 @@ mod tests {
 
     #[test]
     fn test_dice_limits() {
+        // Test boundary conditions for dice counts and sides
+
         assert_valid("500d1000"); // Max allowed
         assert_invalid("501d6"); // Too many dice
         assert_invalid("1d1001"); // Too many sides
@@ -93,10 +137,20 @@ mod tests {
         assert_valid("sil10"); // Max allowed
         assert_invalid("sil0"); // Zero dice
         assert_invalid("sil11"); // Too many dice
+        assert_invalid("-1d6"); // Negative dice count
+        assert_invalid("1d-6"); // Negative sides
+
+        // Test that large mathematical operations don't overflow
+        let result = parse_and_roll("500d1 * 2").unwrap();
+        assert_eq!(result[0].total, 1000); // 500 * 1 * 2 = 1000
+
+        let result = parse_and_roll("1d1 + 999999").unwrap();
+        assert_eq!(result[0].total, 1000000); // 1 + 999999 = 1000000
     }
 
     #[test]
     fn test_single_die() {
+        // Test that default dice count is 1 when omitted
         let result = parser::parse_dice_string("d6").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 1);
@@ -105,6 +159,7 @@ mod tests {
 
     #[test]
     fn test_maximum_valid_dice_count() {
+        // Test upper boundary for dice count
         let result = parser::parse_dice_string("500d6").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 500);
@@ -113,6 +168,7 @@ mod tests {
 
     #[test]
     fn test_maximum_valid_die_sides() {
+        // Test upper boundary for die sides
         let result = parser::parse_dice_string("1d1000").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 1);
@@ -121,6 +177,7 @@ mod tests {
 
     #[test]
     fn test_percentile_dice() {
+        // Test that percentile dice (d%) converts to d100
         let result = parser::parse_dice_string("1d%").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 1);
@@ -129,10 +186,13 @@ mod tests {
 
     // ============================================================================
     // MATHEMATICAL MODIFIERS
+    // Tests arithmetic operations on dice results
     // ============================================================================
 
     #[test]
     fn test_math_modifiers() {
+        // Test basic mathematical operations on dice
+
         // Basic operations
         assert_valid("1d6+5");
         assert_valid("1d6 + 5");
@@ -150,16 +210,18 @@ mod tests {
         assert_valid("3d8-1d6");
         assert_valid("3d8 - 1d6");
 
-        // Complex
+        // Complex expressions
         assert_valid("2d6+3d8+5");
         assert_valid("1d20+1d6-2");
 
-        // Error cases
+        // Error cases - division by zero protection
         assert_invalid("1d6/0");
+        assert_invalid("5d10 / 0");
     }
 
     #[test]
     fn test_dice_with_modifier() {
+        // Test that modifiers are parsed correctly
         let result = parser::parse_dice_string("3d8 + 5").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 3);
@@ -173,6 +235,7 @@ mod tests {
 
     #[test]
     fn test_dice_math_with_multiple_dice() {
+        // Test complex expressions with multiple modifiers
         let result = parser::parse_dice_string("10d6 e6 k8 +4").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 10);
@@ -182,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_dice_operations_with_predictable_results() {
-        // Test dice multiplication with fixed dice
+        // Test dice multiplication with fixed dice (1d1 always = 1)
         let result = parse_and_roll("3d1 * 2d1").unwrap();
         assert_eq!(result.len(), 1);
         // 3d1 = 3, 2d1 = 2, so 3 * 2 = 6
@@ -224,7 +287,7 @@ mod tests {
 
     #[test]
     fn test_number_divided_by_dice() {
-        // Test number divided by dice
+        // Test number divided by dice (special case: number comes first)
         let result = parse_and_roll("200/1d1").unwrap();
         assert_eq!(result.len(), 1);
         // 1d1 always rolls 1, so 200/1 = 200
@@ -248,8 +311,7 @@ mod tests {
 
     #[test]
     fn test_number_divided_by_percentile_dice() {
-        // Test with percentile dice (d%)
-        // Use a loop to test multiple times since d% is random
+        // Test with percentile dice (d%) - random results, test range
         let mut found_valid_result = false;
 
         for _ in 0..10 {
@@ -272,6 +334,8 @@ mod tests {
 
     #[test]
     fn test_math_edge_cases() {
+        // Test mathematical edge cases and boundary conditions
+
         // Roll sets with division syntax
         let result = parse_and_roll("4 20/2d1").unwrap();
         assert_eq!(result.len(), 4, "Should create 4 roll sets");
@@ -345,6 +409,7 @@ mod tests {
 
     #[test]
     fn test_math_behavior() {
+        // Test that mathematical operations produce expected results
         let results = parse_and_roll("2d6 + 3").unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(
@@ -355,6 +420,7 @@ mod tests {
 
     #[test]
     fn test_format_multiple_results() {
+        // Test result formatting functionality
         let result1 = RollResult {
             individual_rolls: vec![3, 5],
             kept_rolls: vec![3, 5],
@@ -387,10 +453,12 @@ mod tests {
 
     // ============================================================================
     // DICE MODIFIERS
+    // Tests for dice modification mechanics (exploding, keep/drop, rerolls)
     // ============================================================================
 
     #[test]
     fn test_exploding_dice() {
+        // Test exploding dice syntax parsing
         assert_valid("3d6e");
         assert_valid("3d6 e");
         assert_valid("3d6e6");
@@ -403,6 +471,7 @@ mod tests {
 
     #[test]
     fn test_exploding_dice_parsing() {
+        // Test that exploding modifiers parse correctly
         let result = parser::parse_dice_string("4d6 e6").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 4);
@@ -416,6 +485,7 @@ mod tests {
 
     #[test]
     fn test_indefinite_explode() {
+        // Test indefinite exploding dice parsing
         let result = parser::parse_dice_string("3d6 ie6").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].modifiers.len(), 1);
@@ -427,7 +497,9 @@ mod tests {
 
     #[test]
     fn test_keep_drop_dice() {
-        // Basic keep/drop modifiers (existing tests)
+        // Test keep/drop modifiers and complex combinations
+
+        // Basic keep/drop modifiers
         assert_valid("4d6k3");
         assert_valid("4d6 k3");
         assert_valid("4d6d1");
@@ -491,12 +563,11 @@ mod tests {
         // Test complex combined modifiers with keep/drop
         assert_valid("6d10 e6k4d1"); // explode, keep, drop
         assert_valid("4d6 k3d1r1"); // keep, drop, reroll
-
-        // Note: dh and dl might need different parsing (existing comment preserved)
     }
 
     #[test]
     fn test_keep_high() {
+        // Test keep high modifier parsing
         let result = parser::parse_dice_string("4d6 k3").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 4);
@@ -510,6 +581,7 @@ mod tests {
 
     #[test]
     fn test_reroll_dice() {
+        // Test reroll modifier syntax
         assert_valid("4d6r1");
         assert_valid("4d6 r1");
         assert_valid("4d6r2");
@@ -520,6 +592,7 @@ mod tests {
 
     #[test]
     fn test_reroll_parsing() {
+        // Test reroll modifier parsing
         let result = parser::parse_dice_string("4d6 r2").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 4);
@@ -533,6 +606,7 @@ mod tests {
 
     #[test]
     fn test_indefinite_reroll() {
+        // Test indefinite reroll modifier parsing
         let result = parser::parse_dice_string("4d6 ir2").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].modifiers.len(), 1);
@@ -544,6 +618,7 @@ mod tests {
 
     #[test]
     fn test_reroll_greater_dice() {
+        // Test reroll greater modifier syntax
         assert_valid("4d6rg5");
         assert_valid("4d6 rg5");
         assert_valid("4d6rg15");
@@ -554,6 +629,7 @@ mod tests {
 
     #[test]
     fn test_reroll_greater_parsing() {
+        // Test reroll greater modifier parsing
         let result = parser::parse_dice_string("4d6 rg5").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 4);
@@ -567,6 +643,7 @@ mod tests {
 
     #[test]
     fn test_indefinite_reroll_greater() {
+        // Test indefinite reroll greater modifier parsing
         let result = parser::parse_dice_string("4d6 irg5").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].modifiers.len(), 1);
@@ -657,10 +734,12 @@ mod tests {
 
     // ============================================================================
     // TARGET SYSTEM TESTS
+    // Tests for success counting and target-based systems
     // ============================================================================
 
     #[test]
     fn test_target_system() {
+        // Test target-based system syntax
         assert_valid("6d10t7");
         assert_valid("6d10 t7");
         assert_valid("4d6f1");
@@ -673,6 +752,7 @@ mod tests {
 
     #[test]
     fn test_target_success() {
+        // Test target success modifier parsing
         let result = parser::parse_dice_string("6d10 t7").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 6);
@@ -686,6 +766,7 @@ mod tests {
 
     #[test]
     fn test_botch_modifier() {
+        // Test botch modifier parsing
         let result = parser::parse_dice_string("5d10 b1").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].modifiers.len(), 1);
@@ -697,6 +778,7 @@ mod tests {
 
     #[test]
     fn test_failure_modifier() {
+        // Test failure modifier parsing
         let result = parser::parse_dice_string("5d10 t8 f1").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].modifiers.len(), 2);
@@ -780,6 +862,7 @@ mod tests {
 
     #[test]
     fn test_multiple_modifiers() {
+        // Test parsing complex modifier combinations
         let result = parser::parse_dice_string("10d6 e6 k8 +4").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 10);
@@ -789,33 +872,147 @@ mod tests {
 
     // ============================================================================
     // GAME SYSTEM TESTS
+    // Tests for specific game system mechanics and aliases
     // ============================================================================
 
     #[test]
+    fn test_core_game_system_aliases() {
+        // Test the most commonly used game system aliases
+
+        // World of Darkness / Chronicles of Darkness
+        assert_valid("5d10 t8"); // Standard WoD target
+        assert_valid("6d10 t8 f1 b1"); // Full WoD with failure and botch
+
+        // D&D style advantage/disadvantage
+        assert_valid("2d20k1"); // Advantage (keep highest)
+        assert_valid("2d20kl1"); // Disadvantage (keep lowest)
+
+        // Shadowrun style
+        assert_valid("6d6 t5"); // Shadowrun target 5
+        assert_valid("8d6 t5 ie6"); // Shadowrun with edge (indefinite explode)
+
+        // FUDGE/FATE dice
+        assert_valid("4df"); // FUDGE dice
+
+        // Test that these actually produce expected results
+        let result = parse_and_roll("4df").unwrap();
+        assert!(
+            result[0].total >= -4 && result[0].total <= 4,
+            "FUDGE result should be -4 to +4"
+        );
+        assert!(
+            result[0].fudge_symbols.is_some(),
+            "FUDGE roll should have symbols"
+        );
+    }
+
+    #[test]
+    fn test_specialized_game_systems() {
+        // Test specialized systems that have unique mechanics
+
+        // Hero System
+        assert_valid("3d6 hsn"); // Hero System normal
+        assert_valid("2d6 hsk"); // Hero System killing
+        assert_valid("3d6 hsh"); // Hero System hit location
+
+        // Godbound
+        assert_valid("1d20 gb"); // Godbound basic
+        assert_valid("1d20 gbs"); // Godbound straight
+
+        // Dark Heresy
+        assert_valid("1d100 dh"); // Dark Heresy
+
+        // Cyberpunk Red
+        assert_valid("1d10 cpr"); // Cyberpunk Red
+
+        // Witcher
+        assert_valid("1d10 wit"); // Witcher system
+
+        // Test that these systems produce appropriate results
+        let result = parse_and_roll("1d100 dh").unwrap();
+        assert!(
+            result[0].total >= 1 && result[0].total <= 100,
+            "Dark Heresy should roll 1-100"
+        );
+
+        let result = parse_and_roll("1d20 gb").unwrap();
+        assert!(
+            result[0].total >= 1 && result[0].total <= 20,
+            "Godbound should roll 1-20"
+        );
+    }
+
+    #[test]
+    fn test_division_by_zero_protection() {
+        // Test mathematical division by zero (should be caught at parse time)
+        assert_invalid("1d6/0");
+        assert_invalid("5d10 / 0");
+
+        // Test dice division where result could be zero (runtime protection)
+        let result = parse_and_roll("10 / 1d1"); // Should work: 10/1 = 10
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap()[0].total, 10);
+
+        // Test edge case: ensure system handles when dice total could be 0
+        // This tests the runtime protection in the roller
+        for _ in 0..5 {
+            let result = parse_and_roll("100 / 1d100");
+            match result {
+                Ok(r) => assert!(r[0].total > 0, "Division result should be positive"),
+                Err(_) => {} // Division by zero caught correctly
+            }
+        }
+    }
+
+    #[test]
+    fn test_explosion_limits() {
+        // Test explosion limit protection
+        let result = parse_and_roll("1d6 ie1").unwrap(); // Always explodes
+
+        // Should have some reasonable limit on explosions (typically 100)
+        assert!(
+            result[0].individual_rolls.len() <= 101,
+            "Explosions should be limited to prevent infinite loops"
+        );
+
+        // Test normal explosion behavior
+        let result = parse_and_roll("1d6 e6").unwrap();
+        assert!(
+            result[0].individual_rolls.len() >= 1,
+            "Should have at least the original roll"
+        );
+        assert!(
+            result[0].individual_rolls.len() <= 101,
+            "Should respect explosion limits"
+        );
+    }
+
+    #[test]
     fn test_chronicle_of_darkness() {
+        // Test Chronicles of Darkness system
         assert_valid("4cod");
         assert_valid("5cod8");
         assert_valid("6cod9");
         assert_valid("4codr");
-        // Note: Some CoD patterns with spaces or advanced keywords might not parse correctly
     }
 
     #[test]
     fn test_world_of_darkness() {
+        // Test World of Darkness system
         assert_valid("4wod8");
         assert_valid("5wod6");
-        // Note: Some WoD patterns with spaces might not parse correctly
     }
 
     #[test]
     fn test_shadowrun() {
+        // Test Shadowrun system
         assert_valid("sr5");
         assert_valid("sr6");
-        // Note: Parametized shadowrun like 4sr5 might not work in current implementation
     }
 
     #[test]
     fn test_godbound() {
+        // Test Godbound system
         assert_valid("gb");
         assert_valid("gbs");
         assert_valid("gb 1d8");
@@ -824,13 +1021,14 @@ mod tests {
 
     #[test]
     fn test_fudge_fate() {
+        // Test FUDGE/FATE dice
         assert_valid("4df");
         assert_valid("3df");
-        // Note: 'df' alone might not work - needs a count
     }
 
     #[test]
     fn test_savage_worlds() {
+        // Test Savage Worlds system
         assert_valid("sw4");
         assert_valid("sw6");
         assert_valid("sw8");
@@ -840,6 +1038,7 @@ mod tests {
 
     #[test]
     fn test_savage_worlds_with_roll_sets() {
+        // Test Savage Worlds with roll sets
         assert_valid("3 sw8");
         let result = parse_and_roll("3 sw8").unwrap();
         assert_eq!(result.len(), 3);
@@ -889,6 +1088,7 @@ mod tests {
 
     #[test]
     fn test_earthdawn() {
+        // Test Earthdawn system
         assert_valid("ed4");
         assert_valid("ed6");
         assert_valid("ed8");
@@ -899,9 +1099,9 @@ mod tests {
 
     #[test]
     fn test_d6_system() {
+        // Test D6 System
         assert_valid("d6s4");
         assert_valid("d6s5");
-        // Note: More complex d6 system patterns might not work yet
     }
 
     #[test]
@@ -954,6 +1154,7 @@ mod tests {
         assert!(result[0].failures.is_none());
         assert!(result[0].botches.is_none());
     }
+
     #[test]
     fn test_cyberpunk_red_with_modifiers() {
         // Test CPR with mathematical modifiers
@@ -1018,6 +1219,7 @@ mod tests {
 
     #[test]
     fn test_witcher_basic() {
+        // Test Witcher system basic functionality
         assert_valid("wit");
         assert_valid("wit + 5");
         assert_valid("wit - 3");
@@ -1027,6 +1229,7 @@ mod tests {
 
     #[test]
     fn test_witcher_alias_expansion() {
+        // Test Witcher alias expansion
         let expanded = aliases::expand_alias("wit").unwrap();
         assert_eq!(expanded, "1d10 wit");
 
@@ -1039,6 +1242,7 @@ mod tests {
 
     #[test]
     fn test_witcher_modifier_parsing() {
+        // Test Witcher modifier parsing
         let result = parser::parse_dice_string("1d10 wit").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 1);
@@ -1053,6 +1257,7 @@ mod tests {
 
     #[test]
     fn test_witcher_rolling() {
+        // Test Witcher rolling behavior
         let result = parse_and_roll("wit").unwrap();
         assert_eq!(result.len(), 1);
 
@@ -1205,6 +1410,7 @@ mod tests {
 
     #[test]
     fn test_brave_new_world_basic() {
+        // Test Brave New World system basic functionality
         assert_valid("bnw3");
         assert_valid("bnw5");
         assert_valid("bnw1");
@@ -1223,12 +1429,14 @@ mod tests {
 
     #[test]
     fn test_brave_new_world_alias_expansion() {
+        // Test BNW alias expansion
         let expanded = aliases::expand_alias("bnw4").unwrap();
         assert_eq!(expanded, "4d6 bnw");
     }
 
     #[test]
     fn test_brave_new_world_with_modifiers() {
+        // Test BNW with mathematical modifiers
         assert_valid("bnw3 + 5");
         assert_valid("bnw4 - 2");
 
@@ -1262,6 +1470,7 @@ mod tests {
 
     #[test]
     fn test_silhouette_basic() {
+        // Test Silhouette system basic functionality
         assert_valid("sil1");
         assert_valid("sil3");
         assert_valid("sil5");
@@ -1271,6 +1480,7 @@ mod tests {
 
     #[test]
     fn test_silhouette_alias_expansion() {
+        // Test Silhouette alias expansion
         let expanded = aliases::expand_alias("sil4").unwrap();
         assert_eq!(expanded, "1d6 sil4");
     }
@@ -1289,12 +1499,15 @@ mod tests {
         assert!(result[0].failures.is_none());
         assert!(result[0].botches.is_none());
     }
+
     // ============================================================================
     // CONAN 2D20 SYSTEM TESTS
+    // Tests for Conan 2d20 skill and combat dice mechanics
     // ============================================================================
 
     #[test]
     fn test_conan_2d20_basic() {
+        // Test Conan 2d20 basic functionality
         assert_valid("conan");
         assert_valid("conan + 5");
         assert_valid("conan - 3");
@@ -1304,6 +1517,7 @@ mod tests {
 
     #[test]
     fn test_conan_2d20_alias_expansion() {
+        // Test Conan alias expansion
         let expanded = aliases::expand_alias("conan").unwrap();
         assert_eq!(expanded, "2d20 conan");
 
@@ -1321,6 +1535,7 @@ mod tests {
 
     #[test]
     fn test_conan_2d20_modifier_parsing() {
+        // Test Conan modifier parsing
         let result = parser::parse_dice_string("2d20 conan").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].count, 2);
@@ -1335,6 +1550,7 @@ mod tests {
 
     #[test]
     fn test_conan_2d20_rolling() {
+        // Test Conan rolling behavior
         let result = parse_and_roll("conan").unwrap();
         assert_eq!(result.len(), 1);
 
@@ -1344,6 +1560,7 @@ mod tests {
 
     #[test]
     fn test_wrath_glory_basic() {
+        // Test Wrath & Glory basic functionality
         assert_valid("wng 4d6");
         assert_valid("wng dn2 4d6");
         assert_valid("wng 4d6 !soak");
@@ -1353,6 +1570,7 @@ mod tests {
 
     #[test]
     fn test_wrath_glory_difficulty() {
+        // Test Wrath & Glory difficulty mechanics
         let result = parse_and_roll("wng dn3 4d6").unwrap();
         assert_eq!(result.len(), 1);
 
@@ -1443,6 +1661,7 @@ mod tests {
 
     #[test]
     fn test_hero_system() {
+        // Test Hero System
         assert_valid("2hsn");
         assert_valid("3hsh");
         assert_valid("3hsk");
@@ -1451,6 +1670,7 @@ mod tests {
 
     #[test]
     fn test_plus_one_forward() {
+        // Test advantage/disadvantage patterns
         assert_valid("+d20");
         assert_valid("+d6");
         assert_valid("+d%");
@@ -1506,10 +1726,12 @@ mod tests {
 
     // ============================================================================
     // ROLL SETS AND MULTIPLE ROLLS
+    // Tests for roll sets and semicolon-separated rolls
     // ============================================================================
 
     #[test]
     fn test_roll_sets() {
+        // Test roll set parsing
         let result = parser::parse_dice_string("6 4d6").unwrap();
         assert_eq!(result.len(), 6);
         for (i, dice) in result.iter().enumerate() {
@@ -1521,6 +1743,7 @@ mod tests {
 
     #[test]
     fn test_minimum_roll_set() {
+        // Test minimum roll set size
         let result = parser::parse_dice_string("2 1d6").unwrap();
         assert_eq!(result.len(), 2);
         for dice in &result {
@@ -1531,6 +1754,7 @@ mod tests {
 
     #[test]
     fn test_maximum_roll_set() {
+        // Test maximum roll set size
         let result = parser::parse_dice_string("20 1d6").unwrap();
         assert_eq!(result.len(), 20);
         for dice in &result {
@@ -1541,6 +1765,7 @@ mod tests {
 
     #[test]
     fn test_roll_set_behavior() {
+        // Test roll set rolling behavior
         let result = parse_and_roll("3 4d6").unwrap();
         assert_eq!(result.len(), 3);
         for (i, roll_result) in result.iter().enumerate() {
@@ -1594,6 +1819,7 @@ mod tests {
 
     #[test]
     fn test_multiple_rolls() {
+        // Test semicolon-separated rolls
         assert_valid("1d20;1d6");
         assert_valid("1d20; 1d6");
         assert_valid("1d20 ; 1d6");
@@ -1604,6 +1830,7 @@ mod tests {
 
     #[test]
     fn test_semicolon_separated_rolls() {
+        // Test semicolon parsing
         let result = parser::parse_dice_string("4d100 ; 3d10 k2").unwrap();
         assert_eq!(result.len(), 2);
 
@@ -1618,6 +1845,7 @@ mod tests {
 
     #[test]
     fn test_multiple_roll_behavior() {
+        // Test multiple roll behavior
         let result = parse_and_roll("1d20; 2d6; 1d4").unwrap();
         assert_eq!(result.len(), 3);
         for roll_result in &result {
@@ -1627,6 +1855,7 @@ mod tests {
 
     // ============================================================================
     // ROLL SET ADVANTAGE PATTERN TESTS
+    // Tests for advantage/disadvantage in roll sets
     // ============================================================================
 
     #[test]
@@ -1681,6 +1910,7 @@ mod tests {
 
     // ============================================================================
     // FLAGS AND COMMENTS
+    // Tests for special flags and comment parsing
     // ============================================================================
 
     #[test]
@@ -1710,6 +1940,7 @@ mod tests {
 
     // ============================================================================
     // DISCORD INTEGRATION TESTS
+    // Tests for Discord-specific functionality
     // ============================================================================
 
     #[test]
@@ -1723,6 +1954,7 @@ mod tests {
 
     // ============================================================================
     // PERFORMANCE TESTS
+    // Tests for performance limits and edge cases
     // ============================================================================
 
     #[test]
@@ -1740,12 +1972,86 @@ mod tests {
         assert_valid("20d10 t7 f1 b1 ie10 + 5d6 e6 - 2d4");
     }
 
+    #[test]
+    fn test_input_length_validation() {
+        // Test that normal length inputs work
+        assert!(parse_and_roll("1d20+5").is_ok());
+        assert!(parse_and_roll("10d6 e6 k8 +4").is_ok());
+
+        // Test that input just over the limit fails with length error
+        let over_limit_input = "1d6+".repeat(250) + "1"; // This creates ~1251 chars
+        let result = parser::parse_dice_string(&over_limit_input);
+        assert!(result.is_err(), "Input over 1000 chars should be rejected");
+
+        let error_msg = result.unwrap_err().to_string();
+        assert!(
+            error_msg.contains("Input too long"),
+            "Error should mention input length: {}",
+            error_msg
+        );
+
+        // Test edge case: exactly at the limit should work (if it's valid syntax)
+        let at_limit_input = "1d6".repeat(200); // This creates exactly 600 chars, well under limit
+        // This will fail due to invalid syntax, not length - that's expected
+        let result = parser::parse_dice_string(&at_limit_input);
+        if result.is_err() {
+            let error_msg = result.unwrap_err().to_string();
+            assert!(
+                !error_msg.contains("Input too long"),
+                "Error should not be about length: {}",
+                error_msg
+            );
+        }
+    }
+
+    #[test]
+    fn test_performance_limits_extended() {
+        // Test performance characteristics
+
+        let start = Instant::now();
+        let result = parse_and_roll("500d1000");
+        let duration = start.elapsed();
+
+        assert!(result.is_ok(), "Max dice should parse successfully");
+        assert!(
+            duration.as_millis() < 1000,
+            "Large dice rolls should complete under 1 second"
+        );
+
+        // Test that very long inputs are rejected (DoS protection)
+        let long_input = "1d6+".repeat(1000) + "1";
+        assert!(parser::parse_dice_string(&long_input).is_err());
+    }
+
+    #[test]
+    fn test_discord_message_length_limits() {
+        // Test Discord message limits
+
+        // Test large roll sets
+        let result = parse_and_roll("20 50d6").unwrap();
+        let formatted = format_multiple_results_with_limit(&result);
+        assert!(
+            formatted.len() <= 2000,
+            "Formatted result should fit Discord's message limit"
+        );
+
+        // Test extremely large single roll
+        let result = parse_and_roll("500d6").unwrap();
+        let formatted = result[0].to_string();
+        assert!(
+            formatted.len() <= 2000,
+            "Single large roll should fit Discord limit or be truncated"
+        );
+    }
+
     // ============================================================================
     // HELP TEXT TESTS
+    // Tests for help text generation
     // ============================================================================
 
     #[test]
     fn test_help_text_generation() {
+        // Test help text functions
         let basic_help = help_text::generate_basic_help();
         assert!(basic_help.contains("Dice Maiden"));
         assert!(basic_help.contains("2d6 + 3d10"));
@@ -1762,6 +2068,7 @@ mod tests {
 
     // ============================================================================
     // COMMAND DISPLAY FORMATTING TESTS
+    // Tests for command response formatting
     // ============================================================================
 
     #[test]
@@ -1841,6 +2148,7 @@ mod tests {
 
     // ============================================================================
     // PARSER EDGE CASE TESTS
+    // Tests for parser edge cases and boundary conditions
     // ============================================================================
 
     #[test]
@@ -1903,8 +2211,10 @@ mod tests {
 
     // ============================================================================
     // HELPER FUNCTIONS
+    // Utility functions used by tests
     // ============================================================================
 
+    /// Test helper: Assert that a dice expression parses and rolls successfully
     fn assert_valid(input: &str) {
         let result = parse_and_roll(input);
         assert!(
@@ -1917,11 +2227,22 @@ mod tests {
         assert!(!results.is_empty(), "No results for: '{}'", input);
     }
 
+    /// Test helper: Assert that a dice expression fails to parse
     fn assert_invalid(input: &str) {
         let result = parse_and_roll(input);
         assert!(result.is_err(), "Expected error for: '{}'", input);
     }
 
+    /// Test helper: Strip both labels and comments from dice expression for clean request display
+    ///
+    /// This function removes:
+    /// - Labels in parentheses at the beginning: (label) dice_expression -> dice_expression
+    /// - Comments after exclamation mark: dice_expression ! comment -> dice_expression
+    ///
+    /// Examples:
+    /// - "(roll to hit) 1d20+2" -> "1d20+2"
+    /// - "2d6 ! fire damage" -> "2d6"
+    /// - "(attack) 1d20+5 ! with sword" -> "1d20+5"
     fn strip_label_and_comment_from_expression(input: &str) -> &str {
         // Simple implementation for testing - remove leading parenthetical labels
         if let Some(pos) = input.find(") ") {
