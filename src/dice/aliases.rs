@@ -112,6 +112,9 @@ static CONAN_COMBINED_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^conan([2-5])cd(\d+)$").expect("Failed to compile CONAN_COMBINED_REGEX")
 });
 
+static SIL_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^sil(\d+)$").expect("Failed to compile SIL_REGEX"));
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -131,6 +134,7 @@ static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| 
     aliases.insert("wng", "1d6 wng");
     aliases.insert("conan", "2d20 conan");
     aliases.insert("cd", "1d6 cd");
+    aliases.insert("sil", "1d6 sil1");
     aliases
 });
 
@@ -507,6 +511,16 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = CONAN_COMBAT_REGEX.captures(input) {
         let dice_count = &captures[1];
         return Some(format!("{dice_count}d6 cd{dice_count}"));
+    }
+
+    if let Some(captures) = SIL_REGEX.captures(input) {
+        let dice_count_str = &captures[1];
+        let dice_count: u32 = dice_count_str.parse().unwrap_or(0);
+        if dice_count == 0 || dice_count > 10 {
+            return None; // Invalid dice count, don't expand
+        }
+        // Expand to dice notation that works with existing parser
+        return Some(format!("1d6 sil{dice_count_str}"));
     }
 
     None
