@@ -1065,8 +1065,24 @@ fn parse_all_modifiers(dice: &mut DiceRoll, parts: &[String]) -> Result<()> {
 
 // Helper function to check if a token is combined modifiers
 fn is_combined_modifiers_token(input: &str) -> bool {
-    if input.is_empty() || input.contains('d') {
+    if input.is_empty() {
         return false;
+    }
+
+    // FIX: Instead of blanket rejecting anything with 'd', check if it's actually
+    // a standalone dice expression first
+    if input.contains('d') {
+        // Don't treat standalone dice expressions as combined modifiers
+        if is_standalone_dice_expression(input) {
+            return false;
+        }
+
+        // Don't treat D6 system expressions as combined modifiers
+        if input.starts_with("d6s") {
+            return false;
+        }
+
+        // Otherwise continue checking - might be combined modifiers like "k2d1"
     }
 
     // Check if it starts with common modifier patterns and has more after the first one
@@ -1755,4 +1771,22 @@ fn is_multi_sided_dice_expression(part: &str) -> bool {
     }
 
     false // Default to not a dice expression - let normal modifier parsing handle it
+}
+
+fn is_standalone_dice_expression(input: &str) -> bool {
+    // Check for patterns that represent standalone dice expressions
+    // These should NOT be treated as combined modifiers
+    let standalone_patterns = [
+        r"^\d*d\d+$", // Basic dice like "3d6", "d20", "1d4"
+        r"^\d*d%$",   // Percentile dice like "d%", "2d%"
+    ];
+
+    for pattern in &standalone_patterns {
+        let regex = Regex::new(pattern).unwrap();
+        if regex.is_match(input) {
+            return true;
+        }
+    }
+
+    false
 }
