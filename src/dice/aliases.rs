@@ -520,7 +520,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             return None; // Invalid dice count, don't expand
         }
         // Expand to dice notation that works with existing parser
-        return Some(format!("1d6 sil{}", dice_count_str));
+        return Some(format!("1d6 sil{dice_count_str}"));
     }
 
     None
