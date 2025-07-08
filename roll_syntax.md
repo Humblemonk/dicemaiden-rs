@@ -9,7 +9,7 @@
 ### Core Modifiers
 - **Exploding**: `e6` (explode on 6), `e` (explode on max), `ie6` (explode indefinitely)
 - **Keep/Drop**: `k3` (keep 3 highest), `kl2` (keep 2 lowest), `d1` (drop 1 lowest)
-- **Rerolls**: `r2` (reroll ≤2 once), `ir2` (reroll ≤2 indefinitely)
+- **Rerolls**: `r2` (reroll ≤2 once), `ir2` (reroll ≤2 indefinitely), `rg2` (reroll ≥ 2 once), `irg2` (reroll ≥ 2 indefinitely)
 - **Success Counting**: `t7` (count successes ≥7), `tl6` (count successes ≤6), `f1` (count failures ≤1)
 - **Botch Counting**: `b1` (count botches ≤1), `b` (count botches ≤1)
 - **Math Operations**: `+5`, `-3`, `*2`, `/2`

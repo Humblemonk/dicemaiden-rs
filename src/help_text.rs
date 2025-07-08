@@ -19,6 +19,8 @@ pub fn generate_basic_help() -> String {
 • `d2` - Drop lowest 2 dice
 • `k3` - Keep highest 3 dice  
 • `kl2` - Keep lowest 2 dice
+• `rg3` - Reroll dice ≥ 3
+• `irg3` - Reroll ≥ 3 indefinitely
 • `r2` - Reroll dice ≤ 2 once
 • `ir2` - Reroll dice ≤ 2 indefinitely
 • `t7` - Count successes (≥ 7)

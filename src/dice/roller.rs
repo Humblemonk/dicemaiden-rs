@@ -172,6 +172,14 @@ fn apply_dice_modifying_modifiers(
                 reroll_dice(result, rng, *threshold, dice.sides, true)?;
                 update_base_group(result);
             }
+            Modifier::RerollGreater(threshold) => {
+                reroll_dice_greater(result, rng, *threshold, dice.sides, false)?;
+                update_base_group(result);
+            }
+            Modifier::RerollGreaterIndefinite(threshold) => {
+                reroll_dice_greater(result, rng, *threshold, dice.sides, true)?;
+                update_base_group(result);
+            }
             _ => {} // Handle other modifiers later
         }
     }
@@ -2736,5 +2744,57 @@ fn apply_mathematical_modifiers_to_silhouette(
             _ => {} // Skip non-mathematical modifiers
         }
     }
+    Ok(())
+}
+
+fn reroll_dice_greater(
+    result: &mut RollResult,
+    rng: &mut impl Rng,
+    threshold: u32,
+    dice_sides: u32,
+    indefinite: bool,
+) -> Result<()> {
+    let mut total_rerolls = 0;
+    let max_total_rerolls = 100;
+
+    for i in 0..result.individual_rolls.len() {
+        let mut rerolls_for_this_die = 0;
+        let max_rerolls_per_die = if indefinite { 100 } else { 1 };
+
+        // MAIN DIFFERENCE: Changed condition from <= to >=
+        while result.individual_rolls[i] >= threshold as i32
+            && rerolls_for_this_die < max_rerolls_per_die
+            && total_rerolls < max_total_rerolls
+        {
+            result.individual_rolls[i] = rng.random_range(1..=dice_sides as i32);
+            rerolls_for_this_die += 1;
+            total_rerolls += 1;
+
+            if !indefinite {
+                break;
+            }
+        }
+    }
+
+    // Add single summary note if any rerolls happened
+    if total_rerolls > 0 {
+        if total_rerolls == 1 {
+            result
+                .notes
+                .push("1 die rerolled".to_string());
+        } else {
+            result
+                .notes
+                .push(format!("{total_rerolls} dice rerolled"));
+        }
+    }
+
+    // Safety check note
+    if total_rerolls >= max_total_rerolls {
+        result
+            .notes
+            .push("Maximum rerolls reached (100)".to_string());
+    }
+
     Ok(())
 }
