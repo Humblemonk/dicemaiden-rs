@@ -2779,13 +2779,9 @@ fn reroll_dice_greater(
     // Add single summary note if any rerolls happened
     if total_rerolls > 0 {
         if total_rerolls == 1 {
-            result
-                .notes
-                .push("1 die rerolled".to_string());
+            result.notes.push("1 die rerolled".to_string());
         } else {
-            result
-                .notes
-                .push(format!("{total_rerolls} dice rerolled"));
+            result.notes.push(format!("{total_rerolls} dice rerolled"));
         }
     }
 

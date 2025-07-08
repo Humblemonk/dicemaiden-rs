@@ -427,13 +427,72 @@ mod tests {
 
     #[test]
     fn test_keep_drop_dice() {
+        // Basic keep/drop modifiers (existing tests)
         assert_valid("4d6k3");
         assert_valid("4d6 k3");
         assert_valid("4d6d1");
         assert_valid("4d6 d1");
         assert_valid("4d6kl2");
         assert_valid("4d6 kl2");
-        // Note: dh and dl might need different parsing
+
+        // REGRESSION TEST: k2d1 parsing fix
+        // This was previously failing with "Invalid keep value in 'k2d1'"
+        assert_valid("4d20 k2d1");
+        assert_valid("5d20k2d1"); // No spaces
+        assert_valid("8d6 k3d2");
+        assert_valid("8d6k3d2"); // No spaces
+
+        // Verify the k2d1 parsing produces correct modifiers
+        let result = parser::parse_dice_string("4d20 k2d1").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].count, 4);
+        assert_eq!(result[0].sides, 20);
+        assert_eq!(
+            result[0].modifiers.len(),
+            2,
+            "Should have exactly 2 modifiers: KeepHigh(2) and Drop(1)"
+        );
+
+        // Check for KeepHigh(2) modifier
+        let has_keep_high_2 = result[0]
+            .modifiers
+            .iter()
+            .any(|m| matches!(m, Modifier::KeepHigh(2)));
+        assert!(has_keep_high_2, "Should have KeepHigh(2) modifier");
+
+        // Check for Drop(1) modifier
+        let has_drop_1 = result[0]
+            .modifiers
+            .iter()
+            .any(|m| matches!(m, Modifier::Drop(1)));
+        assert!(has_drop_1, "Should have Drop(1) modifier");
+
+        // Test different order: d2k3 (drop first, then keep)
+        let result2 = parser::parse_dice_string("8d20 d2k3").unwrap();
+        assert_eq!(result2.len(), 1);
+        assert_eq!(
+            result2[0].modifiers.len(),
+            2,
+            "Should have exactly 2 modifiers: Drop(2) and KeepHigh(3)"
+        );
+
+        let has_drop_2 = result2[0]
+            .modifiers
+            .iter()
+            .any(|m| matches!(m, Modifier::Drop(2)));
+        assert!(has_drop_2, "Should have Drop(2) modifier");
+
+        let has_keep_high_3 = result2[0]
+            .modifiers
+            .iter()
+            .any(|m| matches!(m, Modifier::KeepHigh(3)));
+        assert!(has_keep_high_3, "Should have KeepHigh(3) modifier");
+
+        // Test complex combined modifiers with keep/drop
+        assert_valid("6d10 e6k4d1"); // explode, keep, drop
+        assert_valid("4d6 k3d1r1"); // keep, drop, reroll
+
+        // Note: dh and dl might need different parsing (existing comment preserved)
     }
 
     #[test]
