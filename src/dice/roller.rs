@@ -71,6 +71,16 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         return handle_brave_new_world_roll(dice, &mut rng);
     }
 
+    // Check if this is a Silhouette roll - handle it specially
+    let has_silhouette = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::Silhouette(_)));
+
+    if has_silhouette {
+        return handle_silhouette_roll(dice, &mut rng);
+    }
+
     let mut result = RollResult {
         individual_rolls: Vec::new(),
         kept_rolls: Vec::new(),
@@ -96,7 +106,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         suppress_comment: false,
     };
 
-    // Normal dice rolling flow for non-Savage Worlds dice
+    // Normal dice rolling flow for non-special systems
     // Initial dice rolls
     for _ in 0..dice.count {
         let roll = rng.random_range(1..=dice.sides as i32);
@@ -2630,4 +2640,101 @@ fn handle_conan_combat_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRe
         .push("1=1, 2=2, 3-4=0, 5-6=1+special".to_string());
 
     Ok(result)
+}
+
+fn handle_silhouette_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
+    let dice_count = dice
+        .modifiers
+        .iter()
+        .find_map(|m| {
+            if let Modifier::Silhouette(count) = m {
+                Some(*count)
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| anyhow!("Expected Silhouette modifier"))?;
+
+    // Initialize complete RollResult structure
+    let mut result = RollResult {
+        individual_rolls: Vec::new(),
+        kept_rolls: Vec::new(),
+        dropped_rolls: Vec::new(),
+        total: 0,
+        successes: None,
+        failures: None,
+        botches: None,
+        comment: dice.comment.clone(),
+        label: dice.label.clone(),
+        notes: Vec::new(),
+        dice_groups: Vec::new(),
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
+        godbound_damage: None,
+        fudge_symbols: None,
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
+        wng_wrath_dice: None,
+        suppress_comment: false,
+    };
+
+    // Roll the dice pool
+    for _ in 0..dice_count {
+        result.individual_rolls.push(rng.random_range(1..=6));
+    }
+
+    // Find highest die
+    let highest_die = *result.individual_rolls.iter().max().unwrap_or(&1);
+
+    // Count extra 6s and add to result
+    let sixes_count = result.individual_rolls.iter().filter(|&&x| x == 6).count();
+    let extra_sixes = if sixes_count > 0 { sixes_count - 1 } else { 0 };
+    let silhouette_result = highest_die + extra_sixes as i32;
+
+    // Set kept rolls and total
+    result.kept_rolls = vec![silhouette_result];
+    result.total = silhouette_result;
+
+    // Create dice group for display
+    result.dice_groups.push(DiceGroup {
+        _description: format!("{dice_count}d6 Silhouette"),
+        rolls: result.individual_rolls.clone(),
+        modifier_type: "base".to_string(),
+    });
+
+    // Add explanatory notes
+    if extra_sixes > 0 {
+        result
+            .notes
+            .push(format!("{sixes_count} extra 6s add +{extra_sixes}"));
+    }
+
+    // Apply mathematical modifiers to final result
+    apply_mathematical_modifiers_to_silhouette(&mut result, &dice)?;
+
+    Ok(result)
+}
+
+fn apply_mathematical_modifiers_to_silhouette(
+    result: &mut RollResult,
+    dice: &DiceRoll,
+) -> Result<()> {
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::Add(value) => result.total += value,
+            Modifier::Subtract(value) => result.total -= value,
+            Modifier::Multiply(value) => result.total *= value,
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                result.total /= value;
+            }
+            _ => {} // Skip non-mathematical modifiers
+        }
+    }
+    Ok(())
 }

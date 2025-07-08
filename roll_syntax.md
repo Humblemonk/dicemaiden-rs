@@ -46,6 +46,14 @@
 - Skill Rolls: Roll d20s, count successes (target number varies by difficulty)
 - Combat Dice: Special interpretation - 1=1 damage, 2=2 damage, 3-4=0 damage, 5-6=1 damage + special effect
 
+### Silhouette System (Dream Pod 9)
+- `sil` → 1d6 Silhouette (default)
+- `sil3` → 3d6 Silhouette (skilled level)
+- `sil5` → 5d6 Silhouette (superhuman level)
+- `sil10` → 10d6 Silhouette (maximum variant)
+- Roll skill dice, keep highest, each extra 6 adds +1
+- Used in Heavy Gear, Jovian Chronicles, Tribe 8, Gear Krieg
+
 ### D&D/Pathfinder
 - `dndstats` → 6 4d6 k3 (ability score generation)
 - `attack +5` → 1d20 +5 (attack roll)

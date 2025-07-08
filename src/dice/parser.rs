@@ -1610,6 +1610,24 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         let troubles = stripped.parse().unwrap_or(0);
         return Ok(Modifier::MarvelMultiverse(0, troubles));
     }
+
+    if let Some(stripped) = part.strip_prefix("sil") {
+        if stripped.is_empty() {
+            return Ok(Modifier::Silhouette(1));
+        } else {
+            let dice_count = stripped
+                .parse()
+                .map_err(|_| anyhow!("Invalid Silhouette dice count in '{}'", part))?;
+            if dice_count == 0 || dice_count > 10 {
+                return Err(anyhow!(
+                    "Silhouette dice count must be 1-10, got {}",
+                    dice_count
+                ));
+            }
+            return Ok(Modifier::Silhouette(dice_count));
+        }
+    }
+
     Err(anyhow!("Unknown modifier: {}", part))
 }
 

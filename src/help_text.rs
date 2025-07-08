@@ -95,6 +95,7 @@ pub fn generate_alias_help() -> String {
 • `cs 3` → Cypher System 1d20 cs3 (Level 3 task, target 9+)
 • `conan3` → 3d20 conan (3d20 skill roll)
 • `conan2cd4` → 2d20 + 4d6 custom combined attack
+• `sil#` → Silhouette system: roll #d6, keep highest, extra 6s add +1 (e.g., sil3, sil5)
 
 Use `/roll help system` for specific examples!"#
         .to_string()

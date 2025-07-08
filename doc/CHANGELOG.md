@@ -12,6 +12,7 @@
 - Added support for Cypher System
 - Added support for Brave New World
 - Added support for Conan
+- Added support for Silhouette
 
 ## [1.3.0] - 2025-07-03
 

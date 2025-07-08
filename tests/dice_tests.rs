@@ -88,6 +88,9 @@ mod tests {
         assert_invalid("1d1001"); // Too many sides
         assert_invalid("0d6"); // Zero dice
         assert_invalid("1d0"); // Zero sides
+        assert_valid("sil10"); // Max allowed
+        assert_invalid("sil0"); // Zero dice
+        assert_invalid("sil11"); // Too many dice
     }
 
     #[test]
@@ -662,6 +665,55 @@ mod tests {
     }
 
     #[test]
+    fn test_savage_worlds_with_roll_sets() {
+        assert_valid("3 sw8");
+        let result = parse_and_roll("3 sw8").unwrap();
+        assert_eq!(result.len(), 3);
+
+        for roll in &result {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            assert!(roll.notes.iter().any(|note| note.contains("Savage Worlds")));
+        }
+    }
+
+    #[test]
+    fn test_savage_worlds_edge_cases() {
+        // Test boundary conditions
+        assert_valid("sw4"); // Minimum valid
+        assert_valid("sw12"); // Maximum valid
+
+        // Test with flags
+        assert_valid("p sw8"); // Private roll
+        assert_valid("s sw6"); // Simple output
+
+        // Test with complex modifiers
+        assert_valid("sw8 * 2");
+        assert_valid("sw10 / 2");
+    }
+
+    #[test]
+    fn test_savage_worlds_vs_other_systems() {
+        // Make sure SW doesn't interfere with other systems
+        assert_valid("4cod"); // Chronicles of Darkness still works
+        assert_valid("sr6"); // Shadowrun still works
+        assert_valid("3wh4+"); // Warhammer still works
+
+        // And other systems don't interfere with SW
+        let sw_result = parse_and_roll("sw8").unwrap();
+        let cod_result = parse_and_roll("4cod").unwrap();
+
+        // They should produce different note patterns
+        let sw_has_trait_note = sw_result[0]
+            .notes
+            .iter()
+            .any(|note| note.contains("Trait die"));
+        let cod_has_success_note = cod_result[0].successes.is_some();
+
+        assert!(sw_has_trait_note, "SW should have trait die notes");
+        assert!(cod_has_success_note, "CoD should have success counting");
+    }
+
+    #[test]
     fn test_earthdawn() {
         assert_valid("ed4");
         assert_valid("ed6");
@@ -727,6 +779,67 @@ mod tests {
         assert!(result[0].successes.is_none());
         assert!(result[0].failures.is_none());
         assert!(result[0].botches.is_none());
+    }
+    #[test]
+    fn test_cyberpunk_red_with_modifiers() {
+        // Test CPR with mathematical modifiers
+        assert_valid("cpr + 10");
+        assert_valid("cpr - 4");
+        assert_valid("cpr * 3");
+
+        let result = parse_and_roll("cpr + 5").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // Total should include the +5 modifier
+        // Range: Critical failure (1-10) - 9 + 5 = -4 to Critical success (10+10) + 5 = 25
+        assert!(
+            result[0].total >= -4 && result[0].total <= 25,
+            "Total should be in valid CPR range with +5 modifier, got {}",
+            result[0].total
+        );
+    }
+
+    #[test]
+    fn test_cyberpunk_red_roll_sets() {
+        // Test CPR with roll sets
+        assert_valid("3 cpr");
+        let result = parse_and_roll("3 cpr").unwrap();
+        assert_eq!(result.len(), 3);
+
+        for (i, roll) in result.iter().enumerate() {
+            assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
+            // Each roll should be within CPR range (-9 to 20)
+            assert!(
+                roll.total >= -9 && roll.total <= 20,
+                "Roll {} total {} should be in CPR range",
+                i + 1,
+                roll.total
+            );
+        }
+    }
+
+    #[test]
+    fn test_cyberpunk_red_vs_other_systems() {
+        // Make sure CPR doesn't interfere with other systems
+        assert_valid("4cod"); // Chronicles of Darkness still works
+        assert_valid("sw8"); // Savage Worlds still works
+        assert_valid("sr6"); // Shadowrun still works
+
+        // Test that CPR and other systems produce different results
+        let cpr_result = parse_and_roll("cpr").unwrap();
+        let cod_result = parse_and_roll("4cod").unwrap();
+
+        // CPR should not have successes (it's a total-based system)
+        assert!(
+            cpr_result[0].successes.is_none(),
+            "CPR should not have success counting"
+        );
+
+        // CoD should have successes (it's a success-based system)
+        assert!(
+            cod_result[0].successes.is_some(),
+            "CoD should have success counting"
+        );
     }
 
     #[test]
@@ -796,6 +909,100 @@ mod tests {
             "Witcher / 2 should be in reasonable halved range, got {}",
             result[0].total
         );
+    }
+
+    #[test]
+    fn test_witcher_with_roll_sets() {
+        // Test Witcher with roll sets
+        assert_valid("3 wit");
+        let result = parse_and_roll("3 wit").unwrap();
+        assert_eq!(result.len(), 3);
+
+        for (i, roll) in result.iter().enumerate() {
+            assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
+            // Each roll should be within reasonable Witcher range (accounting for explosions)
+            assert!(
+                roll.total >= -100 && roll.total <= 110, // Reasonable bounds with explosions
+                "Roll {} total {} should be in Witcher range",
+                i + 1,
+                roll.total
+            );
+        }
+    }
+
+    #[test]
+    fn test_witcher_vs_other_systems() {
+        // Make sure Witcher doesn't interfere with other systems
+        assert_valid("cpr"); // Cyberpunk Red still works
+        assert_valid("4cod"); // Chronicles of Darkness still works
+        assert_valid("sw8"); // Savage Worlds still works
+
+        // Test that Witcher and other systems produce different results
+        let witcher_result = parse_and_roll("wit").unwrap();
+        let cpr_result = parse_and_roll("cpr").unwrap();
+
+        // Both should not have successes (they're total-based systems)
+        assert!(
+            witcher_result[0].successes.is_none(),
+            "Witcher should not have success counting"
+        );
+        assert!(
+            cpr_result[0].successes.is_none(),
+            "CPR should not have success counting"
+        );
+    }
+
+    #[test]
+    fn test_witcher_edge_cases() {
+        // Test edge cases and error conditions
+
+        // Test with flags
+        assert_valid("p wit"); // Private roll
+        assert_valid("s wit"); // Simple output
+
+        // Test with comments and labels
+        assert_valid("wit ! monster knowledge check");
+        assert_valid("(Investigation) wit");
+        assert_valid("(Tracking) wit + 3 ! with enhanced senses");
+
+        // Test in semicolon combinations
+        assert_valid("wit ; 2d6 ; attack + 5");
+    }
+
+    #[test]
+    fn test_witcher_explosion_mechanics_structure() {
+        // Test explosion mechanics behavior
+        // Since explosions are random, we test structure rather than specific values
+
+        for _ in 0..50 {
+            let result = parse_and_roll("wit").unwrap();
+            assert_eq!(result.len(), 1);
+            let roll_result = &result[0];
+
+            // Check if this triggered any explosions by looking for multiple dice groups
+            if roll_result.dice_groups.len() > 1 {
+                // Should have base group and explosion group
+                assert_eq!(roll_result.dice_groups.len(), 2);
+                assert_eq!(roll_result.dice_groups[0].modifier_type, "base");
+
+                let explosion_type = &roll_result.dice_groups[1].modifier_type;
+                assert!(
+                    explosion_type == "add" || explosion_type == "subtract",
+                    "Explosion type should be add or subtract"
+                );
+
+                // Should have explosion notes
+                let has_explosion_note = roll_result.notes.iter().any(|note| {
+                    note.contains("CRITICAL SUCCESS")
+                        || note.contains("CRITICAL FAILURE")
+                        || note.contains("EXPLOSION CONTINUES")
+                        || note.contains("FAILURE CONTINUES")
+                });
+                assert!(has_explosion_note, "Should have explosion notes");
+
+                break; // Found an explosion, test passes
+            }
+        }
     }
 
     #[test]
@@ -879,6 +1086,35 @@ mod tests {
         assert!(cod_has_successes, "CoD should have success counting");
     }
 
+    #[test]
+    fn test_silhouette_basic() {
+        assert_valid("sil1");
+        assert_valid("sil3");
+        assert_valid("sil5");
+        assert_valid("sil3 + 2");
+        assert_valid("sil4 - 1");
+    }
+
+    #[test]
+    fn test_silhouette_alias_expansion() {
+        let expanded = aliases::expand_alias("sil4").unwrap();
+        assert_eq!(expanded, "1d6 sil4");
+    }
+
+    #[test]
+    fn test_silhouette_rolling() {
+        // Test actual rolling mechanics
+        let result = parse_and_roll("sil1").unwrap();
+        assert_eq!(result.len(), 1);
+
+        // Silhouette 1d6 should always produce 1-6
+        assert!(result[0].total >= 1 && result[0].total <= 6);
+
+        // Should not have success counting (total-based system)
+        assert!(result[0].successes.is_none());
+        assert!(result[0].failures.is_none());
+        assert!(result[0].botches.is_none());
+    }
     // ============================================================================
     // CONAN 2D20 SYSTEM TESTS
     // ============================================================================
@@ -1068,6 +1304,7 @@ mod tests {
             aliases::expand_alias("5wod6"),
             Some("5d10 f1 t6".to_string())
         );
+        assert_eq!(aliases::expand_alias("sil4"), Some("1d6 sil4".to_string()));
     }
 
     #[test]
@@ -1212,6 +1449,60 @@ mod tests {
         for roll_result in &result {
             assert!(roll_result.total > 0);
         }
+    }
+
+    // ============================================================================
+    // ROLL SET ADVANTAGE PATTERN TESTS
+    // ============================================================================
+
+    #[test]
+    fn test_roll_set_advantage_patterns() {
+        // Test roll sets with advantage dice
+        assert_valid("2 +d20");
+        assert_valid("3 -d%");
+        assert_valid("4 +d6*2");
+
+        // Test private roll sets with advantage
+        let result = parse_and_roll("p 2 +d20*3").unwrap();
+        assert_eq!(result.len(), 2, "Should create 2 private roll sets");
+        for roll in &result {
+            assert!(roll.private, "Each roll should be private");
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            assert!(roll.total >= 3 && roll.total <= 60); // adv d20 * 3
+        }
+
+        // Test with different advantage types
+        let result = parse_and_roll("3 -d%+50").unwrap();
+        assert_eq!(result.len(), 3, "Should create 3 disadvantage roll sets");
+        for roll in &result {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            assert!(roll.total >= 51 && roll.total <= 150); // dis d% + 50
+        }
+    }
+
+    #[test]
+    fn test_roll_set_advantage_pattern_error_prevention() {
+        // Test that roll set advantage patterns don't interfere with other valid syntax
+
+        // Should still work: basic roll sets without advantage
+        let result = parse_and_roll("4 2d6").unwrap();
+        assert_eq!(result.len(), 4, "Basic roll sets should still work");
+
+        // Should still work: single advantage without numbers
+        let result = parse_and_roll("+d20").unwrap();
+        assert_eq!(result.len(), 1, "Single advantage should still work");
+        assert!(
+            result[0].label.is_none(),
+            "Single advantage should not have set label"
+        );
+
+        // Should still work: complex advantage expressions
+        let result = parse_and_roll("+d20 + d10 + 5").unwrap();
+        assert_eq!(result.len(), 1, "Complex advantage should still work");
+        assert!(
+            result[0].dice_groups.len() >= 2,
+            "Should have multiple dice groups"
+        );
     }
 
     // ============================================================================
@@ -1372,6 +1663,68 @@ mod tests {
         let result = parse_and_roll("4cod + 3").unwrap();
         assert_eq!(result.len(), 1);
         assert!(result[0].successes.is_some()); // Should have success counting
+    }
+
+    // ============================================================================
+    // PARSER EDGE CASE TESTS
+    // ============================================================================
+
+    #[test]
+    fn test_parser_regex_edge_case_coverage() {
+        // Test edge cases that could potentially break the regex or parser
+
+        // Maximum values
+        assert_valid("+d%*100"); // Large multiplication
+        assert_valid("-d20/1"); // Division by 1
+        assert_valid("20 +d%+99"); // Max roll sets with large modifier
+
+        // Minimum values
+        assert_valid("+d20-20"); // Could result in 0 or negative
+        assert_valid("-d%-99"); // Large negative modifier
+        assert_valid("2 +d20/20"); // Small division result
+
+        // Boundary conditions
+        assert_valid("+d1000+1000"); // Max dice size with large modifier
+        assert_valid("-d1+1"); // Min dice size
+
+        // Should not break existing functionality
+        assert_valid("dndstats"); // Game system aliases
+        assert_valid("4d6 k3 + 2"); // Standard complex expressions
+        assert_valid("1d20; 2d6"); // Semicolon separation
+    }
+
+    #[test]
+    fn test_parser_regex_integration_paths_extended() {
+        // Extended test for parser routing through different code paths
+
+        // Test that roll set advantage patterns work correctly
+        let result = parse_and_roll("4 +d20").unwrap();
+        assert_eq!(result.len(), 4, "Should create 4 roll sets");
+        for roll in &result {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+            assert!(roll.total >= 1 && roll.total <= 20);
+        }
+
+        // Test complex nested expressions
+        let complex_expressions = [
+            "10d6 e6 k8 +4",        // Complex modifiers
+            "+d20 + 2d6 * 3 - 1d4", // Complex advantage expression
+            "p s 5 -d%/2",          // Flags + roll sets + disadvantage
+            "4cod8+3",              // Game system + advantage
+        ];
+
+        for expr in &complex_expressions {
+            let result = parse_and_roll(expr);
+            assert!(
+                result.is_ok(),
+                "Complex expression '{}' should parse successfully",
+                expr
+            );
+        }
+
+        // Test maximum roll sets
+        let result = parse_and_roll("20 1d6").unwrap();
+        assert_eq!(result.len(), 20, "Should handle maximum roll sets");
     }
 
     // ============================================================================
