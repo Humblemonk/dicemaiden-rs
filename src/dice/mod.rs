@@ -427,34 +427,138 @@ const DISCORD_MESSAGE_LIMIT: usize = 2000;
 pub fn format_multiple_results_with_limit(results: &[RollResult]) -> String {
     let full_output = format_multiple_results(results);
 
-    if full_output.len() > DISCORD_MESSAGE_LIMIT {
-        // Create simplified version
-        let simplified_results: Vec<RollResult> =
-            results.iter().map(|r| r.create_simplified()).collect();
+    if full_output.len() <= DISCORD_MESSAGE_LIMIT {
+        return full_output;
+    }
 
-        if simplified_results.len() == 1 {
-            // For single results, use simple format
-            let mut simplified = simplified_results[0].clone();
-            simplified.simple = true; // Show only result, no dice breakdown
-            simplified.to_string()
+    // Level 1: Try simplified format
+    let simplified_results: Vec<RollResult> =
+        results.iter().map(|r| r.create_simplified()).collect();
+
+    let level1_output = if simplified_results.len() == 1 {
+        let mut simplified = simplified_results[0].clone();
+        simplified.simple = true;
+        simplified.to_string()
+    } else {
+        let is_roll_set = simplified_results.len() > 1
+            && simplified_results
+                .iter()
+                .all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
+
+        if is_roll_set {
+            format_roll_set_results(&simplified_results)
         } else {
-            // For multiple results, show simplified format
-            let is_roll_set = simplified_results.len() > 1
-                && simplified_results
-                    .iter()
-                    .all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
+            format_results_with_separator(&simplified_results, |result| {
+                let mut simple_result = result.clone();
+                simple_result.simple = true;
+                simple_result.to_string()
+            })
+        }
+    };
 
-            if is_roll_set {
-                format_roll_set_results(&simplified_results)
-            } else {
-                format_results_with_separator(&simplified_results, |result| {
-                    let mut simple_result = result.clone();
-                    simple_result.simple = true;
-                    simple_result.to_string()
-                })
-            }
+    if level1_output.len() <= DISCORD_MESSAGE_LIMIT {
+        return level1_output;
+    }
+
+    // Level 2: Ultra-compact format (totals only)
+    let level2_output = format_ultra_compact_results(results);
+    if level2_output.len() <= DISCORD_MESSAGE_LIMIT {
+        return level2_output;
+    }
+
+    // Level 3: Summary format
+    let level3_output = format_summary_results(results);
+    if level3_output.len() <= DISCORD_MESSAGE_LIMIT {
+        return level3_output;
+    }
+
+    // Level 4: Emergency truncation
+    let mut emergency_output = level3_output;
+    if emergency_output.len() > DISCORD_MESSAGE_LIMIT - 3 {
+        emergency_output.truncate(DISCORD_MESSAGE_LIMIT - 3);
+        emergency_output.push_str("...");
+    }
+    emergency_output
+}
+
+/// Format ultra-compact results (totals only, minimal text)
+fn format_ultra_compact_results(results: &[RollResult]) -> String {
+    if results.is_empty() {
+        return "No results".to_string();
+    }
+
+    if results.len() == 1 {
+        let result = &results[0];
+        if let Some(gb_damage) = result.godbound_damage {
+            format!("**{gb_damage}** damage")
+        } else if let Some(successes) = result.successes {
+            format!("**{successes}** successes")
+        } else {
+            format!("**{}**", result.total)
         }
     } else {
-        full_output
+        // Check if this is a roll set
+        let is_roll_set = results.len() > 1
+            && results
+                .iter()
+                .all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
+
+        if is_roll_set {
+            // Show individual set results AND combined total
+            let formatted_results: Vec<String> = results
+                .iter()
+                .map(|result| {
+                    let value = calculate_result_value(result);
+                    if let Some(gb_damage) = result.godbound_damage {
+                        format!("**{gb_damage}**")
+                    } else if let Some(successes) = result.successes {
+                        format!("**{successes}**")
+                    } else {
+                        format!("**{value}**")
+                    }
+                })
+                .collect();
+
+            let total_sum: i32 = results.iter().map(calculate_result_value).sum();
+            format!("{}\n**Total: {}**", formatted_results.join(", "), total_sum)
+        } else {
+            // Multiple separate rolls (semicolon-separated)
+            let formatted_results: Vec<String> = results
+                .iter()
+                .map(|result| {
+                    if let Some(gb_damage) = result.godbound_damage {
+                        format!("**{gb_damage}** dmg")
+                    } else if let Some(successes) = result.successes {
+                        format!("**{successes}** succ")
+                    } else {
+                        format!("**{}**", result.total)
+                    }
+                })
+                .collect();
+            formatted_results.join(", ")
+        }
+    }
+}
+
+/// Format summary results (very minimal information)
+fn format_summary_results(results: &[RollResult]) -> String {
+    if results.is_empty() {
+        return "No results".to_string();
+    }
+
+    if results.len() == 1 {
+        format!("Result: **{}**", calculate_result_value(&results[0]))
+    } else {
+        let is_roll_set = results.len() > 1
+            && results
+                .iter()
+                .all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
+
+        if is_roll_set {
+            let total: i32 = results.iter().map(calculate_result_value).sum();
+            format!("{} sets, Total: **{}**", results.len(), total)
+        } else {
+            format!("{} results", results.len())
+        }
     }
 }

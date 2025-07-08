@@ -5,15 +5,17 @@
 ## Added
 
 - Made help commands respond in private message to reduce chat spam
-- Added target lower modifier (tl) 
-- Added reroll greater (rg) and reroll greater indefinite (irg) modifiers
-- Added support for Cyberpunk RED
-- Added support for Witcher d10
-- Added support for additional wrath dice for wrath and glory
-- Added support for Cypher System
-- Added support for Brave New World
-- Added support for Conan
-- Added support for Silhouette
+- target lower modifier (tl) 
+- reroll greater (rg) and reroll greater indefinite (irg) modifiers
+- DoS validation checks
+- Guarantee of Discord 2000 character message limit compliance 
+- Support for Cyberpunk RED
+- Support for Witcher d10
+- Support for additional wrath dice for wrath and glory
+- Support for Cypher System
+- Support for Brave New World
+- Support for Conan
+- Support for Silhouette
 
 ## [1.3.0] - 2025-07-03
 

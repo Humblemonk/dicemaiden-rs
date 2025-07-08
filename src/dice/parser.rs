@@ -3,6 +3,8 @@ use anyhow::{Result, anyhow};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+const MAX_INPUT_LENGTH: usize = 1000;
+
 // Pre-compile all regex patterns at startup to reduce memory allocations
 static SET_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)\s+(.+)$").expect("Failed to compile SET_REGEX"));
@@ -27,6 +29,15 @@ static ADV_WITH_SIMPLE_MOD_REGEX: Lazy<Regex> = Lazy::new(|| {
 
 pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     let input = input.trim();
+
+    // Input length validation for DoS protection
+    if input.len() > MAX_INPUT_LENGTH {
+        return Err(anyhow!(
+            "Input too long: {} characters (max {})",
+            input.len(),
+            MAX_INPUT_LENGTH
+        ));
+    }
 
     // Check for aliases that expand to roll sets
     if let Some(expanded) = super::aliases::expand_alias(input) {
