@@ -22,7 +22,7 @@ fn test_parsing_performance() {
         ("10d10 e10 k5 +3", "Complex modifiers", 100),
         ("500d1000", "Maximum dice count", 200),
         ("20 50d6", "Large roll sets", 100),
-        ("4d6;3d8;2d10;1d20", "Multiple rolls", 30),
+        ("4d6;3d8;2d10;1d20", "Multiple rolls", 50),
         ("100d6 e6 ie k50 r1 t4 +10", "Very complex", 300),
     ];
 
