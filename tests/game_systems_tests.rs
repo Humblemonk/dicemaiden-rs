@@ -134,6 +134,21 @@ fn test_game_systems_comprehensive() {
         ("2wh3+", true, Some("success"), "Warhammer 2d6 3+"),
         ("3wh4+", true, Some("success"), "Warhammer 3d6 4+"),
         ("5wh5+", true, Some("success"), "Warhammer 5d6 5+"),
+        // D6 Legends
+        ("1d6l", true, Some("success"), "D6 Legends wild die only"),
+        (
+            "8d6l",
+            true,
+            Some("success"),
+            "D6 Legends 7 regular + 1 wild",
+        ),
+        (
+            "12d6l",
+            true,
+            Some("success"),
+            "D6 Legends 11 regular + 1 wild",
+        ),
+        ("0d6l", false, None, "Invalid D6 Legends zero dice"),
     ];
 
     for (system, should_parse, expected_feature, description) in game_systems {
@@ -272,6 +287,9 @@ fn test_alias_expansions() {
         ("-d%", Some("2d10 k1 * 10 + 1d10 - 10")),
         ("dndstats", Some("6 4d6 k3")),
         ("invalid_alias", None),
+        ("1d6l", Some("1d6 t4f1ie6")),
+        ("8d6l", Some("7d6 t4 + 1d6 t4f1ie6")),
+        ("12d6l", Some("11d6 t4 + 1d6 t4f1ie6")),
     ];
 
     for (alias, expected) in alias_tests {
@@ -1555,6 +1573,7 @@ fn test_missing_systems_with_roll_sets() {
         ("4 snm5", "SNM roll sets"),
         ("3 6yz", "Year Zero roll sets"),
         ("2 3wh4+", "Warhammer roll sets"),
+        ("3 5d6l", "D6 Legends roll sets"),
     ];
 
     for (expression, description) in roll_set_tests {

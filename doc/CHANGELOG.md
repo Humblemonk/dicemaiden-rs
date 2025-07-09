@@ -17,6 +17,7 @@
 - Support for Brave New World
 - Support for Conan
 - Support for Silhouette
+- Support for D6 Legends
 
 ## [1.3.0] - 2025-07-03
 

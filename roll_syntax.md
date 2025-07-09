@@ -37,6 +37,14 @@
 - `sw12` → 1d12 trait + 1d6 wild, keep highest, both explode
 - Snake Eyes: Critical failure when both dice roll natural
 
+### D6 Legends (Success-based with Wild Die)
+- `1d6l` → 1d6 t4f1ie6 (wild die only)
+- `8d6l` → 7d6 t4 + 1d6 t4f1ie6 (7 regular + 1 wild)
+- Regular dice: Roll d6, count successes on 4-6
+- Wild die: Roll d6, count successes on 4-6, explode on 6, subtract 1 success for each 1
+- Target number is always 4 (no variable difficulty)
+- Used in DC Universe RPG, Hercules & Xena, and other D6 Legend system games
+
 ### Conan
 - `conan` → 2d20 skill roll (default)
 - `conan4` → 4d20 skill roll (momentum spent for extra dice)

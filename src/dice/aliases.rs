@@ -115,6 +115,9 @@ static CONAN_COMBINED_REGEX: Lazy<Regex> = Lazy::new(|| {
 static SIL_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^sil(\d+)$").expect("Failed to compile SIL_REGEX"));
 
+static D6L_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(\d+)d6l$").expect("Failed to compile D6L_REGEX"));
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -541,6 +544,27 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         }
         // Expand to dice notation that works with existing parser
         return Some(format!("1d6 sil{dice_count_str}"));
+    }
+
+    // D6 Legends (8d6l -> 7d6 t4 + 1d6 t4f1ie6)
+    if let Some(captures) = D6L_REGEX.captures(input) {
+        let count_str = &captures[1];
+
+        // Validate dice count - must be positive
+        if let Ok(count) = count_str.parse::<u32>() {
+            if count == 0 {
+                return None; // Invalid dice count
+            }
+
+            if count == 1 {
+                // Special case: 1d6l = wild die only
+                return Some("1d6 t4f1ie6".to_string());
+            } else {
+                // Standard case: count > 1 = (count-1) regular dice + 1 wild die
+                return Some(format!("{}d6 t4 + 1d6 t4f1ie6", count - 1));
+            }
+        }
+        return None; // Invalid count format
     }
 
     None
