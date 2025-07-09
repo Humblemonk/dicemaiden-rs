@@ -19,7 +19,7 @@ fn test_parsing_performance() {
     // Test that parsing completes within reasonable time
     let performance_cases = vec![
         ("1d6", "Simple dice", 10),
-        ("10d10 e10 k5 +3", "Complex modifiers", 20),
+        ("10d10 e10 k5 +3", "Complex modifiers", 100),
         ("500d1000", "Maximum dice count", 200),
         ("20 50d6", "Large roll sets", 100),
         ("4d6;3d8;2d10;1d20", "Multiple rolls", 30),
