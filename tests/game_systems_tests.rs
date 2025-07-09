@@ -115,6 +115,8 @@ fn test_game_systems_comprehensive() {
         ("sp4", true, Some("success"), "Storypath 4 dice"),
         ("sp6", true, Some("success"), "Storypath 6 dice"),
         ("sp8", true, Some("success"), "Storypath 8 dice"),
+        ("sp4t7", true, Some("success"), "Storypath 4 dice target 7"),
+        ("sp5t9", true, Some("success"), "Storypath 5 dice target 9"),
         // Double Digit Dice
         ("dd34", true, None, "Double digit d3*10 + d4"),
         ("dd26", true, None, "Double digit d2*10 + d6"),
@@ -1019,6 +1021,9 @@ fn test_storypath_system_comprehensive() {
         ("sp8", 8, "Storypath 8 dice"),
         ("sp10", 10, "Storypath 10 dice"),
         ("sp12", 12, "Storypath 12 dice"),
+        ("sp4t7", 4, "Storypath 4 dice custom target 7"),
+        ("sp3t6", 3, "Storypath 3 dice custom target 6"),
+        ("sp5t9", 5, "Storypath 5 dice custom target 9"),
     ];
 
     for (alias, expected_dice, description) in storypath_tests {
@@ -1073,7 +1078,7 @@ fn test_storypath_system_comprehensive() {
     }
 
     // Test Storypath with modifiers
-    let storypath_modifier_tests = vec!["sp4 + 2", "sp6 - 1", "sp5 * 2", "sp3 + 1d6"];
+    let storypath_modifier_tests = vec!["sp4 + 2", "sp6 - 1", "sp5 * 2", "sp3 + 1d6", "sp4t7 + 2"];
 
     for test in storypath_modifier_tests {
         let result = parse_and_roll(test);

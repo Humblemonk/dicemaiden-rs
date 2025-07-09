@@ -54,7 +54,7 @@ static SR_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^sr(\d+)$").expect("Failed to compile SR_REGEX"));
 
 static SP_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^sp(\d+)$").expect("Failed to compile SP_REGEX"));
+    Lazy::new(|| Regex::new(r"^sp(\d+)(?:t(\d+))?$").expect("Failed to compile SP_REGEX"));
 
 static YZ_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)yz$").expect("Failed to compile YZ_REGEX"));
@@ -356,10 +356,11 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some(format!("{count}d6 t5"));
     }
 
-    // Storypath (sp4 -> 4d10 t8 ie10)
+    // Storypath (sp4 -> 4d10 t8 ie10, sp4t7 -> 4d10 t7 ie10)
     if let Some(captures) = SP_REGEX.captures(input) {
         let count = &captures[1];
-        return Some(format!("{count}d10 t8 ie10"));
+        let target = captures.get(2).map_or("8", |m| m.as_str());
+        return Some(format!("{count}d10 t{target} ie10"));
     }
 
     // Year Zero (6yz -> 6d6 t6)
