@@ -38,6 +38,7 @@ pub enum Modifier {
     Drop(u32),                      // d#
     KeepHigh(u32),                  // k#
     KeepLow(u32),                   // kl#
+    KeepMiddle(u32),                // km#
     Reroll(u32),                    // r#
     RerollIndefinite(u32),          // ir#
     Target(u32),                    // t#  - count successes >= target

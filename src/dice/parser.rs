@@ -844,9 +844,10 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
             r"^(ie\d*)",            // Indefinite explode first (longer pattern)
             r"^(irg\d+)",           // Indefinite reroll greater (before ir)
             r"^(ir\d+)",            // Indefinite reroll
+            r"^(km\d+)",            // NEW: Keep middle (before kl and k)
             r"^(kl\d+)",            // Keep lowest
             r"^(e\d*)",             // Explode (after ie)
-            r"^(k\d+)",             // Keep highest
+            r"^(k\d+)",             // Keep highest (after km and kl)
             r"^(rg\d+)",            // Reroll greater (before r)
             r"^(r\d+)",             // Reroll (after ir)
             r"^(d\d+)",             // Drop
@@ -1028,6 +1029,10 @@ fn parse_simple_dice_part(dice: &mut DiceRoll, part: &str) -> Result<()> {
                 .map_err(|_| anyhow!("Invalid dice sides"))?;
         }
 
+        if dice.count == 0 {
+            return Err(anyhow!("Cannot roll 0 dice"));
+        }
+
         if dice.count > 500 {
             return Err(anyhow!("Maximum 500 dice allowed"));
         }
@@ -1100,8 +1105,9 @@ fn is_combined_modifiers_token(input: &str) -> bool {
     let modifier_patterns = [
         r"^(e\d*)",
         r"^(ie\d*)",
-        r"^(k\d+)",
+        r"^(km\d+)",
         r"^(kl\d+)",
+        r"^(k\d+)",
         r"^(d\d+)",
         r"^(rg\d+)",
         r"^(irg\d+)",
@@ -1140,8 +1146,9 @@ fn is_modifier_start(input: &str) -> bool {
     let modifier_starts = [
         r"^e\d*",
         r"^ie\d*",
-        r"^k\d+",
+        r"^km\d+",
         r"^kl\d+",
+        r"^k\d+",
         r"^d\d+",
         r"^rg\d+",
         r"^irg\d+",
@@ -1468,6 +1475,16 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             return Err(anyhow!("Cannot reroll on 0 - invalid threshold"));
         }
         return Ok(Modifier::Reroll(num));
+    }
+
+    if let Some(stripped) = part.strip_prefix("km") {
+        let num = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid keep middle value in '{}'", part))?;
+        if num == 0 {
+            return Err(anyhow!("Cannot keep 0 dice"));
+        }
+        return Ok(Modifier::KeepMiddle(num));
     }
 
     if let Some(stripped) = part.strip_prefix("kl") {

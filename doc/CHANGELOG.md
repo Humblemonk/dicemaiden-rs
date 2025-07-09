@@ -6,6 +6,7 @@
 
 - Made help commands respond in private message to reduce chat spam
 - target lower modifier (tl) 
+- keep middle modifier (km)
 - reroll greater (rg) and reroll greater indefinite (irg) modifiers
 - DoS validation checks
 - Guarantee of Discord 2000 character message limit compliance 

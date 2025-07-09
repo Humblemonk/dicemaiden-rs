@@ -209,6 +209,12 @@ fn apply_keep_drop_modifiers(result: &mut RollResult, dice: &DiceRoll) -> Result
                 }
                 keep_dice(result, *count as usize, true)?;
             }
+            Modifier::KeepMiddle(count) => {
+                if *count == 0 {
+                    return Err(anyhow!("Cannot keep 0 dice"));
+                }
+                keep_middle_dice(result, *count as usize)?;
+            }
             _ => {} // Skip modifiers already handled
         }
     }
@@ -845,7 +851,7 @@ fn count_wrath_glory_successes(
         result.successes = None; // Don't show successes for total-based rolls
 
         // Check wrath dice effects (first N dice based on wrath_dice_count)
-        for (_i, &die_value) in result // FIXED: Added underscore to silence warning
+        for (_i, &die_value) in result
             .kept_rolls
             .iter()
             .enumerate()
@@ -2792,5 +2798,52 @@ fn reroll_dice_greater(
             .push("Maximum rerolls reached (100)".to_string());
     }
 
+    Ok(())
+}
+
+fn keep_middle_dice(result: &mut RollResult, count: usize) -> Result<()> {
+    let available_dice = result.individual_rolls.len();
+
+    // If we want to keep all or more dice than available, keep all
+    if count >= available_dice {
+        return Ok(());
+    }
+
+    // Create indexed rolls for tracking original positions
+    let mut indexed_rolls: Vec<(usize, i32)> = result
+        .individual_rolls
+        .iter()
+        .enumerate()
+        .map(|(i, &roll)| (i, roll))
+        .collect();
+
+    // Sort by value to identify middle dice
+    indexed_rolls.sort_by_key(|&(_, roll)| roll);
+
+    // Calculate how many dice to drop from each end
+    let total_to_drop = available_dice - count;
+    let drop_from_low = total_to_drop / 2;
+    let drop_from_high = total_to_drop - drop_from_low;
+
+    // Determine which dice to keep (middle indices after sorting)
+    let keep_start = drop_from_low;
+    let keep_end = available_dice - drop_from_high;
+
+    let kept_indices: Vec<usize> = indexed_rolls[keep_start..keep_end]
+        .iter()
+        .map(|&(i, _)| i)
+        .collect();
+
+    // Separate kept and dropped dice
+    let mut new_rolls = Vec::new();
+    for (i, &roll) in result.individual_rolls.iter().enumerate() {
+        if kept_indices.contains(&i) {
+            new_rolls.push(roll);
+        } else {
+            result.dropped_rolls.push(roll);
+        }
+    }
+
+    result.individual_rolls = new_rolls;
     Ok(())
 }
