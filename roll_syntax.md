@@ -139,7 +139,7 @@
 - **Earthdawn**: `ed15` → Earthdawn step 15 (ed1 through ed50)
 - **Earthdawn 4e**: `ed4e15` → 4th edition step 15
 - **Double Digit**: `dd34` → 1d3*10 + 1d4 (d66-style)
-- **Storypath**: `sp4` → 4d10 t8 ie10
+- **Storypath**: `sp4` → 4d10 t8 ie10, `sp4t6` → 4d10 t6 ie10 (custom target)
 - **Sunsails**: `snm5` → 5d6 ie6 t4
 - **D6 System**: `d6s4` → 4d6 + 1d6 ie
 

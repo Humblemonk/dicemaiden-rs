@@ -28,8 +28,6 @@ pub fn generate_basic_help() -> String {
 • `tl6` - Count successes (≤ 6)
 • `f1` - Count failures (≤ 1)
 • `b1` - Count botches (≤ 1)
-• `gb` - Godbound damage chart (1-=0, 2-5=1, 6-9=2, 10+=4)
-• `gbs` - Godbound straight damage (no chart)
 
 **Special Flags:**
 • `p` - Private roll (only you see results)
@@ -90,6 +88,8 @@ pub fn generate_alias_help() -> String {
 • `3df` → 3d3 fudge (Fudge dice showing +/blank/- symbols)
 • `3wh4+` → 3d6 t4 (Warhammer 40k/AoS)
 • `sr6` → 6d6 t5 (Shadowrun)
+• `sp4` → 4d10 t8 ie10 (Storypath)
+• `sp4t6` → 4d10 t6 ie10 (Storypath target change)
 • `ex5` → 5d10 t7 t10 (Exalted)
 • `6yz` → 6d6 t6 (Year Zero)
 • `age` → 2d6 + 1d6 (AGE system)
