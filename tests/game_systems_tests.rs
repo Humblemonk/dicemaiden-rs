@@ -110,6 +110,28 @@ fn test_game_systems_comprehensive() {
         ("sw14", false, None, "Invalid Savage Worlds die"),
         ("cs 0", false, None, "Invalid Cypher level"),
         ("cs 11", false, None, "Invalid Cypher level"),
+        // Storypath System
+        ("sp3", true, Some("success"), "Storypath 3 dice"),
+        ("sp4", true, Some("success"), "Storypath 4 dice"),
+        ("sp6", true, Some("success"), "Storypath 6 dice"),
+        ("sp8", true, Some("success"), "Storypath 8 dice"),
+        // Double Digit Dice
+        ("dd34", true, None, "Double digit d3*10 + d4"),
+        ("dd26", true, None, "Double digit d2*10 + d6"),
+        ("dd66", true, None, "Double digit d6*10 + d6"),
+        ("dd46", true, None, "Double digit d4*10 + d6"),
+        // Sunsails New Millennium
+        ("snm3", true, Some("success"), "SNM 3 dice"),
+        ("snm5", true, Some("success"), "SNM 5 dice"),
+        ("snm8", true, Some("success"), "SNM 8 dice"),
+        // Year Zero Engine
+        ("3yz", true, Some("success"), "Year Zero 3 dice"),
+        ("6yz", true, Some("success"), "Year Zero 6 dice"),
+        ("8yz", true, Some("success"), "Year Zero 8 dice"),
+        // Warhammer 40k/Age of Sigmar
+        ("2wh3+", true, Some("success"), "Warhammer 2d6 3+"),
+        ("3wh4+", true, Some("success"), "Warhammer 3d6 4+"),
+        ("5wh5+", true, Some("success"), "Warhammer 5d6 5+"),
     ];
 
     for (system, should_parse, expected_feature, description) in game_systems {
@@ -982,5 +1004,668 @@ fn test_system_edge_cases_and_boundaries() {
                 expression, description
             );
         }
+    }
+}
+
+#[test]
+fn test_storypath_system_comprehensive() {
+    // Test Storypath System (spX -> Xd10 t8 ie10)
+    let storypath_tests = vec![
+        // (alias, expected_dice_count, description)
+        ("sp3", 3, "Storypath 3 dice"),
+        ("sp4", 4, "Storypath 4 dice"),
+        ("sp5", 5, "Storypath 5 dice"),
+        ("sp6", 6, "Storypath 6 dice"),
+        ("sp8", 8, "Storypath 8 dice"),
+        ("sp10", 10, "Storypath 10 dice"),
+        ("sp12", 12, "Storypath 12 dice"),
+    ];
+
+    for (alias, expected_dice, description) in storypath_tests {
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Storypath '{}' should parse: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
+
+        let roll = &results[0];
+
+        // Should have success counting (target system)
+        assert!(
+            roll.successes.is_some(),
+            "Storypath should have success counting for '{}'",
+            alias
+        );
+
+        // Should have exploding dice (individual_rolls may be more than expected due to explosions)
+        assert!(
+            roll.individual_rolls.len() >= expected_dice,
+            "Should have at least {} dice for '{}', got {}",
+            expected_dice,
+            alias,
+            roll.individual_rolls.len()
+        );
+
+        // Success count should be reasonable (0 to dice count + explosions)
+        let success_count = roll.successes.unwrap();
+        assert!(
+            success_count >= 0 && success_count <= roll.individual_rolls.len() as i32,
+            "Success count {} should be reasonable for '{}' with {} dice",
+            success_count,
+            alias,
+            roll.individual_rolls.len()
+        );
+
+        // Should be using d10s (all rolls 1-10)
+        for &die_roll in &roll.individual_rolls {
+            assert!(
+                die_roll >= 1 && die_roll <= 10,
+                "Storypath should use d10s, got {} for '{}'",
+                die_roll,
+                alias
+            );
+        }
+    }
+
+    // Test Storypath with modifiers
+    let storypath_modifier_tests = vec!["sp4 + 2", "sp6 - 1", "sp5 * 2", "sp3 + 1d6"];
+
+    for test in storypath_modifier_tests {
+        let result = parse_and_roll(test);
+        assert!(
+            result.is_ok(),
+            "Storypath modifier test '{}' should parse",
+            test
+        );
+    }
+
+    // Test edge cases
+    let storypath_edge_cases = vec![
+        ("sp1", 1, "Minimum Storypath dice"),
+        ("sp15", 15, "Large Storypath pool"),
+    ];
+
+    for (alias, expected_dice, description) in storypath_edge_cases {
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Storypath edge case '{}' should work: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+        assert!(
+            roll.individual_rolls.len() >= expected_dice,
+            "Should have at least {} dice for edge case '{}'",
+            expected_dice,
+            alias
+        );
+    }
+}
+
+#[test]
+fn test_double_digit_dice_comprehensive() {
+    // Test Double Digit Dice System (ddXY -> 1dX * 10 + 1dY)
+    let double_digit_tests = vec![
+        // (alias, tens_sides, ones_sides, description)
+        ("dd34", 3, 4, "d3 tens + d4 ones"),
+        ("dd26", 2, 6, "d2 tens + d6 ones"),
+        ("dd46", 4, 6, "d4 tens + d6 ones"),
+        ("dd66", 6, 6, "d6 tens + d6 ones (d66)"),
+        ("dd36", 3, 6, "d3 tens + d6 ones"),
+        ("dd23", 2, 3, "d2 tens + d3 ones"),
+        ("dd44", 4, 4, "d4 tens + d4 ones"),
+        ("dd88", 8, 8, "d8 tens + d8 ones"),
+    ];
+
+    for (alias, tens_sides, ones_sides, description) in double_digit_tests {
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Double digit '{}' should parse: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
+
+        let roll = &results[0];
+
+        // Should have exactly 2 dice (tens and ones)
+        assert_eq!(
+            roll.individual_rolls.len(),
+            2,
+            "Double digit should have exactly 2 dice for '{}'",
+            alias
+        );
+
+        // Should not have success counting (it's a total-based system)
+        assert!(
+            roll.successes.is_none(),
+            "Double digit should not have success counting for '{}'",
+            alias
+        );
+
+        // Calculate expected range
+        let min_total = 1 * 10 + 1; // Minimum: 1 on tens die * 10 + 1 on ones die
+        let max_total = tens_sides * 10 + ones_sides; // Maximum possible
+
+        assert!(
+            roll.total >= min_total && roll.total <= max_total,
+            "Double digit total {} should be between {} and {} for '{}': {}",
+            roll.total,
+            min_total,
+            max_total,
+            alias,
+            description
+        );
+
+        // Validate individual dice are in correct ranges
+        // Note: We can't easily separate tens vs ones dice from individual_rolls
+        // but we can verify they're all in reasonable ranges
+        for &die_roll in &roll.individual_rolls {
+            assert!(
+                die_roll >= 1 && die_roll <= 8, // Max of our test cases
+                "Double digit die roll {} should be reasonable for '{}'",
+                die_roll,
+                alias
+            );
+        }
+    }
+
+    // Test double digit with modifiers
+    let double_digit_modifier_tests = vec!["dd34 + 5", "dd66 - 10", "dd26 * 2", "dd46 / 2"];
+
+    for test in double_digit_modifier_tests {
+        let result = parse_and_roll(test);
+        assert!(
+            result.is_ok(),
+            "Double digit modifier test '{}' should parse",
+            test
+        );
+    }
+
+    // Test mathematical validation for specific cases
+    let dd34_result = parse_and_roll("dd34").unwrap();
+    let dd34_roll = &dd34_result[0];
+    // dd34 should be between 11 (1*10+1) and 34 (3*10+4)
+    assert!(
+        dd34_roll.total >= 11 && dd34_roll.total <= 34,
+        "dd34 should be between 11-34, got {}",
+        dd34_roll.total
+    );
+
+    let dd66_result = parse_and_roll("dd66").unwrap();
+    let dd66_roll = &dd66_result[0];
+    // dd66 should be between 11 (1*10+1) and 66 (6*10+6)
+    assert!(
+        dd66_roll.total >= 11 && dd66_roll.total <= 66,
+        "dd66 should be between 11-66, got {}",
+        dd66_roll.total
+    );
+}
+
+#[test]
+fn test_sunsails_new_millennium_comprehensive() {
+    // Test Sunsails New Millennium (snmX -> Xd6 ie6 t4)
+    let snm_tests = vec![
+        // (alias, expected_dice_count, description)
+        ("snm3", 3, "SNM 3 dice"),
+        ("snm4", 4, "SNM 4 dice"),
+        ("snm5", 5, "SNM 5 dice"),
+        ("snm6", 6, "SNM 6 dice"),
+        ("snm8", 8, "SNM 8 dice"),
+        ("snm10", 10, "SNM 10 dice"),
+    ];
+
+    for (alias, expected_dice, description) in snm_tests {
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "SNM '{}' should parse: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
+
+        let roll = &results[0];
+
+        // Should have success counting (target 4+)
+        assert!(
+            roll.successes.is_some(),
+            "SNM should have success counting for '{}'",
+            alias
+        );
+
+        // Should have exploding dice (ie6), so may have more than expected dice
+        assert!(
+            roll.individual_rolls.len() >= expected_dice,
+            "Should have at least {} dice for '{}', got {} (explosions expected)",
+            expected_dice,
+            alias,
+            roll.individual_rolls.len()
+        );
+
+        // Success count should be reasonable
+        let success_count = roll.successes.unwrap();
+        assert!(
+            success_count >= 0 && success_count <= roll.individual_rolls.len() as i32,
+            "Success count {} should be reasonable for '{}' with {} dice",
+            success_count,
+            alias,
+            roll.individual_rolls.len()
+        );
+
+        // Should be using d6s (all rolls 1-6)
+        for &die_roll in &roll.individual_rolls {
+            assert!(
+                die_roll >= 1 && die_roll <= 6,
+                "SNM should use d6s, got {} for '{}'",
+                die_roll,
+                alias
+            );
+        }
+
+        // Should have notes about explosions if any 6s were rolled
+        let has_sixes = roll.individual_rolls.iter().any(|&r| r == 6);
+        if has_sixes && roll.individual_rolls.len() > expected_dice {
+            let has_explosion_note = roll
+                .notes
+                .iter()
+                .any(|note| note.contains("exploded") || note.contains("explosion"));
+            assert!(
+                has_explosion_note,
+                "Should have explosion note for '{}' when 6s are rolled",
+                alias
+            );
+        }
+    }
+
+    // Test SNM with modifiers
+    let snm_modifier_tests = vec!["snm5 + 2", "snm3 - 1", "snm4 * 2", "snm6 + 1d4"];
+
+    for test in snm_modifier_tests {
+        let result = parse_and_roll(test);
+        assert!(result.is_ok(), "SNM modifier test '{}' should parse", test);
+    }
+
+    // Test edge cases
+    let snm_edge_cases = vec![
+        ("snm1", 1, "Minimum SNM dice"),
+        ("snm12", 12, "Large SNM pool"),
+    ];
+
+    for (alias, _expected_dice, description) in snm_edge_cases {
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "SNM edge case '{}' should work: {}",
+            alias,
+            description
+        );
+    }
+}
+
+#[test]
+fn test_year_zero_engine_comprehensive() {
+    // Test Year Zero Engine (XYZ -> Xd6 t6)
+    let year_zero_tests = vec![
+        // (alias, expected_dice_count, description)
+        ("3yz", 3, "Year Zero 3 dice"),
+        ("4yz", 4, "Year Zero 4 dice"),
+        ("5yz", 5, "Year Zero 5 dice"),
+        ("6yz", 6, "Year Zero 6 dice"),
+        ("8yz", 8, "Year Zero 8 dice"),
+        ("10yz", 10, "Year Zero 10 dice"),
+        ("12yz", 12, "Year Zero 12 dice"),
+    ];
+
+    for (alias, expected_dice, description) in year_zero_tests {
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Year Zero '{}' should parse: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
+
+        let roll = &results[0];
+
+        // Should have success counting (target 6)
+        assert!(
+            roll.successes.is_some(),
+            "Year Zero should have success counting for '{}'",
+            alias
+        );
+
+        // Should have exactly the expected number of dice (no exploding in basic YZ)
+        assert_eq!(
+            roll.individual_rolls.len(),
+            expected_dice,
+            "Should have exactly {} dice for '{}'",
+            expected_dice,
+            alias
+        );
+
+        // Success count should be reasonable (number of 6s)
+        let success_count = roll.successes.unwrap();
+        let actual_sixes = roll.individual_rolls.iter().filter(|&&r| r == 6).count();
+        assert_eq!(
+            success_count, actual_sixes as i32,
+            "Success count should equal number of 6s for '{}': {} vs {}",
+            alias, success_count, actual_sixes
+        );
+
+        // Should be using d6s (all rolls 1-6)
+        for &die_roll in &roll.individual_rolls {
+            assert!(
+                die_roll >= 1 && die_roll <= 6,
+                "Year Zero should use d6s, got {} for '{}'",
+                die_roll,
+                alias
+            );
+        }
+    }
+
+    // Test Year Zero with modifiers
+    let yz_modifier_tests = vec!["6yz + 2", "4yz - 1", "5yz * 2", "8yz + 1d6"];
+
+    for test in yz_modifier_tests {
+        let result = parse_and_roll(test);
+        assert!(
+            result.is_ok(),
+            "Year Zero modifier test '{}' should parse",
+            test
+        );
+    }
+
+    // Test edge cases
+    let yz_edge_cases = vec![
+        ("1yz", 1, "Minimum Year Zero dice"),
+        ("15yz", 15, "Large Year Zero pool"),
+    ];
+
+    for (alias, expected_dice, description) in yz_edge_cases {
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Year Zero edge case '{}' should work: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+        assert_eq!(
+            roll.individual_rolls.len(),
+            expected_dice,
+            "Should have exactly {} dice for edge case '{}'",
+            expected_dice,
+            alias
+        );
+    }
+}
+
+#[test]
+fn test_warhammer_40k_aos_comprehensive() {
+    // Test Warhammer 40k/Age of Sigmar (XwhY+ -> Xd6 tY)
+    let warhammer_tests = vec![
+        // (alias, expected_dice, target, description)
+        ("2wh3+", 2, 3, "2d6 target 3+"),
+        ("3wh4+", 3, 4, "3d6 target 4+"),
+        ("4wh2+", 4, 2, "4d6 target 2+"),
+        ("5wh5+", 5, 5, "5d6 target 5+"),
+        ("6wh6+", 6, 6, "6d6 target 6+"),
+        ("8wh3+", 8, 3, "8d6 target 3+"),
+        ("10wh4+", 10, 4, "10d6 target 4+"),
+        ("1wh2+", 1, 2, "1d6 target 2+"),
+    ];
+
+    for (alias, expected_dice, target, description) in warhammer_tests {
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Warhammer '{}' should parse: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
+
+        let roll = &results[0];
+
+        // Should have success counting
+        assert!(
+            roll.successes.is_some(),
+            "Warhammer should have success counting for '{}'",
+            alias
+        );
+
+        // Should have exactly the expected number of dice
+        assert_eq!(
+            roll.individual_rolls.len(),
+            expected_dice,
+            "Should have exactly {} dice for '{}'",
+            expected_dice,
+            alias
+        );
+
+        // Success count should match number of dice >= target
+        let success_count = roll.successes.unwrap();
+        let actual_successes = roll
+            .individual_rolls
+            .iter()
+            .filter(|&&r| r >= target as i32)
+            .count();
+        assert_eq!(
+            success_count, actual_successes as i32,
+            "Success count should equal dice >= {} for '{}': {} vs {}",
+            target, alias, success_count, actual_successes
+        );
+
+        // Should be using d6s (all rolls 1-6)
+        for &die_roll in &roll.individual_rolls {
+            assert!(
+                die_roll >= 1 && die_roll <= 6,
+                "Warhammer should use d6s, got {} for '{}'",
+                die_roll,
+                alias
+            );
+        }
+
+        // Success count should be reasonable (0 to dice count)
+        assert!(
+            success_count >= 0 && success_count <= expected_dice as i32,
+            "Success count {} should be 0-{} for '{}'",
+            success_count,
+            expected_dice,
+            alias
+        );
+    }
+
+    // Test edge cases and target variations
+    let warhammer_edge_cases = vec![
+        ("1wh6+", 1, 6, "Single die, hard target"),
+        ("12wh2+", 12, 2, "Many dice, easy target"),
+        ("3wh1+", 3, 1, "Impossible to fail (1+ target)"),
+    ];
+
+    for (alias, expected_dice, target, description) in warhammer_edge_cases {
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Warhammer edge case '{}' should work: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+
+        // Validate success logic for edge cases
+        let success_count = roll.successes.unwrap();
+        let actual_successes = roll
+            .individual_rolls
+            .iter()
+            .filter(|&&r| r >= target as i32)
+            .count();
+
+        assert_eq!(
+            success_count, actual_successes as i32,
+            "Edge case '{}' success count should be correct",
+            alias
+        );
+
+        // Special case: 1+ target should always succeed on d6
+        if target == 1 {
+            assert_eq!(
+                success_count, expected_dice as i32,
+                "1+ target should always succeed all dice for '{}'",
+                alias
+            );
+        }
+    }
+}
+
+#[test]
+fn test_missing_systems_with_roll_sets() {
+    // Test all missing systems work with roll sets
+    let roll_set_tests = vec![
+        ("3 sp4", "Storypath roll sets"),
+        ("2 dd34", "Double digit roll sets"),
+        ("4 snm5", "SNM roll sets"),
+        ("3 6yz", "Year Zero roll sets"),
+        ("2 3wh4+", "Warhammer roll sets"),
+    ];
+
+    for (expression, description) in roll_set_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Roll set '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let expected_sets = expression.chars().next().unwrap().to_digit(10).unwrap() as usize;
+        assert_eq!(
+            results.len(),
+            expected_sets,
+            "Should have {} sets for '{}'",
+            expected_sets,
+            expression
+        );
+
+        for (i, roll) in results.iter().enumerate() {
+            assert_eq!(
+                roll.label,
+                Some(format!("Set {}", i + 1)),
+                "Each set should have correct label for '{}'",
+                expression
+            );
+        }
+    }
+}
+
+#[test]
+fn test_missing_systems_with_complex_modifiers() {
+    // Test complex modifier combinations with missing systems
+    let complex_modifier_tests = vec![
+        // Storypath
+        ("sp4 + 2d6", "Storypath with additional dice"),
+        ("sp6 * 2 - 3", "Storypath with math operations"),
+        // Double Digit
+        ("dd66 / 10", "Double digit division"),
+        // SNM
+        ("snm4 * 3", "SNM with multiplication"),
+        // Year Zero
+        ("8yz - 2", "Year Zero with subtraction"),
+    ];
+
+    for (expression, description) in complex_modifier_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Complex modifier '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for complex modifier '{}'",
+            expression
+        );
+    }
+}
+
+#[test]
+fn test_missing_systems_alias_expansion() {
+    // Verify that alias expansion works correctly for missing systems
+    let alias_expansion_tests = vec![
+        // (alias, expected_expansion)
+        ("sp4", "4d10 t8 ie10"),
+        ("dd34", "1d3 * 10 + 1d4"),
+        ("snm5", "5d6 ie6 t4"),
+        ("6yz", "6d6 t6"),
+        ("3wh4+", "3d6 t4"),
+    ];
+
+    for (alias, expected_expansion) in alias_expansion_tests {
+        // Test that the alias expands correctly
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(
+            expanded,
+            Some(expected_expansion.to_string()),
+            "Alias '{}' should expand to '{}'",
+            alias,
+            expected_expansion
+        );
+
+        // Test that both the alias and expansion produce equivalent results
+        let alias_result = parse_and_roll(alias);
+        let expansion_result = parse_and_roll(expected_expansion);
+
+        assert!(
+            alias_result.is_ok() && expansion_result.is_ok(),
+            "Both alias '{}' and expansion '{}' should work",
+            alias,
+            expected_expansion
+        );
+
+        let alias_roll = alias_result.unwrap();
+        let expansion_roll = expansion_result.unwrap();
+
+        // Should have same number of results
+        assert_eq!(
+            alias_roll.len(),
+            expansion_roll.len(),
+            "Alias and expansion should have same result count for '{}'",
+            alias
+        );
+
+        // Should have similar characteristics (both success-based or both total-based)
+        assert_eq!(
+            alias_roll[0].successes.is_some(),
+            expansion_roll[0].successes.is_some(),
+            "Alias and expansion should have same success counting behavior for '{}'",
+            alias
+        );
     }
 }
