@@ -119,6 +119,12 @@ pub fn generate_system_help() -> String {
 • `/roll 3df` or `/roll 4df` - Fudge dice showing +/blank/- symbols
 • Values: **+** = +1, (blank) = 0, **-** = -1
 
+**D6 Legends System:**
+• Success-based variant of the classic D6 system
+• Regular dice: Count successes on 4-6
+• Wild die: Counts successes on 4-6, explodes on 6, failures (1) subtract 1 success
+• `/roll 8d6l` → 7 regular dice + 1 wild die
+
 **Godbound:**
 • `/roll gb` - d20 with damage chart (1-=0, 2-5=1, 6-9=2, 10+=4)
 • `/roll gbs` - d20 straight damage (bypasses chart)
