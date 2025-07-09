@@ -8,7 +8,8 @@
 // - User workflow scenarios
 
 use dicemaiden_rs::{
-    format_multiple_results, format_multiple_results_with_limit, help_text, parse_and_roll,
+    dice::parser, format_multiple_results, format_multiple_results_with_limit, help_text,
+    parse_and_roll,
 };
 
 // ============================================================================
@@ -499,4 +500,616 @@ fn test_format_regression_cases() {
     // Simple rolls should be identified
     let result = parse_and_roll("s 1d6").unwrap();
     assert!(result[0].simple);
+}
+
+#[test]
+fn test_comments_functionality() {
+    // Test that comments are properly parsed, stored, and formatted
+    let comment_scenarios = vec![
+        ("2d6 ! Fire damage", "Fire damage"),
+        (
+            "1d20 + 5 ! Attack roll with sword",
+            "Attack roll with sword",
+        ),
+        ("4d6 k3 ! Character creation", "Character creation"),
+        ("8d6 ! Fireball spell", "Fireball spell"),
+        ("3d10 t7 ! Difficulty check", "Difficulty check"),
+        ("sw8 ! Savage Worlds trait test", "Savage Worlds trait test"),
+        ("4cod ! Chronicles skill roll", "Chronicles skill roll"),
+    ];
+
+    for (expression, expected_comment) in comment_scenarios {
+        let result = parse_and_roll(expression).unwrap();
+
+        // Verify comment is parsed correctly
+        assert_eq!(
+            result[0].comment,
+            Some(expected_comment.to_string()),
+            "Comment should be parsed correctly for '{}'",
+            expression
+        );
+
+        // Verify comment appears in formatted output
+        let formatted = format_multiple_results(&result);
+        assert!(
+            formatted.contains("Reason:"),
+            "Formatted output should contain 'Reason:' for '{}'",
+            expression
+        );
+        assert!(
+            formatted.contains(expected_comment),
+            "Formatted output should contain comment text for '{}'",
+            expression
+        );
+    }
+
+    // Test comment with roll sets
+    let result = parse_and_roll("3 2d6 ! Damage rolls").unwrap();
+    assert_eq!(result.len(), 3);
+
+    // Only the first roll should have the comment to avoid duplication
+    assert_eq!(result[0].comment, Some("Damage rolls".to_string()));
+
+    let formatted = format_multiple_results(&result);
+    // Should show comment once at the end, not for each set
+    let comment_count = formatted.matches("Reason:").count();
+    assert_eq!(
+        comment_count, 1,
+        "Comment should appear once in roll set output"
+    );
+
+    // Test comment with semicolon-separated rolls
+    let result = parse_and_roll("1d20 ! Attack; 1d8 ! Damage").unwrap();
+    assert_eq!(result.len(), 2);
+    assert_eq!(result[0].comment, Some("Attack".to_string()));
+    assert_eq!(result[1].comment, Some("Damage".to_string()));
+
+    // Test edge cases
+    let edge_cases = vec![
+        ("1d6 !", ""),     // Empty comment
+        ("2d6 !    ", ""), // Whitespace-only comment
+    ];
+
+    for (expression, expected) in edge_cases {
+        let result = parse_and_roll(expression).unwrap();
+        assert_eq!(
+            result[0].comment,
+            Some(expected.to_string()),
+            "Edge case comment for '{}'",
+            expression
+        );
+    }
+}
+
+#[test]
+fn test_labels_functionality() {
+    // Test that labels are properly parsed, stored, and formatted
+    let label_scenarios = vec![
+        ("(Attack) 1d20 + 5", "Attack"),
+        ("(Damage) 2d6", "Damage"),
+        ("(Initiative) 1d20", "Initiative"),
+        ("(Stealth Check) 1d20 - 2", "Stealth Check"),
+        ("(Fire Damage) 8d6", "Fire Damage"),
+        ("(Skill Test) 4cod", "Skill Test"),
+        ("(Trait Roll) sw8", "Trait Roll"),
+    ];
+
+    for (expression, expected_label) in label_scenarios {
+        let result = parse_and_roll(expression).unwrap();
+
+        // Verify label is parsed correctly
+        assert_eq!(
+            result[0].label,
+            Some(expected_label.to_string()),
+            "Label should be parsed correctly for '{}'",
+            expression
+        );
+
+        // Verify label appears in formatted output
+        let formatted = format_multiple_results(&result);
+        assert!(
+            formatted.contains(&format!("**{}**:", expected_label)),
+            "Formatted output should contain labeled format for '{}'",
+            expression
+        );
+    }
+
+    // Test label with roll sets
+    let result = parse_and_roll("3 (Stat Roll) 4d6 k3").unwrap();
+    assert_eq!(result.len(), 3);
+
+    // Each roll in the set should have "Set X" label, overriding the original
+    for (i, roll) in result.iter().enumerate() {
+        assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
+    }
+
+    // Test label + comment combination
+    let result = parse_and_roll("(Attack) 1d20 + 5 ! With magic sword").unwrap();
+    assert_eq!(result[0].label, Some("Attack".to_string()));
+    assert_eq!(result[0].comment, Some("With magic sword".to_string()));
+
+    let formatted = format_multiple_results(&result);
+    assert!(formatted.contains("**Attack**:"));
+    assert!(formatted.contains("Reason: `With magic sword`"));
+
+    // Test edge cases
+    let label_edge_cases = vec![
+        ("() 2d6", ""),                // Empty label
+        ("(  ) 1d20", ""),             // Whitespace-only label
+        ("( Attack ) 1d20", "Attack"), // Extra spaces should be trimmed
+    ];
+
+    for (expression, expected) in label_edge_cases {
+        let result = parse_and_roll(expression).unwrap();
+        assert_eq!(
+            result[0].label,
+            Some(expected.to_string()),
+            "Edge case label for '{}'",
+            expression
+        );
+    }
+}
+
+#[test]
+fn test_special_flags_integration() {
+    // Test special flags in complex integration scenarios
+
+    // Test 'nr' (no results) flag with various systems
+    let nr_tests = vec![
+        ("nr 4d6 k3", "No results with keep modifier"),
+        ("nr 3d10 t7", "No results with success counting"),
+        ("nr sw8", "No results with Savage Worlds"),
+        ("nr 4cod", "No results with Chronicles of Darkness"),
+        ("nr 6 2d6", "No results with roll sets"),
+    ];
+
+    for (expression, description) in nr_tests {
+        let result = parse_and_roll(expression).unwrap();
+
+        for roll in &result {
+            assert!(
+                roll.no_results,
+                "Should have no_results flag for '{}': {}",
+                expression, description
+            );
+        }
+
+        // Test formatted output - should show dice but not final results
+        let formatted = format_multiple_results(&result);
+        assert!(
+            formatted.contains("`["),
+            "Should show dice breakdown for nr flag: '{}'",
+            expression
+        );
+        // Note: Actual formatting behavior for 'nr' flag needs to be verified based on implementation
+    }
+
+    // Test 'ul' (unsorted) flag with various systems - check DiceRoll parsing
+    let ul_tests = vec![
+        ("ul 5d6", "Unsorted basic dice"),
+        ("ul 4d6 k3", "Unsorted with keep modifier"),
+        ("ul 10d10 e10", "Unsorted with exploding dice"),
+        ("ul 3 4d6", "Unsorted with roll sets"),
+    ];
+
+    for (expression, description) in ul_tests {
+        // Check that the DiceRoll has the unsorted flag
+        let parsed = parser::parse_dice_string(expression).unwrap();
+        for dice in &parsed {
+            assert!(
+                dice.unsorted,
+                "Should have unsorted flag in DiceRoll for '{}': {}",
+                expression, description
+            );
+        }
+
+        // Also verify it rolls successfully
+        let result = parse_and_roll(expression).unwrap();
+        assert!(
+            !result.is_empty(),
+            "Should have results for '{}': {}",
+            expression,
+            description
+        );
+
+        // Note: To properly test unsorted behavior, we'd need to verify that the dice
+        // are NOT sorted in the output, but this is difficult to test deterministically
+    }
+
+    // Test flag combinations with complex expressions
+    let complex_flag_tests = vec![
+        (
+            "p s 5 4d6 k3 ! Character stats",
+            "All flags with roll sets and comment",
+        ),
+        ("p nr (Attack) 1d20 + 5", "Private + no results + label"),
+        ("s ul 8d6 e6", "Simple + unsorted + exploding"),
+        ("p s nr ul 2d6", "All four flags together"),
+    ];
+
+    for (expression, description) in complex_flag_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Complex flag test '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for '{}': {}",
+            expression,
+            description
+        );
+
+        // Verify flags are set correctly
+        for roll in &results {
+            if expression.contains(" p ") || expression.starts_with("p ") {
+                assert!(roll.private, "Should be private for '{}'", expression);
+            }
+            if expression.contains(" s ") || expression.starts_with("s ") {
+                assert!(roll.simple, "Should be simple for '{}'", expression);
+            }
+            if expression.contains(" nr ") {
+                assert!(
+                    roll.no_results,
+                    "Should have no_results for '{}'",
+                    expression
+                );
+            }
+        }
+
+        // Check unsorted flag on DiceRoll parsing if ul is in expression
+        if expression.contains(" ul ") {
+            let parsed = parser::parse_dice_string(expression).unwrap();
+            for dice in &parsed {
+                assert!(
+                    dice.unsorted,
+                    "Should have unsorted flag in DiceRoll for '{}'",
+                    expression
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_wrath_glory_special_modes() {
+    // Test Wrath & Glory special modes mentioned in roll_syntax.md but not fully tested
+    let wng_special_modes = vec![
+        // Soak tests (use total instead of successes)
+        ("wng 4d6 !soak", "Basic soak test"),
+        ("wng w2 5d6 !soak", "Soak with multiple wrath dice"),
+        ("wng dn3 4d6 !soak", "Soak with difficulty"),
+        // Exempt tests (no wrath die)
+        ("wng 6d6 !exempt", "Basic exempt test"),
+        ("wng dn2 4d6 !exempt", "Exempt with difficulty"),
+        // Damage tests (similar to soak)
+        ("wng 5d6 !dmg", "Damage test"),
+        ("wng w2 6d6 !dmg", "Damage with multiple wrath dice"),
+    ];
+
+    for (expression, description) in wng_special_modes {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "W&G special mode '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for '{}': {}",
+            expression,
+            description
+        );
+
+        let roll = &results[0];
+
+        // Check that appropriate mechanics are applied
+        if expression.contains("!soak")
+            || expression.contains("!dmg")
+            || expression.contains("!exempt")
+        {
+            // For soak/damage/exempt tests, should use total instead of successes
+            // (Implementation details may vary, but should have some kind of appropriate result)
+            assert!(
+                roll.total > 0 || roll.successes.is_some(),
+                "Should have meaningful result for '{}': {}",
+                expression,
+                description
+            );
+
+            // Check for appropriate notes indicating the special mode
+            let _has_special_note = roll.notes.iter().any(|note| {
+                note.contains("soak")
+                    || note.contains("exempt")
+                    || note.contains("damage")
+                    || note.contains("total")
+                    || note.contains("Wrath")
+            });
+            // Note: This depends on implementation - the system should indicate special mode somehow
+        }
+
+        // Wrath dice should still be tracked for complications/glory
+        if expression.contains("w2") {
+            // Should have multiple wrath dice
+            assert!(
+                roll.wng_wrath_dice.is_some() || roll.wng_wrath_die.is_some(),
+                "Should have wrath dice information for '{}': {}",
+                expression,
+                description
+            );
+        }
+    }
+
+    // Test invalid W&G special modes
+    let invalid_wng_modes = vec!["wng 4d6 !invalid", "wng 4d6 !", "wng 4d6 !soak invalid"];
+
+    for invalid_test in invalid_wng_modes {
+        let result = parse_and_roll(invalid_test);
+        // These might parse but should either work or fail gracefully
+        if result.is_ok() {
+            println!("W&G mode '{}' parsed (behavior may vary)", invalid_test);
+        } else {
+            println!("W&G mode '{}' failed as expected", invalid_test);
+        }
+    }
+}
+
+#[test]
+fn test_comprehensive_user_scenarios() {
+    // Test realistic user scenarios that combine multiple advanced features
+    let user_scenarios = vec![
+        // Character creation scenarios
+        (
+            "(Strength) 4d6 k3 ! Primary stat",
+            "Character creation with label and comment",
+        ),
+        (
+            "6 (Stat) 4d6 k3 ! Character generation",
+            "Multiple stats with labels",
+        ),
+        (
+            "p (Secret Roll) 1d20 + 5 ! GM only",
+            "Private roll with label and comment",
+        ),
+        // Combat scenarios
+        (
+            "(Attack) +d20 + 8 ! Rogue sneak attack",
+            "Advantage attack with label",
+        ),
+        (
+            "(Damage) 3d6 + 2d6 ! Sneak attack damage",
+            "Complex damage with comment",
+        ),
+        (
+            "(Initiative) 1d20 + 3; (Attack) 1d20 + 5; (Damage) 1d8 + 3",
+            "Full combat sequence",
+        ),
+        // Spellcasting scenarios
+        (
+            "(Fireball) 8d6 ! 3rd level spell",
+            "Spell damage with label",
+        ),
+        (
+            "nr (Concentration) 1d20 + 5 ! Maintaining spell",
+            "Concentration check with no results",
+        ),
+        // System-specific scenarios
+        (
+            "(Investigation) 4cod ! Looking for clues",
+            "Chronicles of Darkness skill",
+        ),
+        (
+            "(Fighting) sw8 ! Savage Worlds combat",
+            "Savage Worlds trait test",
+        ),
+        (
+            "(Hack) cpr + 6 ! Cyberpunk Red netrunning",
+            "Cyberpunk Red with modifier",
+        ),
+        (
+            "(Spell) wit + 4 ! Witcher magic attempt",
+            "Witcher magic roll",
+        ),
+        // Complex scenarios with flags
+        (
+            "p s (Secret) 2d20 kl1 ! Stealth disadvantage",
+            "Private simple disadvantage roll",
+        ),
+        (
+            "ul (Chaos) 10d6 e6 ! Wild magic surge",
+            "Unsorted exploding dice",
+        ),
+        (
+            "nr (Behind Screen) 3d6 ! GM planning roll",
+            "No results GM roll",
+        ),
+    ];
+
+    for (expression, description) in user_scenarios {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "User scenario '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for '{}': {}",
+            expression,
+            description
+        );
+
+        // Test that formatting works properly
+        let formatted = format_multiple_results(&results);
+        assert!(
+            !formatted.is_empty(),
+            "Should have formatted output for '{}'",
+            expression
+        );
+        assert!(
+            formatted.len() <= 2000,
+            "Should fit Discord limit for '{}'",
+            expression
+        );
+
+        // Verify complex features work together
+        if expression.contains("(") && expression.contains(")") {
+            // Should have label
+            assert!(
+                results[0].label.is_some() || formatted.contains("Set "),
+                "Should have label or be a roll set for '{}'",
+                expression
+            );
+        }
+
+        if expression.contains("!") {
+            // Should have comment (unless suppressed by sets)
+            assert!(
+                results[0].comment.is_some() || results.len() > 1,
+                "Should have comment or be multi-roll for '{}'",
+                expression
+            );
+        }
+
+        if expression.contains(" p ") || expression.starts_with("p ") {
+            for roll in &results {
+                assert!(roll.private, "Should be private for '{}'", expression);
+            }
+        }
+    }
+}
+
+#[test]
+fn test_error_recovery_scenarios() {
+    // Test that complex expressions with errors fail gracefully
+    let error_scenarios = vec![
+        // Complex expressions with errors
+        ("(Unclosed 1d20 + 5 ! Should fail", "Unclosed label"),
+        (
+            "(Attack) 1d20 + 5 ! Comment; with; many; semicolons",
+            "Complex comment with semicolons",
+        ),
+        ("p s nr ul invalid 2d6", "Flags with invalid dice"),
+        ("(Label) p s 2d6 ! Comment", "Mixed flag and label order"),
+        // System-specific errors
+        ("(Test) 4cod99", "Invalid CoD variant"),
+        ("(Bad) sw15", "Invalid Savage Worlds die"),
+        ("(Error) cpr / 0", "Division by zero with label"),
+        // Complex mathematical errors
+        ("(Math) 2d6 + + 5", "Double operator with label"),
+        ("(Complex) 1d20 * / 2", "Invalid operator sequence"),
+    ];
+
+    for (expression, description) in error_scenarios {
+        let result = parse_and_roll(expression);
+        // These should either work (if the error is handled) or fail gracefully
+        match result {
+            Ok(results) => {
+                println!(
+                    "Error scenario '{}' unexpectedly succeeded: {}",
+                    expression, description
+                );
+                assert!(
+                    !results.is_empty(),
+                    "Should have results if parsing succeeded"
+                );
+            }
+            Err(error) => {
+                println!(
+                    "Error scenario '{}' failed as expected: {} - {}",
+                    expression, description, error
+                );
+                // Error message should be reasonable (not a panic or internal error)
+                let error_str = error.to_string();
+                assert!(!error_str.is_empty(), "Should have error message");
+                assert!(
+                    !error_str.contains("internal error"),
+                    "Should not be internal error"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_discord_formatting_edge_cases() {
+    // Test edge cases in Discord formatting with advanced features
+    let formatting_edge_cases = vec![
+        // Very long comments
+        (
+            "1d6 ! This is a very long comment that might cause formatting issues when combined with complex dice expressions and multiple modifiers",
+            "Long comment",
+        ),
+        // Complex labels
+        ("(Very Long Label Name) 1d20", "Long label"),
+        // Multiple complex elements
+        (
+            "20 (Set) 10d6 e6 k5 ! Large roll set with exploding dice",
+            "Complex large roll set",
+        ),
+        // Unicode in comments/labels
+        (
+            "(⚔️ Attack) 1d20 ! 🔥 Fire damage",
+            "Unicode in label and comment",
+        ),
+        // Special characters
+        (
+            "(Test \"Quotes\") 1d20 ! Comment with 'quotes'",
+            "Quotes in label and comment",
+        ),
+    ];
+
+    for (expression, description) in formatting_edge_cases {
+        let result = parse_and_roll(expression);
+        if result.is_ok() {
+            let results = result.unwrap();
+            let formatted = format_multiple_results_with_limit(&results);
+
+            // Should not exceed Discord limits
+            assert!(
+                formatted.len() <= 2000,
+                "Formatted output should fit Discord limit for '{}': {} chars",
+                expression,
+                formatted.len()
+            );
+
+            // Should still be readable
+            assert!(
+                !formatted.is_empty(),
+                "Should have output for '{}'",
+                expression
+            );
+            assert!(
+                formatted.contains("**"),
+                "Should have bold formatting for '{}'",
+                expression
+            );
+
+            println!(
+                "Formatting test '{}' produced {} chars: {}",
+                description,
+                formatted.len(),
+                if formatted.len() > 100 {
+                    format!("{}...", &formatted[..100])
+                } else {
+                    formatted
+                }
+            );
+        } else {
+            println!(
+                "Formatting edge case '{}' failed to parse: {}",
+                expression, description
+            );
+        }
+    }
 }

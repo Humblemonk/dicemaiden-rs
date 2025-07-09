@@ -465,3 +465,522 @@ fn test_system_roll_sets() {
         }
     }
 }
+
+#[test]
+fn test_dnd_aliases_comprehensive() {
+    // Test D&D/Pathfinder aliases mentioned in roll_syntax.md
+    let dnd_aliases = vec![
+        // Basic aliases
+        ("attack", "1d20", "Basic attack roll"),
+        ("skill", "1d20", "Basic skill check"),
+        ("save", "1d20", "Basic saving throw"),
+        // Aliases with modifiers
+        ("attack +5", "1d20 + 5", "Attack with bonus"),
+        ("attack -2", "1d20 - 2", "Attack with penalty"),
+        ("skill +3", "1d20 + 3", "Skill with bonus"),
+        ("skill -4", "1d20 - 4", "Skill with penalty"),
+        ("save +2", "1d20 + 2", "Save with bonus"),
+        ("save -1", "1d20 - 1", "Save with penalty"),
+        // Large modifiers
+        ("attack +10", "1d20 + 10", "High-level attack"),
+        ("skill -5", "1d20 - 5", "Difficult skill check"),
+        ("save +8", "1d20 + 8", "High save bonus"),
+    ];
+
+    for (alias, expected_equivalent, description) in dnd_aliases {
+        // Test that the alias works
+        let alias_result = parse_and_roll(alias);
+        assert!(
+            alias_result.is_ok(),
+            "D&D alias '{}' should parse: {}",
+            alias,
+            description
+        );
+
+        // Test that the equivalent expression also works
+        let equivalent_result = parse_and_roll(expected_equivalent);
+        assert!(
+            equivalent_result.is_ok(),
+            "Equivalent '{}' should parse: {}",
+            expected_equivalent,
+            description
+        );
+
+        let alias_roll = alias_result.unwrap();
+        let equiv_roll = equivalent_result.unwrap();
+
+        // Both should produce results in similar ranges (can't test exact equality due to randomness)
+        assert_eq!(
+            alias_roll[0].individual_rolls.len(),
+            equiv_roll[0].individual_rolls.len(),
+            "Dice count should match for '{}' vs '{}': {}",
+            alias,
+            expected_equivalent,
+            description
+        );
+    }
+
+    // Test D&D advantage/disadvantage in different contexts
+    let advantage_tests = vec![
+        ("+d20", "Advantage"),
+        ("-d20", "Disadvantage"),
+        ("+d20 + 5", "Advantage with modifier"),
+        ("-d20 - 2", "Disadvantage with penalty"),
+        ("3 +d20", "Advantage roll sets"),
+        ("2 -d20 + 3", "Disadvantage roll sets with modifier"),
+    ];
+
+    for (expression, description) in advantage_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Advantage test '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        if expression.contains("3 ") || expression.contains("2 ") {
+            // Roll sets
+            assert!(
+                results.len() >= 2,
+                "Should have multiple sets for '{}'",
+                expression
+            );
+        } else {
+            // Single roll
+            assert_eq!(
+                results.len(),
+                1,
+                "Should have single result for '{}'",
+                expression
+            );
+        }
+    }
+}
+
+#[test]
+fn test_hero_system_variants() {
+    // Test Hero System variants mentioned in roll_syntax.md but not currently tested
+    let hero_variants = vec![
+        // Fractional dice
+        ("2.5hsk", "2½d6 killing damage"),
+        ("1.5hsn", "1½d6 normal damage"),
+        ("3.5hsk", "3½d6 killing damage"),
+        // Single-die versions
+        ("hsn", "Single die normal damage"),
+        ("hsk", "Single die killing damage"),
+        ("hsh", "Single die to-hit"),
+        // Additional fractional notation
+        ("1hsk1", "1d6 + 1d3 killing (fractional notation)"),
+        ("2hsk1", "2d6 + 1d3 killing (fractional notation)"),
+        ("3hsn1", "3d6 + 1d3 normal (if supported)"),
+    ];
+
+    for (expression, description) in hero_variants {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Hero System variant '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for '{}': {}",
+            expression,
+            description
+        );
+
+        // Basic validation - should have reasonable totals
+        assert!(
+            results[0].total >= 0,
+            "Should have non-negative total for '{}': {}",
+            expression,
+            description
+        );
+
+        // Check if it has the Hero System notes
+        let has_hero_note = results[0].notes.iter().any(|note| {
+            note.contains("Hero")
+                || note.contains("damage")
+                || note.contains("hit")
+                || note.contains("BODY")
+                || note.contains("STUN")
+        });
+        assert!(
+            has_hero_note,
+            "Should have Hero System notes for '{}': {}",
+            expression, description
+        );
+    }
+
+    // Test Hero System with modifiers
+    let hero_modifier_tests = vec!["2hsn + 5", "3hsk - 2", "hsh + 3", "2.5hsk * 2", "1hsk1 + 4"];
+
+    for test in hero_modifier_tests {
+        let result = parse_and_roll(test);
+        assert!(
+            result.is_ok(),
+            "Hero System modifier test '{}' should parse",
+            test
+        );
+    }
+}
+
+#[test]
+fn test_silhouette_variants() {
+    // Test Silhouette System variants mentioned in roll_syntax.md
+    let silhouette_variants = vec![
+        ("sil", 1, "Default Silhouette (1 die)"),
+        ("sil1", 1, "Silhouette 1 die explicitly"),
+        ("sil3", 3, "Silhouette 3 dice"),
+        ("sil5", 5, "Silhouette 5 dice"),
+        ("sil10", 10, "Silhouette 10 dice (maximum)"),
+    ];
+
+    for (expression, expected_dice, description) in silhouette_variants {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Silhouette variant '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for '{}': {}",
+            expression,
+            description
+        );
+
+        // Check that the correct number of dice were rolled
+        assert_eq!(
+            results[0].individual_rolls.len(),
+            expected_dice,
+            "Should have {} dice for '{}': {}",
+            expected_dice,
+            expression,
+            description
+        );
+
+        // Silhouette system should keep highest + bonus for extra 6s
+        // Total should be at least 1 (minimum die result)
+        assert!(
+            results[0].total >= 1,
+            "Should have positive total for '{}': {}",
+            expression,
+            description
+        );
+
+        // Should be reasonable maximum (6 + extra 6s)
+        assert!(
+            results[0].total <= 6 + expected_dice as i32,
+            "Total should be reasonable for '{}': {}",
+            expression,
+            description
+        );
+    }
+
+    // Test invalid Silhouette dice counts
+    let invalid_silhouette = vec![
+        "sil0",  // Zero dice
+        "sil11", // Too many dice
+        "sil20", // Way too many dice
+    ];
+
+    for invalid_test in invalid_silhouette {
+        let result = parse_and_roll(invalid_test);
+        assert!(
+            result.is_err(),
+            "Invalid Silhouette '{}' should fail",
+            invalid_test
+        );
+    }
+
+    // Test Silhouette with modifiers
+    let silhouette_modifier_tests = vec!["sil3 + 2", "sil5 - 1", "sil + 3", "sil10 * 2"];
+
+    for test in silhouette_modifier_tests {
+        let result = parse_and_roll(test);
+        assert!(
+            result.is_ok(),
+            "Silhouette modifier test '{}' should parse",
+            test
+        );
+    }
+}
+
+#[test]
+fn test_conan_system_variants() {
+    // Test Conan system variants mentioned in roll_syntax.md
+    let conan_variants = vec![
+        // Skill dice variants
+        ("conan", "Default 2d20 skill"),
+        ("conan3", "3d20 skill"),
+        ("conan4", "4d20 skill"),
+        ("conan5", "5d20 skill"),
+        // Combat dice variants
+        ("cd", "Default 1d6 combat"),
+        ("cd4", "4d6 combat"),
+        ("cd10", "10d6 combat"),
+        // Combined attacks
+        ("conan3cd5", "3d20 skill + 5d6 combat"),
+        ("conan2cd4", "2d20 skill + 4d6 combat"),
+        ("conan4cd6", "4d20 skill + 6d6 combat"),
+    ];
+
+    for (expression, description) in conan_variants {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Conan variant '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for '{}': {}",
+            expression,
+            description
+        );
+
+        // Check for appropriate notes or mechanics
+        let has_conan_note = results[0]
+            .notes
+            .iter()
+            .any(|note| note.contains("1=1") || note.contains("2=2") || note.contains("special"));
+
+        if expression.starts_with("cd") || expression.contains("cd") {
+            assert!(
+                has_conan_note,
+                "Combat dice should have interpretation notes for '{}': {}",
+                expression, description
+            );
+        }
+
+        // Should have reasonable totals
+        assert!(
+            results[0].total >= 0,
+            "Should have non-negative total for '{}': {}",
+            expression,
+            description
+        );
+    }
+
+    // Test Conan with modifiers
+    let conan_modifier_tests = vec!["conan + 2", "conan3 - 1", "cd4 + 3", "conan2cd4 + 5"];
+
+    for test in conan_modifier_tests {
+        let result = parse_and_roll(test);
+        assert!(
+            result.is_ok(),
+            "Conan modifier test '{}' should parse",
+            test
+        );
+    }
+
+    // Test invalid Conan variants
+    let invalid_conan = vec![
+        "conan1", // Too few dice
+        "conan6", // Too many dice
+        "cd0",    // Zero combat dice
+    ];
+
+    for invalid_test in invalid_conan {
+        let result = parse_and_roll(invalid_test);
+        assert!(
+            result.is_err(),
+            "Invalid Conan '{}' should fail",
+            invalid_test
+        );
+    }
+}
+
+#[test]
+fn test_missing_game_systems() {
+    // Test the remaining game systems mentioned in roll_syntax.md but not yet tested
+    let missing_systems = vec![
+        // Dark Heresy 2nd Edition
+        ("dh 4d10", "Dark Heresy 4d10 righteous fury"),
+        ("dh 6d10", "Dark Heresy 6d10 righteous fury"),
+        // Exalted variants
+        ("ex5", "Exalted 5d10 t7 t10"),
+        ("ex5t8", "Exalted 5d10 t8 t10"),
+        ("ex10", "Exalted 10d10"),
+        ("ex3t6", "Exalted 3d10 t6 t10"),
+        // Year Zero Engine
+        ("6yz", "Year Zero 6d6 t6"),
+        ("4yz", "Year Zero 4d6 t6"),
+        ("8yz", "Year Zero 8d6 t6"),
+        // Warhammer 40k/Age of Sigmar
+        ("3wh4+", "Warhammer 3d6 t4"),
+        ("5wh3+", "Warhammer 5d6 t3"),
+        ("2wh5+", "Warhammer 2d6 t5"),
+        // Earthdawn 4th Edition
+        ("ed4e15", "Earthdawn 4e step 15"),
+        ("ed4e20", "Earthdawn 4e step 20"),
+        ("ed4e50", "Earthdawn 4e step 50"),
+        // Double Digit dice
+        ("dd34", "1d3*10 + 1d4 (d66-style)"),
+        ("dd26", "1d2*10 + 1d6"),
+        ("dd46", "1d4*10 + 1d6"),
+        // Storypath System
+        ("sp4", "Storypath 4d10 t8 ie10"),
+        ("sp6", "Storypath 6d10 t8 ie10"),
+        ("sp8", "Storypath 8d10 t8 ie10"),
+        // Sunsails New Millennium
+        ("snm5", "Sunsails 5d6 ie6 t4"),
+        ("snm3", "Sunsails 3d6 ie6 t4"),
+        ("snm8", "Sunsails 8d6 ie6 t4"),
+    ];
+
+    for (expression, description) in missing_systems {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Missing system '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for '{}': {}",
+            expression,
+            description
+        );
+
+        // Basic sanity check - should have reasonable output
+        assert!(
+            results[0].total >= 0
+                || results[0].successes.is_some()
+                || results[0].individual_rolls.len() > 0,
+            "Should have meaningful results for '{}': {}",
+            expression,
+            description
+        );
+    }
+}
+
+#[test]
+fn test_complex_system_combinations() {
+    // Test complex system combinations mentioned in roll_syntax.md
+    let complex_combinations = vec![
+        // Godbound with complex modifiers
+        ("gbs 2d10 + 5", "Godbound straight 2d10 with bonus"),
+        ("gb 3d8 - 2", "Godbound 3d8 with penalty"),
+        ("gbs 1d20 * 2", "Godbound straight with multiplier"),
+        // Brave New World with modifiers
+        ("bnw4 + 2", "BNW 4-die pool with modifier"),
+        ("bnw5 - 1", "BNW 5-die pool with penalty"),
+        ("bnw3 * 2", "BNW 3-die pool with multiplier"),
+        // Marvel Multiverse complex combinations
+        ("mm 2e", "Marvel with 2 edges"),
+        ("mm 3t", "Marvel with 3 troubles"),
+        ("mm 2e 3t", "Marvel with 2 edges and 3 troubles"),
+        ("mm e t", "Marvel with 1 edge and 1 trouble"),
+        // Complex Cypher System tests
+        ("cs 1 + 5", "Cypher level 1 with modifier"),
+        ("cs 10 - 3", "Cypher level 10 with penalty"),
+        // Complex Witcher tests
+        ("wit * 2", "Witcher with multiplier"),
+        ("wit / 2", "Witcher with division"),
+    ];
+
+    for (expression, description) in complex_combinations {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Complex combination '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for '{}': {}",
+            expression,
+            description
+        );
+
+        // Verify appropriate mechanics are working
+        match expression {
+            expr if expr.contains("gb") => {
+                assert!(
+                    results[0].godbound_damage.is_some(),
+                    "Godbound should have damage calculation for '{}'",
+                    expr
+                );
+            }
+            expr if expr.contains("mm") => {
+                assert!(
+                    results[0].total >= 3 && results[0].total <= 18,
+                    "Marvel should have 3d6 range for '{}'",
+                    expr
+                );
+            }
+            expr if expr.contains("cs") => {
+                // Cypher system should have appropriate notes
+                let has_cypher_note = results[0].notes.iter().any(|note| note.contains("Cypher"));
+                assert!(
+                    has_cypher_note,
+                    "Cypher should have system notes for '{}'",
+                    expr
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+#[test]
+fn test_system_edge_cases_and_boundaries() {
+    // Test boundary conditions for systems that might not be fully covered
+    let boundary_tests = vec![
+        // Marvel Multiverse boundaries
+        ("mm 5e", "Marvel with maximum practical edges"),
+        ("mm 5t", "Marvel with maximum practical troubles"),
+        // Cypher System boundaries
+        ("cs 1", "Cypher minimum level"),
+        ("cs 10", "Cypher maximum level"),
+        // Wrath & Glory boundaries
+        ("wng w1 1d6", "W&G minimum wrath dice"),
+        ("wng w5 5d6", "W&G maximum wrath dice"),
+        // Earthdawn boundaries
+        ("ed1", "Earthdawn minimum step"),
+        ("ed50", "Earthdawn maximum step (1e)"),
+        ("ed4e1", "Earthdawn 4e minimum step"),
+        ("ed4e100", "Earthdawn 4e maximum step"),
+        // Hero System edge cases
+        ("0.5hsk", "Hero System half die (if supported)"),
+        ("10hsk", "Hero System large dice count"),
+    ];
+
+    for (expression, description) in boundary_tests {
+        let result = parse_and_roll(expression);
+        // Some of these might be invalid, but they shouldn't crash
+        if result.is_ok() {
+            let results = result.unwrap();
+            assert!(
+                !results.is_empty(),
+                "Should have results for '{}': {}",
+                expression,
+                description
+            );
+        } else {
+            println!(
+                "Boundary test '{}' failed as expected: {}",
+                expression, description
+            );
+        }
+    }
+}
