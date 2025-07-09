@@ -122,8 +122,6 @@ src/
 ├── database.rs         # SQLite database management for shard statistics
 ├── help_text.rs        # Shared help text generation for all help commands
 ├── lib.rs              # Shared libraries required for unit tests
-├── tests/
-│   └── dice_tests.rs   # Comprehensive list of dice roll unit tests
 ├── dice/
 │   ├── mod.rs          # Dice module exports and core types (DiceRoll, RollResult, etc.)
 │   ├── parser.rs       # Dice expression parsing and syntax validation
@@ -134,6 +132,12 @@ src/
     ├── roll.rs         # Roll command implementation with system info
     ├── help.rs         # Help command with topic-based help system
     └── purge.rs        # Message purge command with permission checking
+
+tests/
+├── unit_tests.rs           # Core dice logic, parsing, rolling
+├── game_systems_tests.rs   # All game system tests (consolidated)
+├── integration_tests.rs    # End-to-end functionality
+└── performance_tests.rs    # Performance and limit testing
 ```
 
 ## Deployment
