@@ -1085,7 +1085,7 @@ fn is_combined_modifiers_token(input: &str) -> bool {
         return false;
     }
 
-    // FIX: Instead of blanket rejecting anything with 'd', check if it's actually
+    // Instead of blanket rejecting anything with 'd', check if it's actually
     // a standalone dice expression first
     if input.contains('d') {
         // Don't treat standalone dice expressions as combined modifiers
