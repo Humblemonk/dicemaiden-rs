@@ -414,6 +414,25 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = EX_REGEX.captures(input) {
         let count = &captures[1];
         let target = captures.get(2).map_or("7", |m| m.as_str());
+
+        // Validate dice count - must be positive
+        if let Ok(count_num) = count.parse::<u32>() {
+            if count_num == 0 {
+                return None; // Invalid dice count
+            }
+        } else {
+            return None; // Invalid count format
+        }
+
+        // Validate target number - must be 1-10 for d10 dice
+        if let Ok(target_num) = target.parse::<u32>() {
+            if target_num == 0 || target_num > 10 {
+                return None; // Invalid target for d10 dice
+            }
+        } else {
+            return None; // Invalid target format
+        }
+
         return Some(format!("{count}d10 t{target} t10"));
     }
 

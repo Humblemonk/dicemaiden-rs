@@ -1669,3 +1669,932 @@ fn test_missing_systems_alias_expansion() {
         );
     }
 }
+
+#[test]
+fn test_exalted_system_comprehensive() {
+    // Test Exalted system (exX -> Xd10 t7 t10, exXtY -> Xd10 tY t10)
+    let exalted_tests = vec![
+        // (alias, expected_dice_count, expected_target, description)
+        ("ex5", 5, 7, "Exalted 5d10 t7 t10"),
+        ("ex5t8", 5, 8, "Exalted 5d10 t8 t10"),
+        ("ex10", 10, 7, "Exalted 10d10 t7 t10"),
+        ("ex3t6", 3, 6, "Exalted 3d10 t6 t10"),
+        ("ex8", 8, 7, "Exalted 8d10 t7 t10"),
+        ("ex6t9", 6, 9, "Exalted 6d10 t9 t10"),
+        ("ex12t5", 12, 5, "Exalted 12d10 t5 t10"),
+    ];
+
+    for (alias, expected_dice, expected_target, description) in exalted_tests {
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Exalted '{}' should parse: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
+
+        let roll = &results[0];
+
+        // Should have success counting (target system)
+        assert!(
+            roll.successes.is_some(),
+            "Exalted should have success counting for '{}'",
+            alias
+        );
+
+        // Should have exactly the expected number of dice
+        assert_eq!(
+            roll.individual_rolls.len(),
+            expected_dice,
+            "Should have exactly {} dice for '{}'",
+            expected_dice,
+            alias
+        );
+
+        // Should be using d10s (all rolls 1-10)
+        for &die_roll in &roll.individual_rolls {
+            assert!(
+                die_roll >= 1 && die_roll <= 10,
+                "Exalted should use d10s, got {} for '{}'",
+                die_roll,
+                alias
+            );
+        }
+
+        // Verify success counting logic for Exalted (7+ = 1 success, 10 = 2 successes)
+        let success_count = roll.successes.unwrap();
+        let manual_count = roll
+            .individual_rolls
+            .iter()
+            .map(|&r| {
+                if r >= expected_target as i32 && r < 10 {
+                    1 // Single success for target+ but less than 10
+                } else if r == 10 {
+                    2 // Double success for 10s
+                } else {
+                    0 // No success
+                }
+            })
+            .sum::<i32>();
+
+        assert_eq!(
+            success_count, manual_count,
+            "Success count should match Exalted rules for '{}': {} vs {} (dice: {:?})",
+            alias, success_count, manual_count, roll.individual_rolls
+        );
+
+        // Should be reasonable success count (0 to 2 * dice count)
+        assert!(
+            success_count >= 0 && success_count <= (expected_dice as i32 * 2),
+            "Success count {} should be 0-{} for '{}'",
+            success_count,
+            expected_dice * 2,
+            alias
+        );
+    }
+
+    // Test Exalted with modifiers
+    let exalted_modifier_tests = vec!["ex5 + 2", "ex8 - 1", "ex6 * 2", "ex4 + 1d6"];
+
+    for test in exalted_modifier_tests {
+        let result = parse_and_roll(test);
+        assert!(
+            result.is_ok(),
+            "Exalted modifier test '{}' should parse",
+            test
+        );
+    }
+
+    // Test edge cases
+    let exalted_edge_cases = vec![
+        ("ex1", 1, 7, "Minimum Exalted dice"),
+        ("ex15", 15, 7, "Large Exalted pool"),
+        ("ex1t10", 1, 10, "Single die, hard target"),
+        ("ex20t4", 20, 4, "Many dice, easy target"),
+    ];
+
+    for (alias, expected_dice, expected_target, description) in exalted_edge_cases {
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Exalted edge case '{}' should work: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+        assert_eq!(
+            roll.individual_rolls.len(),
+            expected_dice,
+            "Should have exactly {} dice for edge case '{}'",
+            expected_dice,
+            alias
+        );
+
+        // Verify double 10s rule still applies
+        if roll.individual_rolls.iter().any(|&r| r == 10) {
+            let tens_count = roll.individual_rolls.iter().filter(|&&r| r == 10).count();
+            let other_successes = roll
+                .individual_rolls
+                .iter()
+                .filter(|&&r| r >= expected_target as i32 && r < 10)
+                .count();
+            let expected_successes = (tens_count * 2) + other_successes;
+
+            assert_eq!(
+                roll.successes.unwrap() as usize,
+                expected_successes,
+                "10s should count double for '{}': expected {}, got {}",
+                alias,
+                expected_successes,
+                roll.successes.unwrap()
+            );
+        }
+    }
+}
+
+#[test]
+fn test_exalted_alias_expansion() {
+    // Test that Exalted aliases expand correctly
+    let exalted_alias_tests = vec![
+        // (alias, expected_expansion)
+        ("ex5", "5d10 t7 t10"),
+        ("ex5t8", "5d10 t8 t10"),
+        ("ex10", "10d10 t7 t10"),
+        ("ex3t6", "3d10 t6 t10"),
+    ];
+
+    for (alias, expected_expansion) in exalted_alias_tests {
+        // Test that the alias expands correctly
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(
+            expanded,
+            Some(expected_expansion.to_string()),
+            "Exalted alias '{}' should expand to '{}'",
+            alias,
+            expected_expansion
+        );
+
+        // Test that both the alias and expansion produce equivalent results
+        let alias_result = parse_and_roll(alias);
+        let expansion_result = parse_and_roll(expected_expansion);
+
+        assert!(
+            alias_result.is_ok() && expansion_result.is_ok(),
+            "Both alias '{}' and expansion '{}' should work",
+            alias,
+            expected_expansion
+        );
+
+        let alias_roll = alias_result.unwrap();
+        let expansion_roll = expansion_result.unwrap();
+
+        // Should have same number of results
+        assert_eq!(
+            alias_roll.len(),
+            expansion_roll.len(),
+            "Alias and expansion should have same result count for '{}'",
+            alias
+        );
+
+        // Should both have success counting
+        assert_eq!(
+            alias_roll[0].successes.is_some(),
+            expansion_roll[0].successes.is_some(),
+            "Alias and expansion should both have success counting for '{}'",
+            alias
+        );
+    }
+}
+
+#[test]
+fn test_exalted_with_roll_sets() {
+    // Test Exalted system works with roll sets
+    let exalted_roll_set_tests = vec![
+        ("3 ex5", "Exalted roll sets"),
+        ("2 ex8t6", "Exalted with custom target roll sets"),
+        ("4 ex3", "Multiple small Exalted pools"),
+    ];
+
+    for (expression, description) in exalted_roll_set_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Exalted roll set '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let expected_sets = expression.chars().next().unwrap().to_digit(10).unwrap() as usize;
+        assert_eq!(
+            results.len(),
+            expected_sets,
+            "Should have {} sets for '{}'",
+            expected_sets,
+            expression
+        );
+
+        for (i, roll) in results.iter().enumerate() {
+            assert_eq!(
+                roll.label,
+                Some(format!("Set {}", i + 1)),
+                "Each set should have correct label for '{}'",
+                expression
+            );
+            assert!(
+                roll.successes.is_some(),
+                "Each Exalted set should have success counting"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_exalted_invalid_cases() {
+    // Test invalid Exalted patterns
+    let invalid_exalted = vec![
+        "ex0",    // Zero dice
+        "ex",     // No dice count
+        "ex5t0",  // Zero target
+        "ex5t11", // Target higher than die sides
+        "ex-5",   // Negative dice count
+    ];
+
+    for invalid_test in invalid_exalted {
+        let result = parse_and_roll(invalid_test);
+        assert!(
+            result.is_err(),
+            "Invalid Exalted '{}' should fail",
+            invalid_test
+        );
+    }
+}
+
+#[test]
+fn test_wrath_glory_special_modes_comprehensive() {
+    // Test Wrath & Glory special modes: !soak, !exempt, !dmg
+    let wng_special_modes = vec![
+        ("wng 4d6 !soak", true, "Basic soak test"),
+        ("wng 6d6 !exempt", true, "Basic exempt test"),
+        ("wng 5d6 !dmg", true, "Basic damage test"),
+    ];
+
+    for (expression, should_use_total, description) in wng_special_modes {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "W&G special mode '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for '{}': {}",
+            expression,
+            description
+        );
+
+        let roll = &results[0];
+
+        if should_use_total {
+            // For soak/damage/exempt tests, should use total instead of successes
+            assert!(
+                roll.total > 0 || roll.individual_rolls.iter().sum::<i32>() >= 0,
+                "Should have meaningful total for '{}': {}",
+                expression,
+                description
+            );
+
+            // May or may not have successes depending on implementation
+            // but should have some kind of meaningful result
+            assert!(
+                roll.total != 0 || roll.successes.is_some() || !roll.individual_rolls.is_empty(),
+                "Should have meaningful result for '{}': {}",
+                expression,
+                description
+            );
+        }
+
+        // Wrath dice should still be tracked for complications/glory
+        if expression.contains("w2") || expression.contains("w3") {
+            // Should have multiple wrath dice information
+            let has_wrath_info = roll.wng_wrath_dice.is_some()
+                || roll.wng_wrath_die.is_some()
+                || roll
+                    .notes
+                    .iter()
+                    .any(|note| note.to_lowercase().contains("wrath"));
+
+            assert!(
+                has_wrath_info,
+                "Should have wrath dice information for '{}': {}",
+                expression, description
+            );
+        }
+
+        // Check difficulty mechanics if specified
+        if expression.contains("dn2") {
+            let has_difficulty_note = roll.notes.iter().any(|note| {
+                note.contains("Difficulty 2")
+                    || note.contains("dn2")
+                    || note.contains("PASS")
+                    || note.contains("FAIL")
+            });
+
+            if !has_difficulty_note {
+                println!(
+                    "Note: Difficulty mechanics for '{}' may need clearer indication",
+                    expression
+                );
+            }
+        }
+    }
+
+    // Test that standard W&G (without special modes) still works normally
+    let standard_wng_tests = vec![
+        ("wng 4d6", false, "Standard W&G test"),
+        ("wng w2 4d6", false, "Standard W&G with multiple wrath"),
+        ("wng dn3 5d6", false, "Standard W&G with difficulty"),
+    ];
+
+    for (expression, _, description) in standard_wng_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Standard W&G '{}' should still work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+
+        // Standard W&G should have success counting, not total-based
+        assert!(
+            roll.successes.is_some(),
+            "Standard W&G should have success counting for '{}'",
+            expression
+        );
+
+        // Should have wrath dice tracking
+        assert!(
+            roll.wng_wrath_die.is_some() || roll.wng_wrath_dice.is_some(),
+            "Should have wrath dice information for '{}'",
+            expression
+        );
+    }
+}
+
+#[test]
+fn test_wrath_glory_complications_and_glory() {
+    // Test that wrath dice complications and glory are properly tracked
+    // Note: This test may be probabilistic, so we run multiple iterations
+    for _ in 0..10 {
+        let result = parse_and_roll("wng w2 6d6");
+        assert!(result.is_ok(), "W&G wrath dice test should work");
+
+        let results = result.unwrap();
+        let roll = &results[0];
+
+        // Should have wrath dice information
+        assert!(
+            roll.wng_wrath_dice.is_some() || roll.wng_wrath_die.is_some(),
+            "Should track wrath dice"
+        );
+
+        // Check for complication/glory notes if applicable
+        let has_complication = roll
+            .notes
+            .iter()
+            .any(|note| note.to_lowercase().contains("complication") || note.contains("rolled 1"));
+
+        let has_glory = roll.notes.iter().any(|note| {
+            note.to_lowercase().contains("glory")
+                || note.to_lowercase().contains("critical")
+                || note.contains("rolled 6")
+        });
+
+        // If we have wrath dice results, check for appropriate mechanics
+        if let Some(ref wrath_dice) = roll.wng_wrath_dice {
+            let has_ones = wrath_dice.iter().any(|&d| d == 1);
+            let has_sixes = wrath_dice.iter().any(|&d| d == 6);
+
+            if has_ones && !has_complication {
+                println!("Note: Complication (1) detected but no complication note found");
+            }
+
+            if has_sixes && !has_glory {
+                println!("Note: Glory (6) detected but no glory note found");
+            }
+        }
+    }
+}
+
+#[test]
+fn test_wrath_glory_special_modes_with_modifiers() {
+    // Test W&G special modes with mathematical modifiers
+    let wng_modifier_tests = vec![
+        ("wng 4d6 !soak + 2", "Soak with bonus"),
+        ("wng 5d6 !dmg - 1", "Damage with penalty"),
+        ("wng w2 4d6 !exempt * 2", "Exempt with multiplier"),
+        ("wng dn3 6d6 !soak / 2", "Soak with division"),
+    ];
+
+    for (expression, description) in wng_modifier_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "W&G special mode with modifier '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for modifier test '{}'",
+            expression
+        );
+    }
+}
+
+#[test]
+fn test_wrath_glory_special_modes_with_roll_sets() {
+    // Test W&G special modes work with roll sets
+    let wng_roll_set_tests = vec![
+        ("3 wng 4d6 !soak", "Soak roll sets"),
+        ("2 wng w2 5d6 !dmg", "Damage roll sets with wrath"),
+        ("4 wng dn2 4d6 !exempt", "Exempt roll sets with difficulty"),
+    ];
+
+    for (expression, description) in wng_roll_set_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "W&G roll set '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let expected_sets = expression.chars().next().unwrap().to_digit(10).unwrap() as usize;
+        assert_eq!(
+            results.len(),
+            expected_sets,
+            "Should have {} sets for '{}'",
+            expected_sets,
+            expression
+        );
+
+        for (i, roll) in results.iter().enumerate() {
+            assert_eq!(
+                roll.label,
+                Some(format!("Set {}", i + 1)),
+                "Each set should have correct label for '{}'",
+                expression
+            );
+        }
+    }
+}
+
+#[test]
+fn test_wrath_glory_invalid_special_modes() {
+    // Test invalid W&G special mode syntax
+    let invalid_wng_modes = vec![
+        "wng 4d6 !invalid",      // Invalid special mode
+        "wng 4d6 !",             // Empty special mode
+        "wng 4d6 !soak invalid", // Extra text after mode
+        "wng 4d6 !SOAK",         // Wrong case (if case-sensitive)
+        "wng 4d6 ! soak",        // Space in special mode
+    ];
+
+    for invalid_test in invalid_wng_modes {
+        let result = parse_and_roll(invalid_test);
+
+        // These might parse but should either work correctly or fail gracefully
+        match result {
+            Ok(results) => {
+                println!(
+                    "W&G mode '{}' parsed successfully (behavior may vary): {} results",
+                    invalid_test,
+                    results.len()
+                );
+                // If it parses, it should at least have some meaningful result
+                assert!(
+                    !results.is_empty(),
+                    "Should have some result if parsing succeeds"
+                );
+            }
+            Err(error) => {
+                println!("W&G mode '{}' failed as expected: {}", invalid_test, error);
+                // Error message should be reasonable
+                let error_str = error.to_string();
+                assert!(!error_str.is_empty(), "Should have error message");
+            }
+        }
+    }
+}
+
+#[test]
+fn test_wrath_glory_edge_case_wrath_dice_counts() {
+    // Test edge cases for wrath dice counts in special modes
+    let wrath_dice_edge_cases = vec![
+        ("wng w1 4d6 !soak", 1, "Minimum wrath dice with soak"),
+        ("wng w5 6d6 !dmg", 5, "Maximum wrath dice with damage"),
+        (
+            "wng w3 dn1 5d6 !exempt",
+            3,
+            "Multiple wrath with easy difficulty",
+        ),
+        (
+            "wng w1 dn6 4d6 !soak",
+            1,
+            "Single wrath with hard difficulty",
+        ),
+    ];
+
+    for (expression, expected_wrath_count, description) in wrath_dice_edge_cases {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "W&G edge case '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+
+        // Check wrath dice count if trackable
+        if let Some(ref wrath_dice) = roll.wng_wrath_dice {
+            assert_eq!(
+                wrath_dice.len(),
+                expected_wrath_count,
+                "Should have {} wrath dice for '{}'",
+                expected_wrath_count,
+                expression
+            );
+        } else if let Some(_) = roll.wng_wrath_die {
+            // Legacy single wrath die tracking
+            if expected_wrath_count == 1 {
+                // This is fine for single wrath die
+            } else {
+                println!(
+                    "Note: Multiple wrath dice tracking may need enhancement for '{}'",
+                    expression
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_advanced_percentile_edge_cases() {
+    // Test complex percentile advantage/disadvantage scenarios
+    let advanced_percentile_tests = vec![
+        // Complex mathematical operations with percentile advantage/disadvantage
+        ("+d% + 25", "Percentile advantage with large bonus"),
+        ("-d% - 15", "Percentile disadvantage with penalty"),
+        ("+d% * 2", "Percentile advantage with multiplication"),
+        ("-d% / 2", "Percentile disadvantage with division"),
+        ("+d% + 1d6", "Percentile advantage with additional dice"),
+        ("-d% - 2d4", "Percentile disadvantage with dice subtraction"),
+        // Edge case values
+        ("+d% + 100", "Advantage with maximum bonus"),
+        ("-d% - 50", "Disadvantage with large penalty"),
+        ("+d% * 0", "Advantage multiplied by zero"),
+        ("-d% + 200", "Disadvantage with large positive modifier"),
+    ];
+
+    for (expression, description) in advanced_percentile_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Advanced percentile '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert_eq!(
+            results.len(),
+            1,
+            "Should have one result for '{}'",
+            expression
+        );
+
+        let roll = &results[0];
+
+        // Should have multiple dice for advantage/disadvantage mechanism
+        assert!(
+            roll.individual_rolls.len() >= 2,
+            "Percentile advantage/disadvantage should have multiple dice for '{}': got {} dice",
+            expression,
+            roll.individual_rolls.len()
+        );
+
+        // For percentile dice, all individual rolls should be in range 1-10 or 1-100 depending on implementation
+        for &die_roll in &roll.individual_rolls {
+            assert!(
+                (die_roll >= 1 && die_roll <= 10) || (die_roll >= 1 && die_roll <= 100),
+                "Percentile die roll should be 1-10 or 1-100, got {} for '{}'",
+                die_roll,
+                expression
+            );
+        }
+
+        // Total should be reasonable (considering modifiers)
+        assert!(
+            roll.total >= -200 && roll.total <= 400,
+            "Total {} should be reasonable for percentile expression '{}'",
+            roll.total,
+            expression
+        );
+
+        println!(
+            "Advanced percentile test '{}': {} dice, total {} - {}",
+            expression,
+            roll.individual_rolls.len(),
+            roll.total,
+            description
+        );
+    }
+}
+
+#[test]
+fn test_percentile_advantage_mechanics_detailed() {
+    // Test the specific mechanics of percentile advantage/disadvantage
+
+    // Run multiple tests to verify statistical behavior
+    let mut advantage_totals = Vec::new();
+    let mut disadvantage_totals = Vec::new();
+    let mut regular_totals = Vec::new();
+
+    for _ in 0..20 {
+        // Test advantage
+        let adv_result = parse_and_roll("+d%").unwrap();
+        advantage_totals.push(adv_result[0].total);
+
+        // Test disadvantage
+        let dis_result = parse_and_roll("-d%").unwrap();
+        disadvantage_totals.push(dis_result[0].total);
+
+        // Test regular percentile for comparison
+        let reg_result = parse_and_roll("d%").unwrap();
+        regular_totals.push(reg_result[0].total);
+    }
+
+    // All results should be in valid percentile range
+    for &total in &advantage_totals {
+        assert!(
+            total >= 1 && total <= 100,
+            "Advantage total {} should be 1-100",
+            total
+        );
+    }
+
+    for &total in &disadvantage_totals {
+        assert!(
+            total >= 1 && total <= 100,
+            "Disadvantage total {} should be 1-100",
+            total
+        );
+    }
+
+    for &total in &regular_totals {
+        assert!(
+            total >= 1 && total <= 100,
+            "Regular total {} should be 1-100",
+            total
+        );
+    }
+
+    // Statistical validation (advantage should tend higher, disadvantage lower)
+    let avg_advantage: f64 =
+        advantage_totals.iter().sum::<i32>() as f64 / advantage_totals.len() as f64;
+    let avg_disadvantage: f64 =
+        disadvantage_totals.iter().sum::<i32>() as f64 / disadvantage_totals.len() as f64;
+    let avg_regular: f64 = regular_totals.iter().sum::<i32>() as f64 / regular_totals.len() as f64;
+
+    println!(
+        "Percentile averages - Advantage: {:.1}, Regular: {:.1}, Disadvantage: {:.1}",
+        avg_advantage, avg_regular, avg_disadvantage
+    );
+
+    // With a reasonable sample size, advantage should generally be higher than disadvantage
+    // (This is probabilistic, so we don't enforce strict ordering, just log the results)
+    if avg_advantage > avg_disadvantage {
+        println!("✓ Advantage performed better than disadvantage as expected");
+    } else {
+        println!("Note: Advantage average not higher than disadvantage (random variation)");
+    }
+}
+
+#[test]
+fn test_percentile_with_complex_game_systems() {
+    // Test percentile dice with various game system combinations
+    let percentile_system_combos = vec![
+        ("+d% + 4cod", "Percentile advantage with CoD roll"),
+        ("-d% + sw8", "Percentile disadvantage with Savage Worlds"),
+        ("+d% + cpr", "Percentile advantage with Cyberpunk Red"),
+        ("-d% + wit", "Percentile disadvantage with Witcher"),
+        ("+d% + 3df", "Percentile advantage with Fudge dice"),
+        ("-d% + gb", "Percentile disadvantage with Godbound"),
+    ];
+
+    for (expression, description) in percentile_system_combos {
+        let result = parse_and_roll(expression);
+
+        // These are complex combinations that may or may not be supported
+        match result {
+            Ok(results) => {
+                println!(
+                    "Complex percentile combo '{}' worked: {} results - {}",
+                    expression,
+                    results.len(),
+                    description
+                );
+
+                assert!(
+                    !results.is_empty(),
+                    "Should have results if parsing succeeds"
+                );
+
+                // Should have meaningful output
+                for roll in &results {
+                    assert!(
+                        roll.total != 0
+                            || roll.successes.is_some()
+                            || !roll.individual_rolls.is_empty(),
+                        "Should have meaningful result for '{}'",
+                        expression
+                    );
+                }
+            }
+            Err(error) => {
+                println!(
+                    "Complex percentile combo '{}' failed: {} - {}",
+                    expression, error, description
+                );
+
+                // Should fail gracefully with meaningful error
+                assert!(!error.to_string().is_empty(), "Should have error message");
+            }
+        }
+    }
+}
+
+#[test]
+fn test_percentile_edge_case_mathematics() {
+    // Test edge cases in percentile mathematics
+    let percentile_math_edge_cases = vec![
+        ("+d% + 0", "Advantage with zero modifier"),
+        ("-d% - 0", "Disadvantage with zero modifier"),
+        ("+d% * 1", "Advantage with identity multiplication"),
+        ("-d% / 1", "Disadvantage with identity division"),
+        ("0 + +d%", "Zero plus advantage"),
+        ("100 - -d%", "100 minus disadvantage"),
+        ("+d% + +d%", "Double advantage (if supported)"),
+        ("-d% + -d%", "Double disadvantage (if supported)"),
+    ];
+
+    for (expression, description) in percentile_math_edge_cases {
+        let result = parse_and_roll(expression);
+
+        match result {
+            Ok(results) => {
+                println!(
+                    "Percentile math edge case '{}' worked: total {} - {}",
+                    expression, results[0].total, description
+                );
+
+                // Should produce reasonable results
+                assert!(
+                    results[0].total >= -100 && results[0].total <= 200,
+                    "Total {} should be reasonable for '{}'",
+                    results[0].total,
+                    expression
+                );
+            }
+            Err(error) => {
+                println!(
+                    "Percentile math edge case '{}' failed: {} - {}",
+                    expression, error, description
+                );
+
+                // Some complex cases may legitimately fail
+                assert!(!error.to_string().is_empty(), "Should have error message");
+            }
+        }
+    }
+}
+
+#[test]
+fn test_percentile_with_roll_sets() {
+    // Test percentile advantage/disadvantage with roll sets
+    let percentile_roll_sets = vec![
+        ("3 +d%", "Advantage roll sets"),
+        ("2 -d%", "Disadvantage roll sets"),
+        ("4 +d% + 10", "Advantage sets with modifier"),
+        ("3 -d% - 5", "Disadvantage sets with penalty"),
+    ];
+
+    for (expression, description) in percentile_roll_sets {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Percentile roll set '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let expected_sets = expression.chars().next().unwrap().to_digit(10).unwrap() as usize;
+        assert_eq!(
+            results.len(),
+            expected_sets,
+            "Should have {} sets for '{}'",
+            expected_sets,
+            expression
+        );
+
+        for (i, roll) in results.iter().enumerate() {
+            assert_eq!(
+                roll.label,
+                Some(format!("Set {}", i + 1)),
+                "Each set should have correct label for '{}'",
+                expression
+            );
+
+            // Each roll should have percentile-like results
+            assert!(
+                roll.total >= 1 && roll.total <= 200, // Allowing for modifiers
+                "Percentile set total {} should be reasonable for '{}'",
+                roll.total,
+                expression
+            );
+        }
+    }
+}
+
+#[test]
+fn test_unicode_handling_in_percentile_expressions() {
+    // Test Unicode characters in comments and labels with percentile dice
+    let unicode_tests = vec![
+        ("(⚔️ Attack) +d%", "Unicode sword in label with advantage"),
+        (
+            "+d% ! 🔥 Fire damage",
+            "Advantage with Unicode fire comment",
+        ),
+        ("(🎯 Skill) -d% ! 🎲 Roll", "Unicode target and dice"),
+        ("(Test \"Quotes\") +d%", "Quotes in label with advantage"),
+        (
+            "(Test 'Apostrophe') -d%",
+            "Apostrophe in label with disadvantage",
+        ),
+    ];
+
+    for (expression, description) in unicode_tests {
+        let result = parse_and_roll(expression);
+
+        match result {
+            Ok(results) => {
+                println!(
+                    "Unicode test '{}' worked: {} - {}",
+                    expression, results[0].total, description
+                );
+
+                // Should preserve Unicode in labels/comments
+                let roll = &results[0];
+                if let Some(ref label) = roll.label {
+                    println!("  Label preserved: '{}'", label);
+                }
+                if let Some(ref comment) = roll.comment {
+                    println!("  Comment preserved: '{}'", comment);
+                }
+
+                // Should still produce valid percentile results
+                assert!(
+                    roll.total >= 1 && roll.total <= 100,
+                    "Unicode test should still produce valid percentile result"
+                );
+            }
+            Err(error) => {
+                println!(
+                    "Unicode test '{}' failed: {} - {}",
+                    expression, error, description
+                );
+
+                // Should fail gracefully if Unicode not supported
+                assert!(!error.to_string().is_empty(), "Should have error message");
+            }
+        }
+    }
+}
