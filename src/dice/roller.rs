@@ -806,6 +806,17 @@ fn apply_special_system_modifiers(
                 apply_shadowrun_critical_glitch_check(result, *dice_count)?;
                 has_special_system = true;
             }
+            Modifier::SavageWorlds(_) => {
+                // Savage Worlds is handled in the main roll_dice function
+                // Don't process it here
+            }
+            Modifier::D6System(_, _) => {
+                // D6 System is handled in the main roll_dice function
+            }
+            Modifier::MarvelMultiverse(_, _) => {
+                *result = handle_marvel_multiverse_roll(dice.clone(), rng)?;
+                return Ok(());
+            }
             Modifier::CyberpunkRed => {
                 apply_cyberpunk_red_mechanics(result, rng)?;
                 has_special_system = true;
@@ -817,6 +828,14 @@ fn apply_special_system_modifiers(
             Modifier::CypherSystem(level) => {
                 apply_cypher_system_mechanics(result, *level)?;
                 has_special_system = true;
+            }
+            Modifier::ConanSkill(_) => {
+                // Conan skill rolls are handled in the main roll_dice function
+                // Don't process them here
+            }
+            Modifier::ConanCombat(_) => {
+                // Conan combat dice are handled in the main roll_dice function
+                // Don't process them here
             }
             // Skip mathematical modifiers here - they're handled by target processing or post-target processing
             Modifier::Add(_)
