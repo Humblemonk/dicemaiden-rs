@@ -655,7 +655,10 @@ fn apply_special_system_modifiers(
     dice: &DiceRoll,
     rng: &mut impl Rng,
 ) -> Result<()> {
-    // Check if we have mathematical modifiers that were applied
+    // Find positions of target-based modifiers
+    let target_positions = find_target_modifier_positions(&dice.modifiers);
+
+    // Check if we have mathematical modifiers
     let has_math_modifiers = dice.modifiers.iter().any(|m| {
         matches!(
             m,
@@ -671,20 +674,105 @@ fn apply_special_system_modifiers(
     // Track if we've applied a special system (success counting, etc.)
     let mut has_special_system = false;
 
-    for modifier in &dice.modifiers {
+    // Process modifiers in order, respecting their position relative to targets
+    for (index, modifier) in dice.modifiers.iter().enumerate() {
         match modifier {
             Modifier::Target(value) => {
+                // Apply any mathematical modifiers that come BEFORE this target
+                if has_math_modifiers {
+                    let pre_target_modifiers: Vec<_> = dice.modifiers[..index]
+                        .iter()
+                        .filter(|m| {
+                            matches!(
+                                m,
+                                Modifier::Add(_)
+                                    | Modifier::Subtract(_)
+                                    | Modifier::Multiply(_)
+                                    | Modifier::Divide(_)
+                            )
+                        })
+                        .cloned()
+                        .collect();
+
+                    if !pre_target_modifiers.is_empty() {
+                        apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
+                    }
+                }
+
                 count_dice_matching(result, |roll| roll >= *value as i32, "successes")?;
                 has_special_system = true;
             }
             Modifier::TargetLower(value) => {
+                // Apply any mathematical modifiers that come BEFORE this target
+                if has_math_modifiers {
+                    let pre_target_modifiers: Vec<_> = dice.modifiers[..index]
+                        .iter()
+                        .filter(|m| {
+                            matches!(
+                                m,
+                                Modifier::Add(_)
+                                    | Modifier::Subtract(_)
+                                    | Modifier::Multiply(_)
+                                    | Modifier::Divide(_)
+                            )
+                        })
+                        .cloned()
+                        .collect();
+
+                    if !pre_target_modifiers.is_empty() {
+                        apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
+                    }
+                }
+
                 count_dice_matching(result, |roll| roll <= *value as i32, "successes")?;
                 has_special_system = true;
             }
             Modifier::Failure(value) => {
+                // Apply pre-target modifiers for failures too
+                if has_math_modifiers {
+                    let pre_target_modifiers: Vec<_> = dice.modifiers[..index]
+                        .iter()
+                        .filter(|m| {
+                            matches!(
+                                m,
+                                Modifier::Add(_)
+                                    | Modifier::Subtract(_)
+                                    | Modifier::Multiply(_)
+                                    | Modifier::Divide(_)
+                            )
+                        })
+                        .cloned()
+                        .collect();
+
+                    if !pre_target_modifiers.is_empty() {
+                        apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
+                    }
+                }
+
                 count_failures_and_subtract(result, *value)?;
             }
             Modifier::Botch(threshold) => {
+                // Apply pre-target modifiers for botches too
+                if has_math_modifiers {
+                    let pre_target_modifiers: Vec<_> = dice.modifiers[..index]
+                        .iter()
+                        .filter(|m| {
+                            matches!(
+                                m,
+                                Modifier::Add(_)
+                                    | Modifier::Subtract(_)
+                                    | Modifier::Multiply(_)
+                                    | Modifier::Divide(_)
+                            )
+                        })
+                        .cloned()
+                        .collect();
+
+                    if !pre_target_modifiers.is_empty() {
+                        apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
+                    }
+                }
+
                 count_dice_matching(
                     result,
                     |roll| roll <= threshold.unwrap_or(1) as i32,
@@ -699,6 +787,7 @@ fn apply_special_system_modifiers(
                     ));
                 }
             }
+            // Handle all other modifiers normally...
             Modifier::Fudge => {
                 apply_fudge_conversion(result)?;
             }
@@ -717,17 +806,6 @@ fn apply_special_system_modifiers(
                 apply_shadowrun_critical_glitch_check(result, *dice_count)?;
                 has_special_system = true;
             }
-            Modifier::SavageWorlds(_) => {
-                // Savage Worlds is handled in the main roll_dice function
-                // Don't process it here
-            }
-            Modifier::D6System(_, _) => {
-                // D6 System is handled in the main roll_dice function
-            }
-            Modifier::MarvelMultiverse(_, _) => {
-                *result = handle_marvel_multiverse_roll(dice.clone(), rng)?;
-                return Ok(());
-            }
             Modifier::CyberpunkRed => {
                 apply_cyberpunk_red_mechanics(result, rng)?;
                 has_special_system = true;
@@ -740,20 +818,44 @@ fn apply_special_system_modifiers(
                 apply_cypher_system_mechanics(result, *level)?;
                 has_special_system = true;
             }
-            Modifier::ConanSkill(_) => {
-                // Conan skill rolls are handled in the main roll_dice function
-                // Don't process them here
+            // Skip mathematical modifiers here - they're handled by target processing or post-target processing
+            Modifier::Add(_)
+            | Modifier::Subtract(_)
+            | Modifier::Multiply(_)
+            | Modifier::Divide(_) => {
+                // These are handled either before targets or after targets
             }
-            Modifier::ConanCombat(_) => {
-                // Conan combat dice are handled in the main roll_dice function
-                // Don't process them here
-            }
-
-            _ => {} // Skip modifiers already handled above
+            _ => {} // Other modifiers handled elsewhere
         }
     }
 
-    // For CPR and Witcher (total-based special systems), apply mathematical modifiers to total
+    // Apply mathematical modifiers that come AFTER target modifiers (to success counts)
+    if has_special_system && has_math_modifiers && result.successes.is_some() {
+        // Find mathematical modifiers that come after the last target modifier
+        if let Some(&last_target_pos) = target_positions.last() {
+            let post_target_modifiers: Vec<_> = dice.modifiers[(last_target_pos + 1)..]
+                .iter()
+                .filter(|m| {
+                    matches!(
+                        m,
+                        Modifier::Add(_)
+                            | Modifier::Subtract(_)
+                            | Modifier::Multiply(_)
+                            | Modifier::Divide(_)
+                    )
+                })
+                .collect();
+
+            if !post_target_modifiers.is_empty() {
+                apply_mathematical_modifiers_to_successes_from_slice(
+                    result,
+                    &post_target_modifiers,
+                )?;
+            }
+        }
+    }
+
+    // Handle other special systems (CPR, Witcher) that don't use success counting
     let has_cpr = dice
         .modifiers
         .iter()
@@ -764,11 +866,6 @@ fn apply_special_system_modifiers(
         .any(|m| matches!(m, Modifier::Witcher));
     if (has_cpr || has_witcher) && has_math_modifiers {
         apply_mathematical_modifiers_to_cpr_total(result, dice)?;
-    }
-
-    // For success-based systems, apply mathematical modifiers to successes
-    if has_special_system && has_math_modifiers && result.successes.is_some() {
-        apply_mathematical_modifiers_to_successes(result, dice)?;
     }
 
     Ok(())
@@ -1346,19 +1443,21 @@ fn apply_fudge_conversion(result: &mut RollResult) -> Result<()> {
     Ok(())
 }
 
-fn apply_mathematical_modifiers_to_successes(
+fn apply_mathematical_modifiers_to_successes_from_slice(
     result: &mut RollResult,
-    dice: &DiceRoll,
+    modifiers: &[&Modifier],
 ) -> Result<()> {
-    let mut success_modifier = 0;
-
-    for modifier in &dice.modifiers {
+    for modifier in modifiers {
         match modifier {
             Modifier::Add(value) => {
-                success_modifier += value;
+                if let Some(ref mut successes) = result.successes {
+                    *successes += value;
+                }
             }
             Modifier::Subtract(value) => {
-                success_modifier -= value;
+                if let Some(ref mut successes) = result.successes {
+                    *successes -= value;
+                }
             }
             Modifier::Multiply(value) => {
                 if let Some(ref mut successes) = result.successes {
@@ -1373,22 +1472,9 @@ fn apply_mathematical_modifiers_to_successes(
                     *successes /= value;
                 }
             }
-            _ => {}
+            _ => {} // Not a mathematical modifier
         }
     }
-
-    // Apply the accumulated modifier to successes
-    if success_modifier != 0 {
-        if let Some(ref mut successes) = result.successes {
-            *successes += success_modifier;
-        }
-    }
-
-    // For success-based systems, update total to match final successes
-    if let Some(successes) = result.successes {
-        result.total = successes;
-    }
-
     Ok(())
 }
 
@@ -2845,5 +2931,98 @@ fn keep_middle_dice(result: &mut RollResult, count: usize) -> Result<()> {
     }
 
     result.individual_rolls = new_rolls;
+    Ok(())
+}
+
+fn find_target_modifier_positions(modifiers: &[Modifier]) -> Vec<usize> {
+    modifiers
+        .iter()
+        .enumerate()
+        .filter_map(|(i, m)| {
+            if matches!(
+                m,
+                Modifier::Target(_)
+                    | Modifier::TargetLower(_)
+                    | Modifier::Failure(_)
+                    | Modifier::Botch(_)
+            ) {
+                Some(i)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn apply_pre_target_mathematical_modifiers(
+    result: &mut RollResult,
+    modifiers: &[Modifier],
+) -> Result<()> {
+    // Apply each mathematical modifier to individual dice
+    for modifier in modifiers {
+        match modifier {
+            Modifier::Add(value) => {
+                for die_value in &mut result.kept_rolls {
+                    *die_value += value;
+                }
+                for die_value in &mut result.individual_rolls {
+                    *die_value += value;
+                }
+                // Update dice groups for display
+                for group in &mut result.dice_groups {
+                    for die_value in &mut group.rolls {
+                        *die_value += value;
+                    }
+                }
+            }
+            Modifier::Subtract(value) => {
+                for die_value in &mut result.kept_rolls {
+                    *die_value -= value;
+                }
+                for die_value in &mut result.individual_rolls {
+                    *die_value -= value;
+                }
+                for group in &mut result.dice_groups {
+                    for die_value in &mut group.rolls {
+                        *die_value -= value;
+                    }
+                }
+            }
+            Modifier::Multiply(value) => {
+                for die_value in &mut result.kept_rolls {
+                    *die_value *= value;
+                }
+                for die_value in &mut result.individual_rolls {
+                    *die_value *= value;
+                }
+                for group in &mut result.dice_groups {
+                    for die_value in &mut group.rolls {
+                        *die_value *= value;
+                    }
+                }
+            }
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                for die_value in &mut result.kept_rolls {
+                    *die_value /= value;
+                }
+                for die_value in &mut result.individual_rolls {
+                    *die_value /= value;
+                }
+                for group in &mut result.dice_groups {
+                    for die_value in &mut group.rolls {
+                        *die_value /= value;
+                    }
+                }
+            }
+            _ => {} // Not a mathematical modifier
+        }
+    }
+
+    // Update the total to reflect the modified dice values
+    result.total = result.kept_rolls.iter().sum();
+
     Ok(())
 }

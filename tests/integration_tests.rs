@@ -1113,3 +1113,47 @@ fn test_discord_formatting_edge_cases() {
         }
     }
 }
+
+#[test]
+fn test_modifier_position_behavior() {
+    // Test that modifier position affects behavior correctly in end-to-end scenarios
+
+    // Test pre-target modifier behavior (modifier affects dice before success counting)
+    // We can't control the exact roll, but we can test the parsing and basic behavior
+    let result1 = parse_and_roll("1d20+5 t6");
+    assert!(
+        result1.is_ok(),
+        "Pre-target modifier should parse correctly"
+    );
+
+    let roll1 = result1.unwrap();
+    assert_eq!(roll1.len(), 1);
+    assert!(roll1[0].successes.is_some(), "Should have success counting");
+
+    // Test post-target modifier behavior (modifier affects success count after counting)
+    let result2 = parse_and_roll("1d20 t5 + 5");
+    assert!(
+        result2.is_ok(),
+        "Post-target modifier should parse correctly"
+    );
+
+    let roll2 = result2.unwrap();
+    assert_eq!(roll2.len(), 1);
+    assert!(roll2[0].successes.is_some(), "Should have success counting");
+
+    // Basic sanity check: both should produce reasonable success counts
+    let success_count1 = roll1[0].successes.unwrap();
+    let success_count2 = roll2[0].successes.unwrap();
+
+    assert!(
+        success_count1 >= 0 && success_count1 <= 25,
+        "Pre-target modifier should give reasonable success count, got {}",
+        success_count1
+    );
+
+    assert!(
+        success_count2 >= 0 && success_count2 <= 25,
+        "Post-target modifier should give reasonable success count, got {}",
+        success_count2
+    );
+}

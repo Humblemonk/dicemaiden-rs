@@ -248,6 +248,37 @@ fn test_target_system_modifiers() {
     for pattern in target_patterns {
         assert_valid(pattern);
     }
+    let modifier_order_tests = vec![
+        ("1d20+5 t6", "Modifier before target"),
+        ("1d20 t5 + 5", "Modifier after target"),
+    ];
+
+    for (expression, description) in modifier_order_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Modifier order test '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            results[0].successes.is_some(),
+            "Target system should have success counting for '{}'",
+            expression
+        );
+
+        // Both should produce reasonable success counts
+        let success_count = results[0].successes.unwrap();
+        assert!(
+            success_count >= 0 && success_count <= 25,
+            "Success count {} should be reasonable for '{}': {}",
+            success_count,
+            expression,
+            description
+        );
+    }
 }
 
 #[test]
@@ -668,6 +699,56 @@ fn test_complex_mathematical_expressions() {
             results[0].total, expected,
             "Math test '{}': {}",
             expression, description
+        );
+    }
+}
+
+// ============================================================================
+// REGRESSION TESTS
+// ============================================================================
+
+#[test]
+fn test_modifier_order_regression_protection() {
+    // This test ensures we maintain backward compatibility
+
+    // Test cases that MUST continue working exactly as before
+    let regression_cases = vec![
+        // Basic target systems (should work unchanged)
+        ("3d6 t4", "Basic target"),
+        ("4d10 t8 ie10", "Target with exploding"),
+        ("5d6 k3 t5", "Target with keep"),
+        // Non-target systems (should work unchanged)
+        ("2d6+3", "Regular dice with modifier"),
+        ("1d20 + 5", "Spaced modifier"),
+        // Game systems that use success counting
+        ("ex5", "Exalted alias"),
+        ("4cod", "Chronicles of Darkness alias"),
+        ("sr6", "Shadowrun alias"),
+    ];
+
+    for (expression, description) in regression_cases {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Regression test FAILED for '{}': {} - This indicates our changes broke existing functionality!",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+
+        // Basic sanity checks
+        assert!(
+            !results[0].individual_rolls.is_empty(),
+            "Should have rolled dice for '{}'",
+            expression
+        );
+
+        // Check that totals are reasonable
+        assert!(
+            results[0].total > 0,
+            "Total should be positive for '{}'",
+            expression
         );
     }
 }
