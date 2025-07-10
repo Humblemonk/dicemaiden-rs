@@ -267,30 +267,20 @@ async fn main() -> Result<()> {
         match (shard_start_env, total_shards_env) {
             (Some(start), Some(total)) => {
                 // Multi-process mode
-                let process_shard_count = manual_count; // This is the raw SHARD_COUNT value (0-indexed)
-                // Calculate the actual number of shards this process will handle
-                // Serenity treats SHARD_COUNT as 0-indexed, so SHARD_COUNT=15 creates 16 shards (0-15)
-                let actual_shard_count = process_shard_count + 1;
-
+                let process_shard_count = manual_count;
                 info!("Multi-process mode detected:");
-                info!(
-                    "  Environment SHARD_COUNT: {} (0-indexed)",
-                    process_shard_count
-                );
                 info!(
                     "  This process handles shards {} to {} ({} shards)",
                     start,
-                    start + process_shard_count, // end shard (inclusive)
-                    actual_shard_count
+                    start + process_shard_count,
+                    process_shard_count + 1
                 );
                 info!("  Total shards across all processes: {}", total);
                 info!(
                     "  Estimated startup time: ~{} seconds",
-                    actual_shard_count * 5
+                    process_shard_count * 5
                 );
-
-                // Pass the actual shard count to Handler so logging shows correct numbers
-                ("multi_process", process_shard_count + 1, start, total)
+                ("multi_process", process_shard_count, start, total)
             }
             _ => {
                 // Single process mode
@@ -475,8 +465,8 @@ async fn main() -> Result<()> {
         info!(
             "This process handles shards {} to {} ({} shards)",
             shard_start,
-            shard_start + shard_count -1,
-            shard_count
+            shard_start + shard_count,
+            shard_count + 1
         );
         info!("Total shards across all processes: {}", total_shards);
         info!("Use 'pkill dicemaiden-rs' to stop all processes");
@@ -568,15 +558,14 @@ async fn start_client_with_shard_strategy(
             client.start_shard_range(0..shard_count, shard_count).await
         }
         "multi_process" => {
-            // shard_count is the number of shards to create
-            let end_shard = shard_start + shard_count; // +1 because Serenity expects exclusive end
+            // The range should be shard_start..(shard_start + shard_count)
+            let end_shard = shard_start + shard_count;
 
-            // Keep the original concise logging style
             info!(
                 "Starting shard range {} to {} ({} shards) out of {} total",
                 shard_start,
-                shard_start + shard_count -1,
-                shard_count,
+                shard_start + shard_count + 1,
+                shard_count + 1,
                 total_shards
             );
             info!(
@@ -584,7 +573,8 @@ async fn start_client_with_shard_strategy(
                 shard_count * 5
             );
 
-            // Use the correct range for Serenity
+            // This should create a range from shard_start to shard_start + shard_count (exclusive)
+            // For example: 208..224 includes shards 208, 209, 210, ..., 223 (16 shards)
             client
                 .start_shard_range(shard_start..end_shard, total_shards)
                 .await
@@ -692,22 +682,21 @@ async fn collect_shard_stats_with_shutdown(
                 .ok()
                 .and_then(|s| s.parse::<i32>().ok())
                 .unwrap_or(0);
-            let env_shard_count = env::var("SHARD_COUNT")
+            let shard_count = env::var("SHARD_COUNT")
                 .ok()
                 .and_then(|s| s.parse::<i32>().ok())
                 .unwrap_or(total_shards_in_process as i32);
-            let actual_shard_count = env_shard_count + 1;
             let total_shards = env::var("TOTAL_SHARDS")
                 .ok()
                 .and_then(|s| s.parse::<i32>().ok())
-                .unwrap_or(env_shard_count);
+                .unwrap_or(shard_count);
 
             // Update process stats
             if let Err(e) = db
                 .update_process_stats(
                     &process_id,
                     shard_start,
-                    env_shard_count,
+                    shard_count,
                     total_shards,
                     total_guilds,
                     memory_usage,
@@ -728,9 +717,9 @@ async fn collect_shard_stats_with_shutdown(
             // Log summary for this process
             info!(
                 "Process stats: {} shards ({}-{}), {} servers, {:.2} MB memory",
-                actual_shard_count,
+                shard_count + 1,
                 shard_start,
-                shard_start + env_shard_count,
+                shard_start + shard_count,
                 total_guilds,
                 memory_usage
             );
