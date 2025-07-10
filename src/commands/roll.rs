@@ -238,15 +238,14 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
             .ok()
             .and_then(|s| s.parse::<u32>().ok())
             .unwrap_or(0);
-        let env_shard_count = std::env::var("SHARD_COUNT")
+        let shard_count = std::env::var("SHARD_COUNT")
             .ok()
             .and_then(|s| s.parse::<u32>().ok())
             .unwrap_or(1);
-        let actual_shard_count = env_shard_count + 1;
         let total_shards = std::env::var("TOTAL_SHARDS")
             .ok()
             .and_then(|s| s.parse::<u32>().ok())
-            .unwrap_or(env_shard_count);
+            .unwrap_or(shard_count);
 
         // Get current process's server and user counts using helper function
         let (process_server_count, process_user_count) = get_server_and_user_counts(ctx);
@@ -258,8 +257,8 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
 • Process Users: ~{}
 • Process Memory: {}"#,
             shard_start,
-            shard_start + env_shard_count,
-            actual_shard_count,
+            shard_start + shard_count + 1,
+            shard_count + 1,
             total_shards,
             process_server_count,
             process_user_count,
