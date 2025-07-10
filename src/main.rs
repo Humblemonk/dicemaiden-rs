@@ -625,7 +625,7 @@ async fn collect_shard_stats_with_shutdown(
     shard_manager: Arc<ShardManager>,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<()> {
-    let mut interval = interval(Duration::from_secs(5)); // 15 minutes
+    let mut interval = interval(Duration::from_secs(900)); // 15 minutes
 
     // Create system info once and only refresh our specific process
     let mut system = System::new();
