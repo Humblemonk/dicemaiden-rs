@@ -16,25 +16,18 @@ use tracing::{error, info, warn};
 
 struct Handler {
     shard_count: u32,
-    connected_shards: Arc<std::sync::atomic::AtomicU32>,
 }
 
 impl Handler {
     fn new(shard_count: u32) -> Self {
-        Self {
-            shard_count,
-            connected_shards: Arc::new(std::sync::atomic::AtomicU32::new(0)),
-        }
+        Self { shard_count }
     }
 }
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, _ready: Ready) {
-        let connected = self
-            .connected_shards
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-            + 1;
+        let connected = get_connected_shard_count(&ctx).await;
 
         // Display the actual shard ID, not an adjusted one
         info!(
@@ -279,8 +272,8 @@ async fn main() -> Result<()> {
                 info!(
                     "  This process handles shards {} to {} ({} shards)",
                     start,
-                    start + process_shard_count + 1,
-                    process_shard_count + 1
+                    start + process_shard_count,
+                    process_shard_count
                 );
                 info!("  Total shards across all processes: {}", total);
                 info!(
@@ -473,7 +466,7 @@ async fn main() -> Result<()> {
             "This process handles shards {} to {} ({} shards)",
             shard_start,
             shard_start + shard_count,
-            shard_count + 1
+            shard_count
         );
         info!("Total shards across all processes: {}", total_shards);
         info!("Use 'pkill dicemaiden-rs' to stop all processes");
@@ -781,4 +774,24 @@ async fn collect_shard_stats_with_shutdown(
 
     info!("Statistics collection loop ended");
     Ok(())
+}
+
+/// Helper function to get the actual count of connected shards from the shard manager
+async fn get_connected_shard_count(ctx: &Context) -> u32 {
+    // Access the shard manager from the context data
+    let data = ctx.data.read().await;
+
+    if let Some(shard_manager) = data.get::<ShardManagerContainer>() {
+        let runners = shard_manager.runners.lock().await;
+
+        // Count shards that are actually in Connected state
+        runners
+            .values()
+            .filter(|runner| runner.stage == serenity::gateway::ConnectionStage::Connected)
+            .count() as u32
+    } else {
+        // Fallback if we can't access the shard manager
+        warn!("Could not access shard manager to count connected shards");
+        0
+    }
 }
