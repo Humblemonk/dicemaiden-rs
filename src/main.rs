@@ -273,7 +273,7 @@ async fn main() -> Result<()> {
                     "  This process handles shards {} to {} ({} shards)",
                     start,
                     start + process_shard_count,
-                    process_shard_count
+                    process_shard_count + 1
                 );
                 info!("  Total shards across all processes: {}", total);
                 info!(
@@ -466,7 +466,7 @@ async fn main() -> Result<()> {
             "This process handles shards {} to {} ({} shards)",
             shard_start,
             shard_start + shard_count,
-            shard_count
+            shard_count + 1
         );
         info!("Total shards across all processes: {}", total_shards);
         info!("Use 'pkill dicemaiden-rs' to stop all processes");
