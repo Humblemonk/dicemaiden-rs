@@ -118,7 +118,6 @@ pub fn generate_system_help() -> String {
 • Values: **+** = +1, (blank) = 0, **-** = -1
 
 **D6 Legends System:**
-• Success-based variant of the classic D6 system
 • Regular dice: Count successes on 4-6
 • Wild die: Counts successes on 4-6, explodes on 6, failures (1) subtract 1 success
 • `/roll 8d6l` → 7 regular dice + 1 wild die
@@ -131,7 +130,6 @@ pub fn generate_system_help() -> String {
 **Hero System:**
 • `/roll 2hsn` - 2d6 normal damage
 • `/roll 3hsk` - 3d6 killing damage (BODY + STUN = BODY × 1d3)
-• `/roll 2.5hsk` - 2½d6 killing (2d6 + 1d3)
 • `/roll 3hsh` - 3d6 to-hit (target: 11 + OCV - DCV)
 
 **Wrath & Glory:**
@@ -155,8 +153,6 @@ pub fn generate_system_help() -> String {
 
 **Other Systems:**
 • `/roll dh 4d10` - Dark Heresy (righteous fury on 10s)
-• `/roll ed15` - Earthdawn step 15 (steps 1-50 available)
-• `/roll cpr + 5` - Skill check with +5 modifier
 
 **Multiple Rolls:**
 • `/roll 4d6 ; 3d8 + 2 ; 1d20` - Up to 4 separate rolls
