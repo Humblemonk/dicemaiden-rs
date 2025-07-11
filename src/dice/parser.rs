@@ -231,13 +231,12 @@ fn is_valid_roll_set_expression(expr: &str) -> bool {
     // but it starts with one
     let game_system_prefixes = ["sw", "cod", "wod", "sr", "gb", "cpr", "wit", "df", "hs"];
     for prefix in &game_system_prefixes {
-        if expr.starts_with(prefix) {
+        if let Some(after_prefix) = expr.strip_prefix(prefix) {
             // Check if it's followed by valid game system patterns
-            let after_prefix = &expr[prefix.len()..];
             if after_prefix
                 .chars()
                 .next()
-                .map_or(false, |c| c.is_ascii_digit())
+                .is_some_and(|c| c.is_ascii_digit())
             {
                 return true; // "sw8", "4cod", etc.
             }
