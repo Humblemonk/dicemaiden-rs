@@ -59,14 +59,19 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         return parse_semicolon_separated_rolls(input);
     }
 
-    // PRIORITY 1: Check for roll sets FIRST, before any other processing
-    // This is critical to catch patterns like "4 +d20 -2" as roll sets
+    // PRIORITY 1: Check for roll sets FIRST, but validate expression first
     if let Some(captures) = SET_REGEX.captures(input) {
         let count_str = &captures[1];
         let expression = &captures[2];
 
-        if let Ok(count) = count_str.parse::<u32>() {
-            if (2..=20).contains(&count) {
+        // CRITICAL FIX: Only proceed with roll set logic if expression is valid
+        if is_valid_roll_set_expression(expression) {
+            if let Ok(count) = count_str.parse::<u32>() {
+                // Add validation check for count range
+                if !(2..=20).contains(&count) {
+                    return Err(anyhow!("Set count must be between 2 and 20"));
+                }
+
                 // Handle advantage/disadvantage patterns with modifiers in roll sets
                 let final_expression =
                     if let Some(expanded) = super::aliases::expand_alias(expression) {
@@ -80,8 +85,7 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
                         // Expand the advantage/disadvantage part
                         let adv_alias = format!("{advantage_sign}d{sides}");
                         if let Some(expanded_adv) = super::aliases::expand_alias(&adv_alias) {
-                            let result = format!("{expanded_adv} {operator} {number}");
-                            result
+                            format!("{expanded_adv} {operator} {number}")
                         } else {
                             expression.to_string()
                         }
@@ -106,6 +110,7 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
                 }
             }
         }
+        // If not a valid roll set expression, fall through to single expression parsing
     }
 
     // Parse flags, labels, and comments
@@ -115,14 +120,19 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     let after_comment = parse_comment(&mut temp_dice, after_label);
     let remaining_input = after_comment.trim();
 
-    // PRIORITY 2: Check for roll sets AGAIN after processing flags
-    // This handles cases like "p 6 4d6" where flags come first
+    // PRIORITY 2: Check for roll sets AGAIN after processing flags, with same validation
     if let Some(captures) = SET_REGEX.captures(remaining_input) {
         let count_str = &captures[1];
         let expression = &captures[2];
 
-        if let Ok(count) = count_str.parse::<u32>() {
-            if (2..=20).contains(&count) {
+        // CRITICAL FIX: Only proceed with roll set logic if expression is valid
+        if is_valid_roll_set_expression(expression) {
+            if let Ok(count) = count_str.parse::<u32>() {
+                // Add validation check for count range
+                if !(2..=20).contains(&count) {
+                    return Err(anyhow!("Set count must be between 2 and 20"));
+                }
+
                 // Handle advantage/disadvantage patterns with modifiers in roll sets
                 let final_expression =
                     if let Some(expanded) = super::aliases::expand_alias(expression) {
@@ -163,6 +173,7 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
                 }
             }
         }
+        // If not a valid roll set expression, fall through to single expression parsing
     }
 
     // PRIORITY 3: Handle advantage/disadvantage with simple modifiers
@@ -183,11 +194,16 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
             return Ok(vec![parse_single_dice_expression(&full_expression)?]);
         }
     }
+
     // PRIORITY 4: Parse as single expression
     let mut result_dice = parse_single_dice_expression(input)?;
     transfer_dice_metadata(&temp_dice, &mut result_dice);
     Ok(vec![result_dice])
 }
+
+// Enhanced is_valid_roll_set_expression function
+// Replace the is_valid_roll_set_expression function in src/dice/parser.rs
+// This fix addresses the three failing test cases
 
 fn is_valid_roll_set_expression(expr: &str) -> bool {
     let expr = expr.trim();
@@ -197,19 +213,51 @@ fn is_valid_roll_set_expression(expr: &str) -> bool {
         return false;
     }
 
-    // Check if it's a known alias first (this catches +d20, -d%, etc.)
+    // Reject expressions that start with "/ " immediately
+    if expr.starts_with("/ ") {
+        return false;
+    }
+
+    // Check if it's a known alias FIRST (before rejecting operators)
+    // This catches +d20, -d20, +d%, -d%, sw8, 4cod, etc.
+    // CRITICAL: This fixes "3 sw8 + 5" because "sw8 + 5" has no direct alias
+    // but "sw8" does, so we need better checking
     if super::aliases::expand_alias(expr).is_some() {
         return true;
     }
 
-    // Reject expressions that start with * or / (these are clearly not roll set material)
-    if expr.starts_with(['*', '/']) {
+    // NEW: Check if the expression starts with a game system alias
+    // This handles cases like "sw8 + 5" where the full expression isn't an alias
+    // but it starts with one
+    let game_system_prefixes = ["sw", "cod", "wod", "sr", "gb", "cpr", "wit", "df", "hs"];
+    for prefix in &game_system_prefixes {
+        if expr.starts_with(prefix) {
+            // Check if it's followed by valid game system patterns
+            let after_prefix = &expr[prefix.len()..];
+            if after_prefix
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_ascii_digit())
+            {
+                return true; // "sw8", "4cod", etc.
+            }
+            if *prefix == "gb" && (after_prefix.is_empty() || after_prefix.starts_with(' ')) {
+                return true; // "gb" or "gb "
+            }
+        }
+    }
+
+    // THEN reject expressions that start with operators (but not advantage/disadvantage)
+    if expr.starts_with(['*', '/', '=', '<', '>', '!', '&', '|', '^', '%']) {
         return false;
     }
 
-    // Must contain 'd' to be a dice expression
-    if !expr.contains('d') {
-        return false;
+    // Special handling for + and - : only reject if they're not followed by 'd'
+    if expr.starts_with(['+', '-']) {
+        let after_sign = &expr[1..];
+        if !after_sign.starts_with('d') {
+            return false;
+        }
     }
 
     // Check for number/dice division patterns (like "20/d6", "100/2d4")
@@ -224,27 +272,40 @@ fn is_valid_roll_set_expression(expr: &str) -> bool {
         return true;
     }
 
-    // If none of the above patterns match, it's probably not valid for roll sets
-    false
+    // Check for advantage/disadvantage patterns explicitly
+    let advantage_regex = Regex::new(r"^[+-]d(\d+|%)").unwrap();
+    if advantage_regex.is_match(expr) {
+        return true;
+    }
+
+    // CRITICAL NEW: Check for dice expressions with modifiers
+    // This fixes "3 (Stat Roll) 4d6 k3" and "6 (Stat) 4d6 k3 ! Character generation"
+    // After label/comment parsing, these become "4d6 k3"
+    let dice_with_modifiers_patterns = [
+        r"^\d*d\d+\s+[kdie]+\d*.*$",    // "4d6 k3", "2d6 e6", "1d20 d1"
+        r"^\d*d\d+\s*[+\-*/]\s*\d+.*$", // "4d6 + 3", "2d6 - 1", "1d20 * 2"
+        r"^\d*d%\s+[kdie]+\d*.*$",      // "d% k1", "2d% e6"
+        r"^\d*d%\s*[+\-*/]\s*\d+.*$",   // "d% + 10", "2d% - 5"
+    ];
+
+    for pattern in &dice_with_modifiers_patterns {
+        if Regex::new(pattern).unwrap().is_match(expr) {
+            return true;
+        }
+    }
+
+    // Must contain 'd' to be a dice expression (for remaining cases)
+    if !expr.contains('d') {
+        return false;
+    }
+
+    // If we get here and it contains 'd', it's probably valid
+    true
 }
 
 // Helper function to create roll sets, eliminating duplication
 fn create_roll_set(captures: &regex::Captures) -> Result<Vec<DiceRoll>> {
-    let count: u32 = captures[1]
-        .parse()
-        .map_err(|_| anyhow!("Invalid set count"))?;
-    if !(2..=20).contains(&count) {
-        return Err(anyhow!("Set count must be between 2 and 20"));
-    }
-    let dice_expr = &captures[2];
-
-    let mut results = Vec::with_capacity(count as usize);
-    for i in 0..count {
-        let mut dice = parse_single_dice_expression(dice_expr)?;
-        dice.label = Some(format!("Set {}", i + 1));
-        results.push(dice);
-    }
-    Ok(results)
+    create_roll_set_with_metadata(captures, None)
 }
 
 // Helper function to parse semicolon-separated rolls
@@ -1817,4 +1878,57 @@ fn is_standalone_dice_expression(input: &str) -> bool {
     }
 
     false
+}
+
+fn create_roll_set_with_metadata(
+    captures: &regex::Captures,
+    metadata: Option<&DiceRoll>,
+) -> Result<Vec<DiceRoll>> {
+    let count: u32 = captures[1]
+        .parse()
+        .map_err(|_| anyhow!("Invalid set count"))?;
+
+    // VALIDATION: Centralized in one place
+    if !(2..=20).contains(&count) {
+        return Err(anyhow!("Set count must be between 2 and 20"));
+    }
+
+    let expression = &captures[2];
+
+    // Handle advantage/disadvantage patterns with modifiers in roll sets
+    let final_expression = if let Some(expanded) = super::aliases::expand_alias(expression) {
+        expanded
+    } else if let Some(adv_captures) = ADV_WITH_SIMPLE_MOD_REGEX.captures(expression) {
+        let advantage_sign = &adv_captures[1];
+        let sides = &adv_captures[2];
+        let operator = &adv_captures[3];
+        let number = &adv_captures[4];
+
+        // Expand the advantage/disadvantage part
+        let adv_alias = format!("{advantage_sign}d{sides}");
+        if let Some(expanded_adv) = super::aliases::expand_alias(&adv_alias) {
+            format!("{expanded_adv} {operator} {number}")
+        } else {
+            expression.to_string()
+        }
+    } else {
+        expression.to_string()
+    };
+
+    // Parse the dice expression
+    let mut dice = parse_single_dice_expression(&final_expression)?;
+
+    // Transfer metadata if provided (for flag support)
+    if let Some(meta) = metadata {
+        transfer_dice_metadata(meta, &mut dice);
+    }
+
+    // Create the roll set
+    let mut results = Vec::with_capacity(count as usize);
+    for i in 0..count {
+        let mut set_dice = dice.clone();
+        set_dice.label = Some(format!("Set {}", i + 1));
+        results.push(set_dice);
+    }
+    Ok(results)
 }
