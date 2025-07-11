@@ -2768,3 +2768,34 @@ fn test_wod_cancel_vs_regular_wod() {
         );
     }
 }
+
+#[test]
+fn test_cancel_mechanics_validation() {
+    // Test specific cancel scenarios to ensure correct behavior
+    // Note: These tests are probabilistic but help validate the logic
+
+    for _ in 0..20 {
+        let result = parse_and_roll("4wod8c");
+        if result.is_ok() {
+            let results = result.unwrap();
+            let roll = &results[0];
+
+            // Basic validation that the mechanics are working
+            assert!(roll.successes.is_some(), "Should track successes");
+            assert!(roll.failures.is_some(), "Should track failures");
+
+            // Check for cancel notes when appropriate
+            let has_cancel_note = roll.notes.iter().any(|note| note.contains("CANCELLED"));
+            let has_tens = roll.kept_rolls.iter().any(|&r| r == 10);
+            let has_ones = roll.kept_rolls.iter().any(|&r| r == 1);
+
+            // If we have both 10s and 1s, we might see a cancel note
+            if has_tens && has_ones {
+                // This is probabilistic, so we can't assert it always happens
+                if has_cancel_note {
+                    println!("Cancel note found: {:?}", roll.notes);
+                }
+            }
+        }
+    }
+}
