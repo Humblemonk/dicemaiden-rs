@@ -47,6 +47,7 @@ pub enum Modifier {
     TargetLower(u32),               // tl# - count successes <= target
     Failure(u32),                   // f#
     Botch(Option<u32>),             // b or b#
+    Cancel,                         // c
     AddDice(DiceRoll),              // Additional dice
     SubtractDice(DiceRoll),         // Subtract dice result
     MultiplyDice(DiceRoll),

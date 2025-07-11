@@ -787,6 +787,11 @@ fn apply_special_system_modifiers(
                     ));
                 }
             }
+            Modifier::Cancel => {
+                // NEW: Apply cancel modifier (10s cancel 1s for World of Darkness)
+                apply_cancel_modifier(result)?;
+                has_special_system = true;
+            }
             // Handle all other modifiers normally...
             Modifier::Fudge => {
                 apply_fudge_conversion(result)?;
@@ -3042,6 +3047,38 @@ fn apply_pre_target_mathematical_modifiers(
 
     // Update the total to reflect the modified dice values
     result.total = result.kept_rolls.iter().sum();
+
+    Ok(())
+}
+
+fn apply_cancel_modifier(result: &mut RollResult) -> Result<()> {
+    // Cancel modifier only works if we have failures tracked
+    if result.failures.is_none() {
+        result
+            .notes
+            .push("Cancel modifier requires failure counting (f#) to work".to_string());
+        return Ok(());
+    }
+
+    // Count 10s and 1s in the kept rolls
+    let tens_count = result.kept_rolls.iter().filter(|&&roll| roll == 10).count() as i32;
+    let ones_count = result.kept_rolls.iter().filter(|&&roll| roll == 1).count() as i32;
+
+    let current_failures = result.failures.unwrap_or(0);
+
+    // Cancel 1s with 10s on a 1:1 basis
+    let cancellations = std::cmp::min(tens_count, ones_count);
+
+    // Only add notes when cancellations actually occur
+    if cancellations > 0 {
+        // Reduce failures by the number of cancellations
+        let new_failures = current_failures - cancellations;
+        result.failures = Some(std::cmp::max(0, new_failures));
+
+        result.notes.push(format!(
+            "**CANCELLED**: {cancellations} failures (1s) cancelled by {cancellations} successes (10s)",
+        ));
+    }
 
     Ok(())
 }

@@ -32,6 +32,10 @@ static WOD_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(\d+)wod(\d+)(?:\s*([+-]\s*\d+))?$").expect("Failed to compile WOD_REGEX")
 });
 
+static WOD_CANCEL_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(\d+)wod(\d+)c(?:\s*([+-]\s*\d+))?$").expect("Failed to compile WOD_CANCEL_REGEX")
+});
+
 static DH_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^dh\s+(\d+)d(\d+)$").expect("Failed to compile DH_REGEX"));
 
@@ -295,17 +299,22 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         });
     }
 
+    // World of Darkness with cancel (4wod8c -> 4d10 f1 t8 c)
+    if let Some(captures) = WOD_CANCEL_REGEX.captures(input) {
+        return process_wod_regex_captures(
+            &captures,
+            "{count}d10 f1 t{difficulty} c",
+            "{count}d10 f1 t{difficulty} c {modifier}",
+        );
+    }
+
     // World of Darkness (4wod8 -> 4d10 f1 ie10 t8)
     if let Some(captures) = WOD_REGEX.captures(input) {
-        let count = &captures[1];
-        let difficulty = &captures[2];
-        let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
-
-        if modifier.is_empty() {
-            return Some(format!("{count}d10 f1 t{difficulty}"));
-        } else {
-            return Some(format!("{count}d10 f1 t{difficulty} {modifier}"));
-        }
+        return process_wod_regex_captures(
+            &captures,
+            "{count}d10 f1 t{difficulty}",
+            "{count}d10 f1 t{difficulty} {modifier}",
+        );
     }
 
     // Dark Heresy (dh 4d10 -> 4d10 ie10)
@@ -833,4 +842,29 @@ fn expand_marvel_multiverse_alias(input: &str) -> Option<String> {
     }
 
     None
+}
+
+fn process_wod_regex_captures(
+    captures: &regex::Captures,
+    base_format: &str,
+    base_format_with_modifier: &str,
+) -> Option<String> {
+    let count = &captures[1];
+    let difficulty = &captures[2];
+    let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
+
+    if modifier.is_empty() {
+        Some(
+            base_format
+                .replace("{count}", count)
+                .replace("{difficulty}", difficulty),
+        )
+    } else {
+        Some(
+            base_format_with_modifier
+                .replace("{count}", count)
+                .replace("{difficulty}", difficulty)
+                .replace("{modifier}", modifier),
+        )
+    }
 }

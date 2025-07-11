@@ -225,12 +225,13 @@ fn test_simple_roll_formatting() {
 fn test_complex_expressions() {
     // Test complex expressions that combine multiple features
     let complex_expressions = vec![
-        "10d6 e6 k8 +4",                     // Exploding, keep, add
-        "6d10 t7 f1 b1 ie10 + 5d6 e6 - 2d4", // Target system with math
-        "4d6 k3 + 2d6 * 3 - 1d4",            // Keep with complex math
-        "3 sw8 + 5",                         // Roll sets with game system and modifier
-        "p s 5 4d6 k3",                      // Flags + roll sets + modifiers
-        "wng 6d6 + 2",                       // Game system with modifier (simplified)
+        "10d6 e6 k8 +4",                                   // Exploding, keep, add
+        "6d10 t7 f1 b1 ie10 + 5d6 e6 - 2d4",               // Target system with math
+        "4d6 k3 + 2d6 * 3 - 1d4",                          // Keep with complex math
+        "3 sw8 + 5",    // Roll sets with game system and modifier
+        "p s 5 4d6 k3", // Flags + roll sets + modifiers
+        "wng 6d6 + 2",  // Game system with modifier (simplified)
+        "(WoD Attack) 4wod8c + 1 ! Supernatural strength", // WoD cancel with label and comment
     ];
 
     for expression in complex_expressions {
@@ -319,6 +320,8 @@ fn test_common_rpg_scenarios() {
         // World of Darkness scenarios
         ("6cod", "Skill roll"),
         ("4wod8", "Classic WoD difficulty 8"),
+        ("4wod8c", "WoD with cancel mechanics"),
+        ("5wod6c + 2", "WoD cancel with modifier"),
         // Savage Worlds scenarios
         ("sw8", "Trait test"),
         ("sw10 + 2", "Modified trait test"),
@@ -1212,4 +1215,61 @@ fn test_modifier_position_behavior() {
         "Post-target modifier should give reasonable success count, got {}",
         success_count2
     );
+}
+
+#[test]
+fn test_wod_cancel_integration_scenarios() {
+    // Test real-world usage scenarios for WOD cancel
+
+    let integration_scenarios = vec![
+        // Basic usage
+        ("4wod8c", "Basic WoD with cancel"),
+        ("5wod6c + 2", "WoD cancel with modifier"),
+        // With labels and comments
+        (
+            "(Melee Attack) 6wod7c ! Using claws",
+            "Labeled WoD with cancel",
+        ),
+        // With roll sets
+        ("3 4wod8c", "Multiple WoD cancel rolls"),
+        // With flags
+        ("p 5wod6c", "Private WoD cancel roll"),
+        ("s 4wod8c", "Simple WoD cancel roll"),
+        // Mixed with other expressions
+        ("4wod8c ; 3d6 + 2", "WoD cancel mixed with regular dice"),
+    ];
+
+    for (expression, description) in integration_scenarios {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "WoD cancel integration '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for '{}': {}",
+            expression,
+            description
+        );
+
+        // Check formatting works
+        let formatted = format_multiple_results(&results);
+        assert!(
+            !formatted.is_empty(),
+            "Should format correctly for '{}': {}",
+            expression,
+            description
+        );
+
+        assert!(
+            formatted.len() <= 2000,
+            "Should fit Discord limit for '{}': {}",
+            expression,
+            description
+        );
+    }
 }

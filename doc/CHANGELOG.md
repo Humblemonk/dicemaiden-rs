@@ -18,6 +18,7 @@
 - Support for Conan
 - Support for Silhouette
 - Support for D6 Legends
+- Support for World of Darkness Homebrew 10s cancel 1s
 
 ## [1.3.0] - 2025-07-03
 

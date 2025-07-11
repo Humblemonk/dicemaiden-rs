@@ -78,6 +78,7 @@
 - `4cod9` → 4d10 t8 ie9 (9-again rule)
 - `4codr` → 4d10 t8 ie10 r7 (rote quality)
 - `4wod8` → 4d10 f1 t8 (World of Darkness, difficulty 8)
+- `4wod8c` → 4d10 f1 t8 c (10s cancel 1s)
 
 ### Cyberpunk Red
 - `cpr` → 1d10 cpr (critical success on 10, critical failure on 1)
