@@ -752,3 +752,57 @@ fn test_modifier_order_regression_protection() {
         );
     }
 }
+
+#[test]
+fn test_roll_set_validation_bug_regression() {
+    // CRITICAL: Test the exact bug cases that were reported to ensure they never return
+
+    // BUG CASE 1: Single roll set must fail
+    let result = parse_and_roll("1 d20+3");
+    assert!(
+        result.is_err(),
+        "CRITICAL BUG: '1 d20+3' must fail - single roll sets not allowed"
+    );
+
+    // BUG CASE 2: Too many roll sets must fail
+    let result = parse_and_roll("21 d20+3");
+    assert!(
+        result.is_err(),
+        "CRITICAL BUG: '21 d20+3' must fail - too many roll sets not allowed"
+    );
+
+    // REGRESSION CHECK: Valid cases must still work
+    assert!(
+        parse_and_roll("2 d20+3").is_ok(),
+        "Minimum valid count should work"
+    );
+    assert!(
+        parse_and_roll("20 d20+3").is_ok(),
+        "Maximum valid count should work"
+    );
+}
+
+#[test]
+fn test_roll_set_validation_with_flags() {
+    // CRITICAL: Ensure validation works consistently with flags (common user scenario)
+
+    // Invalid with flags must fail
+    assert!(
+        parse_and_roll("p 1 d20").is_err(),
+        "Private flag with invalid count should fail"
+    );
+    assert!(
+        parse_and_roll("s 21 d6").is_err(),
+        "Simple flag with invalid count should fail"
+    );
+
+    // Valid with flags must work
+    assert!(
+        parse_and_roll("p 3 d20").is_ok(),
+        "Private flag with valid count should work"
+    );
+    assert!(
+        parse_and_roll("s 5 d6").is_ok(),
+        "Simple flag with valid count should work"
+    );
+}

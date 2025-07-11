@@ -410,6 +410,62 @@ fn test_error_scenarios() {
 }
 
 #[test]
+fn test_roll_set_validation_all_paths() {
+    // CRITICAL: Ensure validation works across ALL parsing paths to prevent future bypasses
+
+    let critical_test_cases = vec![
+        // Direct roll set patterns
+        ("1 d6", false, "Direct single roll set"),
+        ("21 d6", false, "Direct too many roll sets"),
+        ("2 d6", true, "Direct valid roll set"),
+        // With flags
+        ("p 1 d6", false, "Flag with single roll set"),
+        ("p 21 d6", false, "Flag with too many roll sets"),
+        ("p 3 d6", true, "Flag with valid roll set"),
+        // With advantage patterns
+        ("1 +d20", false, "Single advantage roll set"),
+        ("21 +d20", false, "Too many advantage roll sets"),
+        ("3 +d20", true, "Valid advantage roll set"),
+        // Boundary cases
+        ("0 d6", false, "Zero roll sets"),
+        ("20 d6", true, "Maximum valid roll sets"),
+        ("22 d6", false, "Just above maximum"),
+    ];
+
+    for (expression, should_succeed, description) in critical_test_cases {
+        let result = parse_and_roll(expression);
+
+        if should_succeed {
+            assert!(
+                result.is_ok(),
+                "CRITICAL: '{}' should succeed: {}",
+                expression,
+                description
+            );
+        } else {
+            assert!(
+                result.is_err(),
+                "CRITICAL: '{}' should fail: {}",
+                expression,
+                description
+            );
+
+            // Verify proper error message for roll set errors
+            if expression.contains(' ') {
+                let error_msg = result.unwrap_err().to_string();
+                assert!(
+                    error_msg.contains("Set count must be between 2 and 20")
+                        || error_msg.contains("Invalid set count"),
+                    "CRITICAL: '{}' should have proper error message: {}",
+                    expression,
+                    error_msg
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn test_performance_scenarios() {
     // Test performance with realistic loads
     use std::time::Instant;

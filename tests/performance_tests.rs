@@ -218,15 +218,25 @@ fn test_roll_set_limits() {
         "Max roll sets should work"
     );
 
-    // Invalid roll set sizes
+    // Invalid roll set sizes - ENHANCED with error message validation
+    let result = parse_and_roll("1 1d6");
+    assert!(result.is_err(), "Single roll set should fail");
+    let error_msg = result.unwrap_err().to_string();
     assert!(
-        parse_and_roll("1 1d6").is_err(),
-        "Single roll set should fail"
+        error_msg.contains("Set count must be between 2 and 20"),
+        "Error should mention valid range for single roll set, got: {}",
+        error_msg
     );
+
+    let result = parse_and_roll("21 1d6");
+    assert!(result.is_err(), "Too many roll sets should fail");
+    let error_msg = result.unwrap_err().to_string();
     assert!(
-        parse_and_roll("21 1d6").is_err(),
-        "Too many roll sets should fail"
+        error_msg.contains("Set count must be between 2 and 20"),
+        "Error should mention valid range for too many roll sets, got: {}",
+        error_msg
     );
+
     assert!(
         parse_and_roll("100 1d6").is_err(),
         "Way too many roll sets should fail"
