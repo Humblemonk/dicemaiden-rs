@@ -3076,8 +3076,7 @@ fn apply_cancel_modifier(result: &mut RollResult) -> Result<()> {
         result.failures = Some(std::cmp::max(0, new_failures));
 
         result.notes.push(format!(
-            "**CANCELLED**: {} failures (1s) cancelled by {} successes (10s)",
-            cancellations, cancellations
+            "**CANCELLED**: {cancellations} failures (1s) cancelled by {cancellations} successes (10s)",
         ));
     }
 
