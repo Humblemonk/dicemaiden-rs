@@ -44,6 +44,24 @@ fn test_game_systems_comprehensive() {
         ("4codr", true, Some("success"), "Chronicles rote quality"),
         ("4wod8", true, Some("success"), "World of Darkness diff 8"),
         ("5wod6", true, Some("success"), "World of Darkness diff 6"),
+        (
+            "4wod8c",
+            true,
+            Some("success"),
+            "World of Darkness diff 8 with cancel",
+        ),
+        (
+            "5wod6c",
+            true,
+            Some("success"),
+            "World of Darkness diff 6 with cancel",
+        ),
+        (
+            "6wod7c + 2",
+            true,
+            Some("success"),
+            "World of Darkness with cancel and modifier",
+        ),
         // Shadowrun
         ("sr5", true, Some("success"), "Shadowrun 5th edition"),
         ("sr6", true, Some("success"), "Shadowrun 6th edition"),
@@ -290,6 +308,9 @@ fn test_alias_expansions() {
         ("1d6l", Some("1d6 t4f1ie6")),
         ("8d6l", Some("7d6 t4 + 1d6 t4f1ie6")),
         ("12d6l", Some("11d6 t4 + 1d6 t4f1ie6")),
+        ("4wod8c", Some("4d10 f1 t8 c")),
+        ("5wod6c", Some("5d10 f1 t6 c")),
+        ("6wod7c + 3", Some("6d10 f1 t7 c + 3")),
     ];
 
     for (alias, expected) in alias_tests {
@@ -2620,5 +2641,130 @@ fn test_unicode_handling_in_percentile_expressions() {
                 assert!(!error.to_string().is_empty(), "Should have error message");
             }
         }
+    }
+}
+
+#[test]
+fn test_world_of_darkness_cancel_mechanics() {
+    // Test WOD cancel aliases
+    let wod_cancel_tests = vec![
+        ("4wod8c", "WOD difficulty 8 with cancel"),
+        ("5wod6c", "WOD difficulty 6 with cancel"),
+        ("6wod7c", "WOD difficulty 7 with cancel"),
+        ("3wod9c + 2", "WOD with cancel and modifier"),
+    ];
+
+    for (expression, description) in wod_cancel_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "WOD cancel test '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            !results.is_empty(),
+            "Should have results for '{}': {}",
+            expression,
+            description
+        );
+
+        // Should have both success and failure tracking for WOD
+        assert!(
+            results[0].successes.is_some(),
+            "WOD should track successes for '{}'",
+            expression
+        );
+        assert!(
+            results[0].failures.is_some(),
+            "WOD should track failures for '{}'",
+            expression
+        );
+    }
+}
+
+#[test]
+fn test_cancel_modifier_parsing() {
+    // Test manual cancel modifier usage
+    let cancel_tests = vec![
+        ("4d10 f1 t8 c", "Manual WOD with cancel"),
+        ("5d10 f1 t6 c", "Different difficulty with cancel"),
+        ("6d10 t7 f1 c", "Different order with cancel"),
+        ("3d10 c f1 t8", "Cancel first, then failure/target"),
+        ("4d10 f1 c t8 + 2", "Cancel with modifiers"),
+    ];
+
+    for (expression, description) in cancel_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Cancel modifier test '{}' should parse: {}",
+            expression,
+            description
+        );
+    }
+}
+
+#[test]
+fn test_cancel_without_failure_tracking() {
+    // Test that cancel gracefully handles missing failure tracking
+    let result = parse_and_roll("4d10 t8 c"); // No f1
+    assert!(
+        result.is_ok(),
+        "Should parse cancel without failure tracking"
+    );
+
+    if let Ok(results) = result {
+        // Should have some kind of note about needing failure tracking
+        let has_relevant_note = results[0].notes.iter().any(|note| {
+            note.contains("Cancel") || note.contains("failure") || note.contains("requires")
+        });
+
+        // We expect either a warning or the cancel to simply not activate
+        assert!(
+            has_relevant_note || results[0].notes.len() <= 2,
+            "Should handle cancel without failures gracefully"
+        );
+    }
+}
+
+#[test]
+fn test_wod_cancel_vs_regular_wod() {
+    // Test that WOD with and without cancel work correctly
+    let wod_comparison_tests = vec![
+        ("4wod8", "4wod8c", "Difficulty 8 comparison"),
+        ("5wod6", "5wod6c", "Difficulty 6 comparison"),
+        ("3wod9 + 2", "3wod9c + 2", "With modifier comparison"),
+    ];
+
+    for (regular, cancel, description) in wod_comparison_tests {
+        let regular_result = parse_and_roll(regular);
+        let cancel_result = parse_and_roll(cancel);
+
+        assert!(
+            regular_result.is_ok() && cancel_result.is_ok(),
+            "Both regular and cancel WOD should work: {}",
+            description
+        );
+
+        let regular_roll = regular_result.unwrap();
+        let cancel_roll = cancel_result.unwrap();
+
+        // Both should have success/failure tracking
+        assert_eq!(
+            regular_roll[0].successes.is_some(),
+            cancel_roll[0].successes.is_some(),
+            "Success tracking should be consistent: {}",
+            description
+        );
+
+        assert_eq!(
+            regular_roll[0].failures.is_some(),
+            cancel_roll[0].failures.is_some(),
+            "Failure tracking should be consistent: {}",
+            description
+        );
     }
 }

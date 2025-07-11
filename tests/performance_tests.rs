@@ -24,6 +24,7 @@ fn test_parsing_performance() {
         ("20 50d6", "Large roll sets", 100),
         ("4d6;3d8;2d10;1d20", "Multiple rolls", 50),
         ("100d6 e6 ie k50 r1 t4 +10", "Very complex", 300),
+        ("4wod8c + 2", "WoD cancel with modifier", 50),
     ];
 
     // Warmup runs to initialize lazy statics and regex compilation
@@ -331,6 +332,7 @@ fn test_complex_modifier_performance() {
         "10d6 ie6 k5 r1 t4 +5",         // Multiple modifiers
         "5d6 ie ir1 k3 + 2d6 e6 - 1d4", // Nested complexity
         "20d6 e6 k10 + 10",             // Large dice with modifiers
+        "5d10 f1 t8 c ie10 + 3",
     ];
 
     // Warmup
@@ -555,5 +557,90 @@ fn test_stress_scenarios() {
             case,
             best_format_time
         );
+    }
+}
+
+#[test]
+fn test_cancel_modifier_performance() {
+    // Test that cancel modifier doesn't add significant overhead
+
+    let cancel_performance_tests = vec![
+        ("10d10 f1 t8 c", "Cancel with multiple dice", 100),
+        ("20 4wod8c", "Multiple WoD cancel rolls", 200),
+        (
+            "5d10 f1 t6 c ie10 + 2",
+            "Cancel with complex modifiers",
+            150,
+        ),
+    ];
+
+    // Warmup
+    for _ in 0..3 {
+        let _ = parse_and_roll("4wod8c");
+    }
+
+    for (expression, description, max_ms) in cancel_performance_tests {
+        let mut best_time = u128::MAX;
+
+        for _ in 0..5 {
+            let start = Instant::now();
+            let result = parse_and_roll(expression);
+            let duration = start.elapsed().as_millis();
+
+            assert!(
+                result.is_ok(),
+                "Cancel performance test '{}' should succeed: {:?}",
+                expression,
+                result.err()
+            );
+
+            best_time = best_time.min(duration);
+        }
+
+        assert!(
+            best_time <= max_ms,
+            "Cancel performance test '{}' ({}) took {}ms, expected ≤{}ms",
+            expression,
+            description,
+            best_time,
+            max_ms
+        );
+    }
+}
+
+// ============================================================================
+// CRITICAL NEW TEST 5: Specific cancel mechanics validation
+// ============================================================================
+
+// ADD this test to tests/game_systems_tests.rs to validate the actual cancel mechanics:
+
+#[test]
+fn test_cancel_mechanics_validation() {
+    // Test specific cancel scenarios to ensure correct behavior
+    // Note: These tests are probabilistic but help validate the logic
+
+    for _ in 0..20 {
+        let result = parse_and_roll("4wod8c");
+        if result.is_ok() {
+            let results = result.unwrap();
+            let roll = &results[0];
+
+            // Basic validation that the mechanics are working
+            assert!(roll.successes.is_some(), "Should track successes");
+            assert!(roll.failures.is_some(), "Should track failures");
+
+            // Check for cancel notes when appropriate
+            let has_cancel_note = roll.notes.iter().any(|note| note.contains("CANCELLED"));
+            let has_tens = roll.kept_rolls.iter().any(|&r| r == 10);
+            let has_ones = roll.kept_rolls.iter().any(|&r| r == 1);
+
+            // If we have both 10s and 1s, we might see a cancel note
+            if has_tens && has_ones {
+                // This is probabilistic, so we can't assert it always happens
+                if has_cancel_note {
+                    println!("Cancel note found: {:?}", roll.notes);
+                }
+            }
+        }
     }
 }

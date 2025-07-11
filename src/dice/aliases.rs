@@ -32,6 +32,10 @@ static WOD_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(\d+)wod(\d+)(?:\s*([+-]\s*\d+))?$").expect("Failed to compile WOD_REGEX")
 });
 
+static WOD_CANCEL_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(\d+)wod(\d+)c(?:\s*([+-]\s*\d+))?$").expect("Failed to compile WOD_CANCEL_REGEX")
+});
+
 static DH_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^dh\s+(\d+)d(\d+)$").expect("Failed to compile DH_REGEX"));
 
@@ -293,6 +297,19 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             "r" => format!("{count}d10 t8 ie10 r7{modifier_part}"), // rote quality
             _ => format!("{count}d10 t8 ie10{modifier_part}"),  // standard
         });
+    }
+
+    // World of Darkness with cancel (4wod8c -> 4d10 f1 t8 c)
+    if let Some(captures) = WOD_CANCEL_REGEX.captures(input) {
+        let count = &captures[1];
+        let difficulty = &captures[2];
+        let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
+
+        if modifier.is_empty() {
+            return Some(format!("{count}d10 f1 t{difficulty} c"));
+        } else {
+            return Some(format!("{count}d10 f1 t{difficulty} c {modifier}"));
+        }
     }
 
     // World of Darkness (4wod8 -> 4d10 f1 ie10 t8)

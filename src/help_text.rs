@@ -59,9 +59,7 @@ pub fn generate_alias_help() -> String {
 • `4cod` → 4d10 t8 ie10 (Chronicles of Darkness standard)
 • `4codr` → 4d10 t8 ie10 r7 (rote quality: reroll failures)
 • `4wod8` → 4d10 f1 t8 (World of Darkness difficulty 8)
-
-**Cyberpunk Red:**
-• `cpr` → 1d10 cpr (critical success on 10, critical failure on 1)
+• `4wod8c` → 4d10 f1 t8 c (10s cancel 1s)
 
 **D&D/Pathfinder:**
 • `dndstats` → 6 4d6 k3 (ability score generation)
@@ -96,8 +94,8 @@ pub fn generate_alias_help() -> String {
 • `dd34` → 1d3*10 + 1d4 (double-digit d66 style)
 • `ed15` → Earthdawn step 15
 • `cs 3` → Cypher System 1d20 cs3 (Level 3 task, target 9+)
+• `cpr` → Cyberpunk Red 1d10 cpr (critical success on 10, critical failure on 1)
 • `conan3` → 3d20 conan (3d20 skill roll)
-• `conan2cd4` → 2d20 + 4d6 custom combined attack
 • `sil#` → Silhouette system: roll #d6, keep highest, extra 6s add +1 (e.g., sil3, sil5)
 
 Use `/roll help system` for specific examples!"#

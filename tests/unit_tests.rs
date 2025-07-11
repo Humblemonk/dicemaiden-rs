@@ -243,7 +243,7 @@ fn test_reroll_modifiers() {
 
 #[test]
 fn test_target_system_modifiers() {
-    let target_patterns = vec!["6d10t7", "4d6f1", "6d10b", "6d10b1", "6d10tl7"];
+    let target_patterns = vec!["6d10t7", "4d6f1", "6d10b", "6d10b1", "6d10tl7", "6d10c"];
 
     for pattern in target_patterns {
         assert_valid(pattern);
@@ -279,6 +279,20 @@ fn test_target_system_modifiers() {
             description
         );
     }
+
+    // Test cancel modifier parsing specifically
+    let result = parser::parse_dice_string("4d10 f1 c").unwrap();
+    let has_cancel = result[0]
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::Cancel));
+    assert!(has_cancel, "Should parse cancel modifier correctly");
+
+    let has_failure = result[0]
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::Failure(_)));
+    assert!(has_failure, "Should also have failure modifier");
 }
 
 #[test]
@@ -724,6 +738,8 @@ fn test_modifier_order_regression_protection() {
         ("ex5", "Exalted alias"),
         ("4cod", "Chronicles of Darkness alias"),
         ("sr6", "Shadowrun alias"),
+        ("4d10 f1 t8 c", "WOD with cancel"),
+        ("5d10 f1 c t6", "Cancel with different order"),
     ];
 
     for (expression, description) in regression_cases {
@@ -805,4 +821,58 @@ fn test_roll_set_validation_with_flags() {
         parse_and_roll("s 5 d6").is_ok(),
         "Simple flag with valid count should work"
     );
+}
+
+#[test]
+fn test_cancel_modifier_unit_logic() {
+    // Test the core cancel modifier logic with predictable scenarios
+
+    // Test cases where we can verify exact behavior
+    let cancel_unit_tests = vec![
+        ("1d10 f1 t8 c", "Single die with cancel"),
+        ("2d10 f1 t7 c", "Two dice with cancel"),
+        ("3d10 f1 t6 c + 1", "Cancel with mathematical modifier"),
+        ("4d10 c f1 t8", "Cancel before failure tracking"),
+    ];
+
+    for (expression, description) in cancel_unit_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Cancel unit test '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+
+        // Should have proper success/failure structure
+        if results[0].failures.is_some() {
+            assert!(
+                results[0].successes.is_some(),
+                "If failures are tracked, successes should be too: {}",
+                description
+            );
+        }
+    }
+}
+
+#[test]
+fn test_cancel_modifier_validation() {
+    // Test that cancel modifier validates properly
+
+    // These should work
+    let valid_cancel_tests = vec!["1d10 c", "4d10 f1 c", "5d10 t8 f1 c", "6d10 f1 t7 c"];
+
+    for test in valid_cancel_tests {
+        assert_valid(test);
+    }
+
+    // Test that standalone 'c' parses correctly as a modifier
+    let parsed = dicemaiden_rs::dice::parser::parse_dice_string("1d6 c").unwrap();
+    let has_cancel = parsed[0]
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::Cancel));
+    assert!(has_cancel, "Should parse cancel modifier correctly");
 }

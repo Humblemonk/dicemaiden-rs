@@ -1349,6 +1349,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         "cpr" => return Ok(Modifier::CyberpunkRed),
         "wit" => return Ok(Modifier::Witcher),
         "bnw" => return Ok(Modifier::BraveNewWorld(0)),
+        "c" => return Ok(Modifier::Cancel),
         _ => {}
     }
 
