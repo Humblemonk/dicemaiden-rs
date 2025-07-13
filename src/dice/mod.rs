@@ -33,23 +33,25 @@ pub enum Modifier {
     Subtract(i32),
     Multiply(i32),
     Divide(i32),
-    Explode(Option<u32>),           // e or e#
-    ExplodeIndefinite(Option<u32>), // ie or ie#
-    Drop(u32),                      // d#
-    KeepHigh(u32),                  // k#
-    KeepLow(u32),                   // kl#
-    KeepMiddle(u32),                // km#
-    Reroll(u32),                    // r#
-    RerollIndefinite(u32),          // ir#
-    Target(u32),                    // t#  - count successes >= target
-    RerollGreater(u32),             // rg# - NEW: reroll >= threshold once
-    RerollGreaterIndefinite(u32),   // irg# - NEW: reroll >= threshold indefinitely
-    TargetLower(u32),               // tl# - count successes <= target
-    Failure(u32),                   // f#
-    Botch(Option<u32>),             // b or b#
-    Cancel,                         // c
-    AddDice(DiceRoll),              // Additional dice
-    SubtractDice(DiceRoll),         // Subtract dice result
+    Explode(Option<u32>),                   // e or e#
+    ExplodeIndefinite(Option<u32>),         // ie or ie#
+    Drop(u32),                              // d#
+    KeepHigh(u32),                          // k#
+    KeepLow(u32),                           // kl#
+    KeepMiddle(u32),                        // km#
+    Reroll(u32),                            // r#
+    RerollIndefinite(u32),                  // ir#
+    Target(u32),                            // t#  - count successes >= target
+    RerollGreater(u32),                     // rg# - reroll >= threshold once
+    RerollGreaterIndefinite(u32),           // irg# - reroll >= threshold indefinitely
+    TargetLower(u32),                       // tl# - count successes <= target
+    TargetWithDoubleSuccess(u32, u32),      // t{target}ds{double}
+    TargetLowerWithDoubleSuccess(u32, u32), // tl{target}ds{double}
+    Failure(u32),                           // f#
+    Botch(Option<u32>),                     // b or b#
+    Cancel,                                 // c
+    AddDice(DiceRoll),                      // Additional dice
+    SubtractDice(DiceRoll),                 // Subtract dice result
     MultiplyDice(DiceRoll),
     DivideDice(DiceRoll),
     WrathGlory(Option<u32>, bool, u32), // Wrath & Glory: (difficulty, use_total_instead_of_successes)

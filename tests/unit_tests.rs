@@ -1309,7 +1309,7 @@ fn test_single_dice_group_with_keep() {
 
         let group = &result.dice_groups[0];
 
-        // FIXED: Actually use expected_total in an assertion
+        // Actually use expected_total in an assertion
         assert_eq!(
             group.rolls.len(),
             expected_total,
@@ -1526,4 +1526,228 @@ fn test_complete_display_format_with_keep() {
     );
 
     println!("Complete format test result: {}", formatted);
+}
+
+// ============================================================================
+// DOUBLE SUCCESS TESTS
+// ============================================================================
+
+#[test]
+fn test_target_with_double_success_modifiers() {
+    // Test basic parsing
+    let result = parser::parse_dice_string("4d10 t6ds6").unwrap();
+    match &result[0].modifiers[0] {
+        Modifier::TargetWithDoubleSuccess(6, 6) => {}
+        _ => panic!("Expected TargetWithDoubleSuccess(6, 6)"),
+    }
+
+    // Test different values
+    let result = parser::parse_dice_string("5d10 t7ds10").unwrap();
+    match &result[0].modifiers[0] {
+        Modifier::TargetWithDoubleSuccess(7, 10) => {}
+        _ => panic!("Expected TargetWithDoubleSuccess(7, 10)"),
+    }
+}
+
+#[test]
+fn test_target_double_success_validation() {
+    // Test invalid syntax is rejected
+    assert!(parser::parse_dice_string("4d6 t0ds6").is_err()); // Target 0
+    assert!(parser::parse_dice_string("4d6 t6ds4").is_err()); // Double < target
+    assert!(parser::parse_dice_string("4d6 t0ds").is_err()); // Target 0 should fail
+
+    // Valid cases should work
+    assert!(parser::parse_dice_string("4d6 t1ds").is_ok()); // Target 1 should work
+    assert!(parser::parse_dice_string("4d6 t6ds").is_ok()); // Target 6 should work
+}
+
+#[test]
+fn test_no_conflict_with_drop_modifier() {
+    // Critical: ensure no conflict with d{num} drop modifier
+    let result = parser::parse_dice_string("6d10 d2 t4ds6").unwrap();
+    assert_eq!(result[0].modifiers.len(), 2);
+
+    // Should have both drop and double success modifiers
+    let has_drop = result[0]
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::Drop(_)));
+    let has_double = result[0]
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::TargetWithDoubleSuccess(_, _)));
+    assert!(has_drop && has_double);
+}
+
+#[test]
+fn test_default_double_success_end_to_end() {
+    // Test the exact example: t6ds should work end-to-end
+    let result = parse_and_roll("4d10 t6ds").unwrap();
+    assert!(
+        result[0].successes.is_some(),
+        "Should have success counting"
+    );
+
+    // Should have the correct note format for default double success
+    let has_note = result[0]
+        .notes
+        .iter()
+        .any(|note| note.contains("6+ = 2 successes"));
+    assert!(has_note, "Should have note about 6+ being 2 successes");
+
+    // Test different default values
+    let result = parse_and_roll("6d6 t4ds").unwrap();
+    let has_note = result[0]
+        .notes
+        .iter()
+        .any(|note| note.contains("4+ = 2 successes"));
+    assert!(has_note, "Should have note about 4+ being 2 successes");
+}
+
+#[test]
+fn test_target_with_double_success_default_value() {
+    // Test the new t{target}ds syntax (default double success = target)
+    let result = parser::parse_dice_string("4d10 t6ds").unwrap();
+    match &result[0].modifiers[0] {
+        Modifier::TargetWithDoubleSuccess(6, 6) => {}
+        _ => panic!("Expected TargetWithDoubleSuccess(6, 6) for t6ds"),
+    }
+
+    // Test different target values with default double success
+    let test_cases = vec![
+        ("5d10 t7ds", 7, 7, "Default double success on 7"),
+        ("6d6 t4ds", 4, 4, "Default double success on 4"),
+        ("4d8 t5ds", 5, 5, "Default double success on 5"),
+        ("3d20 t15ds", 15, 15, "Default double success on 15"),
+    ];
+
+    for (expression, expected_target, expected_double, description) in test_cases {
+        let result = parser::parse_dice_string(expression).unwrap();
+        match &result[0].modifiers[0] {
+            Modifier::TargetWithDoubleSuccess(target, double_value) => {
+                assert_eq!(
+                    *target, expected_target,
+                    "Target mismatch for {}",
+                    description
+                );
+                assert_eq!(
+                    *double_value, expected_double,
+                    "Double value mismatch for {}",
+                    description
+                );
+            }
+            _ => panic!("Expected TargetWithDoubleSuccess for {}", description),
+        }
+    }
+}
+
+#[test]
+fn test_target_lower_with_double_success_modifiers() {
+    // Test parsing of tl{target}ds{double} syntax
+    let result = parser::parse_dice_string("4d6 tl4ds1").unwrap();
+    match &result[0].modifiers[0] {
+        Modifier::TargetLowerWithDoubleSuccess(4, 1) => {}
+        _ => panic!("Expected TargetLowerWithDoubleSuccess(4, 1)"),
+    }
+
+    // Test default syntax: tl{target}ds
+    let result = parser::parse_dice_string("4d6 tl3ds").unwrap();
+    match &result[0].modifiers[0] {
+        Modifier::TargetLowerWithDoubleSuccess(3, 3) => {}
+        _ => panic!("Expected TargetLowerWithDoubleSuccess(3, 3) for tl3ds"),
+    }
+
+    // Test various combinations
+    let test_cases = vec![
+        ("6d6 tl4ds", 4, 4, "Default lower double success"),
+        ("4d10 tl3ds1", 3, 1, "Explicit lower double success"),
+        ("5d8 tl6ds", 6, 6, "d8 lower double success"),
+    ];
+
+    for (expression, expected_target, expected_double, description) in test_cases {
+        let result = parser::parse_dice_string(expression).unwrap();
+        match &result[0].modifiers[0] {
+            Modifier::TargetLowerWithDoubleSuccess(target, double_value) => {
+                assert_eq!(
+                    *target, expected_target,
+                    "Target mismatch for {}",
+                    description
+                );
+                assert_eq!(
+                    *double_value, expected_double,
+                    "Double value mismatch for {}",
+                    description
+                );
+            }
+            _ => panic!("Expected TargetLowerWithDoubleSuccess for {}", description),
+        }
+    }
+}
+
+#[test]
+fn test_target_lower_double_success_validation() {
+    // Test validation for target lower double success
+    assert!(parser::parse_dice_string("4d6 tl0ds").is_err()); // Target 0
+    assert!(parser::parse_dice_string("4d6 tl3ds0").is_err()); // Double 0
+    assert!(parser::parse_dice_string("4d6 tl3ds5").is_err()); // Double > target (invalid for lower)
+
+    // Valid cases
+    assert!(parser::parse_dice_string("4d6 tl4ds").is_ok()); // Default
+    assert!(parser::parse_dice_string("4d6 tl4ds1").is_ok()); // Double ≤ target
+    assert!(parser::parse_dice_string("4d6 tl4ds4").is_ok()); // Double = target
+}
+
+#[test]
+fn test_target_lower_double_success_end_to_end() {
+    // Test end-to-end functionality
+    let result = parse_and_roll("6d6 tl4ds").unwrap();
+    assert!(
+        result[0].successes.is_some(),
+        "Should have success counting"
+    );
+
+    // Should have correct note for target lower default
+    let has_note = result[0]
+        .notes
+        .iter()
+        .any(|note| note.contains("≤4 = 2 successes"));
+    assert!(has_note, "Should have note about ≤4 being 2 successes");
+
+    // Test explicit double success
+    let result = parse_and_roll("6d6 tl4ds1").unwrap();
+    let has_note = result[0]
+        .notes
+        .iter()
+        .any(|note| note.contains("≤1 = 2 successes") && note.contains("≤4 = 1 success"));
+    assert!(has_note, "Should have note about different success tiers");
+}
+
+#[test]
+fn test_all_double_success_variants() {
+    // Test that all four variants work together
+    let variants = vec![
+        ("4d10 t6ds", "Target double success default"),
+        ("4d10 t6ds10", "Target double success explicit"),
+        ("4d6 tl4ds", "Target lower double success default"),
+        ("4d6 tl4ds1", "Target lower double success explicit"),
+    ];
+
+    for (expression, description) in variants {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Variant '{}' should work: {}. Error: {:?}",
+            expression,
+            description,
+            result.err()
+        );
+
+        let results = result.unwrap();
+        assert!(
+            results[0].successes.is_some(),
+            "Variant '{}' should have success counting: {}",
+            expression,
+            description
+        );
+    }
 }

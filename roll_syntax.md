@@ -11,6 +11,7 @@
 - **Keep/Drop**: `k3` (keep 3 highest), `kl2` (keep 2 lowest), `km2` (keep 2 middle), `d1` (drop 1 lowest)
 - **Rerolls**: `r2` (reroll ≤2 once), `ir2` (reroll ≤2 indefinitely), `rg2` (reroll ≥ 2 once), `irg2` (reroll ≥ 2 indefinitely)
 - **Success Counting**: `t7` (count successes ≥7), `tl6` (count successes ≤6), `f1` (count failures ≤1)
+- **Double Success**: `t7ds10` (target 7+, double success on 10; defaults to target value), `tl6ds5` (target 6-, double success on 5)
 - **Botch Counting**: `b1` (count botches ≤1), `b` (count botches ≤1)
 - **Math Operations**: `+5`, `-3`, `*2`, `/2`
 - **Additional Dice**: `+2d6`, `-1d4` (add/subtract dice rolls)

@@ -301,7 +301,7 @@ fn apply_remaining_mathematical_modifiers(
                 add_dice_group(result, dice_to_subtract, &additional_result, "subtract");
             }
             Modifier::MultiplyDice(dice_to_multiply) => {
-                // NEW: Handle dice multiplication in remaining modifiers
+                // Handle dice multiplication in remaining modifiers
                 let additional_result = roll_dice(dice_to_multiply.clone())?;
                 expression_parts.push("*".to_string());
                 expression_parts.push(format!("{}", additional_result.total));
@@ -316,7 +316,7 @@ fn apply_remaining_mathematical_modifiers(
                 add_dice_group(result, dice_to_multiply, &additional_result, "multiply");
             }
             Modifier::DivideDice(dice_to_divide) => {
-                // NEW: Handle dice division in remaining modifiers
+                // Handle dice division in remaining modifiers
                 let additional_result = roll_dice(dice_to_divide.clone())?;
 
                 if additional_result.total == 0 {
@@ -426,7 +426,7 @@ fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) ->
                 add_dice_group(result, dice_to_subtract, &additional_result, "subtract");
             }
             Modifier::MultiplyDice(dice_to_multiply) => {
-                // NEW: Handle dice multiplication
+                // Handle dice multiplication
                 let additional_result = roll_dice(dice_to_multiply.clone())?;
                 expression_parts.push("*".to_string());
                 expression_parts.push(format!("{}", additional_result.total));
@@ -445,7 +445,7 @@ fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) ->
                 add_dice_group(result, dice_to_multiply, &additional_result, "multiply");
             }
             Modifier::DivideDice(dice_to_divide) => {
-                // NEW: Handle dice division
+                //  Handle dice division
                 let additional_result = roll_dice(dice_to_divide.clone())?;
 
                 // Check for division by zero
@@ -652,6 +652,59 @@ fn apply_special_system_modifiers(
     // Process modifiers in order, respecting their position relative to targets
     for (index, modifier) in dice.modifiers.iter().enumerate() {
         match modifier {
+            // TargetWithDoubleSuccess must come BEFORE existing Target case
+            Modifier::TargetWithDoubleSuccess(target, double_success_value) => {
+                // Apply any mathematical modifiers that come BEFORE this target
+                if has_math_modifiers {
+                    let pre_target_modifiers: Vec<_> = dice.modifiers[..index]
+                        .iter()
+                        .filter(|m| {
+                            matches!(
+                                m,
+                                Modifier::Add(_)
+                                    | Modifier::Subtract(_)
+                                    | Modifier::Multiply(_)
+                                    | Modifier::Divide(_)
+                            )
+                        })
+                        .cloned()
+                        .collect();
+
+                    if !pre_target_modifiers.is_empty() {
+                        apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
+                    }
+                }
+
+                // Call our new function
+                count_dice_with_double_success(result, *target, *double_success_value)?;
+                has_special_system = true;
+            }
+            Modifier::TargetLowerWithDoubleSuccess(target, double_value) => {
+                // Apply pre-target mathematical modifiers
+                if has_math_modifiers {
+                    let pre_target_modifiers: Vec<_> = dice.modifiers[..index]
+                        .iter()
+                        .filter(|m| {
+                            matches!(
+                                m,
+                                Modifier::Add(_)
+                                    | Modifier::Subtract(_)
+                                    | Modifier::Multiply(_)
+                                    | Modifier::Divide(_)
+                            )
+                        })
+                        .cloned()
+                        .collect();
+
+                    if !pre_target_modifiers.is_empty() {
+                        apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
+                    }
+                }
+
+                // Call target lower double success function
+                count_dice_with_target_lower_double_success(result, *target, *double_value)?;
+                has_special_system = true;
+            }
             Modifier::Target(value) => {
                 // Apply any mathematical modifiers that come BEFORE this target
                 if has_math_modifiers {
@@ -763,7 +816,7 @@ fn apply_special_system_modifiers(
                 }
             }
             Modifier::Cancel => {
-                // NEW: Apply cancel modifier (10s cancel 1s for World of Darkness)
+                // Apply cancel modifier (10s cancel 1s for World of Darkness)
                 apply_cancel_modifier(result)?;
                 has_special_system = true;
             }
@@ -1023,7 +1076,7 @@ fn count_wrath_glory_successes(
         // Set Wrath & Glory specific fields
         if !wrath_dice_values.is_empty() {
             result.wng_wrath_die = Some(wrath_dice_values[0]); // Keep for backwards compatibility
-            result.wng_wrath_dice = Some(wrath_dice_values.clone()); // NEW: Store all wrath dice
+            result.wng_wrath_dice = Some(wrath_dice_values.clone()); // Store all wrath dice
         }
 
         result.wng_icons = Some(icon_count);
@@ -2614,7 +2667,7 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
         }
     }
 
-    // 5. Add notes for combat dice (NEW SECTION)
+    // 5. Add notes for combat dice
     if has_combat_dice {
         // Add special effects note if applicable
         if combat_specials > 0 {
@@ -2959,6 +3012,8 @@ fn find_target_modifier_positions(modifiers: &[Modifier]) -> Vec<usize> {
                 m,
                 Modifier::Target(_)
                     | Modifier::TargetLower(_)
+                    | Modifier::TargetWithDoubleSuccess(_, _)
+                    | Modifier::TargetLowerWithDoubleSuccess(_, _)
                     | Modifier::Failure(_)
                     | Modifier::Botch(_)
             ) {
@@ -3069,6 +3124,79 @@ fn apply_cancel_modifier(result: &mut RollResult) -> Result<()> {
 
         result.notes.push(format!(
             "**CANCELLED**: {cancellations} failures (1s) cancelled by {cancellations} successes (10s)",
+        ));
+    }
+
+    Ok(())
+}
+
+fn count_dice_with_double_success(
+    result: &mut RollResult,
+    target: u32,
+    double_success_value: u32,
+) -> Result<()> {
+    let success_count = result
+        .kept_rolls
+        .iter()
+        .map(|&roll| {
+            if roll >= double_success_value as i32 {
+                2 // Double success
+            } else if roll >= target as i32 {
+                1 // Single success
+            } else {
+                0 // No success
+            }
+        })
+        .sum::<i32>();
+
+    // Add to existing success count (preserves existing multi-target behavior)
+    result.successes = Some(result.successes.unwrap_or(0) + success_count);
+
+    // Add explanatory note
+    if double_success_value == target {
+        result
+            .notes
+            .push(format!("{double_success_value}+ = 2 successes"));
+    } else {
+        result.notes.push(format!(
+            "{target}+ = 1 success, {double_success_value}+ = 2 successes"
+        ));
+    }
+
+    Ok(())
+}
+
+fn count_dice_with_target_lower_double_success(
+    result: &mut RollResult,
+    target: u32,
+    double_success_value: u32,
+) -> Result<()> {
+    let success_count = result
+        .kept_rolls
+        .iter()
+        .map(|&roll| {
+            if roll <= double_success_value as i32 {
+                2 // Double success (roll is ≤ double_success_value)
+            } else if roll <= target as i32 {
+                1 // Single success (roll is ≤ target but > double_success_value)
+            } else {
+                0 // No success (roll is > target)
+            }
+        })
+        .sum::<i32>();
+
+    // Add to existing success count
+    result.successes = Some(result.successes.unwrap_or(0) + success_count);
+
+    // Add explanatory note
+    if double_success_value == target {
+        result
+            .notes
+            .push(format!("≤{} = 2 successes", double_success_value));
+    } else {
+        result.notes.push(format!(
+            "≤{} = 2 successes, ≤{} = 1 success",
+            double_success_value, target
         ));
     }
 
