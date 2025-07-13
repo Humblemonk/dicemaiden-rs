@@ -3192,12 +3192,10 @@ fn count_dice_with_target_lower_double_success(
     if double_success_value == target {
         result
             .notes
-            .push(format!("≤{} = 2 successes", double_success_value));
+            .push(format!("≤{double_success_value} = 2 successes"));
     } else {
         result.notes.push(format!(
-            "≤{} = 2 successes, ≤{} = 1 success",
-            double_success_value, target
-        ));
+            "≤{double_success_value} = 2 successes, ≤{target} = 1 success"));
     }
 
     Ok(())
