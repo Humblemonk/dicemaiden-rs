@@ -286,7 +286,7 @@ fn is_valid_roll_set_expression(expr: &str) -> bool {
         return true;
     }
 
-    // CRITICAL NEW: Check for dice expressions with modifiers
+    // Check for dice expressions with modifiers
     // This fixes "3 (Stat Roll) 4d6 k3" and "6 (Stat) 4d6 k3 ! Character generation"
     // After label/comment parsing, these become "4d6 k3"
     let dice_with_modifiers_patterns = [
@@ -1675,6 +1675,99 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             return Err(anyhow!("Cannot keep 0 dice"));
         }
         return Ok(Modifier::KeepHigh(num));
+    }
+
+    // Target with doubles t{num}ds{num} must be checked BEFORE other targets
+    if let Some(captures) = Regex::new(r"^t(\d+)ds(\d+)$").unwrap().captures(part) {
+        let target = captures[1]
+            .parse()
+            .map_err(|_| anyhow!("Invalid target value in TargetWithDoubleSuccess '{}'", part))?;
+        let double_value = captures[2]
+            .parse()
+            .map_err(|_| anyhow!("Invalid double value in TargetWithDoubleSuccess '{}'", part))?;
+
+        // Validation for new syntax only
+        if target == 0 {
+            return Err(anyhow!("Target value must be greater than 0"));
+        }
+        if double_value == 0 {
+            return Err(anyhow!("Double success must be greater than 0"));
+        }
+        if double_value < target {
+            return Err(anyhow!(
+                "Double success ({}) must be >= target value ({})",
+                double_value,
+                target
+            ));
+        }
+
+        return Ok(Modifier::TargetWithDoubleSuccess(target, double_value));
+    }
+
+    // Check for t{target}ds pattern (default double success = target)
+    if let Some(captures) = Regex::new(r"^t(\d+)ds$").unwrap().captures(part) {
+        let target = captures[1]
+            .parse()
+            .map_err(|_| anyhow!("Invalid target value in TargetWithDoubleSuccess '{}'", part))?;
+
+        // Validation
+        if target == 0 {
+            return Err(anyhow!("Target value must be greater than 0"));
+        }
+
+        // Default: double success value = target value
+        return Ok(Modifier::TargetWithDoubleSuccess(target, target));
+    }
+
+    // Parse target lower with double success (explicit)
+    if let Some(captures) = Regex::new(r"^tl(\d+)ds(\d+)$").unwrap().captures(part) {
+        let target = captures[1].parse().map_err(|_| {
+            anyhow!(
+                "Invalid target value in TargetLowerWithDoubleSuccess '{}'",
+                part
+            )
+        })?;
+        let double_value = captures[2].parse().map_err(|_| {
+            anyhow!(
+                "Invalid double success value in TargetLowerWithDoubleSuccess '{}'",
+                part
+            )
+        })?;
+
+        // Validation
+        if target == 0 {
+            return Err(anyhow!("Target lower value must be greater than 0"));
+        }
+        if double_value == 0 {
+            return Err(anyhow!("Double success value must be greater than 0"));
+        }
+        if double_value > target {
+            return Err(anyhow!(
+                "Double success value ({}) must be <= target lower value ({})",
+                double_value,
+                target
+            ));
+        }
+
+        return Ok(Modifier::TargetLowerWithDoubleSuccess(target, double_value));
+    }
+
+    // Parse target lower with double success (default)
+    if let Some(captures) = Regex::new(r"^tl(\d+)ds$").unwrap().captures(part) {
+        let target = captures[1].parse().map_err(|_| {
+            anyhow!(
+                "Invalid target value in TargetLowerWithDoubleSuccess '{}'",
+                part
+            )
+        })?;
+
+        // Validation
+        if target == 0 {
+            return Err(anyhow!("Target lower value must be greater than 0"));
+        }
+
+        // Default: double success value = target value
+        return Ok(Modifier::TargetLowerWithDoubleSuccess(target, target));
     }
 
     // Target Lower (tl) must be checked BEFORE Target (t) to avoid conflicts

@@ -25,7 +25,9 @@ pub fn generate_basic_help() -> String {
 • `r2` - Reroll dice ≤ 2 once
 • `ir2` - Reroll dice ≤ 2 indefinitely
 • `t7` - Count successes (≥ 7)
+• `t4ds6` - Count successes (≥ 4) and double success on 6 (defaults to target)
 • `tl6` - Count successes (≤ 6)
+• `tl6ds4` - Count successes (≤ 6) and double success on 4 (defaults to target)
 • `f1` - Count failures (≤ 1)
 • `b1` - Count botches (≤ 1)
 
