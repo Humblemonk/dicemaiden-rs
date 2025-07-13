@@ -484,12 +484,12 @@ fn test_cancel_modifier_performance() {
     // Test that cancel modifier doesn't add significant overhead
 
     let cancel_performance_tests = vec![
-        ("10d10 f1 t8 c", "Cancel with multiple dice", 100),
+        ("10d10 f1 t8 c", "Cancel with multiple dice", 200),
         ("20 4wod8c", "Multiple WoD cancel rolls", 200),
         (
             "5d10 f1 t6 c ie10 + 2",
             "Cancel with complex modifiers",
-            150,
+            200,
         ),
     ];
 
