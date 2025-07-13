@@ -74,7 +74,8 @@ pub enum Modifier {
 pub struct DiceGroup {
     pub _description: String, // Currently unused but kept for future debugging
     pub rolls: Vec<i32>,
-    pub modifier_type: String, // "base", "add", "subtract"
+    pub dropped_rolls: Vec<i32>, // Dropped dice for strikethrough display
+    pub modifier_type: String,   // "base", "add", "subtract"
 }
 
 #[derive(Debug, Clone)]
@@ -112,6 +113,32 @@ impl RollResult {
             return format!("`[{}]`", symbols.join(", "));
         }
 
+        // When there are dropped dice, always prioritize showing all original dice
+        // This addresses the user's complaint that dice groups only show kept dice
+        if !self.dropped_rolls.is_empty() {
+            if !self.dice_groups.is_empty() {
+                // For complex expressions with dice groups AND dropped dice:
+                // Use dice groups, which should contain all original dice from each group
+                // (If dice groups were modified by keep operations, this will still work
+                // because format_dropped_dice() will show what was dropped separately)
+                return self.format_dice_groups();
+            } else {
+                // Simple case: no dice groups, but there are dropped dice
+                // Show all original dice (kept + dropped) as a single group
+                let mut all_original_dice = self.individual_rolls.clone();
+                all_original_dice.extend(self.dropped_rolls.clone());
+                return format!(
+                    "`[{}]`",
+                    all_original_dice
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            }
+        }
+
+        // Standard behavior for cases without dropped dice
         if !self.dice_groups.is_empty() {
             self.format_dice_groups()
         } else if !self.kept_rolls.is_empty() {
@@ -155,6 +182,15 @@ impl RollResult {
                 .collect();
 
             output.push_str(&format!("`[{}]`", formatted_rolls.join(", ")));
+
+            if !group.dropped_rolls.is_empty() {
+                let dropped_formatted: Vec<String> = group
+                    .dropped_rolls
+                    .iter()
+                    .map(|&roll| roll.to_string())
+                    .collect();
+                output.push_str(&format!(" ~~[{}]~~", dropped_formatted.join(", ")));
+            }
         }
         output
     }

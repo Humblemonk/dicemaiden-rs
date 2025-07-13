@@ -64,7 +64,7 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         let count_str = &captures[1];
         let expression = &captures[2];
 
-        // CRITICAL FIX: Only proceed with roll set logic if expression is valid
+        // Only proceed with roll set logic if expression is valid
         if is_valid_roll_set_expression(expression) {
             if let Ok(count) = count_str.parse::<u32>() {
                 // Add validation check for count range
@@ -125,7 +125,7 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         let count_str = &captures[1];
         let expression = &captures[2];
 
-        // CRITICAL FIX: Only proceed with roll set logic if expression is valid
+        // Only proceed with roll set logic if expression is valid
         if is_valid_roll_set_expression(expression) {
             if let Ok(count) = count_str.parse::<u32>() {
                 // Add validation check for count range
@@ -226,7 +226,16 @@ fn is_valid_roll_set_expression(expr: &str) -> bool {
         return true;
     }
 
-    // NEW: Check if the expression starts with a game system alias
+    // Check for D6 Legends patterns specifically
+    if let Some(before_d6l) = expr.strip_suffix("d6l") {
+        // Pattern like "5d6l" or "12d6l"
+        // Remove "d6l"
+        if let Ok(count) = before_d6l.parse::<u32>() {
+            return count > 0; // Valid if positive number
+        }
+    }
+
+    // Check if the expression starts with a game system alias
     // This handles cases like "sw8 + 5" where the full expression isn't an alias
     // but it starts with one
     let game_system_prefixes = ["sw", "cod", "wod", "sr", "gb", "cpr", "wit", "df", "hs"];
@@ -488,6 +497,17 @@ fn parse_expression_to_parts(input: &str) -> Result<Vec<String>> {
 
     // Normalize whitespace first
     let normalized = normalize_whitespace(input);
+
+    // Handle basic dice + modifiers case (like "1d6 t4f1ie6") before complex parsing
+    if !normalized.contains(['+', '-', '*', '/']) && normalized.contains(' ') {
+        let parts: Vec<String> = normalized
+            .split_whitespace()
+            .map(|s| s.to_string())
+            .collect();
+        if parts.len() == 2 && parts[0].contains('d') {
+            return Ok(parts);
+        }
+    }
 
     // REMOVE the aggressive advantage detection here - it's interfering with roll sets
     // Only handle advantage patterns when they're part of complex expressions (multiple operators)
@@ -896,56 +916,86 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
     let mut modifiers = Vec::new();
     let mut remaining = modifiers_part;
 
-    while !remaining.is_empty() {
-        let original_remaining = remaining;
+    // Use progress tracking instead of arbitrary iteration limit
+    let mut last_length = remaining.len();
+    let mut no_progress_count = 0;
+    const MAX_NO_PROGRESS: usize = 3;
 
-        // Try to extract known modifier patterns
+    while !remaining.is_empty() {
+        // COMPLETE patterns array in correct order
         let patterns = [
-            r"^(ie\d*)",            // Indefinite explode first (longer pattern)
-            r"^(irg\d+)",           // Indefinite reroll greater (before ir)
-            r"^(ir\d+)",            // Indefinite reroll
-            r"^(km\d+)",            // NEW: Keep middle (before kl and k)
-            r"^(kl\d+)",            // Keep lowest
-            r"^(e\d*)",             // Explode (after ie)
-            r"^(k\d+)",             // Keep highest (after km and kl)
-            r"^(rg\d+)",            // Reroll greater (before r)
-            r"^(r\d+)",             // Reroll (after ir)
-            r"^(d\d+)",             // Drop
-            r"^(t\d+)",             // Target
-            r"^(f\d+)",             // Failure
-            r"^(b\d*)",             // Botch
-            r"^(wng\d*t?)",         // Wrath & Glory
-            r"^(gb|gbs)",           // Godbound
-            r"^(hs[nkh])",          // Hero System
-            r"^(dh)",               // Dark Heresy
-            r"^(fudge|df)",         // Fudge
-            r"^(d6s\d+(?:\+\d+)?)", // D6 System
+            (r"^(ie\d*)", "indefinite explode"), // ie, ie6 (BEFORE regular explode)
+            (r"^(irg\d+)", "indefinite reroll greater"), // irg5 (BEFORE rg)
+            (r"^(ir\d+)", "indefinite reroll"),  // ir1 (BEFORE regular reroll)
+            (r"^(km\d+)", "keep middle"),        // km3 (BEFORE regular keep)
+            (r"^(kl\d+)", "keep low"),           // kl2 (BEFORE regular keep)
+            (r"^(tl\d+)", "target lower"),       // tl5 (BEFORE regular target)
+            (r"^(rg\d+)", "reroll greater"),     // rg5
+            (r"^(k\d+)", "keep high"),           // k3
+            (r"^(d\d+)", "drop"),                // d1
+            (r"^(r\d+)", "reroll"),              // r1
+            (r"^(t\d+)", "target"),              // t4, t7 - CRITICAL
+            (r"^(f\d+)", "failure"),             // f1 - CRITICAL
+            (r"^(e\d*)", "explode"),             // e, e6 (AFTER indefinite explode)
+            (r"^(b\d*)", "botch"),               // b, b1
+            (r"^(c)", "cancel"),                 // c
+            (r"^(wng\d*t?)", "wrath & glory"),   // wng patterns
+            (r"^(gb|gbs)", "godbound"),          // gb, gbs
+            (r"^(hs[nkh])", "hero system"),      // hsn, hsk, hsh
+            (r"^(dh)", "dark heresy"),           // dh
+            (r"^(fudge|df)", "fudge"),           // fudge, df
+            (r"^(d6s\d+(?:\+\d+)?(?:\-\d+)?)", "d6 system"), // d6s patterns
+            (r"^(cpr)", "cyberpunk red"),        // cpr
+            (r"^(wit)", "witcher"),              // wit
+            (r"^(bnw)", "brave new world"),      // bnw
         ];
 
-        let mut found = false;
-        for pattern in &patterns {
-            let regex = Regex::new(pattern).unwrap();
-            if let Some(captures) = regex.captures(remaining) {
-                let modifier = captures[1].to_string();
-                modifiers.push(modifier.clone());
-                remaining = &remaining[modifier.len()..];
-                found = true;
-                break;
+        let mut found_match = false;
+
+        for (pattern, _) in &patterns {
+            if let Ok(regex) = Regex::new(pattern) {
+                if let Some(captures) = regex.captures(remaining) {
+                    if let Some(matched) = captures.get(1) {
+                        let modifier = matched.as_str().to_string();
+                        modifiers.push(modifier.clone());
+
+                        // Move past this modifier
+                        remaining = &remaining[matched.end()..];
+                        found_match = true;
+
+                        break;
+                    }
+                }
             }
         }
 
-        if !found {
-            // If we can't parse any more modifiers, treat the rest as one piece
-            if !remaining.is_empty() {
-                modifiers.push(remaining.to_string());
-            }
-            break;
+        if !found_match {
+            return Err(anyhow!(
+                "Unable to parse combined modifier: '{}' at position: '{}'. Expected valid modifier pattern.",
+                input,
+                remaining
+            ));
         }
 
-        // Safety check to prevent infinite loops
-        if remaining == original_remaining {
-            break;
+        // Progress tracking
+        let current_length = remaining.len();
+        if current_length == last_length {
+            no_progress_count += 1;
+            if no_progress_count > MAX_NO_PROGRESS {
+                return Err(anyhow!(
+                    "Infinite loop detected while parsing modifiers '{}' at position: '{}'",
+                    input,
+                    remaining
+                ));
+            }
+        } else {
+            no_progress_count = 0;
+            last_length = current_length;
         }
+    }
+
+    if modifiers.is_empty() {
+        return Err(anyhow!("No valid modifiers found in: {}", input));
     }
 
     Ok(modifiers)
@@ -1112,16 +1162,50 @@ fn parse_simple_dice_part(dice: &mut DiceRoll, part: &str) -> Result<()> {
 fn parse_all_modifiers(dice: &mut DiceRoll, parts: &[String]) -> Result<()> {
     let mut i = 0;
     while i < parts.len() {
+        let part = &parts[i];
+
         // Try parsing operator + operand pairs
         if i + 1 < parts.len() {
             if let Some(consumed) = try_parse_operator_pair(dice, &parts[i], &parts[i + 1])? {
                 i += consumed;
+
+                // Check if we just created an AddDice and if following tokens are modifiers
+                if consumed == 2 && parts[i - 2] == "+" && parts[i - 1].contains('d') {
+                    // Check if following tokens are modifiers for the dice we just added
+                    let mut modifier_tokens = Vec::new();
+                    let mut j = i;
+                    while j < parts.len() && is_modifier_start(&parts[j]) {
+                        modifier_tokens.push(parts[j].clone());
+                        j += 1;
+                    }
+
+                    if !modifier_tokens.is_empty() {
+                        // Handle combined modifiers properly
+                        if let Some(Modifier::AddDice(dice_roll)) = dice.modifiers.last_mut() {
+                            for token in &modifier_tokens {
+                                // Check if this token is combined modifiers
+                                if is_combined_modifiers_token(token) {
+                                    // Split combined modifiers and add each one
+                                    let combined_parts = split_combined_modifiers(token)?;
+                                    for combined_part in combined_parts {
+                                        let modifier = parse_single_modifier(&combined_part)?;
+                                        dice_roll.modifiers.push(modifier);
+                                    }
+                                } else {
+                                    // Single modifier
+                                    let modifier = parse_single_modifier(token)?;
+                                    dice_roll.modifiers.push(modifier);
+                                }
+                            }
+                        }
+                        i += modifier_tokens.len(); // Skip the modifier tokens we just processed
+                    }
+                }
                 continue;
             }
         }
 
         // Check if this part is combined modifiers before parsing as single
-        let part = &parts[i];
         if is_combined_modifiers_token(part) {
             let modifier_parts = split_combined_modifiers(part)?;
 
@@ -1145,8 +1229,7 @@ fn is_combined_modifiers_token(input: &str) -> bool {
         return false;
     }
 
-    // Instead of blanket rejecting anything with 'd', check if it's actually
-    // a standalone dice expression first
+    // Handle D6 system expressions specially - don't treat as combined modifiers
     if input.contains('d') {
         // Don't treat standalone dice expressions as combined modifiers
         if is_standalone_dice_expression(input) {
@@ -1157,40 +1240,48 @@ fn is_combined_modifiers_token(input: &str) -> bool {
         if input.starts_with("d6s") {
             return false;
         }
-
-        // Otherwise continue checking - might be combined modifiers like "k2d1"
     }
 
     // Check if it starts with common modifier patterns and has more after the first one
     let modifier_patterns = [
-        r"^(e\d*)",
-        r"^(ie\d*)",
-        r"^(km\d+)",
-        r"^(kl\d+)",
-        r"^(k\d+)",
-        r"^(d\d+)",
-        r"^(rg\d+)",
-        r"^(irg\d+)",
-        r"^(r\d+)",
-        r"^(ir\d+)",
-        r"^(t\d+)",
-        r"^(f\d+)",
-        r"^(b\d*)",
+        r"^(ie\d*)",  // Indefinite explode first (longer pattern)
+        r"^(irg\d+)", // Indefinite reroll greater
+        r"^(ir\d+)",  // Indefinite reroll
+        r"^(km\d+)",  // Keep middle
+        r"^(kl\d+)",  // Keep low
+        r"^(tl\d+)",  // Target lower (must come before regular target)
+        r"^(rg\d+)",  // Reroll greater
+        r"^(e\d*)",   // Explode
+        r"^(k\d+)",   // Keep high
+        r"^(d\d+)",   // Drop
+        r"^(r\d+)",   // Reroll
+        r"^(t\d+)",   // Target - KEY FOR D6 LEGENDS
+        r"^(f\d+)",   // Failure - KEY FOR D6 LEGENDS
+        r"^(b\d*)",   // Botch
     ];
 
     for pattern in &modifier_patterns {
-        let regex = Regex::new(pattern).unwrap();
-        if let Some(captures) = regex.captures(input) {
-            let first_modifier = &captures[1];
+        if let Ok(regex) = Regex::new(pattern) {
+            if let Some(captures) = regex.captures(input) {
+                let first_modifier = &captures[1];
+                let match_length = first_modifier.len();
 
-            // If the match is the entire string, it's a single modifier, not combined
-            if first_modifier.len() == input.len() {
-                return false;
+                // Safety check for zero-length matches
+                if match_length == 0 {
+                    continue;
+                }
+
+                // If the match is the entire string, it's a single modifier, not combined
+                if match_length == input.len() {
+                    return false;
+                }
+
+                // If there's more after the first modifier, check if it looks like more modifiers
+                let remaining = &input[match_length..];
+                let result = is_modifier_start(remaining);
+
+                return result;
             }
-
-            // If there's more after the first modifier, check if it looks like more modifiers
-            let remaining = &input[first_modifier.len()..];
-            return is_modifier_start(remaining);
         }
     }
 
@@ -1203,34 +1294,47 @@ fn is_modifier_start(input: &str) -> bool {
         return false;
     }
 
-    let modifier_starts = [
-        r"^e\d*",
-        r"^ie\d*",
-        r"^km\d+",
-        r"^kl\d+",
-        r"^k\d+",
-        r"^d\d+",
-        r"^rg\d+",
-        r"^irg\d+",
-        r"^r\d+",
-        r"^ir\d+",
-        r"^t\d+",
-        r"^f\d+",
-        r"^b\d*",
-        r"^wng",
-        r"^gb",
-        r"^gbs",
-        r"^hs[nkh]",
-        r"^dh",
-        r"^fudge",
-        r"^df",
-        r"^d6s",
+    // Special case: Don't treat single letters as modifiers if they could be part of game system aliases
+    if input.len() == 1 {
+        return matches!(input, "c"); // Cancel is the only single-letter modifier
+    }
+
+    // Check if it starts with any known modifier pattern (not requiring it to be complete)
+    let modifier_start_patterns = [
+        r"^ie\d*",  // Indefinite explode: ie, ie6
+        r"^irg\d+", // Indefinite reroll greater: irg5
+        r"^ir\d+",  // Indefinite reroll: ir1
+        r"^km\d+",  // Keep middle: km3
+        r"^kl\d+",  // Keep low: kl2
+        r"^tl\d+",  // Target lower: tl5
+        r"^rg\d+",  // Reroll greater: rg5
+        r"^k\d+",   // Keep high: k3
+        r"^d\d+",   // Drop: d1
+        r"^r\d+",   // Reroll: r1
+        r"^t\d+",   // Target: t4, t7 - CRITICAL FOR D6 LEGENDS
+        r"^f\d+",   // Failure: f1 - CRITICAL FOR D6 LEGENDS
+        r"^e\d*",   // Explode: e, e6
+        r"^b\d*",   // Botch: b, b1
+        r"^c$",     // Cancel: c (exact match)
+        // System modifiers
+        r"^wng",     // Wrath & Glory patterns
+        r"^gb$",     // Godbound (exact)
+        r"^gbs$",    // Godbound straight (exact)
+        r"^hs[nkh]", // Hero System
+        r"^dh$",     // Dark Heresy (exact)
+        r"^fudge$",  // Fudge (exact)
+        r"^df$",     // Fudge dice (exact)
+        r"^d6s\d+",  // D6 System
+        r"^cpr$",    // Cyberpunk Red (exact)
+        r"^wit$",    // Witcher (exact)
     ];
 
-    for pattern in &modifier_starts {
-        let regex = Regex::new(pattern).unwrap();
-        if regex.is_match(input) {
-            return true;
+    // Check if the input starts with any of these patterns
+    for pattern in &modifier_start_patterns {
+        if let Ok(regex) = Regex::new(pattern) {
+            if regex.is_match(input) {
+                return true;
+            }
         }
     }
 
@@ -1337,6 +1441,11 @@ fn parse_complex_dice_expression(input: &str) -> Result<DiceRoll> {
 }
 
 fn parse_single_modifier(part: &str) -> Result<Modifier> {
+    // Reject standalone 'l' - it should only appear in d6l aliases
+    if part == "l" {
+        return Err(anyhow!("Unrecognized modifier pattern: 'l' in 'l'"));
+    }
+
     // System modifiers
     match part {
         "dh" => return Ok(Modifier::DarkHeresy),

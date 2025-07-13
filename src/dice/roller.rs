@@ -117,6 +117,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     let base_group = DiceGroup {
         _description: format!("{}d{}", dice.count, dice.sides),
         rolls: result.individual_rolls.clone(),
+        dropped_rolls: Vec::new(),
         modifier_type: "base".to_string(),
     };
     result.dice_groups.push(base_group);
@@ -281,12 +282,7 @@ fn apply_remaining_mathematical_modifiers(
                     .extend(additional_result.kept_rolls.clone());
 
                 // Add a new dice group for display
-                add_dice_group(
-                    result,
-                    dice_to_add,
-                    additional_result.individual_rolls,
-                    "add",
-                );
+                add_dice_group(result, dice_to_add, &additional_result, "add");
             }
             Modifier::SubtractDice(dice_to_subtract) => {
                 let additional_result = roll_dice(dice_to_subtract.clone())?;
@@ -302,12 +298,7 @@ fn apply_remaining_mathematical_modifiers(
                     .extend(additional_result.kept_rolls.clone());
 
                 // Add a new dice group for display
-                add_dice_group(
-                    result,
-                    dice_to_subtract,
-                    additional_result.individual_rolls,
-                    "subtract",
-                );
+                add_dice_group(result, dice_to_subtract, &additional_result, "subtract");
             }
             Modifier::MultiplyDice(dice_to_multiply) => {
                 // NEW: Handle dice multiplication in remaining modifiers
@@ -322,12 +313,7 @@ fn apply_remaining_mathematical_modifiers(
                     .kept_rolls
                     .extend(additional_result.kept_rolls.clone());
 
-                add_dice_group(
-                    result,
-                    dice_to_multiply,
-                    additional_result.individual_rolls,
-                    "multiply",
-                );
+                add_dice_group(result, dice_to_multiply, &additional_result, "multiply");
             }
             Modifier::DivideDice(dice_to_divide) => {
                 // NEW: Handle dice division in remaining modifiers
@@ -347,12 +333,7 @@ fn apply_remaining_mathematical_modifiers(
                     .kept_rolls
                     .extend(additional_result.kept_rolls.clone());
 
-                add_dice_group(
-                    result,
-                    dice_to_divide,
-                    additional_result.individual_rolls,
-                    "divide",
-                );
+                add_dice_group(result, dice_to_divide, &additional_result, "divide");
             }
             Modifier::Add(value) => {
                 expression_parts.push("+".to_string());
@@ -402,6 +383,10 @@ fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) ->
                 expression_parts.push("+".to_string());
                 expression_parts.push(format!("{}", additional_result.total));
 
+                // IMPORTANT: Merge notes from AddDice into main result
+                // This ensures Hero System notes are preserved
+                result.notes.extend(additional_result.notes.clone());
+
                 // Add dice to individual_rolls for display
                 result
                     .individual_rolls
@@ -416,7 +401,7 @@ fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) ->
                 add_dice_group(
                     result,
                     dice_to_add,
-                    additional_result.individual_rolls,
+                    &additional_result, // Pass full result instead of just rolls
                     "add",
                 );
             }
@@ -438,12 +423,7 @@ fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) ->
                     .extend(additional_result.kept_rolls.clone());
 
                 // Add a new dice group for display using the SAME rolled dice
-                add_dice_group(
-                    result,
-                    dice_to_subtract,
-                    additional_result.individual_rolls,
-                    "subtract",
-                );
+                add_dice_group(result, dice_to_subtract, &additional_result, "subtract");
             }
             Modifier::MultiplyDice(dice_to_multiply) => {
                 // NEW: Handle dice multiplication
@@ -462,12 +442,7 @@ fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) ->
                     .extend(additional_result.kept_rolls.clone());
 
                 // Add a new dice group for display
-                add_dice_group(
-                    result,
-                    dice_to_multiply,
-                    additional_result.individual_rolls,
-                    "multiply",
-                );
+                add_dice_group(result, dice_to_multiply, &additional_result, "multiply");
             }
             Modifier::DivideDice(dice_to_divide) => {
                 // NEW: Handle dice division
@@ -492,12 +467,7 @@ fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) ->
                     .extend(additional_result.kept_rolls.clone());
 
                 // Add a new dice group for display
-                add_dice_group(
-                    result,
-                    dice_to_divide,
-                    additional_result.individual_rolls,
-                    "divide",
-                );
+                add_dice_group(result, dice_to_divide, &additional_result, "divide");
             }
             Modifier::Add(value) => {
                 expression_parts.push("+".to_string());
@@ -537,12 +507,17 @@ fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) ->
 fn add_dice_group(
     result: &mut RollResult,
     dice_spec: &DiceRoll,
-    rolls: Vec<i32>,
+    additional_result: &RollResult,
     modifier_type: &str,
 ) {
+    // Combine individual_rolls (kept) + dropped_rolls to get all original dice
+    let mut all_original_rolls = additional_result.individual_rolls.clone();
+    all_original_rolls.extend(additional_result.dropped_rolls.clone());
+
     let dice_group = DiceGroup {
         _description: format!("{}d{}", dice_spec.count, dice_spec.sides),
-        rolls, // Use the actual rolled dice
+        rolls: all_original_rolls,
+        dropped_rolls: additional_result.dropped_rolls.clone(),
         modifier_type: modifier_type.to_string(),
     };
     result.dice_groups.push(dice_group);
@@ -912,6 +887,7 @@ fn sort_result_rolls(result: &mut RollResult) {
 fn update_base_group(result: &mut RollResult) {
     if let Some(base_group) = result.dice_groups.get_mut(0) {
         base_group.rolls = result.individual_rolls.clone();
+        base_group.dropped_rolls = result.dropped_rolls.clone();
     }
 }
 
@@ -1563,12 +1539,14 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
     result.dice_groups.push(DiceGroup {
         _description: format!("1d{trait_sides} ie{trait_sides}"),
         rolls: trait_rolls.clone(),
+        dropped_rolls: Vec::new(),
         modifier_type: "trait".to_string(),
     });
 
     result.dice_groups.push(DiceGroup {
         _description: "1d6 ie6".to_string(),
         rolls: wild_rolls.clone(),
+        dropped_rolls: Vec::new(),
         modifier_type: "wild".to_string(),
     });
 
@@ -1742,12 +1720,14 @@ fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResul
     result.dice_groups.push(DiceGroup {
         _description: format!("{count}d6"),
         rolls: base_rolls.clone(),
+        dropped_rolls: Vec::new(),
         modifier_type: "base".to_string(),
     });
 
     result.dice_groups.push(DiceGroup {
         _description: "1d6 ie6".to_string(),
         rolls: wild_rolls.clone(),
+        dropped_rolls: Vec::new(),
         modifier_type: "add".to_string(),
     });
 
@@ -1906,6 +1886,7 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
     let base_group = DiceGroup {
         _description: "3d6 Marvel Multiverse".to_string(),
         rolls: initial_display_rolls,
+        dropped_rolls: Vec::new(),
         modifier_type: "base".to_string(),
     };
     result.dice_groups.push(base_group);
@@ -2042,6 +2023,7 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
     let result_group = DiceGroup {
         _description: "3d6 Marvel Multiverse result".to_string(),
         rolls: final_display_rolls,
+        dropped_rolls: Vec::new(),
         modifier_type: "result".to_string(),
     };
     result.dice_groups.push(result_group);
@@ -2114,6 +2096,7 @@ fn apply_cyberpunk_red_mechanics(result: &mut RollResult, rng: &mut impl Rng) ->
         let base_group = DiceGroup {
             _description: "1d10".to_string(),
             rolls: vec![original_roll],
+            dropped_rolls: Vec::new(),
             modifier_type: "base".to_string(),
         };
 
@@ -2125,6 +2108,7 @@ fn apply_cyberpunk_red_mechanics(result: &mut RollResult, rng: &mut impl Rng) ->
             }
             .to_string(),
             rolls: additional_rolls.clone(),
+            dropped_rolls: Vec::new(),
             modifier_type: if original_roll == 10 {
                 "add"
             } else {
@@ -2266,6 +2250,7 @@ fn apply_witcher_mechanics(result: &mut RollResult, rng: &mut impl Rng) -> Resul
         let base_group = DiceGroup {
             _description: "1d10".to_string(),
             rolls: vec![original_roll],
+            dropped_rolls: Vec::new(),
             modifier_type: "base".to_string(),
         };
 
@@ -2277,6 +2262,7 @@ fn apply_witcher_mechanics(result: &mut RollResult, rng: &mut impl Rng) -> Resul
             }
             .to_string(),
             rolls: additional_rolls.clone(),
+            dropped_rolls: Vec::new(),
             modifier_type: if original_roll == 10 {
                 "add"
             } else {
@@ -2427,6 +2413,7 @@ pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result
     result.dice_groups.push(DiceGroup {
         _description: format!("{pool_size}d6 bnw"),
         rolls: all_results,
+        dropped_rolls: Vec::new(),
         modifier_type: "base".to_string(),
     });
 
@@ -2534,6 +2521,7 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
     result.dice_groups.push(DiceGroup {
         _description: format!("{dice_count}d20"),
         rolls: result.individual_rolls.clone(),
+        dropped_rolls: Vec::new(),
         modifier_type: "base".to_string(),
     });
 
@@ -2574,6 +2562,7 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
                 result.dice_groups.push(DiceGroup {
                     _description: format!("{}d6", additional_dice.count),
                     rolls: additional_result.individual_rolls.clone(),
+                    dropped_rolls: Vec::new(),
                     modifier_type: "add".to_string(),
                 });
             } else {
@@ -2589,6 +2578,7 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
                 result.dice_groups.push(DiceGroup {
                     _description: format!("{}d{}", additional_dice.count, additional_dice.sides),
                     rolls: additional_result.individual_rolls.clone(),
+                    dropped_rolls: Vec::new(),
                     modifier_type: "add".to_string(),
                 });
             }
@@ -2731,6 +2721,7 @@ fn handle_conan_combat_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRe
     result.dice_groups.push(DiceGroup {
         _description: format!("{dice_count}d6"),
         rolls: result.individual_rolls.clone(),
+        dropped_rolls: Vec::new(),
         modifier_type: "base".to_string(),
     });
 
@@ -2826,6 +2817,7 @@ fn handle_silhouette_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
     result.dice_groups.push(DiceGroup {
         _description: format!("{dice_count}d6 Silhouette"),
         rolls: result.individual_rolls.clone(),
+        dropped_rolls: Vec::new(),
         modifier_type: "base".to_string(),
     });
 
