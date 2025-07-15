@@ -27,6 +27,21 @@ pub enum HeroSystemType {
     Hit,     // hsh - to hit roll (3d6 roll-under)
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum LaserFeelingsType {
+    Lasers,   // Roll <= target for success
+    Feelings, // Roll >= target for success
+}
+
+impl fmt::Display for LaserFeelingsType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LaserFeelingsType::Lasers => write!(f, "Lasers"),
+            LaserFeelingsType::Feelings => write!(f, "Feelings"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Modifier {
     Add(i32),
@@ -71,6 +86,7 @@ pub enum Modifier {
     ConanCombat(u32), // cd, cd4, cd5 - combat dice interpretation
     Silhouette(u32),
     VampireMasquerade5(u32, u32),
+    LaserFeelings(u32, u32, LaserFeelingsType), // (dice_count, target, roll_type)
 }
 
 #[derive(Debug, Clone)]

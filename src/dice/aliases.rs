@@ -125,6 +125,9 @@ static D6L_REGEX: Lazy<Regex> =
 static VTM5_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^vtm(\d+)h(\d+)$").expect("Failed to compile VTM5_REGEX"));
 
+static LF_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(\d+)lf(\d+)([lf]?)$").expect("Failed to compile LF_REGEX"));
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -589,6 +592,36 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             if pool > 0 && pool <= 30 && hunger <= pool {
                 return Some(format!("{pool_size}d10 vtm5p{pool_size}h{hunger_dice}"));
             }
+        }
+    }
+
+    // Lasers & Feelings (2lf4, 2lf4l, 2lf4f)
+    if let Some(captures) = LF_REGEX.captures(input) {
+        let dice_count_str = &captures[1];
+        let target_str = &captures[2];
+        let roll_type = captures.get(3).map_or("", |m| m.as_str());
+
+        if let (Ok(dice_count), Ok(target)) =
+            (dice_count_str.parse::<u32>(), target_str.parse::<u32>())
+        {
+            // Validate dice count (reasonable range)
+            if dice_count == 0 || dice_count > 20 {
+                return None;
+            }
+
+            // Validate target (2-5 as per L&F rules)
+            if !(2..=5).contains(&target) {
+                return None;
+            }
+
+            // Determine roll type
+            let lf_type = match roll_type {
+                "l" => "l", // Explicit Lasers
+                "f" => "f", // Explicit Feelings
+                _ => "",    // Generic (let user decide)
+            };
+
+            return Some(format!("{}d6 lf{}{}", dice_count, target, lf_type));
         }
     }
 

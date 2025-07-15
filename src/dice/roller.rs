@@ -1,4 +1,4 @@
-use super::{DiceGroup, DiceRoll, HeroSystemType, Modifier, RollResult};
+use super::{DiceGroup, DiceRoll, HeroSystemType, LaserFeelingsType, Modifier, RollResult};
 use anyhow::{Result, anyhow};
 use rand::Rng;
 
@@ -873,6 +873,12 @@ fn apply_special_system_modifiers(
             Modifier::VampireMasquerade5(pool_size, hunger_dice) => {
                 *result = handle_vtm5_roll(dice.clone(), rng, *pool_size, *hunger_dice)?;
                 return Ok(());
+            }
+            Modifier::LaserFeelings(_, target, roll_type) => {
+                // Extract dice count from the actual dice expression
+                let dice_count = dice.count;
+                apply_laser_feelings_mechanics(result, *target, roll_type, dice_count)?;
+                has_special_system = true;
             }
             // Skip mathematical modifiers here - they're handled by target processing or post-target processing
             Modifier::Add(_)
@@ -3363,5 +3369,77 @@ fn apply_mathematical_modifiers_to_vtm5_successes(
             _ => {} // Skip VTM5 and other non-mathematical modifiers
         }
     }
+    Ok(())
+}
+
+fn apply_laser_feelings_mechanics(
+    result: &mut RollResult,
+    target: u32,
+    roll_type: &LaserFeelingsType,
+    dice_count: u32,
+) -> Result<()> {
+    if result.individual_rolls.is_empty() {
+        return Err(anyhow!("No dice rolled for Lasers & Feelings"));
+    }
+
+    // Validate that we're using d6s
+    let all_d6 = result
+        .individual_rolls
+        .iter()
+        .all(|&roll| roll >= 1 && roll <= 6);
+    if !all_d6 {
+        return Err(anyhow!("Lasers & Feelings requires d6 dice"));
+    }
+
+    let target_i32 = target as i32;
+    let mut successes = 0;
+    let mut laser_feelings_count = 0;
+
+    // Count successes and LASER FEELINGS
+    for &roll in &result.individual_rolls {
+        match roll_type {
+            LaserFeelingsType::Lasers => {
+                // Lasers: success on <= target
+                if roll <= target_i32 {
+                    successes += 1;
+                }
+            }
+            LaserFeelingsType::Feelings => {
+                // Feelings: success on >= target
+                if roll >= target_i32 {
+                    successes += 1;
+                }
+            }
+        }
+
+        // LASER FEELINGS: rolling exactly the target number
+        if roll == target_i32 {
+            laser_feelings_count += 1;
+        }
+    }
+
+    // Set success count
+    result.successes = Some(successes);
+
+    // Clear any existing total since this is a success-counting system
+    result.total = 0;
+
+    result.notes.push(format!(
+        "Lasers & Feelings: {}d6 target {} ({})",
+        dice_count, target, roll_type
+    ));
+
+    if laser_feelings_count > 0 {
+        let feeling_text = if laser_feelings_count == 1 {
+            "LASER FEELINGS"
+        } else {
+            "LASER FEELINGS"
+        };
+        result.notes.push(format!(
+            "💡 **{}** **{}**! Ask the GM a question!",
+            laser_feelings_count, feeling_text
+        ));
+    }
+
     Ok(())
 }

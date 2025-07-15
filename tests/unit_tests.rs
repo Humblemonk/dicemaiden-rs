@@ -479,6 +479,9 @@ fn test_complex_modifier_combinations() {
         "4d6 k3d1r1",
         "6d10 e6km4d1",
         "4d6 km3d1r1",
+        "2lf4l + 2",
+        "3lf3f k2",
+        "2lf5 + 1d6",
     ];
 
     for pattern in complex_patterns {
@@ -916,6 +919,9 @@ fn test_modifier_order_regression_protection() {
         ("sr6", "Shadowrun alias"),
         ("4d10 f1 t8 c", "WOD with cancel"),
         ("5d10 f1 c t6", "Cancel with different order"),
+        ("2lf4l", "Lasers & Feelings Lasers"),
+        ("2lf4f", "Lasers & Feelings Feelings"),
+        ("3lf3", "Generic Lasers & Feelings"),
     ];
 
     for (expression, description) in regression_cases {
@@ -938,8 +944,10 @@ fn test_modifier_order_regression_protection() {
 
         // Check that totals are reasonable
         assert!(
-            results[0].total > 0,
-            "Total should be positive for '{}'",
+            results[0].total > 0
+                || results[0].successes.is_some()
+                || results[0].godbound_damage.is_some(),
+            "Result should have positive total OR success counting OR special damage for '{}'",
             expression
         );
     }
@@ -1748,6 +1756,79 @@ fn test_all_double_success_variants() {
             "Variant '{}' should have success counting: {}",
             expression,
             description
+        );
+    }
+}
+
+#[test]
+fn test_lasers_feelings_no_standalone_l_conflict() {
+    // CRITICAL: Ensure L&F doesn't trigger standalone 'l' error
+
+    let lf_patterns = vec![
+        ("2lf4l", "Lasers & Feelings with explicit Lasers"),
+        ("2lf4f", "Lasers & Feelings with explicit Feelings"),
+        ("3lf3l", "3 dice Lasers"),
+        ("1lf5f", "Single die Feelings"),
+        ("2lf4", "Generic L&F (defaults to Lasers)"),
+    ];
+
+    for (expression, description) in lf_patterns {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "REGRESSION: L&F '{}' should not trigger standalone 'l' error: {}",
+            expression,
+            description
+        );
+
+        // Ensure we don't get the specific standalone 'l' error
+        if let Err(e) = &result {
+            let error_msg = e.to_string();
+            assert!(
+                !error_msg.contains("Unrecognized modifier pattern: 'l' in 'l'"),
+                "REGRESSION: '{}' triggered standalone 'l' error: {}",
+                expression,
+                error_msg
+            );
+        }
+
+        // Verify the roll works as expected
+        if result.is_ok() {
+            let results = result.unwrap();
+            assert!(
+                results[0].successes.is_some(),
+                "L&F '{}' should have success counting",
+                expression
+            );
+        }
+    }
+}
+
+#[test]
+fn test_existing_l_patterns_still_rejected() {
+    // CRITICAL: Ensure we didn't break existing 'l' validation
+
+    let invalid_l_patterns = vec![
+        ("1d6 l", "Standalone l modifier"),
+        ("2d6 k2 l", "l after other modifiers"),
+        ("3d10 l t7", "l in middle of modifiers"),
+    ];
+
+    for (expression, description) in invalid_l_patterns {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_err(),
+            "REGRESSION: Invalid 'l' pattern '{}' should still be rejected: {}",
+            expression,
+            description
+        );
+
+        let error_msg = result.unwrap_err().to_string();
+        assert!(
+            error_msg.contains("Unrecognized modifier pattern: 'l'"),
+            "REGRESSION: '{}' should have standalone 'l' error message: {}",
+            expression,
+            error_msg
         );
     }
 }

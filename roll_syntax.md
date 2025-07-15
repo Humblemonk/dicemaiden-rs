@@ -147,6 +147,15 @@
 ### Dark Heresy 2nd Edition
 - `dh 4d10` → 4d10 ie10 (righteous fury on natural 10s)
 
+### Lasers & Feelings
+- `2lf4` → 2d6 target 4 (generic - defaults to Lasers)
+- `2lf4l` → 2d6 target 4 Lasers (success on ≤4)
+- `2lf4f` → 2d6 target 4 Feelings (success on ≥4)
+- **Target Range**: 2-5 (character's number from the game)
+- **LASER FEELINGS**: Rolling exactly the target number gives special insight
+- **Lasers** (science/tech): Count successes on rolls ≤ target
+- **Feelings** (intuition/social): Count successes on rolls ≥ target
+
 ### Other Popular Systems
 - **Shadowrun**: `sr6` → 6d6 t5 (6th edition)
 - **Exalted**: `ex5` → 5d10 t7 t10, `ex5t8` → 5d10 t8 t10
