@@ -179,6 +179,10 @@ fn test_game_systems_comprehensive() {
             "VTM5 minimum pool, all hunger",
         ),
         ("vtm8h5", true, Some("success"), "VTM5 8 dice, max hunger"),
+        // Lasers & Feelings
+        ("2lf4l", true, Some("success"), "Lasers & Feelings Lasers"),
+        ("2lf4f", true, Some("success"), "Lasers & Feelings Feelings"),
+        ("3lf3", true, Some("success"), "Lasers & Feelings generic"),
     ];
 
     for (system, should_parse, expected_feature, description) in game_systems {
@@ -331,6 +335,11 @@ fn test_alias_expansions() {
         ("vtm7h2", Some("7d10 vtm5p7h2")),
         ("vtm8h0", Some("8d10 vtm5p8h0")),
         ("vtm10h3", Some("10d10 vtm5p10h3")),
+        ("2lf4", Some("2d6 lf4")),
+        ("2lf4l", Some("2d6 lf4l")),
+        ("2lf4f", Some("2d6 lf4f")),
+        ("3lf2", Some("3d6 lf2")),
+        ("1lf5", Some("1d6 lf5")),
     ];
 
     for (alias, expected) in alias_tests {
@@ -527,13 +536,21 @@ fn test_system_validation_edge_cases() {
     assert_valid("wng w5 4d6"); // Maximum
     assert_invalid("wng w0 4d6"); // Too small
     assert_invalid("wng w6 4d6"); // Too large
+    // // Lasers & Feelings - target 2-5
+    assert_valid("2lf2"); // Minimum target
+    assert_valid("2lf5"); // Maximum target
+    assert_invalid("2lf1"); // Target too low
+    assert_invalid("2lf6"); // Target too high
+    assert_invalid("0lf4"); // Zero dice
+    assert_invalid("25lf4"); // Too many dice
 }
 
 #[test]
 fn test_system_roll_sets() {
     // Test game systems work with roll sets
     let roll_set_systems = vec![
-        "3 sw8", "3 cpr", "3 wit", "3 4cod", "3 gb", "3 mm", "3 cs 5", "3 vtm5h2",
+        "3 sw8", "3 cpr", "3 wit", "3 4cod", "3 gb", "3 mm", "3 cs 5", "3 vtm5h2", "3 2lf4l",
+        "3 2lf4f", "3 1lf5",
     ];
     for system in roll_set_systems {
         let result = parse_and_roll(system);
@@ -3087,4 +3104,207 @@ fn test_vtm5_mechanics_simulation() {
 
     // Total successes should equal success count
     assert_eq!(roll.total, roll.successes.unwrap());
+}
+
+#[test]
+fn test_lasers_feelings_alias_expansion() {
+    // Test alias expansion for Lasers & Feelings
+    let lf_alias_tests = vec![
+        // (alias, expected_expansion)
+        ("2lf4", "2d6 lf4"),   // Generic (defaults to Lasers)
+        ("2lf4l", "2d6 lf4l"), // Explicit Lasers
+        ("2lf4f", "2d6 lf4f"), // Explicit Feelings
+        ("3lf2", "3d6 lf2"),   // Different dice count and target
+        ("1lf5", "1d6 lf5"),   // Single die, max target
+    ];
+
+    for (alias, expected_expansion) in lf_alias_tests {
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(
+            expanded,
+            Some(expected_expansion.to_string()),
+            "Lasers & Feelings alias '{}' should expand to '{}'",
+            alias,
+            expected_expansion
+        );
+    }
+}
+
+#[test]
+fn test_lasers_feelings_mechanics() {
+    // Test Lasers & Feelings basic mechanics
+    let lf_tests = vec![
+        ("2lf4l", "Explicit Lasers"),
+        ("2lf4f", "Explicit Feelings"),
+        ("3lf3l", "3 dice Lasers"),
+        ("3lf3f", "3 dice Feelings"),
+        ("1lf2l", "Single die Lasers"),
+        ("1lf5f", "Single die Feelings"),
+    ];
+
+    for (expression, description) in lf_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Lasers & Feelings '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert_eq!(results.len(), 1);
+
+        let roll = &results[0];
+
+        // Should have success counting
+        assert!(
+            roll.successes.is_some(),
+            "Lasers & Feelings should have success counting for '{}'",
+            expression
+        );
+
+        // Should have descriptive notes
+        let has_lf_note = roll
+            .notes
+            .iter()
+            .any(|note| note.contains("Lasers & Feelings"));
+        assert!(
+            has_lf_note,
+            "Should have Lasers & Feelings note for '{}'",
+            expression
+        );
+
+        // Should use d6s only
+        let all_d6 = roll.individual_rolls.iter().all(|&r| r >= 1 && r <= 6);
+        assert!(
+            all_d6,
+            "Lasers & Feelings should only use d6s for '{}'",
+            expression
+        );
+
+        // Total should be 0 (success-counting system)
+        assert_eq!(
+            roll.total, 0,
+            "Lasers & Feelings should have total=0 (success counting) for '{}'",
+            expression
+        );
+    }
+}
+
+#[test]
+fn test_lasers_feelings_validation() {
+    // Test invalid Lasers & Feelings patterns
+    let invalid_lf_tests = vec![
+        ("2lf1", "Target too low"),  // Target must be 2-5
+        ("2lf6", "Target too high"), // Target must be 2-5
+        ("0lf4", "Zero dice"),       // No dice
+        ("25lf4", "Too many dice"),  // Too many dice
+        ("2lf4x", "Invalid type"),   // Invalid type specifier
+    ];
+
+    for (expression, description) in invalid_lf_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_err(),
+            "Invalid Lasers & Feelings '{}' should fail: {}",
+            expression,
+            description
+        );
+    }
+
+    // Test valid boundary cases
+    let valid_boundary_tests = vec![
+        ("1lf2", "Minimum dice and target"),
+        ("20lf5", "Maximum dice and target"),
+        ("2lf2", "Minimum target"),
+        ("2lf5", "Maximum target"),
+    ];
+
+    for (expression, description) in valid_boundary_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Valid boundary Lasers & Feelings '{}' should work: {}",
+            expression,
+            description
+        );
+    }
+}
+
+#[test]
+fn test_lasers_feelings_with_roll_sets() {
+    // Test Lasers & Feelings with roll sets
+    let lf_roll_set_tests = vec![
+        ("3 2lf4l", "Lasers roll sets"),
+        ("2 3lf3f", "Feelings roll sets"),
+        ("4 1lf5l", "Single die roll sets"),
+    ];
+
+    for (expression, description) in lf_roll_set_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Lasers & Feelings roll set '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let expected_sets = expression.chars().next().unwrap().to_digit(10).unwrap() as usize;
+        assert_eq!(
+            results.len(),
+            expected_sets,
+            "Should have {} sets for '{}'",
+            expected_sets,
+            expression
+        );
+
+        for (i, roll) in results.iter().enumerate() {
+            assert_eq!(
+                roll.label,
+                Some(format!("Set {}", i + 1)),
+                "Each set should have correct label for '{}'",
+                expression
+            );
+            assert!(
+                roll.successes.is_some(),
+                "Each Lasers & Feelings set should have success counting"
+            );
+
+            // Should have appropriate notes
+            let has_lf_note = roll
+                .notes
+                .iter()
+                .any(|note| note.contains("Lasers & Feelings"));
+            assert!(has_lf_note, "Each set should have Lasers & Feelings note");
+        }
+    }
+}
+
+#[test]
+fn test_lasers_feelings_success_counting() {
+    // Test success counting logic with controlled results
+    // We can't control randomness directly, but we can verify the system works
+
+    for _ in 0..10 {
+        let result = parse_and_roll("2lf4l").unwrap(); // Lasers
+        let successes = result[0].successes.unwrap();
+
+        // Success count should be reasonable (0-2 for 2 dice)
+        assert!(
+            successes >= 0 && successes <= 2,
+            "Lasers success count should be 0-2, got {}",
+            successes
+        );
+
+        let result = parse_and_roll("2lf4f").unwrap(); // Feelings
+        let successes = result[0].successes.unwrap();
+
+        // Success count should be reasonable (0-2 for 2 dice)
+        assert!(
+            successes >= 0 && successes <= 2,
+            "Feelings success count should be 0-2, got {}",
+            successes
+        );
+    }
 }

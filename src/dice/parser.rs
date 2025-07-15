@@ -1,4 +1,4 @@
-use super::{DiceRoll, HeroSystemType, Modifier};
+use super::{DiceRoll, HeroSystemType, LaserFeelingsType, Modifier};
 use anyhow::{Result, anyhow};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -1996,6 +1996,68 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
 
             return Ok(Modifier::VampireMasquerade5(pool_size, hunger_dice));
         }
+    }
+
+    // Lasers & Feelings handling (lf2, lf2l, lf2f, etc.)
+    if let Some(stripped) = part.strip_prefix("lf") {
+        // Parse target and optional type (lf4l, lf4f, lf4)
+        let chars: Vec<char> = stripped.chars().collect();
+
+        if chars.is_empty() {
+            return Err(anyhow!("Invalid Lasers & Feelings format: '{}'", part));
+        }
+
+        // Find where the number ends and type begins
+        let mut number_end = 0;
+        for (i, ch) in chars.iter().enumerate() {
+            if ch.is_ascii_digit() {
+                number_end = i + 1;
+            } else {
+                break;
+            }
+        }
+
+        if number_end == 0 {
+            return Err(anyhow!("Invalid Lasers & Feelings target in '{}'", part));
+        }
+
+        let target_str: String = chars[..number_end].iter().collect();
+        let type_str: String = chars[number_end..].iter().collect();
+
+        let target = target_str
+            .parse()
+            .map_err(|_| anyhow!("Invalid Lasers & Feelings target in '{}'", part))?;
+
+        // Validate target number (2-5 as per L&F rules)
+        if !(2..=5).contains(&target) {
+            return Err(anyhow!(
+                "Lasers & Feelings target must be between 2 and 5, got {} in '{}'",
+                target,
+                part
+            ));
+        }
+
+        // Determine roll type
+        let roll_type = match type_str.as_str() {
+            "l" => LaserFeelingsType::Lasers,
+            "f" => LaserFeelingsType::Feelings,
+            "" => {
+                // Generic - we'll need both types available, but for now default to Lasers
+                // In a real implementation, you might want to ask the user or handle differently
+                LaserFeelingsType::Lasers
+            }
+            _ => {
+                return Err(anyhow!(
+                    "Invalid Lasers & Feelings type '{}' in '{}'",
+                    type_str,
+                    part
+                ));
+            }
+        };
+
+        // Note: dice_count will be extracted from the dice expression, not the modifier
+        // For now, we'll use 0 as a placeholder and let the roller extract the actual count
+        return Ok(Modifier::LaserFeelings(0, target, roll_type));
     }
 
     Err(anyhow!("Unknown modifier: {}", part))
