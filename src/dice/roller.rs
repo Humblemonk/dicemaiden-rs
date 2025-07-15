@@ -3386,7 +3386,7 @@ fn apply_laser_feelings_mechanics(
     let all_d6 = result
         .individual_rolls
         .iter()
-        .all(|&roll| roll >= 1 && roll <= 6);
+        .all(|&roll| (1..=6).contains(&roll));
     if !all_d6 {
         return Err(anyhow!("Lasers & Feelings requires d6 dice"));
     }
@@ -3425,19 +3425,12 @@ fn apply_laser_feelings_mechanics(
     result.total = 0;
 
     result.notes.push(format!(
-        "Lasers & Feelings: {}d6 target {} ({})",
-        dice_count, target, roll_type
+        "Lasers & Feelings: {dice_count}d6 target {target} ({roll_type})"
     ));
 
     if laser_feelings_count > 0 {
-        let feeling_text = if laser_feelings_count == 1 {
-            "LASER FEELINGS"
-        } else {
-            "LASER FEELINGS"
-        };
         result.notes.push(format!(
-            "💡 **{}** **{}**! Ask the GM a question!",
-            laser_feelings_count, feeling_text
+            "💡 **{laser_feelings_count}** LASER FEELINGS! Ask the GM a question!"
         ));
     }
 

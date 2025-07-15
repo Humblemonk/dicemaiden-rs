@@ -621,7 +621,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
                 _ => "",    // Generic (let user decide)
             };
 
-            return Some(format!("{}d6 lf{}{}", dice_count, target, lf_type));
+            return Some(format!("{dice_count}d6 lf{target}{lf_type}"));
         }
     }
 
