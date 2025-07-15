@@ -81,6 +81,14 @@
 - `4wod8` → 4d10 f1 t8 (World of Darkness, difficulty 8)
 - `4wod8c` → 4d10 f1 t8 c (10s cancel 1s)
 
+## Vampire: The Masquerade 5th Edition
+- `vtm7h2` - 7 dice pool with 2 hunger dice
+- `vtm5h0` - 5 dice pool with no hunger
+- Critical Success: Pairs of 10s = 4 successes each pair
+- Messy Critical: Critical success with hunger dice showing 10s
+- Bestial Failure: Failed roll with hunger dice showing 1s
+- Regular Failure: Failed roll without hunger 1s
+
 ### Cyberpunk Red
 - `cpr` → 1d10 cpr (critical success on 10, critical failure on 1)
 - `cpr + 5` → 1d10 cpr + 5 (with modifier)

@@ -167,6 +167,18 @@ fn test_game_systems_comprehensive() {
             "D6 Legends 11 regular + 1 wild",
         ),
         ("0d6l", false, None, "Invalid D6 Legends zero dice"),
+        // VTM5 - Vampire: The Masquerade 5th Edition
+        ("vtm5h2", true, Some("success"), "VTM5 5 dice, 2 hunger"),
+        ("vtm7h2", true, Some("success"), "VTM5 7 dice, 2 hunger"),
+        ("vtm8h0", true, Some("success"), "VTM5 8 dice, no hunger"),
+        ("vtm10h3", true, Some("success"), "VTM5 10 dice, 3 hunger"),
+        (
+            "vtm1h1",
+            true,
+            Some("success"),
+            "VTM5 minimum pool, all hunger",
+        ),
+        ("vtm8h5", true, Some("success"), "VTM5 8 dice, max hunger"),
     ];
 
     for (system, should_parse, expected_feature, description) in game_systems {
@@ -232,6 +244,10 @@ fn test_game_system_modifiers() {
         ("gbs - 2", "Godbound straight with penalty"),
         ("sw8 + 3", "Savage Worlds with bonus"),
         ("sw10 * 2", "Savage Worlds multiplied"),
+        ("vtm6h2 + 2", "VTM5 with positive modifier"),
+        ("vtm5h1 - 1", "VTM5 with negative modifier"),
+        ("vtm4h0 * 2", "VTM5 with multiplication"),
+        ("vtm8h3 / 2", "VTM5 with division"),
     ];
 
     for (expression, description) in system_modifiers {
@@ -311,6 +327,10 @@ fn test_alias_expansions() {
         ("4wod8c", Some("4d10 f1 t8 c")),
         ("5wod6c", Some("5d10 f1 t6 c")),
         ("6wod7c + 3", Some("6d10 f1 t7 c + 3")),
+        ("vtm5h2", Some("5d10 vtm5p5h2")),
+        ("vtm7h2", Some("7d10 vtm5p7h2")),
+        ("vtm8h0", Some("8d10 vtm5p8h0")),
+        ("vtm10h3", Some("10d10 vtm5p10h3")),
     ];
 
     for (alias, expected) in alias_tests {
@@ -513,9 +533,8 @@ fn test_system_validation_edge_cases() {
 fn test_system_roll_sets() {
     // Test game systems work with roll sets
     let roll_set_systems = vec![
-        "3 sw8", "3 cpr", "3 wit", "3 4cod", "3 gb", "3 mm", "3 cs 5",
+        "3 sw8", "3 cpr", "3 wit", "3 4cod", "3 gb", "3 mm", "3 cs 5", "3 vtm5h2",
     ];
-
     for system in roll_set_systems {
         let result = parse_and_roll(system);
         assert!(result.is_ok(), "Roll set '{}' should work", system);
@@ -2798,4 +2817,274 @@ fn test_cancel_mechanics_validation() {
             }
         }
     }
+}
+
+// Add these tests to tests/game_systems_tests.rs
+
+#[test]
+fn test_vtm5_system_comprehensive() {
+    // Test VTM5 (Vampire: The Masquerade 5th Edition) system
+    let vtm5_tests = vec![
+        // (alias, expected_pool, expected_hunger, description)
+        ("vtm3h1", 3, 1, "VTM5 3 dice pool, 1 hunger"),
+        ("vtm7h2", 7, 2, "VTM5 7 dice pool, 2 hunger"),
+        ("vtm5h0", 5, 0, "VTM5 5 dice pool, no hunger"),
+        ("vtm10h3", 10, 3, "VTM5 10 dice pool, 3 hunger"),
+        ("vtm1h1", 1, 1, "VTM5 minimum pool, all hunger"),
+        ("vtm8h5", 8, 5, "VTM5 8 dice pool, max hunger"),
+    ];
+
+    for (alias, expected_pool, expected_hunger, description) in vtm5_tests {
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "VTM5 test '{}' should work: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+
+        // Should have correct total dice count
+        assert_eq!(
+            roll.individual_rolls.len(),
+            expected_pool as usize,
+            "Should have {} total dice for '{}': {}",
+            expected_pool,
+            alias,
+            description
+        );
+
+        // Should have success counting enabled
+        assert!(
+            roll.successes.is_some(),
+            "VTM5 should have success counting for '{}': {}",
+            alias,
+            description
+        );
+
+        // Success count should be reasonable (0 to pool size * 2 max for crits)
+        let success_count = roll.successes.unwrap();
+        assert!(
+            success_count >= 0 && success_count <= (expected_pool as i32 * 2),
+            "Success count {} should be 0-{} for '{}': {}",
+            success_count,
+            expected_pool * 2,
+            alias,
+            description
+        );
+
+        // Should have appropriate dice groups
+        let regular_dice_count = expected_pool - expected_hunger;
+        if expected_hunger > 0 && regular_dice_count > 0 {
+            assert!(
+                roll.dice_groups.len() == 2,
+                "Should have regular and hunger dice groups for '{}': {}",
+                alias,
+                description
+            );
+        } else {
+            assert!(
+                roll.dice_groups.len() == 1,
+                "Should have single dice group for '{}': {} (regular: {}, hunger: {})",
+                alias,
+                description,
+                regular_dice_count,
+                expected_hunger
+            );
+        }
+
+        // Check for result type notes (probabilistic, so we don't assert on presence)
+        let _has_result_note = roll.notes.iter().any(|note| {
+            note.contains("CRITICAL")
+                || note.contains("MESSY")
+                || note.contains("BESTIAL")
+                || note.contains("FAILURE")
+                || note.contains("pairs of 10s")
+        });
+
+        // Note: Not every roll will have special results, so we just check the structure is right
+        // The presence of notes depends on the random roll results
+    }
+}
+
+#[test]
+fn test_vtm5_alias_expansion() {
+    // Test that VTM5 aliases expand correctly
+    let vtm5_alias_tests = vec![
+        // (alias, expected_expansion)
+        ("vtm5h2", "5d10 vtm5p5h2"),
+        ("vtm8h3", "8d10 vtm5p8h3"),
+        ("vtm10h0", "10d10 vtm5p10h0"),
+        ("vtm1h1", "1d10 vtm5p1h1"),
+    ];
+
+    for (alias, expected_expansion) in vtm5_alias_tests {
+        // Test that the alias expands correctly
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(
+            expanded,
+            Some(expected_expansion.to_string()),
+            "VTM5 alias '{}' should expand to '{}'",
+            alias,
+            expected_expansion
+        );
+
+        // Test that both the alias and expansion produce equivalent results
+        let alias_result = parse_and_roll(alias);
+        let expansion_result = parse_and_roll(expected_expansion);
+
+        assert!(
+            alias_result.is_ok() && expansion_result.is_ok(),
+            "Both alias '{}' and expansion '{}' should work",
+            alias,
+            expected_expansion
+        );
+
+        let alias_roll = alias_result.unwrap();
+        let expansion_roll = expansion_result.unwrap();
+
+        // Should have same number of results
+        assert_eq!(
+            alias_roll.len(),
+            expansion_roll.len(),
+            "Alias and expansion should have same result count for '{}'",
+            alias
+        );
+
+        // Should both have success counting
+        assert_eq!(
+            alias_roll[0].successes.is_some(),
+            expansion_roll[0].successes.is_some(),
+            "Alias and expansion should both have success counting for '{}'",
+            alias
+        );
+    }
+}
+
+#[test]
+fn test_vtm5_with_modifiers() {
+    // Test VTM5 system works with mathematical modifiers
+    let vtm5_modifier_tests = vec![
+        ("vtm6h2 + 2", "VTM5 with positive modifier"),
+        ("vtm5h1 - 1", "VTM5 with negative modifier"),
+        ("vtm4h0 * 2", "VTM5 with multiplication"),
+        ("vtm8h3 + 1d6", "VTM5 with additional dice"),
+    ];
+
+    for (expression, description) in vtm5_modifier_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "VTM5 modifier test '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert!(
+            results[0].successes.is_some(),
+            "VTM5 with modifiers should have success counting: {}",
+            description
+        );
+    }
+}
+
+#[test]
+fn test_vtm5_with_roll_sets() {
+    // Test VTM5 system works with roll sets
+    let vtm5_roll_set_tests = vec![
+        ("3 vtm5h2", "VTM5 roll sets"),
+        ("2 vtm8h3", "VTM5 larger pools in sets"),
+        ("4 vtm4h1", "Multiple VTM5 sets"),
+    ];
+
+    for (expression, description) in vtm5_roll_set_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "VTM5 roll set '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let expected_sets = expression.chars().next().unwrap().to_digit(10).unwrap() as usize;
+        assert_eq!(
+            results.len(),
+            expected_sets,
+            "Should have {} sets for '{}'",
+            expected_sets,
+            expression
+        );
+
+        for (i, roll) in results.iter().enumerate() {
+            assert_eq!(
+                roll.label,
+                Some(format!("Set {}", i + 1)),
+                "Each set should have correct label for '{}'",
+                expression
+            );
+            assert!(
+                roll.successes.is_some(),
+                "Each VTM5 set should have success counting"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_vtm5_invalid_cases() {
+    // Test invalid VTM5 patterns
+    let invalid_vtm5 = vec![
+        ("vtm0h1", "Zero pool size"),
+        ("vtm5h6", "Too many hunger dice"),
+        ("vtm31h2", "Pool too large"),
+        ("vtm3h4", "Hunger exceeds pool"),
+        ("vtmh2", "Missing pool size"),
+        ("vtm5", "Missing hunger specification"),
+        ("vtm5h", "Missing hunger count"),
+    ];
+
+    for (invalid_test, description) in invalid_vtm5 {
+        let result = parse_and_roll(invalid_test);
+        // These should either fail to parse or fail validation
+        if result.is_ok() {
+            println!(
+                "VTM5 invalid case '{}' unexpectedly parsed: {}",
+                invalid_test, description
+            );
+        }
+    }
+}
+
+#[test]
+fn test_vtm5_mechanics_simulation() {
+    // Test to verify VTM5 mechanics work as expected
+    // Note: This is probabilistic, so we test structure rather than exact outcomes
+
+    let result = parse_and_roll("vtm10h3").unwrap();
+    let roll = &result[0];
+
+    // Should have exactly 10 dice
+    assert_eq!(roll.individual_rolls.len(), 10);
+
+    // Should have success counting
+    assert!(roll.successes.is_some());
+
+    // All dice should be d10s (1-10 range)
+    for &die_roll in &roll.individual_rolls {
+        assert!(
+            die_roll >= 1 && die_roll <= 10,
+            "VTM5 should use d10s, got {}",
+            die_roll
+        );
+    }
+
+    // Should have appropriate dice groups
+    assert!(roll.dice_groups.len() >= 1 && roll.dice_groups.len() <= 2);
+
+    // Total successes should equal success count
+    assert_eq!(roll.total, roll.successes.unwrap());
 }

@@ -122,6 +122,9 @@ static SIL_REGEX: Lazy<Regex> =
 static D6L_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)d6l$").expect("Failed to compile D6L_REGEX"));
 
+static VTM5_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^vtm(\d+)h(\d+)$").expect("Failed to compile VTM5_REGEX"));
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -574,6 +577,22 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             }
         }
         return None; // Invalid count format
+    }
+
+    // VTM5 - Vampire: The Masquerade 5th Edition (vtm7h2 -> 7d10 vtm5p7h2)
+    if let Some(captures) = VTM5_REGEX.captures(input) {
+        let pool_size = &captures[1];
+        let hunger_dice = &captures[2];
+
+        // Validate ranges
+        if let (Ok(pool), Ok(hunger)) = (pool_size.parse::<u32>(), hunger_dice.parse::<u32>()) {
+            if pool > 0 && pool <= 30 && hunger <= pool {
+                return Some(format!(
+                    "{}d10 vtm5p{}h{}",
+                    pool_size, pool_size, hunger_dice
+                ));
+            }
+        }
     }
 
     None

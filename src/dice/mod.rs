@@ -70,6 +70,7 @@ pub enum Modifier {
     ConanSkill(u32),  // conan, conan3, conan4, conan5 - d20 skill rolls
     ConanCombat(u32), // cd, cd4, cd5 - combat dice interpretation
     Silhouette(u32),
+    VampireMasquerade5(u32, u32),
 }
 
 #[derive(Debug, Clone)]

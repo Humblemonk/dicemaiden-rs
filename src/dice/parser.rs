@@ -1962,6 +1962,42 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         }
     }
 
+    // VTM5 - Vampire: The Masquerade 5th Edition
+    if let Some(stripped) = part.strip_prefix("vtm5p") {
+        // Parse pattern like "vtm5p7h2" (pool=7, hunger=2)
+        if let Some(h_pos) = stripped.find('h') {
+            let pool_str = &stripped[..h_pos];
+            let hunger_str = &stripped[h_pos + 1..];
+
+            let pool_size = pool_str
+                .parse::<u32>()
+                .map_err(|_| anyhow!("Invalid VTM5 pool size in '{}'", part))?;
+            let hunger_dice = hunger_str
+                .parse::<u32>()
+                .map_err(|_| anyhow!("Invalid VTM5 hunger dice count in '{}'", part))?;
+
+            // Validate ranges
+            if pool_size == 0 || pool_size > 30 {
+                return Err(anyhow!("VTM5 pool size must be 1-30, got {}", pool_size));
+            }
+            if hunger_dice > pool_size {
+                return Err(anyhow!(
+                    "VTM5 hunger dice ({}) cannot exceed pool size ({})",
+                    hunger_dice,
+                    pool_size
+                ));
+            }
+            if hunger_dice > 5 {
+                return Err(anyhow!(
+                    "VTM5 hunger dice cannot exceed 5, got {}",
+                    hunger_dice
+                ));
+            }
+
+            return Ok(Modifier::VampireMasquerade5(pool_size, hunger_dice));
+        }
+    }
+
     Err(anyhow!("Unknown modifier: {}", part))
 }
 
