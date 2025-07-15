@@ -870,6 +870,10 @@ fn apply_special_system_modifiers(
                 // Conan combat dice are handled in the main roll_dice function
                 // Don't process them here
             }
+            Modifier::VampireMasquerade5(pool_size, hunger_dice) => {
+                *result = handle_vtm5_roll(dice.clone(), rng, *pool_size, *hunger_dice)?;
+                return Ok(());
+            }
             // Skip mathematical modifiers here - they're handled by target processing or post-target processing
             Modifier::Add(_)
             | Modifier::Subtract(_)
@@ -3195,8 +3199,169 @@ fn count_dice_with_target_lower_double_success(
             .push(format!("≤{double_success_value} = 2 successes"));
     } else {
         result.notes.push(format!(
-            "≤{double_success_value} = 2 successes, ≤{target} = 1 success"));
+            "≤{double_success_value} = 2 successes, ≤{target} = 1 success"
+        ));
     }
 
+    Ok(())
+}
+
+fn handle_vtm5_roll(
+    dice: DiceRoll,
+    rng: &mut impl Rng,
+    pool_size: u32,
+    hunger_dice: u32,
+) -> Result<RollResult> {
+    // Initialize result structure
+    let mut result = RollResult {
+        individual_rolls: Vec::new(),
+        kept_rolls: Vec::new(),
+        dropped_rolls: Vec::new(),
+        total: 0,
+        successes: Some(0),
+        failures: None,
+        botches: None,
+        comment: dice.comment.clone(),
+        label: dice.label.clone(),
+        notes: Vec::new(),
+        dice_groups: Vec::new(),
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
+        godbound_damage: None,
+        fudge_symbols: None,
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
+        wng_wrath_dice: None,
+        suppress_comment: false,
+    };
+
+    let regular_dice = pool_size - hunger_dice;
+    let mut regular_rolls = Vec::new();
+    let mut hunger_rolls = Vec::new();
+
+    // Roll regular dice
+    for _ in 0..regular_dice {
+        regular_rolls.push(rng.random_range(1..=10));
+    }
+
+    // Roll hunger dice
+    for _ in 0..hunger_dice {
+        hunger_rolls.push(rng.random_range(1..=10));
+    }
+
+    // Combine all rolls for display
+    result.individual_rolls.extend(&regular_rolls);
+    result.individual_rolls.extend(&hunger_rolls);
+    result.kept_rolls = result.individual_rolls.clone();
+
+    // Create dice groups for display
+    if !regular_rolls.is_empty() {
+        result.dice_groups.push(DiceGroup {
+            _description: format!("{regular_dice}d10 Regular"),
+            rolls: regular_rolls.clone(),
+            dropped_rolls: Vec::new(),
+            modifier_type: "regular".to_string(),
+        });
+    }
+
+    if !hunger_rolls.is_empty() {
+        result.dice_groups.push(DiceGroup {
+            _description: format!("{hunger_dice}d10 Hunger"),
+            rolls: hunger_rolls.clone(),
+            dropped_rolls: Vec::new(),
+            modifier_type: "hunger".to_string(),
+        });
+    }
+
+    // Calculate basic successes (6+)
+    let regular_successes = regular_rolls.iter().filter(|&&r| r >= 6).count();
+    let hunger_successes = hunger_rolls.iter().filter(|&&r| r >= 6).count();
+    let mut total_successes = regular_successes + hunger_successes;
+
+    // Count 10s for critical success calculation
+    let regular_tens = regular_rolls.iter().filter(|&&r| r == 10).count();
+    let hunger_tens = hunger_rolls.iter().filter(|&&r| r == 10).count();
+    let total_tens = regular_tens + hunger_tens;
+
+    // Apply critical success rule: pairs of 10s = 4 successes each pair
+    if total_tens >= 2 {
+        let pairs = total_tens / 2;
+        let extra_successes = pairs * 2; // Each pair adds 2 extra (4 total - 2 base = 2 extra)
+        total_successes += extra_successes;
+        result.notes.push(format!(
+            "{pairs} pairs of 10s add +{extra_successes} successes"
+        ));
+    }
+
+    // Check for special results
+    let has_successes = total_successes > 0;
+    let has_crit = total_tens >= 2;
+    let has_hunger_tens = hunger_tens > 0;
+    let has_hunger_ones = hunger_rolls.contains(&1);
+
+    // Determine result type and add notes
+    if has_crit && has_successes && has_hunger_tens {
+        result
+            .notes
+            .push("**MESSY CRITICAL** - Success with bestial consequences".to_string());
+    } else if has_crit && has_successes {
+        result.notes.push("**CRITICAL SUCCESS**".to_string());
+    } else if !has_successes && has_hunger_ones {
+        result
+            .notes
+            .push("**BESTIAL FAILURE** - Failed with bestial consequences".to_string());
+    } else if !has_successes {
+        result.notes.push("**FAILURE**".to_string());
+    }
+
+    result.successes = Some(total_successes as i32);
+    result.total = total_successes as i32;
+
+    // Apply any mathematical modifiers to the success count
+    apply_mathematical_modifiers_to_vtm5_successes(&mut result, &dice)?;
+
+    Ok(result)
+}
+
+// Helper function to apply mathematical modifiers to VTM5 success counts
+fn apply_mathematical_modifiers_to_vtm5_successes(
+    result: &mut RollResult,
+    dice: &DiceRoll,
+) -> Result<()> {
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::Add(value) => {
+                if let Some(ref mut successes) = result.successes {
+                    *successes += value;
+                    result.total += value;
+                }
+            }
+            Modifier::Subtract(value) => {
+                if let Some(ref mut successes) = result.successes {
+                    *successes -= value;
+                    result.total -= value;
+                }
+            }
+            Modifier::Multiply(value) => {
+                if let Some(ref mut successes) = result.successes {
+                    *successes *= value;
+                    result.total *= value;
+                }
+            }
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                if let Some(ref mut successes) = result.successes {
+                    *successes /= value;
+                    result.total /= value;
+                }
+            }
+            _ => {} // Skip VTM5 and other non-mathematical modifiers
+        }
+    }
     Ok(())
 }
