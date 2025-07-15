@@ -587,10 +587,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         // Validate ranges
         if let (Ok(pool), Ok(hunger)) = (pool_size.parse::<u32>(), hunger_dice.parse::<u32>()) {
             if pool > 0 && pool <= 30 && hunger <= pool {
-                return Some(format!(
-                    "{}d10 vtm5p{}h{}",
-                    pool_size, pool_size, hunger_dice
-                ));
+                return Some(format!("{pool_size}d10 vtm5p{pool_size}h{hunger_dice}"));
             }
         }
     }

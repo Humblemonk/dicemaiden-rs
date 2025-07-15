@@ -3260,7 +3260,7 @@ fn handle_vtm5_roll(
     // Create dice groups for display
     if !regular_rolls.is_empty() {
         result.dice_groups.push(DiceGroup {
-            _description: format!("{}d10 Regular", regular_dice),
+            _description: format!("{regular_dice}d10 Regular"),
             rolls: regular_rolls.clone(),
             dropped_rolls: Vec::new(),
             modifier_type: "regular".to_string(),
@@ -3269,7 +3269,7 @@ fn handle_vtm5_roll(
 
     if !hunger_rolls.is_empty() {
         result.dice_groups.push(DiceGroup {
-            _description: format!("{}d10 Hunger", hunger_dice),
+            _description: format!("{hunger_dice}d10 Hunger"),
             rolls: hunger_rolls.clone(),
             dropped_rolls: Vec::new(),
             modifier_type: "hunger".to_string(),
@@ -3292,8 +3292,7 @@ fn handle_vtm5_roll(
         let extra_successes = pairs * 2; // Each pair adds 2 extra (4 total - 2 base = 2 extra)
         total_successes += extra_successes;
         result.notes.push(format!(
-            "{} pairs of 10s add +{} successes",
-            pairs, extra_successes
+            "{pairs} pairs of 10s add +{extra_successes} successes"
         ));
     }
 
@@ -3301,7 +3300,7 @@ fn handle_vtm5_roll(
     let has_successes = total_successes > 0;
     let has_crit = total_tens >= 2;
     let has_hunger_tens = hunger_tens > 0;
-    let has_hunger_ones = hunger_rolls.iter().any(|&r| r == 1);
+    let has_hunger_ones = hunger_rolls.contains(&1);
 
     // Determine result type and add notes
     if has_crit && has_successes && has_hunger_tens {
