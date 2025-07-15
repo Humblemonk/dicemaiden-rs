@@ -81,7 +81,7 @@
 - `4wod8` → 4d10 f1 t8 (World of Darkness, difficulty 8)
 - `4wod8c` → 4d10 f1 t8 c (10s cancel 1s)
 
-## Vampire: The Masquerade 5th Edition
+### Vampire: The Masquerade 5th Edition
 - `vtm7h2` - 7 dice pool with 2 hunger dice
 - `vtm5h0` - 5 dice pool with no hunger
 - Critical Success: Pairs of 10s = 4 successes each pair
