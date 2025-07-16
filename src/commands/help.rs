@@ -14,12 +14,13 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(
                 CommandOptionType::String,
                 "topic",
-                "Help topic (basic, alias, system)",
+                "Help topic (basic, alias, system, a5e)",
             )
             .required(false)
             .add_string_choice("basic", "basic")
             .add_string_choice("alias", "alias")
-            .add_string_choice("system", "system"),
+            .add_string_choice("system", "system")
+            .add_string_choice("a5e", "a5e"),
         )
 }
 
@@ -37,6 +38,7 @@ pub async fn run(_ctx: &Context, command: &CommandInteraction) -> Result<Command
     let help_text = match topic {
         "alias" => help_text::generate_alias_help(),
         "system" => help_text::generate_system_help(),
+        "a5e" => help_text::generate_a5e_help(),
         _ => help_text::generate_basic_help(),
     };
 

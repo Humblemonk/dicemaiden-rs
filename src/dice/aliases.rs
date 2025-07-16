@@ -128,6 +128,21 @@ static VTM5_REGEX: Lazy<Regex> =
 static LF_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)lf(\d+)([lf]?)$").expect("Failed to compile LF_REGEX"));
 
+static A5E_BASIC_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(?i)a5e\s*([+-]?\d+)?\s*ex([1-3]|4|6|8|10|12|20|100)$")
+        .expect("Failed to compile A5E_BASIC_REGEX")
+});
+
+static A5E_ADV_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(?i)\+a5e\s*([+-]?\d+)?\s*ex([1-3]|4|6|8|10|12|20|100)$")
+        .expect("Failed to compile A5E_ADV_REGEX")
+});
+
+static A5E_DIS_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(?i)-a5e\s*([+-]?\d+)?\s*ex([1-3]|4|6|8|10|12|20|100)$")
+        .expect("Failed to compile A5E_DIS_REGEX")
+});
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -207,6 +222,11 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
 
     if input == "dh" {
         return Some("1d10 dh".to_string());
+    }
+
+    // Check for A5E (Level Up Advanced 5th Edition) aliases
+    if let Some(a5e_result) = expand_a5e_alias(input) {
+        return Some(a5e_result);
     }
 
     if let Some(captures) = SR_REGEX.captures(input) {
@@ -916,4 +936,64 @@ fn process_wod_regex_captures(
                 .replace("{modifier}", modifier),
         )
     }
+}
+
+/// Expand A5E (Level Up Advanced 5th Edition) aliases
+///
+/// Concise syntax assuming d20 by default:
+/// - a5e +5 ed1 → 1d20+5 + 1d4
+/// - a5e ed2 → 1d20 + 1d6 (no modifier)
+/// - +a5e +5 ed1 → 2d20 kh1+5 + 1d4 (advantage)
+/// - -a5e +5 ed1 → 2d20 kl1+5 + 1d4 (disadvantage)
+pub fn expand_a5e_alias(input: &str) -> Option<String> {
+    let input = input.trim();
+
+    // Determine expertise die size
+    let get_expertise_die = |ed_value: &str| -> Option<&str> {
+        match ed_value {
+            "1" => Some("1d4"),     // Level 1 expertise = d4
+            "2" => Some("1d6"),     // Level 2 expertise = d6
+            "3" => Some("1d8"),     // Level 3 expertise = d8
+            "4" => Some("1d4"),     // Explicit d4
+            "6" => Some("1d6"),     // Explicit d6
+            "8" => Some("1d8"),     // Explicit d8
+            "10" => Some("1d10"),   // Explicit d10 (house rules)
+            "12" => Some("1d12"),   // Explicit d12 (house rules)
+            "20" => Some("1d20"),   // Explicit d20 (house rules)
+            "100" => Some("1d100"), // Explicit d100 (house rules)
+            _ => None,
+        }
+    };
+
+    // Check for advantage A5E
+    if let Some(captures) = A5E_ADV_REGEX.captures(input) {
+        let modifier = captures.get(1).map(|m| m.as_str()).unwrap_or("");
+        let ed_value = captures.get(2).unwrap().as_str();
+
+        if let Some(expertise_die) = get_expertise_die(ed_value) {
+            return Some(format!("2d20 k1{} + {}", modifier, expertise_die));
+        }
+    }
+
+    // Check for disadvantage A5E
+    if let Some(captures) = A5E_DIS_REGEX.captures(input) {
+        let modifier = captures.get(1).map(|m| m.as_str()).unwrap_or("");
+        let ed_value = captures.get(2).unwrap().as_str();
+
+        if let Some(expertise_die) = get_expertise_die(ed_value) {
+            return Some(format!("2d20 kl1{} + {}", modifier, expertise_die));
+        }
+    }
+
+    // Check for basic A5E
+    if let Some(captures) = A5E_BASIC_REGEX.captures(input) {
+        let modifier = captures.get(1).map(|m| m.as_str()).unwrap_or("");
+        let ed_value = captures.get(2).unwrap().as_str();
+
+        if let Some(expertise_die) = get_expertise_die(ed_value) {
+            return Some(format!("1d20{} + {}", modifier, expertise_die));
+        }
+    }
+
+    None
 }

@@ -47,6 +47,9 @@ fn test_parsing_performance() {
         ("4d6;3d8;2d10;1d20", "Multiple rolls", 100),
         ("100d6 e6 ie k50 r1 t4 +10", "Very complex", 300),
         ("4wod8c + 2", "WoD cancel with modifier", 100),
+        ("a5e +5 ex1", "A5E basic", 100),
+        ("+a5e +7 ex2", "A5E advantage", 200),
+        ("3 a5e +5 ex1", "A5E roll sets", 300),
     ];
 
     // Warmup runs to initialize lazy statics and regex compilation
@@ -54,6 +57,7 @@ fn test_parsing_performance() {
         let _ = parse_and_roll("1d6");
         let _ = parse_and_roll("4cod");
         let _ = parse_and_roll("sw8");
+        let _ = parse_and_roll("a5e +5 ex1");
     }
 
     for (expression, description, max_ms) in performance_cases {
@@ -517,4 +521,27 @@ fn test_cancel_modifier_performance() {
             max_ms
         );
     }
+}
+
+#[test]
+fn test_a5e_alias_performance() {
+    use dicemaiden_rs::dice::aliases;
+    use std::time::Instant;
+
+    // Test that A5E alias expansion is fast
+    let start = Instant::now();
+
+    for _ in 0..1000 {
+        let _ = aliases::expand_alias("a5e +5 ex1");
+        let _ = aliases::expand_alias("+a5e +5 ex1");
+        let _ = aliases::expand_alias("-a5e +5 ex1");
+        let _ = aliases::expand_alias("a5e ex2");
+    }
+
+    let duration = start.elapsed();
+    assert!(
+        duration.as_millis() < 100,
+        "A5E alias expansion should be fast: {}ms",
+        duration.as_millis()
+    );
 }
