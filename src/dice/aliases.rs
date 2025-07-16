@@ -965,34 +965,43 @@ pub fn expand_a5e_alias(input: &str) -> Option<String> {
         }
     };
 
+    // Helper function to process A5E captures and eliminate duplication
+    let process_a5e_captures =
+        |captures: regex::Captures, roll_type: A5eRollType| -> Option<String> {
+            let modifier = captures.get(1).map(|m| m.as_str()).unwrap_or("");
+            let ed_value = captures.get(2).unwrap().as_str();
+
+            if let Some(expertise_die) = get_expertise_die(ed_value) {
+                let base_roll = match roll_type {
+                    A5eRollType::Basic => format!("1d20{modifier}"),
+                    A5eRollType::Advantage => format!("2d20 k1{modifier}"),
+                    A5eRollType::Disadvantage => format!("2d20 kl1{modifier}"),
+                };
+                return Some(format!("{base_roll} + {expertise_die}"));
+            }
+            None
+        };
+
+    // Define roll type enum to avoid duplication
+    enum A5eRollType {
+        Basic,
+        Advantage,
+        Disadvantage,
+    }
+
     // Check for advantage A5E
     if let Some(captures) = A5E_ADV_REGEX.captures(input) {
-        let modifier = captures.get(1).map(|m| m.as_str()).unwrap_or("");
-        let ed_value = captures.get(2).unwrap().as_str();
-
-        if let Some(expertise_die) = get_expertise_die(ed_value) {
-            return Some(format!("2d20 k1{} + {}", modifier, expertise_die));
-        }
+        return process_a5e_captures(captures, A5eRollType::Advantage);
     }
 
     // Check for disadvantage A5E
     if let Some(captures) = A5E_DIS_REGEX.captures(input) {
-        let modifier = captures.get(1).map(|m| m.as_str()).unwrap_or("");
-        let ed_value = captures.get(2).unwrap().as_str();
-
-        if let Some(expertise_die) = get_expertise_die(ed_value) {
-            return Some(format!("2d20 kl1{} + {}", modifier, expertise_die));
-        }
+        return process_a5e_captures(captures, A5eRollType::Disadvantage);
     }
 
     // Check for basic A5E
     if let Some(captures) = A5E_BASIC_REGEX.captures(input) {
-        let modifier = captures.get(1).map(|m| m.as_str()).unwrap_or("");
-        let ed_value = captures.get(2).unwrap().as_str();
-
-        if let Some(expertise_die) = get_expertise_die(ed_value) {
-            return Some(format!("1d20{} + {}", modifier, expertise_die));
-        }
+        return process_a5e_captures(captures, A5eRollType::Basic);
     }
 
     None
