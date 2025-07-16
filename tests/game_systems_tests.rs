@@ -183,6 +183,12 @@ fn test_game_systems_comprehensive() {
         ("2lf4l", true, Some("success"), "Lasers & Feelings Lasers"),
         ("2lf4f", true, Some("success"), "Lasers & Feelings Feelings"),
         ("3lf3", true, Some("success"), "Lasers & Feelings generic"),
+        // A5E (Level Up Advanced 5th Edition)
+        ("a5e +5 ex1", true, Some("total"), "A5E expertise level 1"),
+        ("a5e +7 ex2", true, Some("total"), "A5E expertise level 2"),
+        ("a5e +3 ex3", true, Some("total"), "A5E expertise level 3"),
+        ("+a5e +5 ex1", true, Some("total"), "A5E with advantage"),
+        ("-a5e +5 ex1", true, Some("total"), "A5E with disadvantage"),
     ];
 
     for (system, should_parse, expected_feature, description) in game_systems {
@@ -340,6 +346,12 @@ fn test_alias_expansions() {
         ("2lf4f", Some("2d6 lf4f")),
         ("3lf2", Some("3d6 lf2")),
         ("1lf5", Some("1d6 lf5")),
+        ("a5e +5 ex1", Some("1d20+5 + 1d4")),
+        ("a5e +7 ex2", Some("1d20+7 + 1d6")),
+        ("a5e +3 ex3", Some("1d20+3 + 1d8")),
+        ("+a5e +5 ex1", Some("2d20 k1+5 + 1d4")),
+        ("-a5e +5 ex1", Some("2d20 kl1+5 + 1d4")),
+        ("a5e ex1", Some("1d20 + 1d4")),
     ];
 
     for (alias, expected) in alias_tests {
@@ -3305,6 +3317,92 @@ fn test_lasers_feelings_success_counting() {
             successes >= 0 && successes <= 2,
             "Feelings success count should be 0-2, got {}",
             successes
+        );
+    }
+}
+
+#[test]
+fn test_a5e_system_integration() {
+    use dicemaiden_rs::parse_and_roll;
+
+    // Test A5E expertise levels through full parsing
+    let result = parse_and_roll("a5e +5 ex1").expect("A5E should parse");
+    assert_eq!(result.len(), 1);
+    assert!(result[0].total >= 7 && result[0].total <= 29); // 1d20+5 + 1d4 range
+
+    let result = parse_and_roll("a5e +5 ex2").expect("A5E ed2 should parse");
+    assert!(result[0].total >= 7 && result[0].total <= 31); // 1d20+5 + 1d6 range
+
+    let result = parse_and_roll("a5e +5 ex3").expect("A5E ed3 should parse");
+    assert!(result[0].total >= 7 && result[0].total <= 33); // 1d20+5 + 1d8 range
+}
+
+#[test]
+fn test_a5e_advantage_disadvantage_integration() {
+    use dicemaiden_rs::parse_and_roll;
+
+    // Test advantage
+    let result = parse_and_roll("+a5e +5 ex1").expect("A5E advantage should parse");
+    assert_eq!(result.len(), 1);
+
+    // Test disadvantage
+    let result = parse_and_roll("-a5e +5 ex1").expect("A5E disadvantage should parse");
+    assert_eq!(result.len(), 1);
+}
+
+#[test]
+fn test_a5e_with_roll_sets() {
+    use dicemaiden_rs::parse_and_roll;
+
+    // Test A5E with roll sets
+    let result = parse_and_roll("3 a5e +5 ex1").expect("A5E roll sets should work");
+    assert_eq!(result.len(), 3);
+
+    for (i, roll) in result.iter().enumerate() {
+        assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
+        assert!(roll.total >= 7 && roll.total <= 29);
+    }
+}
+
+#[test]
+fn test_a5e_compared_to_manual_equivalents() {
+    use dicemaiden_rs::parse_and_roll;
+
+    // Test that A5E aliases produce equivalent results to manual rolls
+    for _ in 0..10 {
+        let a5e_result = parse_and_roll("a5e +5 ex1").expect("A5E should work");
+        let manual_result = parse_and_roll("1d20+5 + 1d4").expect("Manual should work");
+
+        // Should have same structure
+        assert_eq!(a5e_result.len(), manual_result.len());
+
+        // Both should be in same range (though different random results)
+        assert!(a5e_result[0].total >= 7 && a5e_result[0].total <= 29);
+        assert!(manual_result[0].total >= 7 && manual_result[0].total <= 29);
+    }
+}
+
+#[test]
+fn test_a5e_alias_expansion_in_game_systems() {
+    use dicemaiden_rs::dice::aliases;
+
+    // Test A5E aliases expand correctly compared to other game systems
+    let a5e_expansions = vec![
+        ("a5e +5 ex1", "1d20+5 + 1d4"),
+        ("a5e +7 ex2", "1d20+7 + 1d6"),
+        ("a5e +3 ex3", "1d20+3 + 1d8"),
+        ("+a5e +5 ex1", "2d20 k1+5 + 1d4"),
+        ("-a5e +5 ex1", "2d20 kl1+5 + 1d4"),
+    ];
+
+    for (alias, expected_expansion) in a5e_expansions {
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(
+            expanded,
+            Some(expected_expansion.to_string()),
+            "A5E alias '{}' should expand to '{}'",
+            alias,
+            expected_expansion
         );
     }
 }

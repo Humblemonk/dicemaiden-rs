@@ -1832,3 +1832,128 @@ fn test_existing_l_patterns_still_rejected() {
         );
     }
 }
+
+#[test]
+fn test_a5e_alias_expansion_unit() {
+    // Test A5E aliases through the public expand_alias function
+    use dicemaiden_rs::dice::aliases;
+
+    // Basic expertise levels
+    assert_eq!(
+        aliases::expand_alias("a5e +5 ex1"),
+        Some("1d20+5 + 1d4".to_string())
+    );
+    assert_eq!(
+        aliases::expand_alias("a5e +5 ex2"),
+        Some("1d20+5 + 1d6".to_string())
+    );
+    assert_eq!(
+        aliases::expand_alias("a5e +5 ex3"),
+        Some("1d20+5 + 1d8".to_string())
+    );
+
+    // Advantage/disadvantage
+    assert_eq!(
+        aliases::expand_alias("+a5e +5 ex1"),
+        Some("2d20 k1+5 + 1d4".to_string())
+    );
+    assert_eq!(
+        aliases::expand_alias("-a5e +5 ex1"),
+        Some("2d20 kl1+5 + 1d4".to_string())
+    );
+
+    // No modifier cases
+    assert_eq!(
+        aliases::expand_alias("a5e ex1"),
+        Some("1d20 + 1d4".to_string())
+    );
+
+    // Explicit dice sizes
+    assert_eq!(
+        aliases::expand_alias("a5e +3 ex4"),
+        Some("1d20+3 + 1d4".to_string())
+    );
+    assert_eq!(
+        aliases::expand_alias("a5e +3 ex6"),
+        Some("1d20+3 + 1d6".to_string())
+    );
+    assert_eq!(
+        aliases::expand_alias("a5e +3 ex8"),
+        Some("1d20+3 + 1d8".to_string())
+    );
+
+    // Invalid patterns - these should return None since they don't match any alias
+    assert_eq!(aliases::expand_alias("a5e +5 ex0"), None);
+    assert_eq!(aliases::expand_alias("a5e +5 ex5"), None);
+    assert_eq!(aliases::expand_alias("a5e +5"), None);
+    assert_eq!(aliases::expand_alias("1d20+5 ex1"), None);
+    assert_eq!(aliases::expand_alias("invalid"), None);
+}
+
+#[test]
+fn test_a5e_case_insensitive_expansion() {
+    // Test that A5E aliases work with different cases
+    use dicemaiden_rs::dice::aliases;
+
+    let case_variants = vec![
+        ("a5e +5 ex1", "1d20+5 + 1d4"),
+        ("A5E +5 EX1", "1d20+5 + 1d4"),
+        ("a5E +5 Ex1", "1d20+5 + 1d4"),
+        ("+a5e +5 ex2", "2d20 k1+5 + 1d6"),
+        ("+A5E +5 EX2", "2d20 k1+5 + 1d6"),
+        ("-a5e +5 ex3", "2d20 kl1+5 + 1d8"),
+        ("-A5E +5 EX3", "2d20 kl1+5 + 1d8"),
+    ];
+
+    for (input, expected) in case_variants {
+        let result = aliases::expand_alias(input);
+        assert_eq!(
+            result,
+            Some(expected.to_string()),
+            "Case variant '{}' should expand correctly",
+            input
+        );
+    }
+}
+
+#[test]
+fn test_a5e_edge_cases() {
+    // Test A5E edge cases through public API
+    use dicemaiden_rs::dice::aliases;
+
+    // Negative modifiers
+    assert_eq!(
+        aliases::expand_alias("a5e -2 ex1"),
+        Some("1d20-2 + 1d4".to_string())
+    );
+
+    // Zero modifier
+    assert_eq!(
+        aliases::expand_alias("a5e +0 ex2"),
+        Some("1d20+0 + 1d6".to_string())
+    );
+
+    // Large modifiers
+    assert_eq!(
+        aliases::expand_alias("a5e +15 ex3"),
+        Some("1d20+15 + 1d8".to_string())
+    );
+
+    // Extended dice sizes (house rules)
+    assert_eq!(
+        aliases::expand_alias("a5e +1 ex10"),
+        Some("1d20+1 + 1d10".to_string())
+    );
+    assert_eq!(
+        aliases::expand_alias("a5e +1 ex12"),
+        Some("1d20+1 + 1d12".to_string())
+    );
+    assert_eq!(
+        aliases::expand_alias("a5e +1 ex20"),
+        Some("1d20+1 + 1d20".to_string())
+    );
+    assert_eq!(
+        aliases::expand_alias("a5e +1 ex100"),
+        Some("1d20+1 + 1d100".to_string())
+    );
+}

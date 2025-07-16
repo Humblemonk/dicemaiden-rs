@@ -1420,3 +1420,57 @@ mod dice_formatting_final_tests {
         println!("Fix activation logic test completed");
     }
 }
+
+#[test]
+fn test_a5e_result_formatting() {
+    use dicemaiden_rs::{format_multiple_results, parse_and_roll};
+
+    // Test A5E result formatting
+    let result = parse_and_roll("a5e +5 ex1").expect("A5E should parse");
+    let formatted = format_multiple_results(&result);
+
+    // Should have proper formatting
+    assert!(formatted.contains("**")); // Bold totals
+    assert!(formatted.contains("`[")); // Dice display
+
+    // Should show the total
+    let total = result[0].total;
+    assert!(formatted.contains(&format!("**{}**", total)));
+}
+
+#[test]
+fn test_a5e_roll_sets_formatting() {
+    use dicemaiden_rs::{format_multiple_results, parse_and_roll};
+
+    // Test A5E roll sets formatting
+    let result = parse_and_roll("3 a5e +5 ex1").expect("A5E roll sets should work");
+    let formatted = format_multiple_results(&result);
+
+    // Should show individual sets
+    assert!(formatted.contains("Set 1"));
+    assert!(formatted.contains("Set 2"));
+    assert!(formatted.contains("Set 3"));
+
+    // Should show combined total
+    assert!(formatted.contains("**Total:"));
+
+    let expected_total: i32 = result.iter().map(|r| r.total).sum();
+    assert!(formatted.contains(&format!("{}**", expected_total)));
+}
+
+#[test]
+fn test_a5e_semicolon_separated() {
+    use dicemaiden_rs::{format_multiple_results, parse_and_roll};
+
+    // Test A5E with semicolon-separated rolls
+    let result = parse_and_roll("a5e +5 ex1; a5e +7 ex2; a5e +3 ex3").expect("Should parse");
+    assert_eq!(result.len(), 3);
+
+    // Each should have original expressions
+    for roll in &result {
+        assert!(roll.original_expression.is_some());
+    }
+
+    let formatted = format_multiple_results(&result);
+    assert!(formatted.contains("Request:")); // Should show individual requests
+}

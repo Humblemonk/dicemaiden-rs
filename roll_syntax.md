@@ -73,6 +73,23 @@
 - `+d%` → 2d10 kl1 * 10 + 1d10 - 10 (percentile advantage)
 - `-d%` → 2d10 k1 * 10 + 1d10 - 10 (percentile disadvantage)
 
+### Level Up Advanced 5th Edition (A5E)
+- `a5e +5 ex1` → 1d20+5 + 1d4 (skill check with expertise level 1)
+- `a5e +7 ex2` → 1d20+7 + 1d6 (skill check with expertise level 2)
+- `a5e +3 ex3` → 1d20+3 + 1d8 (skill check with expertise level 3)
+- `+a5e +5 ex1` → 2d20 k1+5 + 1d4 (advantage with expertise)
+- `-a5e +3 ex2` → 2d20 kl1+3 + 1d6 (disadvantage with expertise)
+- `a5e ex1` → 1d20 + 1d4 (expertise without modifier)
+- `a5e +2 ex6` → 1d20+2 + 1d6 (explicit d6 expertise die)
+- `a5e +1 ex8` → 1d20+1 + 1d8 (explicit d8 expertise die)
+- `a5e +3 ex10` → 1d20+3 + 1d10 (house rule: d10 expertise)
+
+**Expertise Die Levels:**
+- `ex1` → d4 (Level 1 expertise)
+- `ex2` → d6 (Level 2 expertise)
+- `ex3` → d8 (Level 3 expertise)
+- `ex4`, `ex6`, `ex8`, `ex10`, `ex12`, `ex20`, `ex100` → Explicit die size
+
 ### World of Darkness / Chronicles of Darkness
 - `4cod` → 4d10 t8 ie10 (Chronicles of Darkness)
 - `4cod8` → 4d10 t8 ie8 (8-again rule)

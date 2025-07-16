@@ -163,3 +163,45 @@ pub fn generate_system_help() -> String {
 Use `/help` for basic syntax and `/help alias` for more shortcuts!"#
         .to_string()
 }
+
+pub fn generate_a5e_help() -> String {
+    r#"🎲 **Level Up: Advanced 5th Edition (A5E) System** 🎲
+
+**Note:**
+• Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+• If you experience a bug, please report the issue on GitHub!
+
+A5E uses expertise dice that add to d20 rolls. Multiple expertise sources don't stack as additional dice, but increase the die size:
+
+• **1 source**: +1d4 expertise die
+• **2 sources**: +1d6 expertise die  
+• **3+ sources**: +1d8 expertise die (maximum)
+
+**Concise A5E Syntax (assumes d20):**
+• `a5e +5 ex1` → 1d20+5 + 1d4 (attack +5 with expertise level 1)
+• `a5e ex2` → 1d20 + 1d6 (no modifier, expertise level 2)
+• `a5e -2 ex3` → 1d20-2 + 1d8 (penalty -2, expertise level 3)
+
+**Expertise Levels:**
+• `ex1` = 1d4 (one expertise source)
+• `ex2` = 1d6 (two expertise sources)  
+• `ex3` = 1d8 (three or more sources)
+
+**Explicit Dice Sizes:**
+• `ex4`, `ex6`, `ex8` (standard)
+• `ex10`, `ex12`, `ex20`, `ex100` (house rules)
+
+**Advantage/Disadvantage (only d20 rolled twice):**
+• `+a5e +5 ex1` → 2d20 kh1+5 + 1d4 (advantage + expertise)
+• `-a5e +5 ex1` → 2d20 kl1+5 + 1d4 (disadvantage + expertise)
+• `+a5e ex2` → 2d20 kh1 + 1d6 (advantage, no modifier)
+
+**Common Usage Examples:**
+• `a5e +7 ex1` - Attack roll with proficiency bonus and one expertise source
+• `+a5e +3 ex2` - Advantage on ability check with two expertise sources  
+• `-a5e +5 ex3` - Disadvantage on saving throw with maximum expertise
+• `a5e +12 ex6` - High-level attack with explicit d6 expertise die
+
+Use `/help` for basic syntax and `/help alias` for more shortcuts!"#
+        .to_string()
+}

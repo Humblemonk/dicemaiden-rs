@@ -114,6 +114,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
         "help" => return Ok(CommandResponse::private(help_text::generate_basic_help())),
         "help alias" => return Ok(CommandResponse::private(help_text::generate_alias_help())),
         "help system" => return Ok(CommandResponse::private(help_text::generate_system_help())),
+        "help a5e" => return Ok(CommandResponse::private(help_text::generate_a5e_help())),
         "donate" => return Ok(CommandResponse::public(generate_donate_text())),
         "bot-info" => {
             let bot_info = generate_bot_info(ctx).await?;
