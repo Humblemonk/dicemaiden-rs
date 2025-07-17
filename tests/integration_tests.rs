@@ -414,8 +414,7 @@ fn test_error_scenarios() {
 
 #[test]
 fn test_roll_set_validation_all_paths() {
-    // CRITICAL: Ensure validation works across ALL parsing paths to prevent future bypasses
-
+    // Ensure validation works across ALL parsing paths to prevent future bypasses
     let critical_test_cases = vec![
         // Direct roll set patterns
         ("1 d6", false, "Direct single roll set"),
