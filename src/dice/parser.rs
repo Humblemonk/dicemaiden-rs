@@ -220,7 +220,7 @@ fn is_valid_roll_set_expression(expr: &str) -> bool {
 
     // Check if it's a known alias FIRST (before rejecting operators)
     // This catches +d20, -d20, +d%, -d%, sw8, 4cod, etc.
-    // CRITICAL: This fixes "3 sw8 + 5" because "sw8 + 5" has no direct alias
+    // This fixes "3 sw8 + 5" because "sw8 + 5" has no direct alias
     // but "sw8" does, so we need better checking
     if super::aliases::expand_alias(expr).is_some() {
         return true;
@@ -934,8 +934,8 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
             (r"^(k\d+)", "keep high"),           // k3
             (r"^(d\d+)", "drop"),                // d1
             (r"^(r\d+)", "reroll"),              // r1
-            (r"^(t\d+)", "target"),              // t4, t7 - CRITICAL
-            (r"^(f\d+)", "failure"),             // f1 - CRITICAL
+            (r"^(t\d+)", "target"),              // t4, t7
+            (r"^(f\d+)", "failure"),             // f1
             (r"^(e\d*)", "explode"),             // e, e6 (AFTER indefinite explode)
             (r"^(b\d*)", "botch"),               // b, b1
             (r"^(c)", "cancel"),                 // c

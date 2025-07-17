@@ -955,7 +955,7 @@ fn test_modifier_order_regression_protection() {
 
 #[test]
 fn test_roll_set_validation_bug_regression() {
-    // CRITICAL: Test the exact bug cases that were reported to ensure they never return
+    // Test the exact bug cases that were reported to ensure they never return
 
     // BUG CASE 1: Single roll set must fail
     let result = parse_and_roll("1 d20+3");
@@ -984,7 +984,7 @@ fn test_roll_set_validation_bug_regression() {
 
 #[test]
 fn test_roll_set_validation_with_flags() {
-    // CRITICAL: Ensure validation works consistently with flags (common user scenario)
+    // Ensure validation works consistently with flags (common user scenario)
 
     // Invalid with flags must fail
     assert!(
@@ -1762,8 +1762,7 @@ fn test_all_double_success_variants() {
 
 #[test]
 fn test_lasers_feelings_no_standalone_l_conflict() {
-    // CRITICAL: Ensure L&F doesn't trigger standalone 'l' error
-
+    // Ensure L&F doesn't trigger standalone 'l' error
     let lf_patterns = vec![
         ("2lf4l", "Lasers & Feelings with explicit Lasers"),
         ("2lf4f", "Lasers & Feelings with explicit Feelings"),
@@ -1806,8 +1805,7 @@ fn test_lasers_feelings_no_standalone_l_conflict() {
 
 #[test]
 fn test_existing_l_patterns_still_rejected() {
-    // CRITICAL: Ensure we didn't break existing 'l' validation
-
+    // Ensure we didn't break existing 'l' validation
     let invalid_l_patterns = vec![
         ("1d6 l", "Standalone l modifier"),
         ("2d6 k2 l", "l after other modifiers"),
