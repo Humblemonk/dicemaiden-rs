@@ -948,6 +948,8 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
             (r"^(cpr)", "cyberpunk red"),        // cpr
             (r"^(wit)", "witcher"),              // wit
             (r"^(bnw)", "brave new world"),      // bnw
+            (r"^(alien)", "alien base"),         // alien (exact)
+            (r"^(aliens\d+)", "alien stress"),   // aliens1, aliens2, etc.
         ];
 
         let mut found_match = false;
@@ -1317,16 +1319,18 @@ fn is_modifier_start(input: &str) -> bool {
         r"^b\d*",   // Botch: b, b1
         r"^c$",     // Cancel: c (exact match)
         // System modifiers
-        r"^wng",     // Wrath & Glory patterns
-        r"^gb$",     // Godbound (exact)
-        r"^gbs$",    // Godbound straight (exact)
-        r"^hs[nkh]", // Hero System
-        r"^dh$",     // Dark Heresy (exact)
-        r"^fudge$",  // Fudge (exact)
-        r"^df$",     // Fudge dice (exact)
-        r"^d6s\d+",  // D6 System
-        r"^cpr$",    // Cyberpunk Red (exact)
-        r"^wit$",    // Witcher (exact)
+        r"^wng",       // Wrath & Glory patterns
+        r"^gb$",       // Godbound (exact)
+        r"^gbs$",      // Godbound straight (exact)
+        r"^hs[nkh]",   // Hero System
+        r"^dh$",       // Dark Heresy (exact)
+        r"^fudge$",    // Fudge (exact)
+        r"^df$",       // Fudge dice (exact)
+        r"^d6s\d+",    // D6 System
+        r"^cpr$",      // Cyberpunk Red (exact)
+        r"^wit$",      // Witcher (exact)
+        r"^alien$",    // Alien base modifier (exact)
+        r"^aliens\d+", // Alien stress modifiers: aliens1, aliens2, etc.
     ];
 
     // Check if the input starts with any of these patterns
@@ -1444,6 +1448,26 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
     // Reject standalone 'l' - it should only appear in d6l aliases
     if part == "l" {
         return Err(anyhow!("Unrecognized modifier pattern: 'l' in 'l'"));
+    }
+
+    // Check for Alien RPG modifiers first
+    if part == "alien" {
+        return Ok(Modifier::Alien);
+    }
+
+    if let Some(stripped) = part.strip_prefix("aliens") {
+        let stress_level: u32 = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid stress level in Alien stress modifier '{}'", part))?;
+
+        if stress_level == 0 {
+            return Err(anyhow!("Alien stress level cannot be 0"));
+        }
+        if stress_level > 10 {
+            return Err(anyhow!("Alien stress level cannot exceed 10"));
+        }
+
+        return Ok(Modifier::AlienStress(stress_level));
     }
 
     // System modifiers

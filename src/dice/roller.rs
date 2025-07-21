@@ -104,6 +104,9 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         wng_exalted_icons: None,
         wng_wrath_dice: None,
         suppress_comment: false,
+        alien_stress_level: None,
+        alien_panic_roll: None,
+        alien_stress_ones: None,
     };
 
     // Normal dice rolling flow for non-special systems
@@ -652,6 +655,14 @@ fn apply_special_system_modifiers(
     // Process modifiers in order, respecting their position relative to targets
     for (index, modifier) in dice.modifiers.iter().enumerate() {
         match modifier {
+            Modifier::Alien => {
+                apply_alien_base_modifier(result)?;
+                has_special_system = true;
+            }
+            Modifier::AlienStress(stress_level) => {
+                apply_alien_stress_modifier(result, *stress_level, rng)?;
+                has_special_system = true;
+            }
             // TargetWithDoubleSuccess must come BEFORE existing Target case
             Modifier::TargetWithDoubleSuccess(target, double_success_value) => {
                 // Apply any mathematical modifiers that come BEFORE this target
@@ -928,6 +939,11 @@ fn apply_special_system_modifiers(
         .any(|m| matches!(m, Modifier::Witcher));
     if (has_cpr || has_witcher) && has_math_modifiers {
         apply_mathematical_modifiers_to_cpr_total(result, dice)?;
+    }
+
+    // Apply mathematical modifiers to special systems if needed
+    if has_special_system && has_math_modifiers {
+        apply_mathematical_modifiers_to_special_systems(result, dice)?;
     }
 
     Ok(())
@@ -1565,6 +1581,9 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
         wng_exalted_icons: None,
         wng_wrath_dice: None,
         suppress_comment: false,
+        alien_stress_level: None,
+        alien_panic_roll: None,
+        alien_stress_ones: None,
     };
 
     // Find the Savage Worlds modifier
@@ -1748,6 +1767,9 @@ fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResul
         wng_exalted_icons: None,
         wng_wrath_dice: None,
         suppress_comment: false,
+        alien_stress_level: None,
+        alien_panic_roll: None,
+        alien_stress_ones: None,
     };
 
     // Find the D6 System modifier
@@ -1909,6 +1931,9 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
         wng_exalted_icons: None,
         wng_wrath_dice: None,
         suppress_comment: false,
+        alien_stress_level: None,
+        alien_panic_roll: None,
+        alien_stress_ones: None,
     };
 
     // Find the Marvel Multiverse modifier
@@ -2426,6 +2451,9 @@ pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result
         wng_exalted_icons: None,
         wng_wrath_dice: None,
         suppress_comment: false,
+        alien_stress_level: None,
+        alien_panic_roll: None,
+        alien_stress_ones: None,
     };
 
     let pool_size = dice.count;
@@ -2554,6 +2582,9 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
         wng_exalted_icons: None,
         wng_wrath_dice: None,
         suppress_comment: false,
+        alien_stress_level: None,
+        alien_panic_roll: None,
+        alien_stress_ones: None,
     };
 
     // Find the ConanSkill modifier to get dice count
@@ -2739,6 +2770,9 @@ fn handle_conan_combat_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRe
         wng_exalted_icons: None,
         wng_wrath_dice: None,
         suppress_comment: false,
+        alien_stress_level: None,
+        alien_panic_roll: None,
+        alien_stress_ones: None,
     };
 
     // Find the ConanCombat modifier to get dice count
@@ -2857,6 +2891,9 @@ fn handle_silhouette_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
         wng_exalted_icons: None,
         wng_wrath_dice: None,
         suppress_comment: false,
+        alien_stress_level: None,
+        alien_panic_roll: None,
+        alien_stress_ones: None,
     };
 
     // Roll the dice pool
@@ -3242,6 +3279,9 @@ fn handle_vtm5_roll(
         wng_exalted_icons: None,
         wng_wrath_dice: None,
         suppress_comment: false,
+        alien_stress_level: None,
+        alien_panic_roll: None,
+        alien_stress_ones: None,
     };
 
     let regular_dice = pool_size - hunger_dice;
@@ -3432,6 +3472,116 @@ fn apply_laser_feelings_mechanics(
         result.notes.push(format!(
             "💡 **{laser_feelings_count}** LASER FEELINGS! Ask the GM a question!"
         ));
+    }
+
+    Ok(())
+}
+
+fn apply_alien_base_modifier(result: &mut RollResult) -> Result<()> {
+    // Count 6s as successes for base Alien dice
+    let success_count = result.kept_rolls.iter().filter(|&&roll| roll == 6).count() as i32;
+
+    result.successes = Some(result.successes.unwrap_or(0) + success_count);
+
+    Ok(())
+}
+
+fn apply_alien_stress_modifier(
+    result: &mut RollResult,
+    stress_level: u32,
+    rng: &mut impl Rng,
+) -> Result<()> {
+    // Count 6s as successes for stress dice
+    let success_count = result.kept_rolls.iter().filter(|&&roll| roll == 6).count() as i32;
+
+    result.successes = Some(result.successes.unwrap_or(0) + success_count);
+
+    // Count 1s on stress dice for panic checks
+    let ones_count = result.kept_rolls.iter().filter(|&&roll| roll == 1).count() as i32;
+
+    result.alien_stress_ones = Some(ones_count);
+    result.alien_stress_level = Some(stress_level);
+
+    // Add stress system note
+    result.notes.push(format!(
+        "⚡ **STRESS DICE** (Level {stress_level}): 6s = successes, 1s = panic risk"
+    ));
+
+    // If we rolled any 1s on stress dice, trigger panic roll
+    if ones_count > 0 {
+        let panic_roll = rng.random_range(1..=6) + stress_level as i32;
+        result.alien_panic_roll = Some(panic_roll);
+
+        // Add panic roll note with interpretation
+        let panic_effect = interpret_panic_roll(panic_roll);
+        result.notes.push(format!(
+            "💀 **PANIC ROLL**: {ones_count}d6 + {stress_level} stress = **{panic_roll}** → {panic_effect}"
+        ));
+
+        // Add flavor note about push restriction
+        result
+            .notes
+            .push("⚠️  **Cannot push this roll** (rolled 1s on stress dice)".to_string());
+    } else {
+        // Add push availability note
+        result
+            .notes
+            .push("🔄 **Push available**: Add 'p' to alias to push (e.g., alien4s2p)".to_string());
+    }
+
+    Ok(())
+}
+
+fn interpret_panic_roll(panic_total: i32) -> String {
+    match panic_total {
+        1..=6 => "Keeping it together".to_string(),
+        7 => "Tremble - Shaky hands (-2 to next roll)".to_string(),
+        8 => "Drop Item - You drop a weapon or important item".to_string(),
+        9 => "Freeze - You lose your next turn".to_string(),
+        10 => "Seek Cover - You must move to safety immediately".to_string(),
+        11 => "Scream - Everyone who hears you must make a Panic Roll".to_string(),
+        12 => "Flee - You must move away from the threat".to_string(),
+        13 => "Berserk - You attack the nearest person or creature".to_string(),
+        14 => "Catatonic - You become unresponsive for one turn".to_string(),
+        15..=99 => "Heart Attack - You suffer a heart attack and become Broken".to_string(),
+        _ => "Catastrophic Panic".to_string(),
+    }
+}
+
+fn apply_mathematical_modifiers_to_special_systems(
+    result: &mut RollResult,
+    dice: &DiceRoll,
+) -> Result<()> {
+    // Apply mathematical modifiers to success-based systems like Alien RPG
+    if result.successes.is_some() {
+        for modifier in &dice.modifiers {
+            match modifier {
+                Modifier::Add(value) => {
+                    if let Some(ref mut successes) = result.successes {
+                        *successes += value;
+                    }
+                }
+                Modifier::Subtract(value) => {
+                    if let Some(ref mut successes) = result.successes {
+                        *successes -= value;
+                    }
+                }
+                Modifier::Multiply(value) => {
+                    if let Some(ref mut successes) = result.successes {
+                        *successes *= value;
+                    }
+                }
+                Modifier::Divide(value) => {
+                    if *value == 0 {
+                        return Err(anyhow!("Cannot divide by zero"));
+                    }
+                    if let Some(ref mut successes) = result.successes {
+                        *successes /= value;
+                    }
+                }
+                _ => {} // Skip non-mathematical modifiers
+            }
+        }
     }
 
     Ok(())

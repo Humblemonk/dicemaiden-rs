@@ -545,3 +545,71 @@ fn test_a5e_alias_performance() {
         duration.as_millis()
     );
 }
+
+#[test]
+fn test_alien_rpg_alias_performance() {
+    use dicemaiden_rs::dice::aliases;
+    use std::time::Instant;
+
+    // Test that Alien RPG alias expansion is fast
+    let start = Instant::now();
+
+    for _ in 0..1000 {
+        let _ = aliases::expand_alias("alien4");
+        let _ = aliases::expand_alias("alien5s2");
+        let _ = aliases::expand_alias("alien3s1p");
+        let _ = aliases::expand_alias("alien6s4");
+        let _ = aliases::expand_alias("alien10s10");
+    }
+
+    let duration = start.elapsed();
+    assert!(
+        duration.as_millis() < 100,
+        "Alien RPG alias expansion should be fast: {}ms",
+        duration.as_millis()
+    );
+}
+
+#[test]
+fn test_alien_panic_roll_performance() {
+    // Test that panic roll generation doesn't add significant overhead
+    // Note: We can't force panic rolls, but we can test the worst-case scenario
+
+    let panic_performance_tests = vec![
+        ("alien4s3", "Moderate stress (potential panic)", 200),
+        ("alien6s5", "High stress (potential panic)", 250),
+        ("alien10s10", "Maximum stress (potential panic)", 300),
+        ("10 alien4s3", "Multiple potential panic rolls", 500),
+        ("20 alien3s2", "Many moderate stress rolls", 600),
+    ];
+
+    // Run multiple times to potentially trigger panic mechanics
+    for (expression, _description, max_ms) in panic_performance_tests {
+        let mut total_time = 0u128;
+        let mut panic_count = 0;
+
+        // Run 10 times to get average performance and potentially trigger panics
+        for _ in 0..10 {
+            let (time, result) = measure_best_performance_time(expression, 1);
+            total_time += time;
+
+            if let Ok(results) = result {
+                for roll in &results {
+                    if roll.alien_panic_roll.is_some() {
+                        panic_count += 1;
+                    }
+                }
+            }
+        }
+
+        let avg_time = total_time / 10;
+        assert!(
+            avg_time <= max_ms,
+            "Alien panic performance test '{}' averaged {}ms, expected ≤{}ms (with {} panics)",
+            expression,
+            avg_time,
+            max_ms,
+            panic_count
+        );
+    }
+}

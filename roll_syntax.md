@@ -30,6 +30,40 @@
 
 ## Game System Aliases
 
+### Alien RPG (Year Zero Engine)
+- `alien4` → 4d6 alien (4 base dice, count 6s as successes)
+- `alien5s2` → 5d6 alien + 2d6 aliens2 (5 base + 2 stress dice)
+- `alien6s3p` → alien6s4 (push roll - increases stress from 3 to 4)
+- **Base Dice**: Roll d6s equal to attribute + skill, count 6s as successes
+- **Stress Dice**: Add more dice but 1s trigger panic rolls
+- **Push Mechanics**: Add 'p' to stress aliases to push (increases stress by 1)
+- **Panic System**: Automatic 1d6 + stress level when 1s appear on stress dice
+- **Stress Levels**: 1-10 maximum, higher levels = more effective but more dangerous
+
+**Examples:**
+- `alien4` → 4 base dice for attribute + skill roll
+- `alien5s1` → 5 base dice + 1 stress die
+- `alien3s2p` → Push previous roll (becomes alien3s3)
+- `3 alien4s2` → Roll 3 sets of 4 base + 2 stress dice
+
+**Panic Table Results:**
+- 1-6: Keeping it together
+- 7: Tremble (-2 to next roll)
+- 8: Drop item
+- 9: Freeze (lose next turn)
+- 10: Seek cover
+- 11: Scream (others must panic roll)
+- 12: Flee from threat
+- 13: Berserk attack
+- 14: Catatonic
+- 15+: Heart attack (Broken)
+
+**Mechanics:**
+- Success on 6s (Year Zero Engine standard)
+- Stress dice add successes but risk panic on 1s
+- Cannot push if stress dice show 1s
+- Automatic panic interpretation with results
+
 ### Savage Worlds
 - `sw4` → 1d4 trait + 1d6 wild, keep highest, both explode
 - `sw6` → 1d6 trait + 1d6 wild, keep highest, both explode

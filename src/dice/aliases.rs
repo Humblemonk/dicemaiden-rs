@@ -143,6 +143,17 @@ static A5E_DIS_REGEX: Lazy<Regex> = Lazy::new(|| {
         .expect("Failed to compile A5E_DIS_REGEX")
 });
 
+static ALIEN_BASIC_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(?i)alien(\d+)$").expect("Failed to compile ALIEN_BASIC_REGEX"));
+
+static ALIEN_STRESS_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(?i)alien(\d+)s(\d+)$").expect("Failed to compile ALIEN_STRESS_REGEX")
+});
+
+static ALIEN_PUSH_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(?i)alien(\d+)s(\d+)p$").expect("Failed to compile ALIEN_PUSH_REGEX")
+});
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -207,6 +218,11 @@ fn process_hero_system_dice(
 }
 
 fn expand_parameterized_alias(input: &str) -> Option<String> {
+    // Handle Alien RPG aliases first
+    if let Some(alien_result) = expand_alien_alias(input) {
+        return Some(alien_result);
+    }
+
     // Handle percentile advantage/disadvantage FIRST before general advantage/disadvantage
     if input == "+d%" {
         return Some("2d10 kl1 * 10 + 1d10 - 10".to_string());
@@ -1002,6 +1018,55 @@ pub fn expand_a5e_alias(input: &str) -> Option<String> {
     // Check for basic A5E
     if let Some(captures) = A5E_BASIC_REGEX.captures(input) {
         return process_a5e_captures(captures, A5eRollType::Basic);
+    }
+
+    None
+}
+
+fn expand_alien_alias(input: &str) -> Option<String> {
+    // Check for push roll first (alien4s3p -> alien4s4)
+    if let Some(captures) = ALIEN_PUSH_REGEX.captures(input) {
+        let base_dice = &captures[1];
+        let current_stress: u32 = captures[2].parse().ok()?;
+        let new_stress = current_stress + 1; // Push adds 1 stress
+
+        // Return the new stress level alias (which will be expanded again)
+        return Some(format!("alien{base_dice}s{new_stress}"));
+    }
+
+    // Check for stress dice (alien4s2 -> 4d6 alien + 2d6 aliens2)
+    if let Some(captures) = ALIEN_STRESS_REGEX.captures(input) {
+        let base_dice = &captures[1];
+        let stress_dice = &captures[2];
+
+        // Validate inputs
+        let base_count: u32 = base_dice.parse().ok()?;
+        let stress_level: u32 = stress_dice.parse().ok()?;
+
+        // Validate ranges
+        if base_count == 0 || base_count > 20 {
+            return None; // Invalid base dice count
+        }
+        if stress_level == 0 || stress_level > 10 {
+            return None; // Invalid stress level
+        }
+
+        return Some(format!(
+            "{base_dice}d6 alien + {stress_dice}d6 aliens{stress_dice}"
+        ));
+    }
+
+    // Check for basic alien roll (alien4 -> 4d6 alien)
+    if let Some(captures) = ALIEN_BASIC_REGEX.captures(input) {
+        let base_dice = &captures[1];
+
+        // Validate input
+        let base_count: u32 = base_dice.parse().ok()?;
+        if base_count == 0 || base_count > 20 {
+            return None; // Invalid base dice count
+        }
+
+        return Some(format!("{base_dice}d6 alien"));
     }
 
     None
