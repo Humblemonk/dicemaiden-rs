@@ -941,11 +941,6 @@ fn apply_special_system_modifiers(
         apply_mathematical_modifiers_to_cpr_total(result, dice)?;
     }
 
-    // Apply mathematical modifiers to special systems if needed
-    if has_special_system && has_math_modifiers {
-        apply_mathematical_modifiers_to_special_systems(result, dice)?;
-    }
-
     Ok(())
 }
 
@@ -3546,43 +3541,4 @@ fn interpret_panic_roll(panic_total: i32) -> String {
         15..=99 => "Heart Attack - You suffer a heart attack and become Broken".to_string(),
         _ => "Catastrophic Panic".to_string(),
     }
-}
-
-fn apply_mathematical_modifiers_to_special_systems(
-    result: &mut RollResult,
-    dice: &DiceRoll,
-) -> Result<()> {
-    // Apply mathematical modifiers to success-based systems like Alien RPG
-    if result.successes.is_some() {
-        for modifier in &dice.modifiers {
-            match modifier {
-                Modifier::Add(value) => {
-                    if let Some(ref mut successes) = result.successes {
-                        *successes += value;
-                    }
-                }
-                Modifier::Subtract(value) => {
-                    if let Some(ref mut successes) = result.successes {
-                        *successes -= value;
-                    }
-                }
-                Modifier::Multiply(value) => {
-                    if let Some(ref mut successes) = result.successes {
-                        *successes *= value;
-                    }
-                }
-                Modifier::Divide(value) => {
-                    if *value == 0 {
-                        return Err(anyhow!("Cannot divide by zero"));
-                    }
-                    if let Some(ref mut successes) = result.successes {
-                        *successes /= value;
-                    }
-                }
-                _ => {} // Skip non-mathematical modifiers
-            }
-        }
-    }
-
-    Ok(())
 }

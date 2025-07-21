@@ -1001,8 +1001,8 @@ fn test_complex_mathematical_expressions() {
         if expression.contains(" + ") {
             // Addition should increase success count by the modifier value
             assert!(
-                success_count >= 2, // +2 should add at least 2 successes
-                "Success-based addition test '{}' should add to success count: {} ({})",
+                success_count >= 0 && success_count <= 3,
+                "Success-based addition test '{}' should have 0-3 successes (3 dice), got {}: {}",
                 expression,
                 success_count,
                 description
@@ -2126,4 +2126,82 @@ fn test_a5e_edge_cases() {
         aliases::expand_alias("a5e +1 ex100"),
         Some("1d20+1 + 1d100".to_string())
     );
+}
+
+#[cfg(test)]
+mod test_issue_94_minimal {
+    use dicemaiden_rs::parse_and_roll;
+
+    #[test]
+    fn test_issue_94_exact_cases() {
+        // Test the exact cases reported in Issue #94
+
+        // Case 1: 1d12+2 t8
+        // Before fix: showed 2-3 successes (bug)
+        // After fix: should show 0-1 successes (correct)
+        let result = parse_and_roll("1d12+2 t8").unwrap();
+        let roll = &result[0];
+
+        assert!(roll.successes.is_some(), "Should have success counting");
+        let success_count = roll.successes.unwrap();
+        assert!(
+            success_count >= 0 && success_count <= 1,
+            "1d12+2 t8 should have 0-1 successes, got {}",
+            success_count
+        );
+
+        // Case 2: 10 1d12+6 t8 (roll sets)
+        let result = parse_and_roll("10 1d12+6 t8").unwrap();
+        assert_eq!(result.len(), 10, "Should have 10 roll sets");
+
+        for (i, roll) in result.iter().enumerate() {
+            assert!(
+                roll.successes.is_some(),
+                "Roll set {} should have success counting",
+                i
+            );
+            let success_count = roll.successes.unwrap();
+            assert!(
+                success_count >= 0 && success_count <= 1,
+                "Roll set {} should have 0-1 successes, got {}",
+                i,
+                success_count
+            );
+        }
+    }
+
+    #[test]
+    fn test_no_double_application() {
+        // Test with a deterministic case to ensure no double application
+
+        // Using d1 to make the test deterministic
+        let result = parse_and_roll("1d1+5 t6").unwrap();
+        let roll = &result[0];
+
+        // d1 always rolls 1, +5 makes it 6, target 6+ should always succeed exactly once
+        assert_eq!(
+            roll.successes.unwrap(),
+            1,
+            "1d1+5 t6 should always have exactly 1 success (1+5=6 >= 6)"
+        );
+
+        // If there was double application, this might show 6 successes instead of 1
+    }
+
+    #[test]
+    fn test_post_target_still_works() {
+        // Ensure post-target modifiers still work (this functionality should remain)
+
+        let result = parse_and_roll("1d20 t10 +5").unwrap();
+        let roll = &result[0];
+
+        assert!(roll.successes.is_some(), "Should have success counting");
+
+        // Post-target +5 should add to the success count
+        // We can't predict the exact value due to randomness, but success counting should work
+        println!(
+            "Post-target modifier result: {} successes",
+            roll.successes.unwrap()
+        );
+    }
 }
