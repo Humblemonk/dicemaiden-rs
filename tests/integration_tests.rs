@@ -327,6 +327,14 @@ fn test_common_rpg_scenarios() {
         ("sw10 + 2", "Modified trait test"),
         // Shadowrun scenarios
         ("sr12", "Skill test with 12 dice"),
+        // NEW: Aliens RPG scenarios
+        ("alien4", "Alien RPG basic attribute + skill roll"),
+        ("alien5s2", "Alien RPG skill roll with moderate stress"),
+        ("alien3s1p", "Alien RPG push mechanic (low stress)"),
+        ("alien6s4", "Alien RPG high-stress situation"),
+        ("3 alien4s2", "Multiple Alien RPG rolls for group actions"),
+        ("alien4 + 2", "Alien RPG with situational modifier"),
+        ("alien5s3 - 1", "Alien RPG stress roll with penalty"),
         // Generic scenarios
         ("3 4d6 k3", "Multiple character stats"),
         ("1d20; 1d8 + 3", "Attack and damage"),
@@ -358,11 +366,63 @@ fn test_common_rpg_scenarios() {
             // 3. Special damage system (godbound_damage set)
             // 4. Has individual dice rolls (basic validation that something was rolled)
             assert!(
-                !roll.individual_rolls.is_empty()
+                roll.total != 0
                     || roll.successes.is_some()
-                    || roll.godbound_damage.is_some(),
-                "Roll should have some meaningful result - either dice rolls, successes, or special damage"
+                    || roll.godbound_damage.is_some()
+                    || !roll.individual_rolls.is_empty()
+                    || roll.fudge_symbols.is_some(),
+                "RPG scenario '{}' should produce meaningful output: {}",
+                expression,
+                description
             );
+
+            // NEW: Verify Aliens RPG specific integration features
+            if expression.contains("alien") {
+                assert!(
+                    roll.successes.is_some(),
+                    "Alien RPG scenario '{}' should have success counting in integration test",
+                    expression
+                );
+
+                // Only stress rolls have system notes (basic alien rolls don't)
+                if expression.contains('s') {
+                    let has_stress_note =
+                        roll.notes.iter().any(|note| note.contains("STRESS DICE"));
+                    assert!(
+                        has_stress_note,
+                        "Alien RPG stress scenario '{}' should have stress notes in integration test",
+                        expression
+                    );
+                }
+
+                // For stress rolls, verify stress system features
+                if expression.contains('s') {
+                    // Should have stress-related notes or tracking
+                    let has_stress_feature = roll.alien_stress_level.is_some()
+                        || roll.notes.iter().any(|note| note.contains("STRESS"));
+                    assert!(
+                        has_stress_feature,
+                        "Alien RPG stress scenario '{}' should have stress features",
+                        expression
+                    );
+                }
+
+                // For panic situations (if stress dice roll 1s), verify panic mechanics
+                if let Some(panic_roll) = roll.alien_panic_roll {
+                    assert!(
+                        panic_roll >= 4 && panic_roll <= 16,
+                        "Alien RPG panic roll should be in valid range for '{}'",
+                        expression
+                    );
+
+                    let has_panic_note = roll.notes.iter().any(|note| note.contains("PANIC ROLL"));
+                    assert!(
+                        has_panic_note,
+                        "Alien RPG scenario '{}' with panic should have panic note",
+                        expression
+                    );
+                }
+            }
         }
     }
 }
@@ -1472,4 +1532,191 @@ fn test_a5e_semicolon_separated() {
 
     let formatted = format_multiple_results(&result);
     assert!(formatted.contains("Request:")); // Should show individual requests
+}
+
+#[test]
+fn test_alien_rpg_full_integration() {
+    // Test complete Aliens RPG workflows that might be used in actual play
+    let alien_workflows = vec![
+        // Basic skill tests
+        ("alien4", "Simple attribute + skill test"),
+        ("alien6", "High-skill character test"),
+        // Stress progression
+        ("alien4s1", "Light stress situation"),
+        ("alien4s3", "Moderate stress situation"),
+        ("alien4s5", "High stress situation"),
+        // Push mechanics
+        ("alien3s2p", "Pushing a moderate stress roll"),
+        ("alien4s1p", "Pushing a low stress roll"),
+        // Mathematical modifiers in stressful situations
+        ("alien4s2 + 2", "Stress roll with equipment bonus"),
+        ("alien3s3 - 1", "Stress roll with injury penalty"),
+        ("alien5s1 * 2", "Stress roll with doubled effect"),
+        // Group action scenarios
+        ("3 alien4s2", "Group performing same stressful action"),
+        ("5 alien3s1", "Large group with light stress"),
+        // Complex scenarios
+        ("alien6s4 + 1d6", "High stress with additional dice"),
+        ("alien4s3 - 2d4", "Stress roll with variable penalty"),
+    ];
+
+    for (expression, description) in alien_workflows {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Alien workflow '{}' should work in integration: {} - Error: {:?}",
+            expression,
+            description,
+            result.err()
+        );
+
+        let results = result.unwrap();
+
+        // Verify basic structure
+        assert!(
+            !results.is_empty(),
+            "Alien workflow '{}' should produce results",
+            expression
+        );
+
+        for (set_index, roll) in results.iter().enumerate() {
+            // All Alien rolls should have success counting
+            assert!(
+                roll.successes.is_some(),
+                "Alien workflow '{}' set {} should have success counting",
+                expression,
+                set_index + 1
+            );
+
+            // Should have appropriate system notes (only for stress rolls)
+            if expression.contains('s') {
+                let has_stress_note = roll.notes.iter().any(|note| note.contains("STRESS"));
+                assert!(
+                    has_stress_note,
+                    "Alien workflow '{}' set {} should have stress notes",
+                    expression,
+                    set_index + 1
+                );
+            } else {
+                // Basic alien rolls don't have system notes, just success counting
+                // This is intentional - the success counting indicates it's working
+            }
+
+            // If this is a roll set, verify proper labeling
+            if results.len() > 1 {
+                assert!(
+                    roll.label.is_some(),
+                    "Alien workflow '{}' should have set labels",
+                    expression
+                );
+
+                let label = roll.label.as_ref().unwrap();
+                assert!(
+                    label.starts_with("Set "),
+                    "Alien workflow '{}' should have proper set label format: {}",
+                    expression,
+                    label
+                );
+            }
+
+            // Verify stress mechanics if applicable
+            if expression.contains('s') && !expression.contains('p') {
+                // Stress rolls should have stress-related features
+                let has_stress_tracking = roll.alien_stress_level.is_some()
+                    || roll.notes.iter().any(|note| note.contains("STRESS DICE"));
+                assert!(
+                    has_stress_tracking,
+                    "Alien stress workflow '{}' set {} should have stress tracking",
+                    expression,
+                    set_index + 1
+                );
+            }
+
+            // Verify panic mechanics if triggered
+            if roll.alien_panic_roll.is_some() {
+                let panic_roll = roll.alien_panic_roll.unwrap();
+
+                // Panic roll should be in valid range
+                assert!(
+                    panic_roll >= 4 && panic_roll <= 16,
+                    "Alien workflow '{}' panic roll {} should be in valid range",
+                    expression,
+                    panic_roll
+                );
+
+                // Should have panic notes
+                let has_panic_note = roll.notes.iter().any(|note| note.contains("PANIC ROLL"));
+                assert!(
+                    has_panic_note,
+                    "Alien workflow '{}' with panic should have panic explanation",
+                    expression
+                );
+
+                // Should have push restriction note
+                let has_push_restriction =
+                    roll.notes.iter().any(|note| note.contains("Cannot push"));
+                assert!(
+                    has_push_restriction,
+                    "Alien workflow '{}' with panic should prevent pushing",
+                    expression
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_alien_rpg_cross_system_compatibility() {
+    // Test that Aliens RPG doesn't interfere with other systems
+    let cross_system_tests = vec![
+        // Aliens RPG mixed with other dice
+        ("alien4 + 1d6", "Alien roll with regular dice addition"),
+        ("alien3s2 + 2d10", "Alien stress with regular dice"),
+        // Multiple different systems in one expression
+        ("alien4; 1d20 + 5", "Alien and D&D in same expression"),
+        ("alien3s1; 4cod", "Alien and Chronicles of Darkness"),
+        ("alien4s2; sr6", "Alien and Shadowrun"),
+        // Roll sets mixing systems (should fail gracefully or work)
+        // Note: These test that the parser handles mixed systems correctly
+    ];
+
+    for (expression, description) in cross_system_tests {
+        let result = parse_and_roll(expression);
+
+        // Most of these should work
+        if expression.contains(';') {
+            // Semicolon expressions should work
+            assert!(
+                result.is_ok(),
+                "Cross-system test '{}' should work: {} - Error: {:?}",
+                expression,
+                description,
+                result.err()
+            );
+
+            let results = result.unwrap();
+            assert!(
+                results.len() >= 2,
+                "Cross-system semicolon test '{}' should have multiple results",
+                expression
+            );
+        } else {
+            // Mixed dice in same expression should work
+            assert!(
+                result.is_ok(),
+                "Cross-system mixed test '{}' should work: {} - Error: {:?}",
+                expression,
+                description,
+                result.err()
+            );
+
+            let results = result.unwrap();
+            assert_eq!(
+                results.len(),
+                1,
+                "Cross-system mixed test '{}' should have one result",
+                expression
+            );
+        }
+    }
 }

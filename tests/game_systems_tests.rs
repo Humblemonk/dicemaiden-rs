@@ -3406,3 +3406,313 @@ fn test_a5e_alias_expansion_in_game_systems() {
         );
     }
 }
+
+// ============================================================================
+// ALIEN RPG TESTS
+// ============================================================================
+
+#[test]
+fn test_alien_rpg_basic_rolls() {
+    // Test basic alien rolls
+    let alien_basic_tests = vec![
+        ("alien3", "3d6 alien", "Basic 3 dice alien roll"),
+        ("alien4", "4d6 alien", "Basic 4 dice alien roll"),
+        ("alien6", "6d6 alien", "Basic 6 dice alien roll"),
+        ("alien10", "10d6 alien", "Large alien roll"),
+    ];
+
+    for (alias, expected_expansion, description) in alien_basic_tests {
+        // Test alias expansion
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(
+            expanded,
+            Some(expected_expansion.to_string()),
+            "Alien alias '{}' should expand to '{}': {}",
+            alias,
+            expected_expansion,
+            description
+        );
+
+        // Test that the roll works
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Alien roll '{}' should work: {} - Error: {:?}",
+            alias,
+            description,
+            result.err()
+        );
+
+        let results = result.unwrap();
+        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
+
+        // Should have success counting
+        assert!(
+            results[0].successes.is_some(),
+            "Alien roll '{}' should have success counting",
+            alias
+        );
+    }
+}
+
+#[test]
+fn test_alien_rpg_stress_rolls() {
+    // Test alien rolls with stress dice
+    let alien_stress_tests = vec![
+        ("alien3s1", "3d6 alien + 1d6 aliens1", "3 base + 1 stress"),
+        ("alien4s2", "4d6 alien + 2d6 aliens2", "4 base + 2 stress"),
+        ("alien5s3", "5d6 alien + 3d6 aliens3", "5 base + 3 stress"),
+        ("alien6s5", "6d6 alien + 5d6 aliens5", "6 base + 5 stress"),
+    ];
+
+    for (alias, expected_expansion, description) in alien_stress_tests {
+        // Test alias expansion
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(
+            expanded,
+            Some(expected_expansion.to_string()),
+            "Alien stress alias '{}' should expand to '{}': {}",
+            alias,
+            expected_expansion,
+            description
+        );
+
+        // Test that the roll works
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Alien stress roll '{}' should work: {} - Error: {:?}",
+            alias,
+            description,
+            result.err()
+        );
+
+        let results = result.unwrap();
+        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
+
+        // Should have success counting
+        assert!(
+            results[0].successes.is_some(),
+            "Alien stress roll '{}' should have success counting",
+            alias
+        );
+
+        // Note: We can't reliably test stress level tracking here because
+        // it depends on the specific dice rolled and modifiers applied.
+        // The stress level tracking will be tested in integration tests.
+
+        // Should have stress system notes
+        let has_stress_note = results[0]
+            .notes
+            .iter()
+            .any(|note| note.contains("STRESS DICE"));
+        assert!(
+            has_stress_note,
+            "Should have stress dice note for '{}'",
+            alias
+        );
+    }
+}
+
+#[test]
+fn test_alien_rpg_push_mechanics() {
+    // Test push mechanic (alien4s2p should become alien4s3)
+    let push_tests = vec![
+        ("alien4s2p", "alien4s3", "Push adds 1 stress level"),
+        ("alien3s1p", "alien3s2", "Push from stress 1 to 2"),
+        ("alien5s4p", "alien5s5", "Push from stress 4 to 5"),
+    ];
+
+    for (push_alias, expected_alias, description) in push_tests {
+        // Test that push alias expands to higher stress level
+        let push_expanded = aliases::expand_alias(push_alias);
+        let expected_expanded = aliases::expand_alias(expected_alias);
+
+        // Both should expand properly
+        assert!(
+            push_expanded.is_some(),
+            "Push alias '{}' should expand",
+            push_alias
+        );
+        assert!(
+            expected_expanded.is_some(),
+            "Expected alias '{}' should expand",
+            expected_alias
+        );
+
+        // The push should expand to the expected alias, then that gets expanded to dice
+        let push_first_expansion = push_expanded.unwrap();
+        assert_eq!(
+            push_first_expansion, expected_alias,
+            "Push alias '{}' should first expand to '{}': {}",
+            push_alias, expected_alias, description
+        );
+
+        // Test that the final expanded form works
+        let final_expansion = aliases::expand_alias(&push_first_expansion);
+        assert_eq!(
+            final_expansion, expected_expanded,
+            "Push alias final expansion should match expected for '{}'",
+            push_alias
+        );
+
+        // Test that the push roll works
+        let result = parse_and_roll(push_alias);
+        assert!(
+            result.is_ok(),
+            "Push roll '{}' should work: {} - Error: {:?}",
+            push_alias,
+            description,
+            result.err()
+        );
+    }
+}
+
+#[test]
+fn test_alien_rpg_panic_mechanics() {
+    // Test that panic rolls are generated when stress dice show 1s
+    // We can't control randomness, so we test the structure
+
+    for _ in 0..10 {
+        let result = parse_and_roll("alien4s3").unwrap();
+
+        // Should always have success counting
+        assert!(result[0].successes.is_some());
+
+        // Note: We can't reliably test stress level tracking in unit tests
+        // because it depends on which specific dice have the alien vs aliens modifiers.
+        // This would be better tested in integration tests.
+
+        // If panic roll exists, it should be reasonable
+        if let Some(panic_roll) = result[0].alien_panic_roll {
+            assert!(
+                panic_roll >= 4 && panic_roll <= 9, // 1d6(1-6) + 3 stress = 4-9
+                "Panic roll should be in range 4-9 for stress level 3, got {}",
+                panic_roll
+            );
+
+            // Should have panic roll note
+            let has_panic_note = result[0]
+                .notes
+                .iter()
+                .any(|note| note.contains("PANIC ROLL"));
+            assert!(
+                has_panic_note,
+                "Should have panic roll note when panic occurs"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_alien_rpg_with_roll_sets() {
+    // Test Alien RPG with roll sets
+    let result = parse_and_roll("3 alien4s2").unwrap();
+    assert_eq!(result.len(), 3, "Should have 3 roll sets");
+
+    for (i, roll) in result.iter().enumerate() {
+        assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
+        assert!(
+            roll.successes.is_some(),
+            "Each set should have success counting"
+        );
+
+        // Note: Stress level tracking depends on modifier application order
+        // which is complex with roll sets. This is better tested in integration tests.
+    }
+}
+
+#[test]
+fn test_alien_rpg_alias_validation() {
+    // Test invalid alien aliases
+    let invalid_aliases = vec![
+        "alien0",    // Zero dice
+        "alien4s0",  // Zero stress (should use basic alien)
+        "alien4s11", // Stress too high (max 10)
+        "alien21",   // Too many base dice (max 20)
+        "alienx",    // Invalid format
+    ];
+
+    for invalid_alias in invalid_aliases {
+        let expanded = aliases::expand_alias(invalid_alias);
+        assert!(
+            expanded.is_none(),
+            "Invalid alien alias '{}' should not expand",
+            invalid_alias
+        );
+    }
+}
+
+#[test]
+fn test_alien_rpg_stress_level_limits() {
+    // Test stress level validation
+    let stress_limit_tests = vec![
+        ("alien4s1", true, "Stress level 1 is valid"),
+        ("alien4s5", true, "Stress level 5 is valid"),
+        ("alien4s10", true, "Stress level 10 is valid (max)"),
+    ];
+
+    for (alias, should_work, description) in stress_limit_tests {
+        let expansion = aliases::expand_alias(alias);
+        assert_eq!(
+            expansion.is_some(),
+            should_work,
+            "Stress limit test '{}': {} - Result: {:?}",
+            alias,
+            description,
+            expansion
+        );
+
+        if should_work {
+            let result = parse_and_roll(alias);
+            assert!(
+                result.is_ok(),
+                "Valid alias '{}' should parse successfully: {}",
+                alias,
+                description
+            );
+        }
+    }
+}
+
+#[test]
+fn test_alien_rpg_notes_and_formatting() {
+    // Test that Alien RPG rolls have proper notes and formatting
+    let result = parse_and_roll("alien4s2").unwrap();
+    let roll = &result[0];
+
+    // Should have base dice note OR stress dice note (depends on modifier order)
+    let has_alien_note = roll.notes.iter().any(|note| note.contains("STRESS DICE"));
+    assert!(has_alien_note, "Should have stress dice related notes");
+
+    // Should have success counting
+    assert!(roll.successes.is_some(), "Should have success counting");
+}
+
+#[test]
+fn test_alien_rpg_mathematical_modifiers() {
+    // Test that mathematical modifiers work with Alien RPG
+    let modifier_tests = vec![
+        ("alien4 + 2", "Alien roll with addition"),
+        ("alien4s2 - 1", "Alien stress roll with subtraction"),
+        ("alien3s1 * 2", "Alien roll with multiplication"),
+    ];
+
+    for (expression, description) in modifier_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Alien mathematical modifier '{}' should work: {} - Error: {:?}",
+            expression,
+            description,
+            result.err()
+        );
+
+        let results = result.unwrap();
+        assert!(
+            results[0].successes.is_some(),
+            "Should maintain success counting with modifiers for '{}'",
+            expression
+        );
+    }
+}

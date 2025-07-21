@@ -87,6 +87,8 @@ pub enum Modifier {
     Silhouette(u32),
     VampireMasquerade5(u32, u32),
     LaserFeelings(u32, u32, LaserFeelingsType), // (dice_count, target, roll_type)
+    Alien,                                      // Basic alien roll (count 6s as successes)
+    AlienStress(u32), // Stress dice (count 6s, track 1s for panic, stress level)
 }
 
 #[derive(Debug, Clone)]
@@ -122,6 +124,9 @@ pub struct RollResult {
     pub wng_exalted_icons: Option<i32>, // Count of exalted icons (6 results)
     pub wng_wrath_dice: Option<Vec<i32>>, // All wrath dice values (for multiple dice)
     pub suppress_comment: bool,
+    pub alien_stress_level: Option<u32>, // Current stress level for Alien RPG
+    pub alien_panic_roll: Option<i32>,   // Panic roll result (1d6 + stress level)
+    pub alien_stress_ones: Option<i32>,  // Count of 1s rolled on stress dice
 }
 
 impl RollResult {

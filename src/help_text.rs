@@ -205,3 +205,59 @@ A5E uses expertise dice that add to d20 rolls. Multiple expertise sources don't 
 Use `/help` for basic syntax and `/help alias` for more shortcuts!"#
         .to_string()
 }
+
+pub fn generate_aliens_help() -> String {
+    r#"🎲 **Alien RPG (Year Zero Engine) System** 🎲
+
+**Note:**
+• Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+• If you experience a bug, please report the issue on GitHub!
+
+The Alien RPG uses the Year Zero Engine with **Base Dice** (safe) and **Stress Dice** (dangerous but powerful).
+
+**Basic Syntax:**
+• `alien4` → 4 base dice (attribute + skill roll)
+• `alien5s2` → 5 base dice + 2 stress dice
+• `alien3s1p` → Push roll (increases stress by 1)
+
+**Base Dice (Safe):**
+• Roll d6s equal to **Attribute + Skill**
+• Count 6s as successes - no negative effects
+
+**Stress Dice (Powerful but Dangerous):**
+• Add extra d6s to your roll for more successes
+• 6s = successes (just like base dice)
+• 1s = **PANIC RISK** - triggers automatic panic roll
+• Stress level ranges from 1-10
+
+**Panic System:**
+When stress dice show **1s**, you must make a panic roll:
+• Panic Roll = `1d6 + Current Stress Level`
+• Higher stress = worse panic effects
+
+**Panic Table Results:**
+• 1-6: Keeping it together (no effect)
+• 7: Tremble - Shaky hands (-2 to next roll)
+• 8: Drop Item - You drop a weapon or important item
+• 9: Freeze - You lose your next turn
+• 10: Seek Cover - You must move to safety immediately
+• 11: Scream - Everyone who hears you must make a Panic Roll
+• 12: Flee - You must move away from the threat
+• 13: Berserk - You attack the nearest person or creature
+• 14: Catatonic - You become unresponsive for one turn
+• 15+: Heart Attack - You suffer a heart attack and become Broken
+
+**Push Mechanics:**
+• Add 'p' to stress aliases to push: `alien4s2p` becomes `alien4s3`
+• Cannot push if you rolled any 1s on stress dice
+• Pushing adds +1 to your stress level
+• Risk vs. reward - more successes but higher panic risk
+
+**Stress Level Guidelines:**
+• 1-3: Low stress, manageable risk
+• 4-6: Moderate stress, noticeable panic effects
+• 7-10: High stress, severe consequences likely
+
+Use `/help` for basic syntax and `/help alias` for more shortcuts!"#
+        .to_string()
+}

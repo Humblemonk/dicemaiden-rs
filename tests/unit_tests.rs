@@ -131,6 +131,71 @@ fn test_malformed_input_validation() {
 // ============================================================================
 
 #[test]
+fn test_mathematical_modifiers_with_game_systems() {
+    // Test that mathematical modifiers work correctly with different system types
+    let system_modifier_tests = vec![
+        // Total-based systems
+        ("1d20 + 5", false, "Regular dice with addition"),
+        ("2d6 * 3", false, "Regular dice with multiplication"),
+        // Success-based systems
+        ("alien4 + 2", true, "Alien RPG with addition"),
+        ("alien3s2 - 1", true, "Alien RPG stress with subtraction"),
+        ("4cod + 3", true, "Chronicles of Darkness with addition"),
+        ("sr6 * 2", true, "Shadowrun with multiplication"),
+        ("4d10 t8 + 1", true, "Target system with addition"),
+        // Special systems
+        ("gb + 1d4", false, "Godbound damage with addition"),
+        ("4df + 2", false, "Fudge dice with addition"),
+    ];
+
+    for (expression, is_success_based, description) in system_modifier_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "System modifier test '{}' should work: {} - Error: {:?}",
+            expression,
+            description,
+            result.err()
+        );
+
+        let results = result.unwrap();
+        assert_eq!(
+            results.len(),
+            1,
+            "Should have one result for '{}'",
+            expression
+        );
+
+        let roll = &results[0];
+
+        if is_success_based {
+            assert!(
+                roll.successes.is_some(),
+                "Success-based system '{}' should have success counting: {}",
+                expression,
+                description
+            );
+        } else {
+            // For non-success systems, verify we have a meaningful total or special handling
+            assert!(
+                roll.total != 0 || roll.godbound_damage.is_some() || roll.fudge_symbols.is_some(),
+                "Non-success system '{}' should have total or special output: {}",
+                expression,
+                description
+            );
+        }
+
+        // All systems should produce some output
+        assert!(
+            !roll.individual_rolls.is_empty() || roll.fudge_symbols.is_some(),
+            "System modifier test '{}' should produce dice output: {}",
+            expression,
+            description
+        );
+    }
+}
+
+#[test]
 fn test_left_to_right_evaluation() {
     // Test that mathematical operations follow left-to-right order, not PEMDAS
     let math_tests = vec![
@@ -894,6 +959,62 @@ fn test_complex_mathematical_expressions() {
             expression, description
         );
     }
+
+    // NEW: Test mathematical modifiers with success-based systems (Aliens RPG)
+    let success_based_math_tests = vec![
+        // (expression, description)
+        ("alien3 + 2", "Alien basic with addition (success-based)"),
+        (
+            "alien4s2 - 1",
+            "Alien stress with subtraction (success-based)",
+        ),
+        (
+            "alien3s1 * 2",
+            "Alien stress with multiplication (success-based)",
+        ),
+    ];
+
+    for (expression, description) in success_based_math_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Success-based math test '{}' should parse: {} - Error: {:?}",
+            expression,
+            description,
+            result.err()
+        );
+
+        let results = result.unwrap();
+        assert!(
+            results[0].successes.is_some(),
+            "Success-based math test '{}' should maintain success counting: {}",
+            expression,
+            description
+        );
+
+        // Verify mathematical modifiers are applied (success count can be 0 due to randomness)
+        let success_count = results[0].successes.unwrap();
+
+        // For multiplication and division, we can't easily verify the modifier was applied
+        // since the base success count could be 0. Just verify success counting exists.
+        // For addition/subtraction, we can verify more specifically.
+        if expression.contains(" + ") {
+            // Addition should increase success count by the modifier value
+            assert!(
+                success_count >= 2, // +2 should add at least 2 successes
+                "Success-based addition test '{}' should add to success count: {} ({})",
+                expression,
+                success_count,
+                description
+            );
+        } else if expression.contains(" - ") {
+            // Subtraction could result in negative success count, which gets clamped
+            // Just verify it has success counting (already verified above)
+        } else {
+            // For multiplication and division, just verify success counting exists
+            // The actual result depends on random dice rolls
+        }
+    }
 }
 
 // ============================================================================
@@ -922,6 +1043,12 @@ fn test_modifier_order_regression_protection() {
         ("2lf4l", "Lasers & Feelings Lasers"),
         ("2lf4f", "Lasers & Feelings Feelings"),
         ("3lf3", "Generic Lasers & Feelings"),
+        // NEW: Aliens RPG system tests
+        ("alien4", "Alien RPG basic"),
+        ("alien4s2", "Alien RPG with stress"),
+        ("alien3s1 + 2", "Alien RPG with mathematical modifier"),
+        ("alien5s3p", "Alien RPG push mechanic"),
+        ("3 alien4s2", "Alien RPG roll sets"),
     ];
 
     for (expression, description) in regression_cases {
@@ -950,6 +1077,51 @@ fn test_modifier_order_regression_protection() {
             "Result should have positive total OR success counting OR special damage for '{}'",
             expression
         );
+
+        // NEW: Verify Aliens RPG specific features
+        if expression.contains("alien") {
+            assert!(
+                results[0].successes.is_some(),
+                "Alien RPG regression test '{}' should have success counting",
+                expression
+            );
+
+            // Only stress rolls have system notes (basic alien rolls don't)
+            if expression.contains('s') {
+                let has_stress_note = results[0]
+                    .notes
+                    .iter()
+                    .any(|note| note.contains("STRESS DICE"));
+                assert!(
+                    has_stress_note,
+                    "Alien RPG stress regression test '{}' should have stress notes",
+                    expression
+                );
+            }
+
+            // If it's a stress roll, verify stress tracking
+            if expression.contains('s') && !expression.contains('p') {
+                // Should have stress system features when stress dice are involved
+                // Note: Stress level tracking depends on actual dice results in realistic scenarios
+                let has_stress_note = results[0]
+                    .notes
+                    .iter()
+                    .any(|note| note.contains("STRESS DICE"));
+                assert!(
+                    has_stress_note,
+                    "Alien RPG stress regression test '{}' should have stress notes",
+                    expression
+                );
+            } else {
+                // Basic alien rolls don't have system notes - this is intentional
+                // The success counting field indicates the system is working correctly
+            }
+
+            // If it's a push roll, verify it parses correctly
+            if expression.contains('p') {
+                // Push should expand to higher stress level - tested in game_systems_tests.rs
+            }
+        }
     }
 }
 
