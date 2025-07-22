@@ -109,7 +109,6 @@ pub fn generate_system_help() -> String {
 
 **Note:**
 • Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
-• If you experience a bug, please report the issue on GitHub!
 
 **Percentile Advantage/Disadvantage:**
 • `/roll +d%` - Advantage (keeps lower tens die) for roll-under systems
