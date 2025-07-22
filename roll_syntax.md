@@ -168,9 +168,9 @@
 - `gbs 2d10 +5` → 2d10 straight damage +5
 
 ### Forged in the Dark
-- fitd1 → 1d6 FitD (1 die action roll)
-- fitd2 → 2d6 FitD (2 dice action roll)
-- fitd0 → 2d6 FitD zero dice (desperate position - take lowest)
+- `fitd1` → 1d6 FitD (1 die action roll)
+- `fitd2` → 2d6 FitD (2 dice action roll)
+- `fitd0` → 2d6 FitD zero dice (desperate position - take lowest)
 - Result System: Roll pool of d6s, take highest single die
 - 1-3: Failure (bad outcome)
 - 4-5: Partial Success (consequences)
