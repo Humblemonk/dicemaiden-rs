@@ -167,6 +167,17 @@
 - `gb 3d8` → 3d8 gb (3d8 with damage chart)
 - `gbs 2d10 +5` → 2d10 straight damage +5
 
+### Forged in the Dark
+- fitd1 → 1d6 FitD (1 die action roll)
+- fitd2 → 2d6 FitD (2 dice action roll)
+- fitd0 → 2d6 FitD zero dice (desperate position - take lowest)
+- Result System: Roll pool of d6s, take highest single die
+- 1-3: Failure (bad outcome)
+- 4-5: Partial Success (consequences)
+- 6: Success (you do it well)
+- Multiple 6s: Critical Success (extra advantage)
+- Zero Dice: Roll 2d6, take lowest (desperate situation)
+
 ### Brave New World Pool System
 - `bnw3` → 3-die pool: roll 3d6, take highest die, 6s explode
 - `bnw4 + 2` → 4-die pool with +2 modifier applied to final result

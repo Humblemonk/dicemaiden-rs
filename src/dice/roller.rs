@@ -107,6 +107,9 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         alien_stress_level: None,
         alien_panic_roll: None,
         alien_stress_ones: None,
+        fitd_outcome: None,
+        fitd_result: None,
+        fitd_highest_die: None,
     };
 
     // Normal dice rolling flow for non-special systems
@@ -688,6 +691,14 @@ fn apply_special_system_modifiers(
 
                 // Call our new function
                 count_dice_with_double_success(result, *target, *double_success_value)?;
+                has_special_system = true;
+            }
+            Modifier::ForgedDark => {
+                apply_forged_dark_mechanics(result)?;
+                has_special_system = true;
+            }
+            Modifier::ForgedDarkZero => {
+                apply_forged_dark_zero_mechanics(result)?;
                 has_special_system = true;
             }
             Modifier::TargetLowerWithDoubleSuccess(target, double_value) => {
@@ -1579,6 +1590,9 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
         alien_stress_level: None,
         alien_panic_roll: None,
         alien_stress_ones: None,
+        fitd_outcome: None,
+        fitd_result: None,
+        fitd_highest_die: None,
     };
 
     // Find the Savage Worlds modifier
@@ -1765,6 +1779,9 @@ fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResul
         alien_stress_level: None,
         alien_panic_roll: None,
         alien_stress_ones: None,
+        fitd_outcome: None,
+        fitd_result: None,
+        fitd_highest_die: None,
     };
 
     // Find the D6 System modifier
@@ -1929,6 +1946,9 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
         alien_stress_level: None,
         alien_panic_roll: None,
         alien_stress_ones: None,
+        fitd_outcome: None,
+        fitd_result: None,
+        fitd_highest_die: None,
     };
 
     // Find the Marvel Multiverse modifier
@@ -2449,6 +2469,9 @@ pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result
         alien_stress_level: None,
         alien_panic_roll: None,
         alien_stress_ones: None,
+        fitd_outcome: None,
+        fitd_result: None,
+        fitd_highest_die: None,
     };
 
     let pool_size = dice.count;
@@ -2580,6 +2603,9 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
         alien_stress_level: None,
         alien_panic_roll: None,
         alien_stress_ones: None,
+        fitd_outcome: None,
+        fitd_result: None,
+        fitd_highest_die: None,
     };
 
     // Find the ConanSkill modifier to get dice count
@@ -2768,6 +2794,9 @@ fn handle_conan_combat_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRe
         alien_stress_level: None,
         alien_panic_roll: None,
         alien_stress_ones: None,
+        fitd_outcome: None,
+        fitd_result: None,
+        fitd_highest_die: None,
     };
 
     // Find the ConanCombat modifier to get dice count
@@ -2889,6 +2918,9 @@ fn handle_silhouette_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
         alien_stress_level: None,
         alien_panic_roll: None,
         alien_stress_ones: None,
+        fitd_outcome: None,
+        fitd_result: None,
+        fitd_highest_die: None,
     };
 
     // Roll the dice pool
@@ -3277,6 +3309,9 @@ fn handle_vtm5_roll(
         alien_stress_level: None,
         alien_panic_roll: None,
         alien_stress_ones: None,
+        fitd_outcome: None,
+        fitd_result: None,
+        fitd_highest_die: None,
     };
 
     let regular_dice = pool_size - hunger_dice;
@@ -3541,4 +3576,80 @@ fn interpret_panic_roll(panic_total: i32) -> String {
         15..=99 => "Heart Attack - You suffer a heart attack and become Broken".to_string(),
         _ => "Catastrophic Panic".to_string(),
     }
+}
+
+/// Apply Forged in the Dark standard mechanics
+/// - Take the highest die from the pool
+/// - Classify result: 1-3=failure, 4-5=partial success, 6=success, multiple 6s=critical
+fn apply_forged_dark_mechanics(result: &mut RollResult) -> Result<()> {
+    if result.kept_rolls.is_empty() {
+        return Err(anyhow!("No dice to apply FitD mechanics to"));
+    }
+
+    // Find the highest die
+    let highest_die = *result.kept_rolls.iter().max().unwrap();
+
+    // Count how many 6s we have for critical success detection
+    let six_count = result.kept_rolls.iter().filter(|&&die| die == 6).count();
+
+    // Classify the result based on highest die
+    let (outcome, fitd_result) = match highest_die {
+        1..=3 => ("FAILURE", "Bad outcome - GM makes a move"),
+        4..=5 => ("PARTIAL SUCCESS", "You do it, but with consequences"),
+        6 => {
+            if six_count > 1 {
+                ("CRITICAL SUCCESS", "Great effect + extra advantage!")
+            } else {
+                ("SUCCESS", "You do it well")
+            }
+        }
+        _ => ("UNKNOWN", "Invalid die result"), // Shouldn't happen with d6s
+    };
+
+    // Store the result
+    result.fitd_outcome = Some(outcome.to_string());
+    result.fitd_result = Some(fitd_result.to_string());
+    result.fitd_highest_die = Some(highest_die);
+
+    if six_count > 1 {
+        result.notes.push(format!(
+            "⚡ **CRITICAL**: {six_count} sixes rolled - extra advantage!"
+        ));
+    }
+
+    Ok(())
+}
+
+/// Apply Forged in the Dark zero dice mechanics
+/// - Roll 2d6 and take the LOWEST result (desperate situation)
+/// - Same classification as standard FitD
+fn apply_forged_dark_zero_mechanics(result: &mut RollResult) -> Result<()> {
+    if result.kept_rolls.len() != 2 {
+        return Err(anyhow!("FitD zero dice requires exactly 2 dice"));
+    }
+
+    // Find the lowest die (opposite of standard FitD)
+    let lowest_die = *result.kept_rolls.iter().min().unwrap();
+
+    // Classify the result based on lowest die
+    let (outcome, fitd_result) = match lowest_die {
+        1..=3 => ("FAILURE", "Bad outcome - GM makes a hard move"),
+        4..=5 => (
+            "PARTIAL SUCCESS",
+            "You do it, but with serious consequences",
+        ),
+        6 => ("SUCCESS", "You do it, but it's costly"),
+        _ => ("UNKNOWN", "Invalid die result"),
+    };
+
+    // Store the result
+    result.fitd_outcome = Some(outcome.to_string());
+    result.fitd_result = Some(fitd_result.to_string());
+    result.fitd_highest_die = Some(lowest_die); // Store as "highest" even though it's lowest
+
+    result
+        .notes
+        .push("⚠️ **DESPERATE POSITION**: Zero dice - risky situation!".to_string());
+
+    Ok(())
 }
