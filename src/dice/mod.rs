@@ -89,6 +89,8 @@ pub enum Modifier {
     LaserFeelings(u32, u32, LaserFeelingsType), // (dice_count, target, roll_type)
     Alien,                                      // Basic alien roll (count 6s as successes)
     AlienStress(u32), // Stress dice (count 6s, track 1s for panic, stress level)
+    ForgedDark,
+    ForgedDarkZero,
 }
 
 #[derive(Debug, Clone)]
@@ -127,6 +129,9 @@ pub struct RollResult {
     pub alien_stress_level: Option<u32>, // Current stress level for Alien RPG
     pub alien_panic_roll: Option<i32>,   // Panic roll result (1d6 + stress level)
     pub alien_stress_ones: Option<i32>,  // Count of 1s rolled on stress dice
+    pub fitd_outcome: Option<String>, // "SUCCESS", "PARTIAL SUCCESS", "FAILURE", "CRITICAL SUCCESS"
+    pub fitd_result: Option<String>,  // Description of what the outcome means
+    pub fitd_highest_die: Option<i32>, // The key die used for the result
 }
 
 impl RollResult {
@@ -262,6 +267,11 @@ impl RollResult {
             return format!(
                 "{wrath_display} | TOTAL - Icons: `{icons}` Exalted Icons: `{exalted_icons}` (Value:{exalted_value})"
             );
+        }
+
+        // Forged in the Dark result formatting
+        if let (Some(outcome), Some(highest_die)) = (&self.fitd_outcome, self.fitd_highest_die) {
+            return format!("**{outcome}** (die: `{highest_die}`)");
         }
 
         if let Some(gb_damage) = self.godbound_damage {

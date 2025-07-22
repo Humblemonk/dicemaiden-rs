@@ -23,6 +23,7 @@
 - Support for Vampire 5e
 - Support for Laser and Feelings
 - Support Level up D&D 5th Edition
+- Support for Forged in the Dark
 - "stability and performance improvements"
 
 ## [1.3.0] - 2025-07-03

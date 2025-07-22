@@ -154,6 +154,9 @@ static ALIEN_PUSH_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(?i)alien(\d+)s(\d+)p$").expect("Failed to compile ALIEN_PUSH_REGEX")
 });
 
+static FITD_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(?i)fitd(\d+)$").expect("Failed to compile FITD_REGEX"));
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -174,6 +177,13 @@ static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| 
     aliases.insert("conan", "2d20 conan");
     aliases.insert("cd", "1d6 cd");
     aliases.insert("sil", "1d6 sil1");
+    aliases.insert("fitd1", "1d6 fitd");
+    aliases.insert("fitd2", "2d6 fitd");
+    aliases.insert("fitd3", "3d6 fitd");
+    aliases.insert("fitd4", "4d6 fitd");
+    aliases.insert("fitd5", "5d6 fitd");
+    aliases.insert("fitd6", "6d6 fitd");
+    aliases.insert("fitd0", "2d6 fitd0"); // Zero dice - special case
     aliases
 });
 
@@ -659,6 +669,20 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
 
             return Some(format!("{dice_count}d6 lf{target}{lf_type}"));
         }
+    }
+
+    // Forged in the Dark (fitd7 -> 7d6 fitd, fitd0 -> 2d6 fitd0)
+    if let Some(captures) = FITD_REGEX.captures(input) {
+        let dice_count_str = &captures[1];
+
+        if let Ok(dice_count) = dice_count_str.parse::<u32>() {
+            if dice_count == 0 {
+                return Some("2d6 fitd0".to_string());
+            } else if dice_count <= 10 {
+                return Some(format!("{dice_count}d6 fitd"));
+            }
+        }
+        return None; // Invalid dice count
     }
 
     None

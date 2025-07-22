@@ -1331,6 +1331,8 @@ fn is_modifier_start(input: &str) -> bool {
         r"^wit$",      // Witcher (exact)
         r"^alien$",    // Alien base modifier (exact)
         r"^aliens\d+", // Alien stress modifiers: aliens1, aliens2, etc.
+        r"^fitd$",     // Forged in the Dark (exact)
+        r"^fitd0$",    // FitD zero dice (exact)
     ];
 
     // Check if the input starts with any of these patterns
@@ -1468,6 +1470,15 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         }
 
         return Ok(Modifier::AlienStress(stress_level));
+    }
+
+    // Forged in the Dark modifiers
+    if part == "fitd" {
+        return Ok(Modifier::ForgedDark);
+    }
+
+    if part == "fitd0" {
+        return Ok(Modifier::ForgedDarkZero);
     }
 
     // System modifiers

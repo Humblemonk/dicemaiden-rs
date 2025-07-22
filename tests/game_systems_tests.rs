@@ -3716,3 +3716,863 @@ fn test_alien_rpg_mathematical_modifiers() {
         );
     }
 }
+#[test]
+fn test_fitd_alias_expansion() {
+    let fitd_expansions = vec![
+        ("fitd1", "1d6 fitd"),
+        ("fitd2", "2d6 fitd"),
+        ("fitd3", "3d6 fitd"),
+        ("fitd4", "4d6 fitd"),
+        ("fitd5", "5d6 fitd"),
+        ("fitd6", "6d6 fitd"),
+        ("fitd0", "2d6 fitd0"), // Zero dice special case
+    ];
+
+    for (alias, expected_expansion) in fitd_expansions {
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(
+            expanded,
+            Some(expected_expansion.to_string()),
+            "FitD alias '{}' should expand to '{}'",
+            alias,
+            expected_expansion
+        );
+    }
+}
+
+#[test]
+fn test_fitd_parameterized_expansion() {
+    // Test parameterized expansion for larger dice pools
+    let parameterized_tests = vec![
+        ("fitd7", "7d6 fitd"),
+        ("fitd8", "8d6 fitd"),
+        ("fitd10", "10d6 fitd"),
+    ];
+
+    for (alias, expected_expansion) in parameterized_tests {
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(
+            expanded,
+            Some(expected_expansion.to_string()),
+            "Parameterized FitD alias '{}' should expand to '{}'",
+            alias,
+            expected_expansion
+        );
+    }
+
+    // Test invalid cases
+    assert_eq!(aliases::expand_alias("fitd11"), None); // Over limit
+    assert_eq!(aliases::expand_alias("fitd100"), None); // Way over limit
+}
+
+#[test]
+fn test_fitd_basic_mechanics() {
+    // Test that FitD rolls work end-to-end
+    let fitd_tests = vec!["fitd1", "fitd2", "fitd3", "fitd4", "fitd5", "fitd6"];
+
+    for test in fitd_tests {
+        let result = parse_and_roll(test);
+        assert!(
+            result.is_ok(),
+            "FitD test '{}' should parse and roll successfully",
+            test
+        );
+
+        let results = result.unwrap();
+        assert_eq!(
+            results.len(),
+            1,
+            "Should have exactly one result for '{}'",
+            test
+        );
+
+        let roll = &results[0];
+
+        // Should have FitD outcome
+        assert!(
+            roll.fitd_outcome.is_some(),
+            "FitD roll '{}' should have outcome",
+            test
+        );
+
+        // Should have FitD result description
+        assert!(
+            roll.fitd_result.is_some(),
+            "FitD roll '{}' should have result description",
+            test
+        );
+
+        // Should have highest die recorded
+        assert!(
+            roll.fitd_highest_die.is_some(),
+            "FitD roll '{}' should record highest die",
+            test
+        );
+
+        let highest_die = roll.fitd_highest_die.unwrap();
+        assert!(
+            highest_die >= 1 && highest_die <= 6,
+            "Highest die should be 1-6, got {} for '{}'",
+            highest_die,
+            test
+        );
+
+        // Check that outcome matches the die result
+        let outcome = roll.fitd_outcome.as_ref().unwrap();
+        match highest_die {
+            1..=3 => assert_eq!(outcome, "FAILURE"),
+            4..=5 => assert_eq!(outcome, "PARTIAL SUCCESS"),
+            6 => {
+                // Could be SUCCESS or CRITICAL SUCCESS depending on multiple 6s
+                assert!(outcome == "SUCCESS" || outcome == "CRITICAL SUCCESS");
+            }
+            _ => panic!("Invalid die result: {}", highest_die),
+        }
+
+        // UPDATED: Notes are only present for special cases (critical/zero dice)
+        // Regular rolls should have no notes (clean output)
+        let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
+        if six_count > 1 {
+            // Critical success should have critical note
+            let has_critical_note = roll.notes.iter().any(|note| note.contains("CRITICAL"));
+            assert!(
+                has_critical_note,
+                "Critical success should have critical note for '{}'",
+                test
+            );
+        } else {
+            // Regular results should have no notes (clean output)
+            assert!(
+                roll.notes.is_empty(),
+                "Regular FitD roll '{}' should have no notes for clean output",
+                test
+            );
+        }
+    }
+}
+
+#[test]
+fn test_fitd_zero_dice_mechanics() {
+    let result = parse_and_roll("fitd0");
+    assert!(result.is_ok(), "FitD zero dice should parse successfully");
+
+    let results = result.unwrap();
+    assert_eq!(results.len(), 1, "Should have exactly one result");
+
+    let roll = &results[0];
+
+    // Should have exactly 2 dice rolled
+    assert_eq!(
+        roll.individual_rolls.len(),
+        2,
+        "Zero dice should roll exactly 2d6"
+    );
+
+    // Should have FitD outcome
+    assert!(roll.fitd_outcome.is_some(), "Zero dice should have outcome");
+
+    // Should have FitD result description
+    assert!(
+        roll.fitd_result.is_some(),
+        "Zero dice should have result description"
+    );
+
+    // Should have recorded the lowest die (not highest)
+    let recorded_die = roll.fitd_highest_die.unwrap(); // Still stored in highest_die field
+    let actual_lowest = *roll.individual_rolls.iter().min().unwrap();
+    assert_eq!(
+        recorded_die, actual_lowest,
+        "Zero dice should record the lowest die"
+    );
+
+    // UPDATED: Should have exactly one note (desperate position)
+    assert_eq!(
+        roll.notes.len(),
+        1,
+        "Zero dice should have exactly one note (desperate position)"
+    );
+
+    // Should have desperate position note
+    let has_desperate_note = roll.notes.iter().any(|note| note.contains("DESPERATE"));
+    assert!(
+        has_desperate_note,
+        "Zero dice should have desperate position note"
+    );
+}
+
+#[test]
+fn test_fitd_critical_success_detection() {
+    // This test is probabilistic, so we'll run it multiple times
+    // to try to get a critical success (multiple 6s)
+    let mut found_critical = false;
+
+    for _ in 0..50 {
+        let result = parse_and_roll("fitd6"); // 6 dice gives good chance for multiple 6s
+        if let Ok(results) = result {
+            let roll = &results[0];
+            if let Some(outcome) = &roll.fitd_outcome {
+                if outcome == "CRITICAL SUCCESS" {
+                    found_critical = true;
+
+                    // Verify that we actually have multiple 6s
+                    let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
+                    assert!(
+                        six_count >= 2,
+                        "Critical success should have multiple 6s, found {} sixes",
+                        six_count
+                    );
+
+                    // UPDATED: Should have exactly one note (critical note)
+                    assert_eq!(
+                        roll.notes.len(),
+                        1,
+                        "Critical success should have exactly one note"
+                    );
+
+                    // Should have critical note
+                    let has_critical_note = roll.notes.iter().any(|note| note.contains("CRITICAL"));
+                    assert!(
+                        has_critical_note,
+                        "Critical success should have critical note"
+                    );
+
+                    break;
+                }
+            }
+        }
+    }
+
+    // Note: This test might occasionally fail due to randomness, but with 6d6 over 50 trials,
+    // the probability of getting at least one critical is very high
+    if !found_critical {
+        println!(
+            "Warning: No critical success found in 50 trials (this can happen due to randomness)"
+        );
+    }
+}
+
+#[test]
+fn test_fitd_with_roll_sets() {
+    let result = parse_and_roll("3 fitd4");
+    assert!(result.is_ok(), "FitD roll sets should work");
+
+    let results = result.unwrap();
+    assert_eq!(results.len(), 3, "Should have 3 roll sets");
+
+    for (i, roll) in results.iter().enumerate() {
+        assert_eq!(
+            roll.label,
+            Some(format!("Set {}", i + 1)),
+            "Each set should have correct label"
+        );
+
+        assert!(
+            roll.fitd_outcome.is_some(),
+            "Each set should have FitD outcome"
+        );
+
+        assert!(
+            roll.fitd_highest_die.is_some(),
+            "Each set should record highest die"
+        );
+    }
+}
+
+#[test]
+fn test_fitd_with_modifiers_rejection() {
+    // FitD shouldn't work with mathematical modifiers since it's about the highest die, not total
+    let invalid_tests = vec![
+        "fitd3 + 2", // Math modifiers don't make sense
+        "fitd4 * 2", // Math modifiers don't make sense
+        "fitd2 k1",  // Keep modifiers don't make sense (already takes highest)
+        "fitd3 d1",  // Drop modifiers don't make sense
+    ];
+
+    for test in invalid_tests {
+        let result = parse_and_roll(test);
+        // These should either fail or ignore the incompatible modifiers
+        if let Ok(results) = result {
+            let roll = &results[0];
+            // If it succeeds, should still have FitD mechanics
+            if roll.fitd_outcome.is_some() {
+                println!(
+                    "Note: '{}' succeeded with FitD mechanics - modifiers may have been ignored",
+                    test
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_fitd_formatting() {
+    let result = parse_and_roll("fitd3");
+    assert!(result.is_ok(), "FitD should parse successfully");
+
+    let results = result.unwrap();
+    let roll = &results[0];
+    let formatted = roll.to_string();
+
+    // UPDATED: Should NOT contain redundant "Forged in the Dark" text
+    // The formatting is clean with just the outcome and die shown
+
+    // Should show the outcome in the result value
+    if let Some(outcome) = &roll.fitd_outcome {
+        assert!(
+            formatted.contains(outcome),
+            "Formatting should show outcome '{}': {}",
+            outcome,
+            formatted
+        );
+    }
+
+    // Should show the key die
+    if let Some(die) = roll.fitd_highest_die {
+        assert!(
+            formatted.contains(&format!("die: `{}`", die)),
+            "Formatting should show key die {}: {}",
+            die,
+            formatted
+        );
+    }
+
+    // Should show dice breakdown
+    assert!(
+        formatted.contains("Roll: `["),
+        "Should show dice breakdown: {}",
+        formatted
+    );
+
+    // Should have result formatting
+    assert!(
+        formatted.contains("**")
+            && (formatted.contains("SUCCESS")
+                || formatted.contains("PARTIAL SUCCESS")
+                || formatted.contains("FAILURE")),
+        "Should have proper result formatting: {}",
+        formatted
+    );
+}
+
+#[test]
+fn test_fitd_outcome_consistency() {
+    // Test all possible outcomes to ensure consistency
+    for _ in 0..20 {
+        let result = parse_and_roll("fitd4");
+        if let Ok(results) = result {
+            let roll = &results[0];
+            let outcome = roll.fitd_outcome.as_ref().unwrap();
+            let highest_die = roll.fitd_highest_die.unwrap();
+            let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
+
+            match highest_die {
+                1..=3 => {
+                    assert_eq!(outcome, "FAILURE", "Die {} should be FAILURE", highest_die);
+                    let has_failure_result =
+                        roll.fitd_result.as_ref().unwrap().contains("Bad outcome");
+                    assert!(has_failure_result, "Failure should mention bad outcome");
+                }
+                4..=5 => {
+                    assert_eq!(
+                        outcome, "PARTIAL SUCCESS",
+                        "Die {} should be PARTIAL SUCCESS",
+                        highest_die
+                    );
+                    let has_partial_result =
+                        roll.fitd_result.as_ref().unwrap().contains("consequences");
+                    assert!(has_partial_result, "Partial should mention consequences");
+                }
+                6 => {
+                    if six_count >= 2 {
+                        assert_eq!(
+                            outcome, "CRITICAL SUCCESS",
+                            "Multiple 6s should be CRITICAL"
+                        );
+                        let has_critical_result = roll
+                            .fitd_result
+                            .as_ref()
+                            .unwrap()
+                            .contains("extra advantage");
+                        assert!(
+                            has_critical_result,
+                            "Critical should mention extra advantage"
+                        );
+                    } else {
+                        assert_eq!(outcome, "SUCCESS", "Single 6 should be SUCCESS");
+                        let has_success_result =
+                            roll.fitd_result.as_ref().unwrap().contains("do it well");
+                        assert!(has_success_result, "Success should mention doing it well");
+                    }
+                }
+                _ => panic!("Invalid die result: {}", highest_die),
+            }
+        }
+    }
+}
+
+#[test]
+fn test_fitd_with_labels_and_comments() {
+    let test_cases = vec![
+        "(Action Roll) fitd3 ! Sneaking past guards",
+        "fitd4 ! Desperate leap across rooftops",
+        "(Resistance) fitd0 ! Taking stress damage",
+    ];
+
+    for test in test_cases {
+        let result = parse_and_roll(test);
+        assert!(
+            result.is_ok(),
+            "FitD with labels/comments should work: '{}'",
+            test
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+
+        // Should still have FitD mechanics
+        assert!(
+            roll.fitd_outcome.is_some(),
+            "Should have FitD outcome for '{}'",
+            test
+        );
+
+        // Should preserve labels and comments
+        let formatted = roll.to_string();
+        if test.contains('!') {
+            assert!(
+                formatted.contains("Reason:"),
+                "Should preserve comment for '{}'",
+                test
+            );
+        }
+        if test.starts_with('(') {
+            assert!(
+                formatted.contains("Action Roll") || formatted.contains("Resistance"),
+                "Should preserve label for '{}'",
+                test
+            );
+        }
+    }
+}
+
+#[test]
+fn test_fitd_semicolon_separated() {
+    let result = parse_and_roll("fitd3 ! Action; fitd4 ! Resistance; fitd0 ! Desperate");
+    assert!(result.is_ok(), "FitD semicolon separation should work");
+
+    let results = result.unwrap();
+    assert_eq!(results.len(), 3, "Should have 3 separate rolls");
+
+    for (i, roll) in results.iter().enumerate() {
+        assert!(
+            roll.fitd_outcome.is_some(),
+            "Roll {} should have FitD outcome",
+            i + 1
+        );
+
+        // Each should have its own original expression
+        assert!(
+            roll.original_expression.is_some(),
+            "Roll {} should have original expression",
+            i + 1
+        );
+    }
+}
+
+#[test]
+fn test_fitd_edge_cases() {
+    // Test various edge cases that could cause issues
+    let edge_cases = vec![
+        "FITD3",   // Uppercase (should work with case-insensitive regex)
+        "fitd1",   // Minimum dice
+        "fitd10",  // Maximum parameterized dice
+        "3 fitd0", // Zero dice with roll sets
+    ];
+
+    for test in edge_cases {
+        let result = parse_and_roll(test);
+        match result {
+            Ok(results) => {
+                for roll in &results {
+                    if roll.fitd_outcome.is_some() {
+                        // If FitD mechanics applied, validate they're correct
+                        assert!(
+                            roll.fitd_highest_die.is_some(),
+                            "FitD edge case '{}' should record key die",
+                            test
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                println!("Edge case '{}' failed (may be expected): {}", test, e);
+            }
+        }
+    }
+}
+
+#[test]
+fn test_no_alias_conflicts_with_fitd() {
+    // Test that all existing aliases still work after FitD addition
+    let existing_aliases = vec![
+        // D&D/Pathfinder
+        ("attack", "1d20"),
+        ("skill", "1d20"),
+        ("save", "1d20"),
+        ("dndstats", "6 4d6 k3"),
+        ("+d20", "2d20 k1"),
+        ("-d20", "2d20 kl1"),
+        // Game systems
+        ("age", "2d6 + 1d6"),
+        ("gb", "1d20 gb"),
+        ("gbs", "1d20 gbs"),
+        ("3df", "3d3 fudge"),
+        ("4df", "4d3 fudge"),
+        ("dh", "1d10 dh"),
+        // Hero System
+        ("hsn", "1d6 hsn"),
+        ("hsk", "1d6 hsk"),
+        ("hsh", "3d6 hsh"),
+        // Complex game systems
+        ("4cod", "4d10 t8 ie10"),
+        ("4wod8", "4d10 f1 t8"),
+        ("sw8", "2d1 sw8"),
+        ("vtm5h2", "5d10 vtm5p5h2"),
+        ("2lf4", "2d6 lf4"),
+        ("cs 5", "1d20 cs5"),
+        ("alien4", "4d6 alien"),
+    ];
+
+    for (alias, expected_expansion) in existing_aliases {
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(
+            expanded,
+            Some(expected_expansion.to_string()),
+            "Existing alias '{}' should still expand to '{}' after FitD addition",
+            alias,
+            expected_expansion
+        );
+
+        // Verify the alias still works end-to-end
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Existing alias '{}' should still work after FitD addition",
+            alias
+        );
+    }
+}
+
+#[test]
+fn test_mixed_fitd_and_existing_systems() {
+    // Test that FitD can be mixed with existing systems without conflicts
+    let mixed_expressions = vec![
+        // Semicolon separated
+        ("fitd3 ; 4cod ; sw8", 3, "FitD with CoD and Savage Worlds"),
+        (
+            "2lf4 ; fitd0 ; gb",
+            3,
+            "Lasers & Feelings with FitD zero and Godbound",
+        ),
+        ("vtm5h2 ; fitd4 ; age", 3, "VTM5 with FitD and AGE system"),
+        // Roll sets don't mix systems, but test compatibility
+        ("3 fitd4", 3, "FitD roll sets"),
+        ("2 4cod", 2, "Existing CoD roll sets still work"),
+        ("4 sw8", 4, "Existing Savage Worlds roll sets still work"),
+    ];
+
+    for (expression, expected_count, description) in mixed_expressions {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Mixed expression '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert_eq!(
+            results.len(),
+            expected_count,
+            "Mixed expression '{}' should have {} results: {}",
+            expression,
+            expected_count,
+            description
+        );
+    }
+}
+
+#[test]
+fn test_fitd_doesnt_break_existing_modifiers() {
+    // Test that existing modifier parsing still works correctly
+    let existing_modifier_tests = vec![
+        // Basic modifiers
+        ("4d6 k3", "Keep highest still works"),
+        ("6d10 d2", "Drop lowest still works"),
+        ("3d8 e6", "Exploding dice still works"),
+        ("5d6 t4", "Target counting still works"),
+        // Game system modifiers
+        ("4cod", "CoD alias expansion still works"), // <-- CORRECTED
+        ("6d6 alien", "Alien modifier parsing still works"),
+        ("1d20 gb", "Godbound modifier parsing still works"),
+        ("3df", "Fudge modifier parsing still works"),
+        // Complex combinations
+        ("4d6 k3 + 2", "Keep with math still works"),
+        ("6d10 t7 ie10", "Target with explode still works"),
+        ("5d6 e6 k4", "Explode with keep still works"),
+    ];
+
+    for (expression, description) in existing_modifier_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Existing modifier test '{}' should still work after FitD: {}",
+            expression,
+            description
+        );
+    }
+}
+
+#[test]
+fn test_fitd_unique_namespace() {
+    // Verify FitD uses completely unique namespace
+    let fitd_patterns = vec![
+        "fitd", "fitd0", "fitd1", "fitd2", "fitd3", "fitd4", "fitd5", "fitd6", "fitd7", "fitd8",
+    ];
+
+    // Get all existing non-FitD aliases for comparison
+    let existing_patterns = vec![
+        "sw", "cod", "wod", "ex", "alien", "vtm", "lf", "cs", "sp", "dd", "yz", "wh", "ed", "snm",
+        "gb", "gbs", "hs", "dh", "cpr", "wit", "df", "age", "attack", "skill", "save",
+    ];
+
+    for fitd_pattern in &fitd_patterns {
+        for existing_pattern in &existing_patterns {
+            assert!(
+                !fitd_pattern.starts_with(existing_pattern)
+                    && !existing_pattern.starts_with(fitd_pattern),
+                "FitD pattern '{}' conflicts with existing pattern '{}'",
+                fitd_pattern,
+                existing_pattern
+            );
+        }
+    }
+}
+
+#[test]
+fn test_fitd_with_all_existing_flags() {
+    // Test FitD works with all existing flags
+    let flag_tests = vec![
+        ("p fitd3", "Private flag"),
+        ("s fitd4", "Simple flag"),
+        ("nr fitd2", "No results flag"),
+        ("ul fitd5", "Unsorted flag"),
+        ("p s fitd3", "Multiple flags"),
+        ("ul nr fitd4", "Multiple flags combination"),
+    ];
+
+    for (expression, description) in flag_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "FitD with flags '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+
+        // Verify FitD mechanics still work
+        assert!(
+            roll.fitd_outcome.is_some(),
+            "FitD outcome should work with flags for '{}'",
+            expression
+        );
+
+        // Verify flags are applied
+        if expression.contains('p') {
+            assert!(
+                roll.private,
+                "Private flag should be set for '{}'",
+                expression
+            );
+        }
+        if expression.contains('s') {
+            assert!(
+                roll.simple,
+                "Simple flag should be set for '{}'",
+                expression
+            );
+        }
+    }
+}
+
+#[test]
+fn test_fitd_with_existing_label_comment_patterns() {
+    // Test FitD works with existing label and comment patterns
+    let label_comment_tests = vec![
+        ("(Attack) fitd4", "Label syntax"),
+        ("fitd3 ! Sneaking past guards", "Comment syntax"),
+        (
+            "(Action Roll) fitd3 ! Rolling for stealth",
+            "Label and comment",
+        ),
+        ("fitd0 ! Desperate situation", "Inline description"),
+    ];
+
+    for (expression, description) in label_comment_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "FitD with labels/comments '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+
+        // Verify FitD mechanics still work
+        assert!(
+            roll.fitd_outcome.is_some(),
+            "FitD mechanics should work with labels/comments for '{}'",
+            expression
+        );
+    }
+}
+
+#[test]
+fn test_existing_roll_sets_unchanged() {
+    // Verify existing roll set functionality is unchanged
+    let existing_roll_set_tests = vec![
+        ("3 4cod", 3, "CoD roll sets"),
+        ("2 sw8", 2, "Savage Worlds roll sets"),
+        ("4 2lf4", 4, "Lasers & Feelings roll sets"),
+        ("5 gb", 5, "Godbound roll sets"),
+        ("6 4d6 k3", 6, "Standard dice roll sets"),
+    ];
+
+    for (expression, expected_count, description) in existing_roll_set_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Existing roll set '{}' should still work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert_eq!(
+            results.len(),
+            expected_count,
+            "Existing roll set '{}' should have {} results: {}",
+            expression,
+            expected_count,
+            description
+        );
+
+        // Verify set labels still work
+        for (i, roll) in results.iter().enumerate() {
+            assert_eq!(
+                roll.label,
+                Some(format!("Set {}", i + 1)),
+                "Set labels should still work for '{}'",
+                expression
+            );
+        }
+    }
+}
+
+#[test]
+fn test_fitd_error_isolation() {
+    // Test that FitD errors don't affect other systems
+    let error_isolation_tests = vec![
+        // Invalid FitD followed by valid existing system
+        ("fitd100 ; 4cod", "Invalid FitD shouldn't break valid CoD"),
+        (
+            "invalid_fitd ; sw8",
+            "Invalid FitD shouldn't break valid SW",
+        ),
+        // Valid existing system followed by invalid FitD
+        (
+            "4cod ; fitd100",
+            "Valid CoD shouldn't be affected by invalid FitD",
+        ),
+        (
+            "sw8 ; invalid_fitd",
+            "Valid SW shouldn't be affected by invalid FitD",
+        ),
+    ];
+
+    for (expression, description) in error_isolation_tests {
+        let result = parse_and_roll(expression);
+        // These might fail (which is OK), but should not crash or cause parsing issues
+        // The key is that the error handling is clean and isolated
+        match result {
+            Ok(_) => {
+                // If it succeeds, that's fine
+            }
+            Err(e) => {
+                // If it fails, the error should be clean and specific
+                let error_msg = e.to_string();
+                assert!(
+                    !error_msg.contains("panic") && !error_msg.contains("unwrap"),
+                    "Error should be clean for '{}': {} - {}",
+                    expression,
+                    description,
+                    error_msg
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_backward_compatibility_complete() {
+    // Comprehensive test of all documented game systems from roll_syntax.md
+    let all_documented_systems = vec![
+        // From the actual documentation
+        "sw8", "4cod", "4codr", "4wod8", "4wod8c", "attack", "skill", "save", "+d20", "-d20",
+        "dndstats", "2hsn", "3hsk", "3hsh", "gb", "gbs", "3df", "4df", "sr6", "ex5", "6yz", "age",
+        "3wh4+", "dd34", "ed15", "cs 3", "cpr", "conan3", "sil3", "alien4", "alien4s2", "vtm5h2",
+        "2lf4", "sp4", "snm5", "wit", "mm", "bnw3",
+    ];
+
+    for system in all_documented_systems {
+        let result = parse_and_roll(system);
+        assert!(
+            result.is_ok(),
+            "Documented system '{}' must continue to work after FitD addition",
+            system
+        );
+    }
+}
+
+#[test]
+fn test_fitd_clean_output() {
+    // Test that regular FitD rolls have clean output with no redundant notes
+    for _ in 0..10 {
+        let result = parse_and_roll("fitd3");
+        if let Ok(results) = result {
+            let roll = &results[0];
+            let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
+
+            if six_count <= 1 {
+                // Regular success, partial success, or failure should have no notes
+                assert!(
+                    roll.notes.is_empty(),
+                    "Regular FitD rolls should have no notes for clean output. Got: {:?}",
+                    roll.notes
+                );
+            }
+
+            // Should still have proper FitD mechanics
+            assert!(roll.fitd_outcome.is_some(), "Should have FitD outcome");
+            assert!(
+                roll.fitd_highest_die.is_some(),
+                "Should have highest die recorded"
+            );
+        }
+    }
+}

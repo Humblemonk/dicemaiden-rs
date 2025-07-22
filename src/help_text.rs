@@ -155,6 +155,7 @@ pub fn generate_system_help() -> String {
 
 **Other Systems:**
 • `/roll dh 4d10` - Dark Heresy (righteous fury on 10s)
+• `/roll fitd4` - Forged in the Dark 4d6 action roll
 
 **Multiple Rolls:**
 • `/roll 4d6 ; 3d8 + 2 ; 1d20` - Up to 4 separate rolls
