@@ -21,7 +21,7 @@ pub fn register() -> CreateCommand {
             .add_string_choice("alias", "alias")
             .add_string_choice("system", "system")
             .add_string_choice("a5e", "a5e")
-            .add_string_choice("aliens","aliens"),
+            .add_string_choice("aliens", "aliens"),
         )
 }
 
