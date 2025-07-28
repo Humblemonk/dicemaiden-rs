@@ -652,11 +652,33 @@ fn apply_special_system_modifiers(
         )
     });
 
+    // Apply pre-target mathematical modifiers exactly ONCE at the beginning
+    if !target_positions.is_empty() && has_math_modifiers {
+        let first_target_position = target_positions[0];
+        let pre_target_modifiers: Vec<Modifier> = dice.modifiers[..first_target_position]
+            .iter()
+            .filter(|m| {
+                matches!(
+                    m,
+                    Modifier::Add(_)
+                        | Modifier::Subtract(_)
+                        | Modifier::Multiply(_)
+                        | Modifier::Divide(_)
+                )
+            })
+            .cloned()
+            .collect();
+
+        if !pre_target_modifiers.is_empty() {
+            apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
+        }
+    }
+
     // Track if we've applied a special system (success counting, etc.)
     let mut has_special_system = false;
 
     // Process modifiers in order, respecting their position relative to targets
-    for (index, modifier) in dice.modifiers.iter().enumerate() {
+    for modifier in dice.modifiers.iter() {
         match modifier {
             Modifier::Alien => {
                 apply_alien_base_modifier(result)?;
@@ -668,28 +690,6 @@ fn apply_special_system_modifiers(
             }
             // TargetWithDoubleSuccess must come BEFORE existing Target case
             Modifier::TargetWithDoubleSuccess(target, double_success_value) => {
-                // Apply any mathematical modifiers that come BEFORE this target
-                if has_math_modifiers {
-                    let pre_target_modifiers: Vec<_> = dice.modifiers[..index]
-                        .iter()
-                        .filter(|m| {
-                            matches!(
-                                m,
-                                Modifier::Add(_)
-                                    | Modifier::Subtract(_)
-                                    | Modifier::Multiply(_)
-                                    | Modifier::Divide(_)
-                            )
-                        })
-                        .cloned()
-                        .collect();
-
-                    if !pre_target_modifiers.is_empty() {
-                        apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
-                    }
-                }
-
-                // Call our new function
                 count_dice_with_double_success(result, *target, *double_success_value)?;
                 has_special_system = true;
             }
@@ -702,127 +702,24 @@ fn apply_special_system_modifiers(
                 has_special_system = true;
             }
             Modifier::TargetLowerWithDoubleSuccess(target, double_value) => {
-                // Apply pre-target mathematical modifiers
-                if has_math_modifiers {
-                    let pre_target_modifiers: Vec<_> = dice.modifiers[..index]
-                        .iter()
-                        .filter(|m| {
-                            matches!(
-                                m,
-                                Modifier::Add(_)
-                                    | Modifier::Subtract(_)
-                                    | Modifier::Multiply(_)
-                                    | Modifier::Divide(_)
-                            )
-                        })
-                        .cloned()
-                        .collect();
-
-                    if !pre_target_modifiers.is_empty() {
-                        apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
-                    }
-                }
-
-                // Call target lower double success function
                 count_dice_with_target_lower_double_success(result, *target, *double_value)?;
                 has_special_system = true;
             }
             Modifier::Target(value) => {
-                // Apply any mathematical modifiers that come BEFORE this target
-                if has_math_modifiers {
-                    let pre_target_modifiers: Vec<_> = dice.modifiers[..index]
-                        .iter()
-                        .filter(|m| {
-                            matches!(
-                                m,
-                                Modifier::Add(_)
-                                    | Modifier::Subtract(_)
-                                    | Modifier::Multiply(_)
-                                    | Modifier::Divide(_)
-                            )
-                        })
-                        .cloned()
-                        .collect();
-
-                    if !pre_target_modifiers.is_empty() {
-                        apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
-                    }
-                }
-
                 count_dice_matching(result, |roll| roll >= *value as i32, "successes")?;
                 has_special_system = true;
             }
             Modifier::TargetLower(value) => {
-                // Apply any mathematical modifiers that come BEFORE this target
-                if has_math_modifiers {
-                    let pre_target_modifiers: Vec<_> = dice.modifiers[..index]
-                        .iter()
-                        .filter(|m| {
-                            matches!(
-                                m,
-                                Modifier::Add(_)
-                                    | Modifier::Subtract(_)
-                                    | Modifier::Multiply(_)
-                                    | Modifier::Divide(_)
-                            )
-                        })
-                        .cloned()
-                        .collect();
-
-                    if !pre_target_modifiers.is_empty() {
-                        apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
-                    }
-                }
-
                 count_dice_matching(result, |roll| roll <= *value as i32, "successes")?;
                 has_special_system = true;
             }
             Modifier::Failure(value) => {
-                // Apply pre-target modifiers for failures too
-                if has_math_modifiers {
-                    let pre_target_modifiers: Vec<_> = dice.modifiers[..index]
-                        .iter()
-                        .filter(|m| {
-                            matches!(
-                                m,
-                                Modifier::Add(_)
-                                    | Modifier::Subtract(_)
-                                    | Modifier::Multiply(_)
-                                    | Modifier::Divide(_)
-                            )
-                        })
-                        .cloned()
-                        .collect();
-
-                    if !pre_target_modifiers.is_empty() {
-                        apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
-                    }
+                if result.successes.is_none() {
+                    result.successes = Some(0);
                 }
-
                 count_failures_and_subtract(result, *value)?;
             }
             Modifier::Botch(threshold) => {
-                // Apply pre-target modifiers for botches too
-                if has_math_modifiers {
-                    let pre_target_modifiers: Vec<_> = dice.modifiers[..index]
-                        .iter()
-                        .filter(|m| {
-                            matches!(
-                                m,
-                                Modifier::Add(_)
-                                    | Modifier::Subtract(_)
-                                    | Modifier::Multiply(_)
-                                    | Modifier::Divide(_)
-                            )
-                        })
-                        .cloned()
-                        .collect();
-
-                    if !pre_target_modifiers.is_empty() {
-                        apply_pre_target_mathematical_modifiers(result, &pre_target_modifiers)?;
-                    }
-                }
-
                 count_dice_matching(
                     result,
                     |roll| roll <= threshold.unwrap_or(1) as i32,

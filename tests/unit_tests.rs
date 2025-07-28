@@ -492,6 +492,12 @@ fn test_target_system_modifiers() {
     let modifier_order_tests = vec![
         ("1d20+5 t6", "Modifier before target"),
         ("1d20 t5 + 5", "Modifier after target"),
+        ("1d20+3 t8f1", "Pre-target math with target then failure"),
+        ("1d20+3 f1t8", "Pre-target math with failure then target"),
+        (
+            "2d10*2 t6f2b1",
+            "Complex pre-target math with multiple target modifiers",
+        ),
     ];
 
     for (expression, description) in modifier_order_tests {
@@ -2185,6 +2191,23 @@ mod test_issue_94_minimal {
             "1d1+5 t6 should always have exactly 1 success (1+5=6 >= 6)"
         );
 
+        let result_tf = parse_and_roll("1d1+5 t6f1").unwrap();
+        let result_ft = parse_and_roll("1d1+5 f1t6").unwrap();
+
+        // Both should be identical - this is the core fix
+        assert_eq!(
+            result_tf[0].successes, result_ft[0].successes,
+            "t6f1 and f1t6 should have identical success counts"
+        );
+        assert_eq!(
+            result_tf[0].failures, result_ft[0].failures,
+            "t6f1 and f1t6 should have identical failure counts"
+        );
+
+        // Both should be: 1 success (6≥6), 0 failures (6>1), net = 1 success
+        assert_eq!(result_tf[0].successes.unwrap(), 1);
+        assert_eq!(result_tf[0].failures.unwrap(), 0);
+
         // If there was double application, this might show 6 successes instead of 1
     }
 
@@ -2202,6 +2225,132 @@ mod test_issue_94_minimal {
         println!(
             "Post-target modifier result: {} successes",
             roll.successes.unwrap()
+        );
+    }
+}
+
+#[test]
+fn test_target_failure_order_consistency() {
+    // Test that f1t4 and t4f1 produce identical results
+    // This is the main test for the bug fix
+
+    let test_cases = vec![
+        ("5d1+4 t4f1", "5d1+4 f1t4", "All succeed, none fail"),
+        ("3d1+2 t4f1", "3d1+2 f1t4", "None succeed, none fail"),
+        ("3d1+0 t4f1", "3d1+0 f1t4", "None succeed, all fail"),
+        ("4d1+1 t4f1+1", "4d1+1 f1t4+1", "With post-target modifier"),
+        (
+            "3d1*2+1 t4f1",
+            "3d1*2+1 f1t4",
+            "With complex pre-target math",
+        ),
+    ];
+
+    for (expr1, expr2, description) in test_cases {
+        let result1 = parse_and_roll(expr1).unwrap();
+        let result2 = parse_and_roll(expr2).unwrap();
+
+        assert_eq!(
+            result1[0].successes, result2[0].successes,
+            "Success counts must be identical for {} vs {} ({})",
+            expr1, expr2, description
+        );
+
+        assert_eq!(
+            result1[0].failures, result2[0].failures,
+            "Failure counts must be identical for {} vs {} ({})",
+            expr1, expr2, description
+        );
+    }
+}
+
+#[test]
+fn test_pre_target_applied_once() {
+    // Verify that pre-target modifiers are applied exactly once
+    // This test catches the specific bug that was causing the issue
+
+    let result1 = parse_and_roll("2d1+5 t4f1").unwrap();
+    let result2 = parse_and_roll("2d1+5 f1t4").unwrap();
+
+    // Both should have dice values of 6 (1+5), so:
+    // - Successes (≥4): 2 dice succeed
+    // - Failures (≤1): 0 dice fail
+    // - Net: 2 - 0 = 2 successes
+    assert_eq!(result1[0].successes.unwrap(), 2);
+    assert_eq!(result2[0].successes.unwrap(), 2);
+    assert_eq!(result1[0].failures.unwrap(), 0);
+    assert_eq!(result2[0].failures.unwrap(), 0);
+
+    // Verify the dice values are correct (should be 6)
+    assert!(result1[0].kept_rolls.iter().all(|&v| v == 6));
+    assert!(result2[0].kept_rolls.iter().all(|&v| v == 6));
+}
+
+#[test]
+fn test_botch_modifier_order_consistency() {
+    // Test that botch modifiers also work consistently with the fix
+    let test_cases = vec![
+        ("3d1+0 t4b1", "3d1+0 b1t4", "All botch and none succeed"),
+        ("3d1+5 t4b1", "3d1+5 b1t4", "All succeed and none botch"),
+    ];
+
+    for (expr1, expr2, description) in test_cases {
+        let result1 = parse_and_roll(expr1).unwrap();
+        let result2 = parse_and_roll(expr2).unwrap();
+
+        assert_eq!(
+            result1[0].successes, result2[0].successes,
+            "Botch order should not affect successes: {} vs {} ({})",
+            expr1, expr2, description
+        );
+        assert_eq!(
+            result1[0].botches, result2[0].botches,
+            "Botch order should not affect botch count: {} vs {} ({})",
+            expr1, expr2, description
+        );
+    }
+}
+
+#[test]
+fn test_complex_modifier_orders() {
+    // Test more complex scenarios to ensure robustness
+    let complex_cases = vec![
+        (
+            "3d1+2*2 t6f1b2",
+            "3d1+2*2 f1b2t6",
+            "Multiple pre-target math",
+        ),
+        (
+            "2d1+3 t4f1b1",
+            "2d1+3 b1f1t4",
+            "Three target-related modifiers",
+        ),
+        (
+            "4d1+1*3 t5f2",
+            "4d1+1*3 f2t5",
+            "Different target/failure values",
+        ),
+    ];
+
+    for (expr1, expr2, description) in complex_cases {
+        let result1 = parse_and_roll(expr1).unwrap();
+        let result2 = parse_and_roll(expr2).unwrap();
+
+        // Basic consistency checks
+        assert_eq!(
+            result1[0].successes, result2[0].successes,
+            "Complex order test successes: {} vs {} ({})",
+            expr1, expr2, description
+        );
+        assert_eq!(
+            result1[0].failures, result2[0].failures,
+            "Complex order test failures: {} vs {} ({})",
+            expr1, expr2, description
+        );
+        assert_eq!(
+            result1[0].botches, result2[0].botches,
+            "Complex order test botches: {} vs {} ({})",
+            expr1, expr2, description
         );
     }
 }

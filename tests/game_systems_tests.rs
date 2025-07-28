@@ -4576,3 +4576,57 @@ fn test_fitd_clean_output() {
         }
     }
 }
+
+#[test]
+fn test_wod_modifier_order_consistency() {
+    // Test World of Darkness modifier order consistency
+    // This is important because WOD commonly uses f1 t8 patterns
+
+    let wod_order_tests = vec![
+        ("4wod8", "4d10 f1 t8", "WOD alias vs manual equivalent"),
+        (
+            "5d10 f1 t8 c",
+            "5d10 t8 f1 c",
+            "WOD with cancel - different order",
+        ),
+        ("6d10 f1 t7", "6d10 t7 f1", "Basic WOD different order"),
+        (
+            "4d10 f1 t8 + 2",
+            "4d10 t8 f1 + 2",
+            "WOD with post-target modifier",
+        ),
+    ];
+
+    for (expr1, expr2, description) in wod_order_tests {
+        let result1 = parse_and_roll(expr1);
+        let result2 = parse_and_roll(expr2);
+
+        assert!(
+            result1.is_ok() && result2.is_ok(),
+            "Both WOD expressions should parse: {} - {}",
+            expr1,
+            expr2
+        );
+
+        let roll1 = result1.unwrap();
+        let roll2 = result2.unwrap();
+
+        // For statistical consistency, just verify both have same structure
+        assert_eq!(
+            roll1[0].successes.is_some(),
+            roll2[0].successes.is_some(),
+            "Success counting should be consistent: {} vs {} ({})",
+            expr1,
+            expr2,
+            description
+        );
+        assert_eq!(
+            roll1[0].failures.is_some(),
+            roll2[0].failures.is_some(),
+            "Failure counting should be consistent: {} vs {} ({})",
+            expr1,
+            expr2,
+            description
+        );
+    }
+}
