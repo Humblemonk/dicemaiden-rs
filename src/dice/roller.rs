@@ -810,6 +810,8 @@ fn apply_special_system_modifiers(
         }
     }
 
+    // Finalize success/failure calculation after all core modifiers
+    finalize_success_failure_calculation(result)?;
     // Apply mathematical modifiers that come AFTER target modifiers (to success counts)
     if has_special_system && has_math_modifiers && result.successes.is_some() {
         // Find mathematical modifiers that come after the last target modifier
@@ -906,10 +908,7 @@ fn count_failures_and_subtract(result: &mut RollResult, threshold: u32) -> Resul
 
     result.failures = Some(result.failures.unwrap_or(0) + failures);
 
-    // Subtract failures from successes
-    if let Some(ref mut successes) = result.successes {
-        *successes -= failures;
-    }
+    // The subtraction will happen later in finalize_success_failure_calculation()
 
     Ok(())
 }
@@ -3548,5 +3547,15 @@ fn apply_forged_dark_zero_mechanics(result: &mut RollResult) -> Result<()> {
         .notes
         .push("⚠️ **DESPERATE POSITION**: Zero dice - risky situation!".to_string());
 
+    Ok(())
+}
+
+fn finalize_success_failure_calculation(result: &mut RollResult) -> Result<()> {
+    // Only apply failure subtraction if we have both successes and failures tracked
+    if let (Some(successes), Some(failures)) = (result.successes, result.failures) {
+        // Apply failure subtraction after all modifiers (including cancel) are processed
+        let final_successes = successes - failures;
+        result.successes = Some(final_successes);
+    }
     Ok(())
 }
