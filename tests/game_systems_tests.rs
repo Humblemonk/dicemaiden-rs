@@ -183,6 +183,9 @@ fn test_game_systems_comprehensive() {
         ("2lf4l", true, Some("success"), "Lasers & Feelings Lasers"),
         ("2lf4f", true, Some("success"), "Lasers & Feelings Feelings"),
         ("3lf3", true, Some("success"), "Lasers & Feelings generic"),
+        // Daggerheart RPG
+        ("dheart", true, Some("total"), "Daggerheart player roll (Hope/Fear)"),
+        ("dheartgm", true, Some("total"), "Daggerheart GM roll (d20)"),
         // A5E (Level Up Advanced 5th Edition)
         ("a5e +5 ex1", true, Some("total"), "A5E expertise level 1"),
         ("a5e +7 ex2", true, Some("total"), "A5E expertise level 2"),
