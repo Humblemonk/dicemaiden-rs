@@ -2354,3 +2354,179 @@ fn test_complex_modifier_orders() {
         );
     }
 }
+
+#[test]
+fn test_explosion_bug_fix_specific_case() {
+    // Test the specific user-reported case: 8d10e10
+    // This test specifically checks that when multiple dice explode,
+    // they ALL explode, not just the first one found
+
+    println!("Testing explosion bug fix for 8d10e10...");
+
+    // Run multiple iterations to catch the bug probabilistically
+    let mut correct_explosion_count = 0;
+    let mut total_tests = 0;
+
+    for iteration in 0..50 {
+        let result = parse_and_roll("8d10 e10").unwrap();
+        let roll = &result[0];
+
+        // Count how many 10s are in the original 8 dice
+        // We know the first 8 dice are the original ones
+        let original_dice = &roll.individual_rolls[0..8.min(roll.individual_rolls.len())];
+        let tens_count = original_dice.iter().filter(|&&die| die == 10).count();
+
+        // The total number of dice should be original 8 + number of explosions
+        let expected_total_dice = 8 + tens_count;
+        let actual_total_dice = roll.individual_rolls.len();
+
+        println!(
+            "Iteration {}: Original dice: {:?}, 10s found: {}, Expected total dice: {}, Actual: {}",
+            iteration + 1,
+            original_dice,
+            tens_count,
+            expected_total_dice,
+            actual_total_dice
+        );
+
+        if tens_count > 0 {
+            total_tests += 1;
+
+            // Check that we have the correct number of total dice
+            if actual_total_dice == expected_total_dice {
+                correct_explosion_count += 1;
+
+                // Check that the explosion note is correct
+                let expected_note = if tens_count == 1 {
+                    "1 die exploded".to_string()
+                } else {
+                    format!("{} dice exploded", tens_count)
+                };
+
+                assert!(
+                    roll.notes.contains(&expected_note),
+                    "Iteration {}: Should contain note '{}', but notes are: {:?}",
+                    iteration + 1,
+                    expected_note,
+                    roll.notes
+                );
+            } else {
+                println!(
+                    "❌ FAILED Iteration {}: Expected {} dice, got {} (original 10s: {})",
+                    iteration + 1,
+                    expected_total_dice,
+                    actual_total_dice,
+                    tens_count
+                );
+            }
+        }
+    }
+
+    // If we had any tests with explosions, they should all be correct
+    if total_tests > 0 {
+        let success_rate = (correct_explosion_count as f64 / total_tests as f64) * 100.0;
+        println!(
+            "✅ Explosion fix validation: {}/{} tests passed ({:.1}%)",
+            correct_explosion_count, total_tests, success_rate
+        );
+
+        assert_eq!(
+            correct_explosion_count, total_tests,
+            "All explosion tests should pass. Success rate: {:.1}%",
+            success_rate
+        );
+    } else {
+        println!(
+            "⚠️  No explosions occurred in {} iterations - rerun test",
+            50
+        );
+        // This is unlikely with 8d10e10, but possible due to randomness
+    }
+}
+
+#[test]
+fn test_explosion_count_accuracy() {
+    // Test that explosion counts are accurate for various scenarios
+    let test_cases = vec![
+        ("4d6 e6", 4, 6),    // 4d6 exploding on 6s
+        ("3d10 e10", 3, 10), // 3d10 exploding on 10s
+        ("5d8 e8", 5, 8),    // 5d8 exploding on 8s
+    ];
+
+    for (expression, original_count, explode_threshold) in test_cases {
+        println!("Testing expression: {}", expression);
+
+        // Run multiple iterations to test different scenarios
+        for _ in 0..10 {
+            let result = parse_and_roll(expression).unwrap();
+            let roll = &result[0];
+
+            // Count exploding dice in original dice only
+            let original_dice =
+                &roll.individual_rolls[0..original_count.min(roll.individual_rolls.len())];
+            let exploding_dice_count = original_dice
+                .iter()
+                .filter(|&&die| die >= explode_threshold)
+                .count();
+
+            let expected_total = original_count + exploding_dice_count;
+            let actual_total = roll.individual_rolls.len();
+
+            assert_eq!(
+                actual_total,
+                expected_total,
+                "Expression '{}': Expected {} total dice ({} original + {} explosions), got {}. Original dice: {:?}",
+                expression,
+                expected_total,
+                original_count,
+                exploding_dice_count,
+                actual_total,
+                original_dice
+            );
+
+            // Verify explosion note accuracy
+            if exploding_dice_count > 0 {
+                let expected_note = if exploding_dice_count == 1 {
+                    "1 die exploded".to_string()
+                } else {
+                    format!("{} dice exploded", exploding_dice_count)
+                };
+
+                assert!(
+                    roll.notes.contains(&expected_note),
+                    "Expression '{}': Expected note '{}', but got notes: {:?}",
+                    expression,
+                    expected_note,
+                    roll.notes
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_indefinite_vs_non_indefinite_explosions() {
+    // Test that indefinite explosions (ie) behave differently from regular explosions (e)
+
+    // Test non-indefinite: should not explode the explosion dice
+    let result = parse_and_roll("2d10 e10").unwrap();
+    let roll = &result[0];
+
+    let original_tens = roll.individual_rolls[0..2.min(roll.individual_rolls.len())]
+        .iter()
+        .filter(|&&die| die == 10)
+        .count();
+
+    // Should have exactly 2 + original_tens dice (explosion dice don't explode)
+    assert_eq!(
+        roll.individual_rolls.len(),
+        2 + original_tens,
+        "Non-indefinite explosions should not explode the new dice. Roll: {:?}",
+        roll.individual_rolls
+    );
+
+    println!("✅ Non-indefinite explosion test passed");
+
+    // Note: We can't easily test indefinite explosions deterministically due to randomness,
+    // but the existing performance tests already cover explosion limits
+}
