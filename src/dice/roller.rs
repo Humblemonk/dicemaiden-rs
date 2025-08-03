@@ -1141,28 +1141,40 @@ fn explode_dice(
     dice: &DiceRoll,
 ) -> Result<()> {
     let explode_on = threshold.unwrap_or(dice_sides);
-
     let mut explosion_count = 0;
-    let max_explosions = if indefinite { 100 } else { 1 };
 
-    let mut i = 0;
-    while i < result.individual_rolls.len() && explosion_count < max_explosions {
-        if result.individual_rolls[i] >= explode_on as i32 {
-            let new_roll = rng.random_range(1..=dice_sides as i32);
-            result.individual_rolls.push(new_roll);
-            explosion_count += 1;
+    if indefinite {
+        // Indefinite explosions: keep exploding new dice that meet threshold
+        let max_explosions = 100;
+        let mut i = 0;
+        while i < result.individual_rolls.len() && explosion_count < max_explosions {
+            if result.individual_rolls[i] >= explode_on as i32 {
+                let new_roll = rng.random_range(1..=dice_sides as i32);
+                result.individual_rolls.push(new_roll);
+                explosion_count += 1;
+            }
+            i += 1;
+        }
 
-            if !indefinite {
-                break;
+        if explosion_count >= max_explosions {
+            result
+                .notes
+                .push("Maximum explosions reached (100)".to_string());
+        }
+    } else {
+        // Non-indefinite explosions: process ALL original dice that meet threshold
+        // Store the original number of dice to avoid exploding newly added dice
+        let original_dice_count = result.individual_rolls.len();
+
+        for i in 0..original_dice_count {
+            if result.individual_rolls[i] >= explode_on as i32 {
+                let new_roll = rng.random_range(1..=dice_sides as i32);
+                result.individual_rolls.push(new_roll);
+                explosion_count += 1;
             }
         }
-        i += 1;
-    }
-
-    if explosion_count >= max_explosions && indefinite {
-        result
-            .notes
-            .push("Maximum explosions reached (100)".to_string());
+        // Note: No maximum explosion limit for non-indefinite since we're only
+        // processing original dice once
     }
 
     if explosion_count > 0 {
