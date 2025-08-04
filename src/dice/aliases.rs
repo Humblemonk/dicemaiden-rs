@@ -128,6 +128,13 @@ static VTM5_REGEX: Lazy<Regex> =
 static LF_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)lf(\d+)([lf]?)$").expect("Failed to compile LF_REGEX"));
 
+// Daggerheart RPG system
+static DAGGERHEART_PLAYER_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^dheart$").expect("Failed to compile DAGGERHEART_PLAYER_REGEX"));
+
+static DAGGERHEART_GM_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^dheartgm$").expect("Failed to compile DAGGERHEART_GM_REGEX"));
+
 static A5E_BASIC_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(?i)a5e\s*([+-]?\d+)?\s*ex([1-3]|4|6|8|10|12|20|100)$")
         .expect("Failed to compile A5E_BASIC_REGEX")
@@ -231,6 +238,15 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     // Handle Alien RPG aliases first
     if let Some(alien_result) = expand_alien_alias(input) {
         return Some(alien_result);
+    }
+
+    // Handle Daggerheart RPG aliases
+    if DAGGERHEART_PLAYER_REGEX.is_match(input) {
+        return Some("2d12 dheart".to_string());
+    }
+
+    if DAGGERHEART_GM_REGEX.is_match(input) {
+        return Some("1d20".to_string());
     }
 
     // Handle percentile advantage/disadvantage FIRST before general advantage/disadvantage
