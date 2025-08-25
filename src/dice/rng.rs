@@ -17,7 +17,7 @@ pub fn create_enhanced_rng() -> StdRng {
     let mut seed = [0u8; 32];
 
     // Primary entropy: OS cryptographic random bytes (16 bytes = 128 bits)
-    if getrandom::getrandom(&mut seed[0..16]).is_err() {
+    if getrandom::fill(&mut seed[0..16]).is_err() {
         // Fallback: use system time if OS entropy fails
         fallback_seed(&mut seed[0..16]);
     }
