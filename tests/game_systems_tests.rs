@@ -183,6 +183,14 @@ fn test_game_systems_comprehensive() {
         ("2lf4l", true, Some("success"), "Lasers & Feelings Lasers"),
         ("2lf4f", true, Some("success"), "Lasers & Feelings Feelings"),
         ("3lf3", true, Some("success"), "Lasers & Feelings generic"),
+        // Daggerheart RPG
+        (
+            "dheart",
+            true,
+            Some("total"),
+            "Daggerheart player roll (Hope/Fear)",
+        ),
+        ("dheartgm", true, Some("total"), "Daggerheart GM roll (d20)"),
         // A5E (Level Up Advanced 5th Edition)
         ("a5e +5 ex1", true, Some("total"), "A5E expertise level 1"),
         ("a5e +7 ex2", true, Some("total"), "A5E expertise level 2"),
@@ -4705,4 +4713,86 @@ fn test_wod_cancel_bug_fix() {
         "WoD6 failure count should be reasonable: got {}",
         failure_count2
     );
+}
+
+#[test]
+fn test_daggerheart_comprehensive() {
+    let daggerheart_tests = vec![
+        // Basic functionality
+        ("dheart", true, "Daggerheart Hope & Fear dice"),
+        ("dheartgm", true, "Daggerheart GM d20 roll"),
+    ];
+
+    for (system, should_parse, description) in daggerheart_tests {
+        let result = parse_and_roll(system);
+        if should_parse {
+            assert!(
+                result.is_ok(),
+                "Daggerheart '{}' should parse: {}",
+                system,
+                description
+            );
+
+            let results = result.unwrap();
+            assert!(!results.is_empty(), "Should have results for '{}'", system);
+
+            // Basic validation that it produces reasonable output
+            assert!(
+                results[0].total >= 0,
+                "Should have non-negative result for '{}'",
+                system
+            );
+        } else {
+            assert!(
+                result.is_err(),
+                "Invalid daggerheart '{}' should fail",
+                system
+            );
+        }
+    }
+}
+
+#[test]
+fn test_dh_dheart_no_conflict() {
+    // Test that Dark Heresy (dh) and Daggerheart (dheart) don't conflict
+    let conflict_tests = vec![
+        // Dark Heresy should still work
+        ("dh", true, "Dark Heresy basic should work"),
+        ("dh 4d10", true, "Dark Heresy with dice should work"),
+        ("dh 6d10", true, "Dark Heresy 6 dice should work"),
+        // Daggerheart should work independently
+        ("dheart", true, "Daggerheart Hope & Fear should work"),
+        ("dheartgm", true, "Daggerheart GM should work"),
+        // Edge cases - these should NOT be confused
+        ("dh1", false, "Invalid Dark Heresy should fail"),
+        ("dheartx", false, "Invalid Daggerheart variant should fail"),
+    ];
+
+    for (expression, should_succeed, description) in conflict_tests {
+        let result = parse_and_roll(expression);
+
+        if should_succeed {
+            assert!(
+                result.is_ok(),
+                "CONFLICT: '{}' should work - {}",
+                expression,
+                description
+            );
+
+            // Verify we get results
+            let results = result.unwrap();
+            assert!(
+                !results.is_empty(),
+                "Should have results for '{}'",
+                expression
+            );
+        } else {
+            assert!(
+                result.is_err(),
+                "CONFLICT: '{}' should fail - {}",
+                expression,
+                description
+            );
+        }
+    }
 }

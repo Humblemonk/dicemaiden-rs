@@ -1484,6 +1484,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
     // System modifiers
     match part {
         "dh" => return Ok(Modifier::DarkHeresy),
+        "dheart" => return Ok(Modifier::Daggerheart),
         "hsn" => return Ok(Modifier::HeroSystem(HeroSystemType::Normal)),
         "hsk" => return Ok(Modifier::HeroSystem(HeroSystemType::Killing)),
         "hsh" => return Ok(Modifier::HeroSystem(HeroSystemType::Hit)),

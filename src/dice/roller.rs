@@ -702,6 +702,10 @@ fn apply_special_system_modifiers(
                 apply_forged_dark_zero_mechanics(result)?;
                 has_special_system = true;
             }
+            Modifier::Daggerheart => {
+                apply_daggerheart_mechanics(result)?;
+                has_special_system = true;
+            }
             Modifier::TargetLowerWithDoubleSuccess(target, double_value) => {
                 count_dice_with_target_lower_double_success(result, *target, *double_value)?;
                 has_special_system = true;
@@ -3570,5 +3574,51 @@ fn finalize_success_failure_calculation(result: &mut RollResult) -> Result<()> {
         let final_successes = successes - failures;
         result.successes = Some(final_successes);
     }
+    Ok(())
+}
+/// Apply Daggerheart mechanics to a 2d12 roll (Hope and Fear dice)
+///
+/// Rules:
+/// - Roll two d12 dice (Hope and Fear)
+/// - Report individual values with labels
+/// - If Hope > Fear: show "roll is TOTAL with Hope"
+/// - If Fear > Hope: show "roll is TOTAL with Fear"
+/// - If Hope == Fear: show "Critical Success!"
+fn apply_daggerheart_mechanics(result: &mut RollResult) -> Result<()> {
+    if result.dice_groups.is_empty() || result.dice_groups[0].rolls.is_empty() {
+        return Err(anyhow!("No dice to apply Daggerheart mechanics to"));
+    }
+
+    let dice_group = &result.dice_groups[0];
+    if dice_group.rolls.len() != 2 {
+        return Err(anyhow!(
+            "Daggerheart requires exactly 2 dice (Hope and Fear)"
+        ));
+    }
+
+    let hope_die = dice_group.rolls[0];
+    let fear_die = dice_group.rolls[1];
+    let total = hope_die + fear_die;
+
+    // Clear existing total since we'll set our own
+    result.total = total;
+
+    // Determine the result based on Hope vs Fear
+    let daggerheart_result = if hope_die == fear_die {
+        "Critical Success!".to_string()
+    } else if hope_die > fear_die {
+        format!("roll is {total} with Hope")
+    } else {
+        format!("roll is {total} with Fear")
+    };
+
+    // Add detailed notes showing individual dice values
+    result.notes.push(format!(
+        "🎲 **Daggerheart Roll**: Hope: {hope_die}, Fear: {fear_die} → {daggerheart_result}"
+    ));
+
+    // Store the result as a comment for display
+    result.comment = Some(daggerheart_result);
+
     Ok(())
 }
