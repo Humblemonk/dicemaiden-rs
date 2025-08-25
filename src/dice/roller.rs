@@ -3614,7 +3614,7 @@ fn apply_daggerheart_mechanics(result: &mut RollResult) -> Result<()> {
 
     // Add detailed notes showing individual dice values
     result.notes.push(format!(
-        "🎲 **Daggerheart Roll**: Hope: {hope_die}, Fear: {fear_die} → {daggerheart_result}"
+        "**Daggerheart Roll**: Hope: {hope_die}, Fear: {fear_die} → {daggerheart_result}"
     ));
 
     // Store the result as a comment for display
