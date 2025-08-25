@@ -1,3 +1,4 @@
+use super::rng::get_dice_rng;
 use super::{DiceGroup, DiceRoll, HeroSystemType, LaserFeelingsType, Modifier, RollResult};
 use anyhow::{Result, anyhow};
 use rand::Rng;
@@ -11,7 +12,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         return Err(anyhow!("Cannot roll 0 dice"));
     }
 
-    let mut rng = rand::rng();
+    let mut rng = get_dice_rng();
 
     // Check for Conan system handlers
     let has_conan_skill = dice

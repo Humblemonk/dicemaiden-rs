@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.0] - 2025-08-24
+
+## Added
+
+- Enhanced dice randomness with cryptographically secure RNG using multiple entropy sources (OS, time, thread, process, memory)
+
 ## [1.4.0] - 2025-07-05
 
 ## Added
