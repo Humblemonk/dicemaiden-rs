@@ -1,6 +1,6 @@
 [package]
 name = "dicemaiden-rs"
-version = "1.4.0"
+version = "1.5.0"
 edition = "2024"
 rust-version = "1.87.0"
 keywords = ["discord", "bot", "dice", "rpg", "tabletop"]
@@ -27,6 +27,7 @@ rand = "0.9"
 regex = "1.10"
 anyhow = "1.0"
 once_cell = "1.19"
+getrandom = "0.2"
 
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono"] }

@@ -1,10 +1,13 @@
 pub mod aliases;
 pub mod parser;
+pub mod rng;
 pub mod roller;
 
 use anyhow::Result;
 use regex::Regex;
 use std::fmt;
+
+pub use rng::{create_enhanced_rng, create_fast_rng, get_dice_rng};
 
 #[derive(Debug, Clone)]
 pub struct DiceRoll {
