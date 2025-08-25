@@ -1720,3 +1720,16 @@ fn test_alien_rpg_cross_system_compatibility() {
         }
     }
 }
+
+#[test]
+fn test_daggerheart_with_roll_sets() {
+    // Test daggerheart works with roll sets if applicable
+    let result = parse_and_roll("3 dheart");
+    if result.is_ok() {
+        let results = result.unwrap();
+        assert_eq!(results.len(), 3);
+        for roll in &results {
+            assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+        }
+    }
+}

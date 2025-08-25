@@ -148,9 +148,9 @@
 - Each explosion happens only once per roll
 
 ### Cypher System
-- `/roll cs 1` - Level 1 task (target 3+, routine)
-- `/roll cs 3` - Level 3 task (target 9+, typical)
-- `/roll cs 6` - Level 6 task (target 18+, demanding)
+- `cs 1` - Level 1 task (target 3+, routine)
+- `cs 3` - Level 3 task (target 9+, typical)
+- `cs 6` - Level 6 task (target 18+, demanding)
 - Special Results: 1=GM Intrusion, 17-19=Minor Effect, 20=Major Effect
 
 ### Hero System 5th Edition
@@ -217,6 +217,10 @@
 - **LASER FEELINGS**: Rolling exactly the target number gives special insight
 - **Lasers** (science/tech): Count successes on rolls ≤ target
 - **Feelings** (intuition/social): Count successes on rolls ≥ target
+
+### Daggerheart
+- `dheart` → Hope & Fear dice with display and summary
+- `dheartgm` → GM d20 roll (standard d20)
 
 ### Other Popular Systems
 - **Shadowrun**: `sr6` → 6d6 t5 (6th edition)
