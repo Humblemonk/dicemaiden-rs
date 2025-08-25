@@ -126,6 +126,7 @@ src/
 │   ├── mod.rs          # Dice module exports and core types (DiceRoll, RollResult, etc.)
 │   ├── parser.rs       # Dice expression parsing and syntax validation
 │   ├── roller.rs       # Dice rolling execution and modifier application
+│   ├── rng.rs          # Enhanced cryptographically secure RNG with multiple entropy sources
 │   └── aliases.rs      # Game system aliases and expression expansions
 └── commands/
     ├── mod.rs          # Command module exports and CommandResponse type
