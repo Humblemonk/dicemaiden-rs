@@ -950,6 +950,8 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
             (r"^(bnw)", "brave new world"),      // bnw
             (r"^(alien)", "alien base"),         // alien (exact)
             (r"^(aliens\d+)", "alien stress"),   // aliens1, aliens2, etc.
+            (r"^(wwc\d+)", "wild worlds cut"),   // wwc2, wwc3, etc. (before basic ww)
+            (r"^(ww)", "wild worlds"),           // ww (basic)
         ];
 
         let mut found_match = false;
@@ -1495,6 +1497,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         "wit" => return Ok(Modifier::Witcher),
         "bnw" => return Ok(Modifier::BraveNewWorld(0)),
         "c" => return Ok(Modifier::Cancel),
+        "ww" => return Ok(Modifier::WildWorlds(None)),
         _ => {}
     }
 
@@ -1939,6 +1942,19 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::Shadowrun(dice_count));
     }
 
+    // Wild Worlds RPG cutting mechanics
+    if let Some(stripped) = part.strip_prefix("wwc") {
+        let cut_count: u32 = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid cut count in Wild Worlds modifier '{}'", part))?;
+
+        if cut_count == 0 {
+            return Err(anyhow!("Cannot cut 0 dice in Wild Worlds"));
+        }
+
+        return Ok(Modifier::WildWorlds(Some(cut_count)));
+    }
+
     // Additional dice modifiers
     if let Some(captures) = DICE_MOD_REGEX.captures(part) {
         let count: u32 = captures[2].parse()?;
@@ -2094,6 +2110,23 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         // Note: dice_count will be extracted from the dice expression, not the modifier
         // For now, we'll use 0 as a placeholder and let the roller extract the actual count
         return Ok(Modifier::LaserFeelings(0, target, roll_type));
+    }
+
+    // Wild Worlds RPG parsing
+    if part == "ww" {
+        return Ok(Modifier::WildWorlds(None));
+    }
+
+    if let Some(cut_match) = Regex::new(r"^wwc(\d+)$").unwrap().captures(part) {
+        let cut_count: u32 = cut_match[1]
+            .parse()
+            .map_err(|_| anyhow!("Invalid cut count in Wild Worlds modifier"))?;
+
+        if cut_count == 0 {
+            return Err(anyhow!("Cannot cut 0 dice in Wild Worlds"));
+        }
+
+        return Ok(Modifier::WildWorlds(Some(cut_count)));
     }
 
     Err(anyhow!("Unknown modifier: {}", part))

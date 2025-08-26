@@ -222,6 +222,16 @@
 - `dheart` → Hope & Fear dice with display and summary
 - `dheartgm` → GM d20 roll (standard d20)
 
+### Wild Worlds
+- `ww3` → 3d6 ww (basic Wild Worlds roll)
+- `ww4c2` → 4d6 wwc2 (roll 4d6, cut 2 highest before evaluation)
+- **Results based on highest remaining die:**
+  - **6 = Triumph** (complete success)
+  - **4-5 = Conflict** (success with drawback)  
+  - **1-3 = Disaster** (failure with complication)
+- **Twist**: Any doubles/triples add a beneficial twist to the outcome
+- **Cutting**: Remove highest dice before evaluation (simulates difficulty)
+
 ### Other Popular Systems
 - **Shadowrun**: `sr6` → 6d6 t5 (6th edition)
 - **Exalted**: `ex5` → 5d10 t7 t10, `ex5t8` → 5d10 t8 t10

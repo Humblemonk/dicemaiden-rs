@@ -164,6 +164,10 @@ static ALIEN_PUSH_REGEX: Lazy<Regex> = Lazy::new(|| {
 static FITD_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(?i)fitd(\d+)$").expect("Failed to compile FITD_REGEX"));
 
+static WILD_WORLDS_BASIC_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^ww(\d+)$").unwrap());
+
+static WILD_WORLDS_CUT_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^ww(\d+)c(\d+)$").unwrap());
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -191,6 +195,23 @@ static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| 
     aliases.insert("fitd5", "5d6 fitd");
     aliases.insert("fitd6", "6d6 fitd");
     aliases.insert("fitd0", "2d6 fitd0"); // Zero dice - special case
+    aliases.insert("ww1", "1d6 ww");
+    aliases.insert("ww2", "2d6 ww");
+    aliases.insert("ww3", "3d6 ww");
+    aliases.insert("ww4", "4d6 ww");
+    aliases.insert("ww5", "5d6 ww");
+    aliases.insert("ww6", "6d6 ww");
+    aliases.insert("ww7", "7d6 ww");
+    aliases.insert("ww8", "8d6 ww");
+    aliases.insert("ww9", "9d6 ww");
+    aliases.insert("ww10", "10d6 ww");
+    aliases.insert("ww4c1", "4d6 wwc1");
+    aliases.insert("ww4c2", "4d6 wwc2");
+    aliases.insert("ww5c1", "5d6 wwc1");
+    aliases.insert("ww5c2", "5d6 wwc2");
+    aliases.insert("ww6c1", "6d6 wwc1");
+    aliases.insert("ww6c2", "6d6 wwc2");
+    aliases.insert("ww6c3", "6d6 wwc3");
     aliases
 });
 
@@ -269,6 +290,11 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     // Check for A5E (Level Up Advanced 5th Edition) aliases
     if let Some(a5e_result) = expand_a5e_alias(input) {
         return Some(a5e_result);
+    }
+
+    // Handle Wild Worlds RPG aliases
+    if let Some(wild_worlds_result) = expand_wild_worlds_alias(input) {
+        return Some(wild_worlds_result);
     }
 
     if let Some(captures) = SR_REGEX.captures(input) {
@@ -1107,6 +1133,43 @@ fn expand_alien_alias(input: &str) -> Option<String> {
         }
 
         return Some(format!("{base_dice}d6 alien"));
+    }
+
+    None
+}
+
+fn expand_wild_worlds_alias(input: &str) -> Option<String> {
+    // Check for cutting dice first (ww4c2 -> 4d6 wwc2)
+    if let Some(captures) = WILD_WORLDS_CUT_REGEX.captures(input) {
+        let dice_count = &captures[1];
+        let cut_count = &captures[2];
+
+        // Validate inputs
+        let dice_num: u32 = dice_count.parse().ok()?;
+        let cut_num: u32 = cut_count.parse().ok()?;
+
+        // Validate ranges
+        if dice_num == 0 || dice_num > 20 {
+            return None; // Invalid dice count
+        }
+        if cut_num == 0 || cut_num >= dice_num {
+            return None; // Can't cut 0 or more than available dice
+        }
+
+        return Some(format!("{dice_count}d6 wwc{cut_count}"));
+    }
+
+    // Check for basic wild worlds roll (ww4 -> 4d6 ww)
+    if let Some(captures) = WILD_WORLDS_BASIC_REGEX.captures(input) {
+        let dice_count = &captures[1];
+
+        // Validate input
+        let dice_num: u32 = dice_count.parse().ok()?;
+        if dice_num == 0 || dice_num > 20 {
+            return None; // Invalid dice count
+        }
+
+        return Some(format!("{dice_count}d6 ww"));
     }
 
     None
