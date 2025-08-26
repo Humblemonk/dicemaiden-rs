@@ -94,7 +94,8 @@ pub enum Modifier {
     AlienStress(u32), // Stress dice (count 6s, track 1s for panic, stress level)
     ForgedDark,
     ForgedDarkZero,
-    Daggerheart, // Daggerheart player roll (2d12 Hope/Fear)
+    Daggerheart,             // Daggerheart player roll (2d12 Hope/Fear)
+    WildWorlds(Option<u32>), // Wild Worlds RPG: None=basic, Some(n)=cut n highest dice
 }
 
 #[derive(Debug, Clone)]

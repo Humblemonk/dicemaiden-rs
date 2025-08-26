@@ -804,6 +804,11 @@ fn apply_special_system_modifiers(
                 apply_laser_feelings_mechanics(result, *target, roll_type, dice_count)?;
                 has_special_system = true;
             }
+            Modifier::WildWorlds(cut_count) => {
+                apply_wild_worlds_mechanics(result, *cut_count)?;
+                has_special_system = true;
+            }
+
             // Skip mathematical modifiers here - they're handled by target processing or post-target processing
             Modifier::Add(_)
             | Modifier::Subtract(_)
@@ -3621,4 +3626,84 @@ fn apply_daggerheart_mechanics(result: &mut RollResult) -> Result<()> {
     result.comment = Some(daggerheart_result);
 
     Ok(())
+}
+
+/// Apply Wild Worlds RPG mechanics (The Wildsea RPG system)
+fn apply_wild_worlds_mechanics(result: &mut RollResult, cut_count: Option<u32>) -> Result<()> {
+    if result.individual_rolls.is_empty() {
+        return Err(anyhow!("No dice to apply Wild Worlds mechanics to"));
+    }
+
+    // Start with all rolled dice
+    let mut working_dice = result.individual_rolls.clone();
+
+    // Apply cutting if specified (remove highest dice before evaluation)
+    if let Some(cut) = cut_count {
+        let cut_amount = cut as usize;
+        if cut_amount >= working_dice.len() {
+            return Err(anyhow!(
+                "Cannot cut {} dice from {} rolled",
+                cut,
+                working_dice.len()
+            ));
+        }
+
+        // Sort dice in descending order and remove the highest ones
+        working_dice.sort_by(|a, b| b.cmp(a)); // Sort descending
+        working_dice.drain(0..cut_amount); // Remove highest dice
+
+        // Add note about cutting
+        result.notes.push(format!("Cut {} highest dice", cut));
+    }
+
+    if working_dice.is_empty() {
+        return Err(anyhow!("No dice remaining after cutting"));
+    }
+
+    // Find the highest die value (this determines the result in Wild Worlds)
+    let highest_die = *working_dice.iter().max().unwrap();
+
+    // Check for doubles/triples (any matching values = twist)
+    let has_twist = has_matching_dice(&working_dice);
+
+    // Interpret the result based on highest die (Wild Worlds rules)
+    let interpretation = match highest_die {
+        6 => "Triumph",          // Complete success
+        4 | 5 => "Conflict",     // Success with drawback
+        1..=3 => "Disaster", // Failure with complication
+        _ => unreachable!("d6 can only roll 1-6"),
+    };
+
+    // Set the result total to the highest die (Wild Worlds uses highest die, not sum)
+    result.total = highest_die;
+
+    // Add interpretation note with twist indication
+    let mut result_text = format!("Wild Worlds: {} ({})", interpretation, highest_die);
+    if has_twist {
+        result_text.push_str(" + Twist");
+    }
+    result.notes.push(result_text);
+
+    // Add twist explanation if applicable
+    if has_twist {
+        result
+            .notes
+            .push("Doubles detected - add a small twist to the outcome!".to_string());
+    }
+
+    // Store the working dice for display (after cuts)
+    result.kept_rolls = working_dice;
+
+    Ok(())
+}
+
+/// Helper function to detect matching dice values (for twist detection)
+fn has_matching_dice(dice: &[i32]) -> bool {
+    for i in 1..=6 {
+        let count = dice.iter().filter(|&&x| x == i).count();
+        if count >= 2 {
+            return true; // Found doubles (or triples, etc.)
+        }
+    }
+    false
 }

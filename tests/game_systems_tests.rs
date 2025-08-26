@@ -4796,3 +4796,174 @@ fn test_dh_dheart_no_conflict() {
         }
     }
 }
+
+#[test]
+fn test_wild_worlds_rpg_system() {
+    use dicemaiden_rs::{dice::aliases, parse_and_roll};
+
+    // Test basic Wild Worlds rolls
+    let basic_tests = vec![
+        ("ww3", "3d6 ww", "Basic 3 dice Wild Worlds roll"),
+        ("ww4", "4d6 ww", "Basic 4 dice Wild Worlds roll"),
+        ("ww6", "6d6 ww", "Basic 6 dice Wild Worlds roll"),
+    ];
+
+    for (alias, expected_expansion, description) in basic_tests {
+        // Test alias expansion
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(
+            expanded,
+            Some(expected_expansion.to_string()),
+            "Wild Worlds alias '{}' should expand to '{}': {}",
+            alias,
+            expected_expansion,
+            description
+        );
+
+        // Test that the alias produces results
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Wild Worlds '{}' should parse successfully: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
+
+        let roll_result = &results[0];
+
+        // Should have Wild Worlds interpretation
+        let has_wild_worlds_note = roll_result.notes.iter().any(|note| {
+            note.contains("Wild Worlds:")
+                && (note.contains("Triumph")
+                    || note.contains("Conflict")
+                    || note.contains("Disaster"))
+        });
+        assert!(
+            has_wild_worlds_note,
+            "Should have Wild Worlds interpretation note for '{}'",
+            alias
+        );
+
+        // Total should be between 1-6 (highest die value)
+        assert!(
+            roll_result.total >= 1 && roll_result.total <= 6,
+            "Wild Worlds result should be 1-6 for '{}': got {}",
+            alias,
+            roll_result.total
+        );
+    }
+
+    // Test cutting dice mechanics
+    let cutting_tests = vec![
+        ("ww4c1", "4d6 wwc1", "Roll 4d6, cut 1 highest"),
+        ("ww5c2", "5d6 wwc2", "Roll 5d6, cut 2 highest"),
+        ("ww6c3", "6d6 wwc3", "Roll 6d6, cut 3 highest"),
+    ];
+
+    for (alias, expected_expansion, description) in cutting_tests {
+        // Test alias expansion
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(
+            expanded,
+            Some(expected_expansion.to_string()),
+            "Wild Worlds cutting alias '{}' should expand to '{}': {}",
+            alias,
+            expected_expansion,
+            description
+        );
+
+        // Test that cutting aliases work
+        let result = parse_and_roll(alias);
+        assert!(
+            result.is_ok(),
+            "Wild Worlds cutting '{}' should parse successfully: {}",
+            alias,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll_result = &results[0];
+
+        // Should have cut note
+        let has_cut_note = roll_result
+            .notes
+            .iter()
+            .any(|note| note.contains("Cut") && note.contains("highest"));
+        assert!(has_cut_note, "Should have cutting note for '{}'", alias);
+
+        // Should have Wild Worlds interpretation
+        let has_interpretation = roll_result
+            .notes
+            .iter()
+            .any(|note| note.contains("Wild Worlds:"));
+        assert!(
+            has_interpretation,
+            "Should have Wild Worlds interpretation for '{}'",
+            alias
+        );
+
+        // Total should be between 1-6
+        assert!(
+            roll_result.total >= 1 && roll_result.total <= 6,
+            "Wild Worlds cutting result should be 1-6 for '{}': got {}",
+            alias,
+            roll_result.total
+        );
+    }
+
+    // Test error cases
+    let error_tests = vec![
+        ("ww0", "Cannot roll 0 dice"),
+        ("ww25", "Too many dice"),
+        ("ww3c3", "Cannot cut all dice"),
+        ("ww2c2", "Cannot cut all dice"),
+        ("ww4c5", "Cannot cut more than rolled"),
+    ];
+
+    for (expression, description) in error_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_err(),
+            "Invalid Wild Worlds '{}' should fail: {}",
+            expression,
+            description
+        );
+    }
+}
+
+#[test]
+fn test_wild_worlds_roll_sets() {
+    use dicemaiden_rs::parse_and_roll;
+
+    // Test Wild Worlds with roll sets
+    let result = parse_and_roll("3 ww4");
+    assert!(result.is_ok(), "Wild Worlds roll sets should work");
+
+    let results = result.unwrap();
+    assert_eq!(results.len(), 3, "Should have 3 sets");
+
+    for (i, roll_result) in results.iter().enumerate() {
+        assert_eq!(
+            roll_result.label,
+            Some(format!("Set {}", i + 1)),
+            "Should have proper set labels"
+        );
+
+        let has_wild_worlds_note = roll_result
+            .notes
+            .iter()
+            .any(|note| note.contains("Wild Worlds:"));
+        assert!(
+            has_wild_worlds_note,
+            "Each set should have Wild Worlds interpretation"
+        );
+
+        assert!(
+            roll_result.total >= 1 && roll_result.total <= 6,
+            "Each set should have valid Wild Worlds result"
+        );
+    }
+}
