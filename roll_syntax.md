@@ -232,6 +232,16 @@
 - **Twist**: Any doubles/triples add a beneficial twist to the outcome
 - **Cutting**: Remove highest dice before evaluation (simulates difficulty)
 
+### Mutants and Masterminds
+- `mnm` → 1d20 mnm (basic check vs DC 10)
+- **Degree System**: Every 5 points above/below the DC counts as one degree of success/failure
+  - **0-4 above DC**:   1 degree of success
+  - **5-9 above DC**:   2 degrees of success
+  - **10-14 above DC**: 3 degrees of success
+  - **1-5 below DC**:   1 degree of failure
+  - **6-10 below DC**:  2 degrees of failure
+  - **11-15 below DC**: 3 degrees of failure
+
 ### Other Popular Systems
 - **Shadowrun**: `sr6` → 6d6 t5 (6th edition)
 - **Exalted**: `ex5` → 5d10 t7 t10, `ex5t8` → 5d10 t8 t10

@@ -7,6 +7,7 @@
 - Enhanced dice randomness with cryptographically secure RNG using multiple entropy sources (OS, time, thread, process, memory)
 - Support for Daggerheart
 - Support for Wild Worlds
+- Support for Mutants and Masterminds
 
 ## [1.4.0] - 2025-07-05
 

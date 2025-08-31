@@ -96,6 +96,7 @@ pub enum Modifier {
     ForgedDarkZero,
     Daggerheart,             // Daggerheart player roll (2d12 Hope/Fear)
     WildWorlds(Option<u32>), // Wild Worlds RPG: None=basic, Some(n)=cut n highest dice
+    MutantsMasterminds,      // Mutants & Masterminds degree system
 }
 
 #[derive(Debug, Clone)]
