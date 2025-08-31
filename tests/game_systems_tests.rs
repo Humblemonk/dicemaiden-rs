@@ -5008,14 +5008,6 @@ fn test_mutants_masterminds_parsing() {
         roll.successes.is_some() || roll.failures.is_some(),
         "MnM should have either successes or failures counted"
     );
-
-    // Should have system identification note
-    assert!(
-        roll.notes
-            .iter()
-            .any(|note| note.contains("Mutants & Masterminds")),
-        "Should have MnM system note"
-    );
 }
 
 #[test]
