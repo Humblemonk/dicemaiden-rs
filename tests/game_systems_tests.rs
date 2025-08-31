@@ -4967,3 +4967,170 @@ fn test_wild_worlds_roll_sets() {
         );
     }
 }
+
+#[test]
+fn test_mutants_masterminds_basic() {
+    // Test basic MnM alias expansion
+    use dicemaiden_rs::dice::aliases;
+
+    assert_eq!(
+        aliases::expand_alias("mnm"),
+        Some("1d20 mnm".to_string()),
+        "Basic MnM alias should expand correctly"
+    );
+
+    // Test MnM with modifiers
+    assert_eq!(
+        aliases::expand_alias("mnm +5"),
+        Some("1d20+5 mnm".to_string()),
+        "MnM with positive modifier should expand correctly"
+    );
+
+    assert_eq!(
+        aliases::expand_alias("mnm -3"),
+        Some("1d20-3 mnm".to_string()),
+        "MnM with negative modifier should expand correctly"
+    );
+}
+
+#[test]
+fn test_mutants_masterminds_parsing() {
+    // Test that MnM modifier is parsed correctly
+    let result = parse_and_roll("1d20 mnm");
+    assert!(result.is_ok(), "Basic MnM should parse correctly");
+
+    let results = result.unwrap();
+    assert_eq!(results.len(), 1, "Should have one result");
+
+    // Should use the MnM system (check for success/failure counting)
+    let roll = &results[0];
+    assert!(
+        roll.successes.is_some() || roll.failures.is_some(),
+        "MnM should have either successes or failures counted"
+    );
+}
+
+#[test]
+fn test_mutants_masterminds_degrees() {
+    // Test degree calculation logic by using fixed dice values
+    // We can't directly test the randomness, but we can test the parsing and structure
+
+    let test_cases = vec![
+        ("mnm", "Basic MnM roll"),
+        ("mnm +5", "MnM with bonus"),
+        ("mnm -2", "MnM with penalty"),
+    ];
+
+    for (expression, description) in test_cases {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "MnM expression '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+
+        // Should have either successes or failures, but not both
+        let has_success = roll.successes.is_some() && roll.successes.unwrap() > 0;
+        let has_failure = roll.failures.is_some() && roll.failures.unwrap() > 0;
+
+        assert!(
+            has_success || has_failure,
+            "MnM roll '{}' should have either success or failure degrees: {}",
+            expression,
+            description
+        );
+
+        assert!(
+            !(has_success && has_failure),
+            "MnM roll '{}' should not have both success and failure: {}",
+            expression,
+            description
+        );
+
+        // Should have appropriate notes
+        let has_result_note = roll
+            .notes
+            .iter()
+            .any(|note| note.contains("SUCCESS") || note.contains("FAILURE"));
+        assert!(
+            has_result_note,
+            "MnM roll '{}' should have success/failure note: {}",
+            expression, description
+        );
+    }
+}
+
+#[test]
+fn test_mutants_masterminds_with_roll_sets() {
+    // Test MnM with roll sets
+    let result = parse_and_roll("3 mnm +2");
+    assert!(result.is_ok(), "MnM roll sets should work");
+
+    let results = result.unwrap();
+    assert_eq!(results.len(), 3, "Should have 3 roll sets");
+
+    for (i, roll) in results.iter().enumerate() {
+        assert_eq!(
+            roll.label,
+            Some(format!("Set {}", i + 1)),
+            "Each set should have proper label"
+        );
+
+        assert!(
+            roll.successes.is_some() || roll.failures.is_some(),
+            "Each MnM set should have success/failure counting"
+        );
+    }
+}
+
+#[test]
+fn test_mutants_masterminds_semicolon_separated() {
+    // Test MnM in semicolon-separated rolls
+    let result = parse_and_roll("mnm ; 1d20+5 ; mnm -2");
+    assert!(result.is_ok(), "MnM in semicolon rolls should work");
+
+    let results = result.unwrap();
+    assert_eq!(results.len(), 3, "Should have 3 separate rolls");
+
+    // First and third should be MnM, second should be regular
+    assert!(
+        results[0].successes.is_some() || results[0].failures.is_some(),
+        "First roll should be MnM system"
+    );
+
+    assert!(
+        results[1].successes.is_none() && results[1].failures.is_none(),
+        "Second roll should be regular d20 (no success/failure counting)"
+    );
+
+    assert!(
+        results[2].successes.is_some() || results[2].failures.is_some(),
+        "Third roll should be MnM system"
+    );
+}
+
+#[test]
+fn test_mutants_masterminds_doesnt_break_existing() {
+    // Test that adding MnM doesn't break existing systems
+    let existing_systems = vec![
+        ("4cod", "Chronicles of Darkness"),
+        ("sw8", "Savage Worlds"),
+        ("1d20 gb", "Godbound"),
+        ("3df", "Fudge dice"),
+        ("cpr", "Cyberpunk Red"),
+    ];
+
+    for (expression, description) in existing_systems {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Existing system '{}' should still work after MnM addition: {}",
+            expression,
+            description
+        );
+    }
+}

@@ -82,6 +82,16 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         return handle_silhouette_roll(dice, &mut rng);
     }
 
+    // Check if this is a Mutants & Masterminds roll - handle it specially
+    let has_mutants_masterminds = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::MutantsMasterminds));
+
+    if has_mutants_masterminds {
+        return handle_mutants_masterminds_roll(dice, &mut rng);
+    }
+
     let mut result = RollResult {
         individual_rolls: Vec::new(),
         kept_rolls: Vec::new(),
@@ -806,6 +816,9 @@ fn apply_special_system_modifiers(
             }
             Modifier::WildWorlds(cut_count) => {
                 apply_wild_worlds_mechanics(result, *cut_count)?;
+                has_special_system = true;
+            }
+            Modifier::MutantsMasterminds => {
                 has_special_system = true;
             }
 
@@ -3668,8 +3681,8 @@ fn apply_wild_worlds_mechanics(result: &mut RollResult, cut_count: Option<u32>) 
 
     // Interpret the result based on highest die (Wild Worlds rules)
     let interpretation = match highest_die {
-        6 => "Triumph",          // Complete success
-        4 | 5 => "Conflict",     // Success with drawback
+        6 => "Triumph",      // Complete success
+        4 | 5 => "Conflict", // Success with drawback
         1..=3 => "Disaster", // Failure with complication
         _ => unreachable!("d6 can only roll 1-6"),
     };
@@ -3706,4 +3719,118 @@ fn has_matching_dice(dice: &[i32]) -> bool {
         }
     }
     false
+}
+
+pub fn handle_mutants_masterminds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
+    // Initialize complete RollResult with all required fields
+    let mut result = RollResult {
+        individual_rolls: Vec::new(),
+        kept_rolls: Vec::new(),
+        dropped_rolls: Vec::new(),
+        total: 0,
+        successes: None,
+        failures: None,
+        botches: None,
+        comment: dice.comment.clone(),
+        label: dice.label.clone(),
+        notes: Vec::new(),
+        dice_groups: Vec::new(),
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
+        godbound_damage: None,
+        fudge_symbols: None,
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
+        wng_wrath_dice: None,
+        suppress_comment: false,
+        alien_stress_level: None,
+        alien_panic_roll: None,
+        alien_stress_ones: None,
+        fitd_outcome: None,
+        fitd_result: None,
+        fitd_highest_die: None,
+    };
+
+    // Roll the dice
+    for _ in 0..dice.count {
+        let roll = rng.random_range(1..=dice.sides as i32);
+        result.individual_rolls.push(roll);
+        result.kept_rolls.push(roll);
+    }
+
+    // Create dice group for display
+    result.dice_groups.push(DiceGroup {
+        _description: format!("{}d{}", dice.count, dice.sides),
+        rolls: result.individual_rolls.clone(),
+        dropped_rolls: Vec::new(),
+        modifier_type: "base".to_string(),
+    });
+
+    // Calculate base total
+    result.total = result.kept_rolls.iter().sum();
+
+    // Apply mathematical modifiers (add, subtract, multiply, divide)
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::Add(value) => {
+                result.total += value;
+            }
+            Modifier::Subtract(value) => {
+                result.total -= value;
+            }
+            Modifier::Multiply(value) => {
+                result.total *= value;
+            }
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                result.total /= value;
+            }
+            _ => {} // Only handle math modifiers, MutantsMasterminds handled separately
+        }
+    }
+
+    // Calculate degrees of success/failure against DC 10
+    let dc = 10;
+    let total_vs_dc = result.total - dc;
+
+    if total_vs_dc >= 0 {
+        // Success: every 5 points above DC is one degree of success
+        let degrees = (total_vs_dc / 5) + 1;
+        result.successes = Some(degrees);
+
+        if degrees == 1 {
+            result.notes.push(format!(
+                "**SUCCESS** (1 degree: rolled {} vs DC {})",
+                result.total, dc
+            ));
+        } else {
+            result.notes.push(format!(
+                "**SUCCESS** ({} degrees: rolled {} vs DC {})",
+                degrees, result.total, dc
+            ));
+        }
+    } else {
+        // Failure: every 5 points below DC is one degree of failure
+        let degrees = ((-total_vs_dc - 1) / 5) + 1;
+        result.failures = Some(degrees);
+
+        if degrees == 1 {
+            result.notes.push(format!(
+                "**FAILURE** (1 degree: rolled {} vs DC {})",
+                result.total, dc
+            ));
+        } else {
+            result.notes.push(format!(
+                "**FAILURE** ({} degrees: rolled {} vs DC {})",
+                degrees, result.total, dc
+            ));
+        }
+    }
+
+    Ok(result)
 }

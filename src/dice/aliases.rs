@@ -168,6 +168,9 @@ static WILD_WORLDS_BASIC_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^ww(\d+)
 
 static WILD_WORLDS_CUT_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^ww(\d+)c(\d+)$").unwrap());
 
+static MNM_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^mnm(?:\s*([+-]\s*\d+))?$").expect("Failed to compile MNM_REGEX"));
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -285,6 +288,18 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
 
     if input == "dh" {
         return Some("1d10 dh".to_string());
+    }
+
+    // Handle Mutants & Masterminds aliases
+    if let Some(captures) = MNM_REGEX.captures(input) {
+        let modifier = captures.get(1).map(|m| m.as_str()).unwrap_or("");
+        if modifier.is_empty() {
+            return Some("1d20 mnm".to_string());
+        } else {
+            // Clean up the modifier string (remove extra spaces)
+            let clean_modifier = modifier.replace(' ', "");
+            return Some(format!("1d20{} mnm", clean_modifier));
+        }
     }
 
     // Check for A5E (Level Up Advanced 5th Edition) aliases
