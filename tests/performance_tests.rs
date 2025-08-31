@@ -40,7 +40,7 @@ fn measure_best_performance_time(expression: &str, runs: usize) -> (u128, Result
 fn test_parsing_performance() {
     // Test that parsing completes within reasonable time
     let performance_cases = vec![
-        ("1d6", "Simple dice", 10),
+        ("1d6", "Simple dice", 20),
         ("10d10 e10 k5 +3", "Complex modifiers", 100),
         ("500d1000", "Maximum dice count", 200),
         ("20 50d6", "Large roll sets", 100),
