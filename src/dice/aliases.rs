@@ -585,7 +585,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = SW_REGEX.captures(input) {
         let sides: u32 = captures[1].parse().ok()?;
         // Savage Worlds uses even-sided dice from d4 to d12
-        if (4..=12).contains(&sides) && sides % 2 == 0 {
+        if (4..=12).contains(&sides) && sides.is_multiple_of(2) {
             // We need to create an expression that rolls both dice and keeps the highest
             // This requires a different approach than simple addition
             return Some(format!("2d1 sw{sides}"));
