@@ -1,5 +1,5 @@
 # Build arguments for version pinning
-ARG RUST_VERSION=1.87.0
+ARG RUST_VERSION=1.90.0
 ARG UBI_VERSION=9
 
 # Use official Rust image for building (faster, more reliable)
