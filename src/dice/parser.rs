@@ -905,6 +905,13 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
         return Ok(vec![]);
     }
 
+    // Special handling for Mothership patterns - don't strip trailing +/-
+    // because they're part of the modifier, not operators
+    if input.starts_with("ms") {
+        // This is a Mothership modifier, return it as-is
+        return Ok(vec![input.to_string()]);
+    }
+
     // First, check if there's a trailing operator and separate it
     let (modifiers_part, _trailing_op) = if input.ends_with(['+', '-', '*', '/']) {
         let op_pos = input.len() - 1;
@@ -951,7 +958,8 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
             (r"^(alien)", "alien base"),         // alien (exact)
             (r"^(aliens\d+)", "alien stress"),   // aliens1, aliens2, etc.
             (r"^(wwc\d+)", "wild worlds cut"),   // wwc2, wwc3, etc. (before basic ww)
-            (r"^(ww)", "wild worlds"),           // ww (basic)
+            (r"^(ms\d+[ad]?|ms[ad]?|ms)", "mothership"),
+            (r"^(ww)", "wild worlds"), // ww (basic)
         ];
 
         let mut found_match = false;
@@ -2012,6 +2020,51 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
                 ));
             }
             return Ok(Modifier::Silhouette(dice_count));
+        }
+    }
+
+    // Mothership RPG handling
+    if part == "ms" {
+        return Ok(Modifier::Mothership(None, false));
+    }
+    if part == "msa" {
+        // Changed from ms+
+        return Ok(Modifier::Mothership(None, true));
+    }
+    if part == "msd" {
+        // Changed from ms-
+        return Ok(Modifier::Mothership(None, false));
+    }
+
+    // Mothership with stat value
+    if let Some(stripped) = part.strip_prefix("ms") {
+        if let Some(stat_str) = stripped.strip_suffix('a') {
+            // Changed from '+'
+            let stat: u32 = stat_str
+                .parse()
+                .map_err(|_| anyhow!("Invalid Mothership stat value in '{}'", part))?;
+            if stat < 1 || stat > 99 {
+                return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
+            }
+            return Ok(Modifier::Mothership(Some(stat), true));
+        } else if let Some(stat_str) = stripped.strip_suffix('d') {
+            // Changed from '-'
+            let stat: u32 = stat_str
+                .parse()
+                .map_err(|_| anyhow!("Invalid Mothership stat value in '{}'", part))?;
+            if stat < 1 || stat > 99 {
+                return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
+            }
+            return Ok(Modifier::Mothership(Some(stat), false));
+        } else if !stripped.is_empty() {
+            // Just a stat value
+            let stat: u32 = stripped
+                .parse()
+                .map_err(|_| anyhow!("Invalid Mothership stat value in '{}'", part))?;
+            if stat < 1 || stat > 99 {
+                return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
+            }
+            return Ok(Modifier::Mothership(Some(stat), false));
         }
     }
 

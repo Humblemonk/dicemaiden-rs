@@ -5134,3 +5134,431 @@ fn test_mutants_masterminds_doesnt_break_existing() {
         );
     }
 }
+
+#[test]
+fn test_mothership_basic_rolls() {
+    // Test basic Mothership alias expansion
+    use dicemaiden_rs::dice::aliases;
+
+    assert_eq!(
+        aliases::expand_alias("ms"),
+        Some("1d100 ms".to_string()),
+        "Basic Mothership alias should expand correctly"
+    );
+
+    assert_eq!(
+        aliases::expand_alias("ms45"),
+        Some("1d100 ms45".to_string()),
+        "Mothership with stat should expand correctly"
+    );
+
+    assert_eq!(
+        aliases::expand_alias("+ms"),
+        Some("2d100 msa".to_string()), // Changed from ms+
+        "Mothership advantage should expand correctly"
+    );
+
+    assert_eq!(
+        aliases::expand_alias("-ms"),
+        Some("2d100 msd".to_string()), // Changed from ms-
+        "Mothership disadvantage should expand correctly"
+    );
+
+    assert_eq!(
+        aliases::expand_alias("+ms45"),
+        Some("2d100 ms45a".to_string()), // Changed from ms45+
+        "Mothership advantage with stat should expand correctly"
+    );
+
+    assert_eq!(
+        aliases::expand_alias("-ms45"),
+        Some("2d100 ms45d".to_string()), // Changed from ms45-
+        "Mothership disadvantage with stat should expand correctly"
+    );
+}
+
+#[test]
+fn test_mothership_parsing() {
+    // Test that Mothership expressions parse correctly
+    let test_cases = vec![
+        ("ms", "Basic Mothership"),
+        ("ms45", "Mothership with stat 45"),
+        ("+ms", "Mothership advantage"),
+        ("-ms", "Mothership disadvantage"),
+        ("+ms45", "Mothership advantage with stat"),
+        ("-ms45", "Mothership disadvantage with stat"),
+    ];
+
+    for (expression, description) in test_cases {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Mothership expression '{}' should parse: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        assert_eq!(
+            results.len(),
+            1,
+            "Should have one result for '{}'",
+            expression
+        );
+
+        let roll = &results[0];
+
+        // Should have a total within valid percentile range
+        assert!(
+            roll.total >= 1 && roll.total <= 100,
+            "Total {} should be 1-100 for '{}'",
+            roll.total,
+            expression
+        );
+
+        // Should have appropriate success or failure marking
+        assert!(
+            roll.successes.is_some() || roll.failures.is_some(),
+            "Roll should have success or failure for '{}'",
+            expression
+        );
+
+        // Should have Mothership notes
+        let has_mothership_note = roll.notes.iter().any(|note| note.contains("Mothership"));
+        assert!(
+            has_mothership_note,
+            "Roll should have Mothership note for '{}'",
+            expression
+        );
+    }
+}
+
+#[test]
+fn test_mothership_advantage_disadvantage_mechanics() {
+    // Test that advantage/disadvantage roll 2 dice
+    let advantage_result = parse_and_roll("+ms45").unwrap();
+    assert_eq!(
+        advantage_result[0].individual_rolls.len(),
+        2,
+        "Advantage should roll 2 dice"
+    );
+
+    let disadvantage_result = parse_and_roll("-ms45").unwrap();
+    assert_eq!(
+        disadvantage_result[0].individual_rolls.len(),
+        2,
+        "Disadvantage should roll 2 dice"
+    );
+
+    let basic_result = parse_and_roll("ms45").unwrap();
+    assert_eq!(
+        basic_result[0].individual_rolls.len(),
+        1,
+        "Basic roll should roll 1 die"
+    );
+}
+
+#[test]
+fn test_mothership_stat_validation() {
+    // Test invalid stat values
+    let invalid_stats = vec![
+        "ms0",   // Zero
+        "ms100", // Too high
+        "ms200", // Way too high
+    ];
+
+    for invalid_test in invalid_stats {
+        let result = parse_and_roll(invalid_test);
+        assert!(
+            result.is_err(),
+            "Invalid Mothership stat '{}' should fail",
+            invalid_test
+        );
+    }
+
+    // Test valid edge cases
+    let valid_stats = vec!["ms1", "ms99"];
+
+    for valid_test in valid_stats {
+        let result = parse_and_roll(valid_test);
+        assert!(
+            result.is_ok(),
+            "Valid Mothership stat '{}' should work",
+            valid_test
+        );
+    }
+}
+
+#[test]
+fn test_mothership_with_roll_sets() {
+    // Test Mothership with roll sets
+    let result = parse_and_roll("3 +ms45");
+    assert!(result.is_ok(), "Mothership roll sets should work");
+
+    let results = result.unwrap();
+    assert_eq!(results.len(), 3, "Should have 3 roll sets");
+
+    for (i, roll) in results.iter().enumerate() {
+        assert_eq!(
+            roll.label,
+            Some(format!("Set {}", i + 1)),
+            "Each set should have proper label"
+        );
+
+        assert!(
+            roll.successes.is_some() || roll.failures.is_some(),
+            "Each Mothership set should have success/failure"
+        );
+
+        // Should roll 2 dice for advantage
+        assert_eq!(
+            roll.individual_rolls.len(),
+            2,
+            "Each advantage set should roll 2 dice"
+        );
+    }
+}
+
+#[test]
+fn test_mothership_doesnt_break_existing() {
+    // Test that adding Mothership doesn't break existing systems
+    let existing_systems = vec![
+        ("mm", "Marvel Multiverse"),
+        ("mnm", "Mutants & Masterminds"),
+        ("4cod", "Chronicles of Darkness"),
+        ("sw8", "Savage Worlds"),
+        ("1d20 gb", "Godbound"),
+        ("3df", "Fudge dice"),
+        ("cpr", "Cyberpunk Red"),
+        ("+d%", "Percentile advantage"),
+        ("-d%", "Percentile disadvantage"),
+    ];
+
+    for (expression, description) in existing_systems {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Existing system '{}' should still work after Mothership addition: {}",
+            expression,
+            description
+        );
+    }
+}
+
+#[test]
+fn test_mothership_case_insensitive() {
+    // Test that Mothership aliases work with different cases
+    use dicemaiden_rs::dice::aliases;
+
+    let case_variants = vec![
+        ("ms", "1d100 ms"),
+        ("MS", "1d100 ms"),
+        ("Ms", "1d100 ms"),
+        ("+ms45", "2d100 ms45a"), // Changed from ms45+
+        ("+MS45", "2d100 ms45a"), // Changed from ms45+
+        ("-ms30", "2d100 ms30d"), // Changed from ms30-
+        ("-MS30", "2d100 ms30d"), // Changed from ms30-
+    ];
+
+    for (input, expected) in case_variants {
+        let result = aliases::expand_alias(input);
+        assert_eq!(
+            result,
+            Some(expected.to_string()),
+            "Case variant '{}' should expand correctly",
+            input
+        );
+    }
+}
+
+#[test]
+fn test_mothership_with_labels_and_comments() {
+    // Test Mothership works with labels and comments
+    let label_comment_tests = vec![
+        ("(Strength Check) ms45", "Label syntax"),
+        ("ms45 ! Trying to open the airlock", "Comment syntax"),
+        (
+            "(Combat Roll) +ms50 ! Attacking the alien",
+            "Label and comment with advantage",
+        ),
+        (
+            "-ms35 ! Sneaking past the crew",
+            "Disadvantage with comment",
+        ),
+    ];
+
+    for (expression, description) in label_comment_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Mothership with labels/comments '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+
+        // Verify Mothership mechanics still work
+        assert!(
+            roll.successes.is_some() || roll.failures.is_some(),
+            "Mothership mechanics should work with labels/comments for '{}'",
+            expression
+        );
+    }
+}
+
+#[test]
+fn test_mothership_unique_namespace() {
+    // Verify Mothership uses unique namespace and doesn't conflict
+    let ms_patterns = vec!["ms", "ms45", "+ms", "-ms", "+ms45", "-ms45"];
+
+    // Get all existing non-Mothership aliases for comparison
+    let existing_patterns = vec![
+        "mm", "mnm", "sw", "cod", "wod", "ex", "alien", "vtm", "lf", "cs", "sp", "dd", "yz", "wh",
+        "ed", "snm", "gb", "gbs", "hs", "dh", "cpr", "wit", "df", "age", "attack", "skill", "save",
+    ];
+
+    for ms_pattern in &ms_patterns {
+        for existing_pattern in &existing_patterns {
+            assert!(
+                !ms_pattern.starts_with(existing_pattern)
+                    && !existing_pattern.starts_with(ms_pattern.trim_start_matches(['+', '-'])),
+                "Mothership pattern '{}' conflicts with existing pattern '{}'",
+                ms_pattern,
+                existing_pattern
+            );
+        }
+    }
+}
+
+#[test]
+fn test_mothership_with_flags() {
+    // Test Mothership works with all existing flags
+    let flag_tests = vec![
+        ("p ms45", "Private flag"),
+        ("s +ms45", "Simple flag"),
+        ("nr -ms45", "No results flag"),
+        ("ul ms45", "Unsorted flag"),
+        ("p s ms45", "Multiple flags"),
+    ];
+
+    for (expression, description) in flag_tests {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Mothership with flags '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+
+        // Verify Mothership mechanics still work
+        assert!(
+            roll.successes.is_some() || roll.failures.is_some(),
+            "Mothership mechanics should work with flags for '{}'",
+            expression
+        );
+
+        // Verify flags are applied - CHECK THE CORRECT FLAG
+        if expression.contains(" p ") || expression.starts_with("p ") {
+            // Fixed condition
+            assert!(
+                roll.private,
+                "Private flag should be set for '{}'",
+                expression
+            );
+        }
+        if expression.contains(" s ") || expression.starts_with("s ") {
+            // Fixed condition
+            assert!(
+                roll.simple,
+                "Simple flag should be set for '{}'",
+                expression
+            );
+        }
+    }
+}
+
+#[test]
+fn test_mothership_semicolon_separated() {
+    // Test Mothership in semicolon-separated rolls
+    let result = parse_and_roll("ms45 ; 1d20+5 ; +ms50");
+    assert!(result.is_ok(), "Mothership in semicolon rolls should work");
+
+    let results = result.unwrap();
+    assert_eq!(results.len(), 3, "Should have 3 separate rolls");
+
+    // First and third should be Mothership, second should be regular
+    assert!(
+        results[0].successes.is_some() || results[0].failures.is_some(),
+        "First roll should be Mothership system"
+    );
+
+    assert!(
+        results[1].successes.is_none() && results[1].failures.is_none(),
+        "Second roll should be regular d20 (no Mothership mechanics)"
+    );
+
+    assert!(
+        results[2].successes.is_some() || results[2].failures.is_some(),
+        "Third roll should be Mothership system"
+    );
+}
+
+#[test]
+fn test_mothership_default_stat() {
+    // Test that Mothership without stat defaults to 50
+    let result = parse_and_roll("ms").unwrap();
+    let roll = &result[0];
+
+    // Should have rolled and evaluated
+    assert!(
+        roll.total >= 1 && roll.total <= 100,
+        "Should have valid percentile roll"
+    );
+
+    // Check note mentions stat (should mention 50 as target)
+    let has_target_note = roll
+        .notes
+        .iter()
+        .any(|note| note.contains("≤50") || note.contains("target"));
+    assert!(
+        has_target_note,
+        "Should mention target stat in notes (default 50)"
+    );
+}
+
+#[test]
+fn test_mothership_edge_case_rolls() {
+    // Test specific edge case values
+    let edge_cases = vec![
+        ("ms1", "Minimum stat"),
+        ("ms99", "Maximum stat"),
+        ("+ms50", "Advantage with 50/50 stat"),
+        ("-ms25", "Disadvantage with low stat"),
+        ("+ms75", "Advantage with high stat"),
+    ];
+
+    for (expression, description) in edge_cases {
+        let result = parse_and_roll(expression);
+        assert!(
+            result.is_ok(),
+            "Mothership edge case '{}' should work: {}",
+            expression,
+            description
+        );
+
+        let results = result.unwrap();
+        let roll = &results[0];
+
+        assert!(
+            roll.total >= 1 && roll.total <= 100,
+            "Total should be valid percentile for '{}': {}",
+            expression,
+            description
+        );
+    }
+}

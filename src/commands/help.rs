@@ -21,7 +21,8 @@ pub fn register() -> CreateCommand {
             .add_string_choice("alias", "alias")
             .add_string_choice("system", "system")
             .add_string_choice("a5e", "a5e")
-            .add_string_choice("aliens", "aliens"),
+            .add_string_choice("aliens", "aliens")
+            .add_string_choice("mothership", "mothership"),
         )
 }
 
@@ -41,6 +42,7 @@ pub async fn run(_ctx: &Context, command: &CommandInteraction) -> Result<Command
         "system" => help_text::generate_system_help(),
         "a5e" => help_text::generate_a5e_help(),
         "aliens" => help_text::generate_aliens_help(),
+        "mothership" => help_text::generate_mothership_help(),
         _ => help_text::generate_basic_help(),
     };
 

@@ -261,3 +261,48 @@ When stress dice show **1s**, you must make a panic roll:
 Use `/help` for basic syntax and `/help alias` for more shortcuts!"#
         .to_string()
 }
+
+pub fn generate_mothership_help() -> String {
+    r#"🎲 **Mothership RPG System** 🎲
+
+**Note:**
+- Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+- If you experience a bug, please report the issue on GitHub!
+
+Mothership uses a percentile (d100) roll-under system where rolling doubles (11, 22, 33, etc.) results in critical successes or critical failures. The advantage/disadvantage system uses sophisticated selection logic.
+
+**Basic Rolls:**
+- `ms` → 1d100 roll-under (default target 50)
+- `ms45` → 1d100 roll-under with Strength stat 45
+- `ms30` → 1d100 roll-under with Speed stat 30
+
+**Advantage/Disadvantage:**
+- `+ms45` → Roll 2d100, select better result using Mothership logic
+- `-ms45` → Roll 2d100, select worse result using Mothership logic
+- `+ms` → Advantage with default target 50
+- `-ms` → Disadvantage with default target 50
+
+**Critical System:**
+Doubles (11, 22, 33, ..., 99, 00) are critical rolls:
+- If you succeed (roll ≤ stat), doubles = **Critical Success**
+- If you fail (roll > stat), doubles = **Critical Failure**
+
+**Selection Logic for Advantage:**
+When rolling with advantage, the better roll is selected by priority:
+1. **Critical Success** (doubles ≤ stat) - BEST
+2. **Success** (non-doubles ≤ stat)
+3. **Critical Failure** (doubles > stat)
+4. **Failure** (non-doubles > stat) - WORST
+- Within same category: prefer lower roll
+
+**Selection Logic for Disadvantage:**
+When rolling with disadvantage, the worse roll is selected by priority:
+1. **Failure** (non-doubles > stat) - WORST
+2. **Critical Failure** (doubles > stat)
+3. **Success** (non-doubles ≤ stat)
+4. **Critical Success** (doubles ≤ stat) - BEST
+- Within same category: prefer higher roll
+
+Use `/help` for basic syntax and `/help alias` for more game systems!"#
+        .to_string()
+}
