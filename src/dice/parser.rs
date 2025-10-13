@@ -2043,7 +2043,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             let stat: u32 = stat_str
                 .parse()
                 .map_err(|_| anyhow!("Invalid Mothership stat value in '{}'", part))?;
-            if stat < 1 || stat > 99 {
+            if !(1..=99).contains(&stat) {
                 return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
             }
             return Ok(Modifier::Mothership(Some(stat), true));
@@ -2052,7 +2052,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             let stat: u32 = stat_str
                 .parse()
                 .map_err(|_| anyhow!("Invalid Mothership stat value in '{}'", part))?;
-            if stat < 1 || stat > 99 {
+            if !(1..=99).contains(&stat) {
                 return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
             }
             return Ok(Modifier::Mothership(Some(stat), false));
@@ -2061,7 +2061,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             let stat: u32 = stripped
                 .parse()
                 .map_err(|_| anyhow!("Invalid Mothership stat value in '{}'", part))?;
-            if stat < 1 || stat > 99 {
+            if !(1..=99).contains(&stat) {
                 return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
             }
             return Ok(Modifier::Mothership(Some(stat), false));
