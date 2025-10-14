@@ -92,6 +92,16 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         return handle_mutants_masterminds_roll(dice, &mut rng);
     }
 
+    // Check if this is a Mothership roll - handle it specially
+    let has_mothership = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::Mothership(_, _)));
+
+    if has_mothership {
+        return handle_mothership_roll(dice, &mut rng);
+    }
+
     let mut result = RollResult {
         individual_rolls: Vec::new(),
         kept_rolls: Vec::new(),
@@ -820,6 +830,10 @@ fn apply_special_system_modifiers(
             }
             Modifier::MutantsMasterminds => {
                 has_special_system = true;
+            }
+            Modifier::Mothership(_, _) => {
+                // Mothership is handled in the main roll_dice function
+                // Don't process it here
             }
 
             // Skip mathematical modifiers here - they're handled by target processing or post-target processing
@@ -3828,6 +3842,194 @@ pub fn handle_mutants_masterminds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Re
             result.notes.push(format!(
                 "**FAILURE** ({} degrees: rolled {} vs DC {})",
                 degrees, result.total, dc
+            ));
+        }
+    }
+
+    Ok(result)
+}
+
+fn handle_mothership_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
+    // Extract Mothership modifier
+    let (stat_target, is_advantage_or_disadvantage) = dice
+        .modifiers
+        .iter()
+        .find_map(|m| {
+            if let Modifier::Mothership(stat, is_adv) = m {
+                Some((*stat, *is_adv))
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| anyhow!("Expected Mothership modifier"))?;
+
+    // Determine actual stat value (default to 50 if not specified)
+    let stat = stat_target.unwrap_or(50);
+
+    // Validate stat range
+    if !(1..=99).contains(&stat) {
+        return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
+    }
+
+    // Roll the dice (either 1d100 or 2d100)
+    let num_dice = if dice.count == 2 { 2 } else { 1 };
+    let mut rolls = Vec::new();
+    for _ in 0..num_dice {
+        let roll = rng.random_range(1..=100);
+        rolls.push(roll);
+    }
+
+    // Helper function to check if a roll is doubles
+    let is_double_digit = |roll: i32| -> bool {
+        if roll == 100 {
+            return true; // 00 counts as doubles (displayed as 100)
+        }
+        let tens = roll / 10;
+        let ones = roll % 10;
+        tens == ones
+    };
+
+    // Categorize rolls
+    #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+    enum RollCategory {
+        CritSuccess = 0, // Best
+        Success = 1,
+        CritFailure = 2,
+        Failure = 3, // Worst
+    }
+
+    let categorize_roll = |roll: i32| -> RollCategory {
+        let is_double = is_double_digit(roll);
+        let is_success = roll <= stat as i32;
+
+        match (is_success, is_double) {
+            (true, true) => RollCategory::CritSuccess,
+            (true, false) => RollCategory::Success,
+            (false, true) => RollCategory::CritFailure,
+            (false, false) => RollCategory::Failure,
+        }
+    };
+
+    // Select the best roll based on advantage/disadvantage
+    let selected_roll = if rolls.len() == 1 {
+        rolls[0]
+    } else {
+        let roll1 = rolls[0];
+        let roll2 = rolls[1];
+        let cat1 = categorize_roll(roll1);
+        let cat2 = categorize_roll(roll2);
+
+        if is_advantage_or_disadvantage {
+            // Advantage: prefer better category, then lower value within category
+            if cat1 < cat2 {
+                roll1
+            } else if cat2 < cat1 {
+                roll2
+            } else {
+                // Same category, prefer lower roll
+                if roll1 < roll2 { roll1 } else { roll2 }
+            }
+        } else {
+            // Disadvantage: prefer worse category, then higher value within category
+            if cat1 > cat2 {
+                roll1
+            } else if cat2 > cat1 {
+                roll2
+            } else {
+                // Same category, prefer higher roll
+                if roll1 > roll2 { roll1 } else { roll2 }
+            }
+        }
+    };
+
+    // Build result
+    let selected_category = categorize_roll(selected_roll);
+    let is_success = selected_roll <= stat as i32;
+    let _is_crit = is_double_digit(selected_roll);
+
+    let mut result = RollResult {
+        individual_rolls: rolls.clone(),
+        kept_rolls: vec![selected_roll],
+        dropped_rolls: rolls
+            .iter()
+            .filter(|&&r| r != selected_roll)
+            .copied()
+            .collect(),
+        total: selected_roll,
+        successes: if is_success { Some(1) } else { None },
+        failures: if !is_success { Some(1) } else { None },
+        botches: None,
+        comment: dice.comment.clone(),
+        label: dice.label.clone(),
+        notes: Vec::new(),
+        dice_groups: Vec::new(),
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
+        godbound_damage: None,
+        fudge_symbols: None,
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
+        wng_wrath_dice: None,
+        suppress_comment: false,
+        alien_stress_level: None,
+        alien_panic_roll: None,
+        alien_stress_ones: None,
+        fitd_outcome: None,
+        fitd_result: None,
+        fitd_highest_die: None,
+    };
+
+    // Add descriptive notes
+    if rolls.len() == 2 {
+        let mode = if is_advantage_or_disadvantage {
+            "Advantage"
+        } else {
+            "Disadvantage"
+        };
+        result.notes.push(format!(
+            "Mothership {} roll (target ≤{}): rolled {} and {}, selected {}",
+            mode, stat, rolls[0], rolls[1], selected_roll
+        ));
+    } else {
+        result.notes.push(format!(
+            "Mothership roll (target ≤{}): rolled {}",
+            stat, selected_roll
+        ));
+    }
+
+    // Add result description
+    let result_desc = match selected_category {
+        RollCategory::CritSuccess => "**CRITICAL SUCCESS**",
+        RollCategory::Success => "**Success**",
+        RollCategory::CritFailure => "**CRITICAL FAILURE**",
+        RollCategory::Failure => "**Failure**",
+    };
+    result.notes.push(result_desc.to_string());
+
+    // Add explanation for selection if advantage/disadvantage
+    if rolls.len() == 2 && rolls[0] != rolls[1] {
+        let cat1 = categorize_roll(rolls[0]);
+        let cat2 = categorize_roll(rolls[1]);
+
+        if cat1 != cat2 {
+            let cat_name = |cat: &RollCategory| match cat {
+                RollCategory::CritSuccess => "crit success",
+                RollCategory::Success => "success",
+                RollCategory::CritFailure => "crit failure",
+                RollCategory::Failure => "failure",
+            };
+            result.notes.push(format!(
+                "({} chosen: {} {} > {} {})",
+                selected_roll,
+                selected_roll,
+                cat_name(&categorize_roll(selected_roll)),
+                rolls.iter().find(|&&r| r != selected_roll).unwrap(),
+                cat_name(&categorize_roll(
+                    *rolls.iter().find(|&&r| r != selected_roll).unwrap()
+                ))
             ));
         }
     }

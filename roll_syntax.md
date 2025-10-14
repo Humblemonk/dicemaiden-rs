@@ -242,6 +242,15 @@
   - **6-10 below DC**:  2 degrees of failure
   - **11-15 below DC**: 3 degrees of failure
 
+### Mothership RPG
+- `ms`    → 1d100 roll-under (default target 50)
+- `ms45`  → 1d100 roll-under Strength 45
+- `ms30`  → 1d100 roll-under Speed 30
+- `+ms45` → Roll twice, select better result using Mothership logic
+- `-ms45` → Roll twice, select worse result using Mothership logic
+- **Crit System**: Doubles (11, 22, 33, ..., 99, 00) are critical rolls
+- **Selection Logic**: Advantage prioritizes Crit Success > Success > Crit Failure > Failure
+
 ### Other Popular Systems
 - **Shadowrun**: `sr6` → 6d6 t5 (6th edition)
 - **Exalted**: `ex5` → 5d10 t7 t10, `ex5t8` → 5d10 t8 t10

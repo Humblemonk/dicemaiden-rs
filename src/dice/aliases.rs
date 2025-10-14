@@ -171,6 +171,9 @@ static WILD_WORLDS_CUT_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^ww(\d+)c(
 static MNM_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^mnm(?:\s*([+-]\s*\d+))?$").expect("Failed to compile MNM_REGEX"));
 
+static MS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^([+-])?ms(\d+)?$").expect("Failed to compile MS_REGEX"));
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -221,12 +224,18 @@ static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| 
 pub fn expand_alias(input: &str) -> Option<String> {
     let input = input.trim().to_lowercase();
 
-    // Handle parameterized aliases first
+    // Handle Mothership advantage/disadvantage patterns FIRST (before parameterized)
+    // This matches +ms, -ms, +ms45, -ms45, etc.
+    if let Some(result) = expand_mothership_alias(&input) {
+        return Some(result);
+    }
+
+    // Handle parameterized aliases
     if let Some(result) = expand_parameterized_alias(&input) {
         return Some(result);
     }
 
-    // Check static aliases first (most common case) - use pre-compiled hashmap
+    // Check static aliases
     if let Some(&static_result) = STATIC_ALIASES.get(input.as_str()) {
         return Some(static_result.to_string());
     }
@@ -1185,6 +1194,41 @@ fn expand_wild_worlds_alias(input: &str) -> Option<String> {
         }
 
         return Some(format!("{dice_count}d6 ww"));
+    }
+
+    None
+}
+
+fn expand_mothership_alias(input: &str) -> Option<String> {
+    if let Some(captures) = MS_REGEX.captures(input) {
+        let advantage_sign = captures.get(1).map(|m| m.as_str());
+        let stat_value = captures.get(2).map(|m| m.as_str());
+
+        // We need to create modifiers that DON'T use +/- suffixes
+        // Instead, use a different marker that won't be confused with operators
+        match (advantage_sign, stat_value) {
+            (Some("+"), Some(stat)) => {
+                // Use 'a' suffix for advantage
+                return Some(format!("2d100 ms{}a", stat));
+            }
+            (Some("-"), Some(stat)) => {
+                // Use 'd' suffix for disadvantage
+                return Some(format!("2d100 ms{}d", stat));
+            }
+            (Some("+"), None) => {
+                return Some("2d100 msa".to_string());
+            }
+            (Some("-"), None) => {
+                return Some("2d100 msd".to_string());
+            }
+            (None, Some(stat)) => {
+                return Some(format!("1d100 ms{}", stat));
+            }
+            (None, None) => {
+                return Some("1d100 ms".to_string());
+            }
+            _ => return None,
+        }
     }
 
     None

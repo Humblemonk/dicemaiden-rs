@@ -8,6 +8,7 @@
 - Support for Daggerheart
 - Support for Wild Worlds
 - Support for Mutants and Masterminds
+- Support for Mothership
 
 ## [1.4.0] - 2025-07-05
 
