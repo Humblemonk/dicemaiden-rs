@@ -934,6 +934,9 @@ fn test_missing_game_systems() {
         ("ex5t8", "Exalted 5d10 t8 t10"),
         ("ex10", "Exalted 10d10"),
         ("ex3t6", "Exalted 3d10 t6 t10"),
+        ("ex7d8", "Exalted 7d10 t7ds8"),
+        ("ex5t8d9", "Exalted 5d10 t8ds9"),
+        ("ex10d8t6", "Exalted 10d10 t6ds8"),
         // Year Zero Engine
         ("6yz", "Year Zero 6d6 t6"),
         ("4yz", "Year Zero 4d6 t6"),
