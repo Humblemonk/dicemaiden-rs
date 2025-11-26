@@ -75,8 +75,8 @@ static HS_REGEX: Lazy<Regex> =
 static HS_FRAC_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)hs([nkh])(\d+)$").expect("Failed to compile HS_FRAC_REGEX"));
 
-static EX_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^ex(\d+)(?:t(\d+))?$").expect("Failed to compile EX_REGEX"));
+static EX_REGEX: Lazy<Regex> = 
+    Lazy::new(|| Regex::new(r"^ex(\d+)(?:t(\d+))?(?:d(\d+))?$").expect("Failed to compile EX_REGEX"));
 
 static ED_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^ed(\d+)$").expect("Failed to compile ED_REGEX"));
@@ -541,10 +541,11 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         });
     }
 
-    // Exalted (ex5 -> 5d10 t7 t10, ex5t8 -> 5d10 t8 t10)
+    // Exalted (ex5 -> 5d10 t7 t10, ex5t8 -> 5d10 t8 t10, ex5t8d9 -> 5d10 t8ds9)
     if let Some(captures) = EX_REGEX.captures(input) {
         let count = &captures[1];
         let target = captures.get(2).map_or("7", |m| m.as_str());
+        let double = captures.get(3).map_or("10", |m| m.as_str());
 
         // Validate dice count - must be positive
         if let Ok(count_num) = count.parse::<u32>() {
@@ -564,8 +565,19 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             return None; // Invalid target format
         }
 
-        return Some(format!("{count}d10 t{target} t10"));
+        // Validate d-target - must be between target number and 10
+        if let Ok(double_num) = double.parse::<u32>() {
+            if double_num == 0 || double_num > 10 || double_num < target_num {
+                return None;
+            }
+        } else {
+            return None;
+        }
+    // the t#ds# notation will ensure that "Note: X+ = 1 success, Y+ = 2 successes" is shown for better reability
+    return Some(format!("{count}d10 t{target}ds{double}"));
+        
     }
+
 
     // Earthdawn system (ed1 through ed50)
     if let Some(captures) = ED_REGEX.captures(input) {
