@@ -5565,3 +5565,31 @@ fn test_mothership_edge_case_rolls() {
         );
     }
 }
+
+#[test]
+fn test_exalted_with_custom_double_success() {
+    // Test new syntax (if added)
+    let tests = vec![
+        ("ex5ds9", "5d10 t7ds9"),     // Custom double success
+        ("ex5t8ds10", "5d10 t8ds10"), // Custom target + double
+    ];
+
+    for (alias, expected) in tests {
+        let expanded = aliases::expand_alias(alias);
+        assert_eq!(expanded, Some(expected.to_string()));
+
+        // Verify it actually works end-to-end
+        let result = parse_and_roll(alias);
+        assert!(result.is_ok());
+    }
+}
+
+#[test]
+fn test_exalted_double_success_validation() {
+    // Invalid: double success < target
+    assert_eq!(aliases::expand_alias("ex5ds6"), None); // 6 < 7 (invalid)
+
+    // Valid cases
+    assert!(aliases::expand_alias("ex5ds7").is_some()); // 7 = 7 (valid)
+    assert!(aliases::expand_alias("ex5ds10").is_some()); // 10 > 7 (valid)
+}

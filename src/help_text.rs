@@ -91,9 +91,6 @@ pub fn generate_alias_help() -> String {
 • `sp4` → 4d10 t8 ie10 (Storypath)
 • `sp4t6` → 4d10 t6 ie10 (Storypath target change)
 • `ex5` → 5d10 t7 t10 (Exalted)
-    Modifiers: (can use one or both, in any order)
-    • `t6` - lower target number to 6
-    • `d8` - count 8 to 10 as double successes
 • `6yz` → 6d6 t6 (Year Zero)
 • `age` → 2d6 + 1d6 (AGE system)
 • `dd34` → 1d3*10 + 1d4 (double-digit d66 style)

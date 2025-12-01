@@ -75,8 +75,26 @@ static HS_REGEX: Lazy<Regex> =
 static HS_FRAC_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)hs([nkh])(\d+)$").expect("Failed to compile HS_FRAC_REGEX"));
 
-static EX_REGEX: Lazy<Regex> = 
-    Lazy::new(|| Regex::new(r"^ex(\d+)(?:t(\d+))?(?:d(\d+))?$").expect("Failed to compile EX_REGEX"));
+static EX_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^ex(\d+)(?:t(\d+))?$").expect("Failed to compile EX_REGEX"));
+
+// Exalted with custom target and double success: ex5t8ds10 → 5d10 t8ds10
+static EX_T_DS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^ex(\d+)t(\d+)ds(\d+)$").expect("Failed to compile EX_T_DS_REGEX"));
+
+// Custom target + double (short form): ex5t8d9 → 5d10 t8ds9
+static EX_T_D_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^ex(\d+)t(\d+)d(\d+)$").expect("Failed to compile EX_T_D_REGEX"));
+
+// Exalted with double success short form: ex7d8 → 7d10 t7ds8
+static EX_D_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^ex(\d+)d(\d+)$").expect("Failed to compile EX_D_REGEX"));
+
+static EX_DS_FULL_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^ex(\d+)d(\d+)t(\d+)$").expect("Failed to compile EX_DS_FULL_REGEX"));
+
+static EX_DS_SIMPLE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^ex(\d+)ds(\d+)$").expect("Failed to compile EX_DS_SIMPLE_REGEX"));
 
 static ED_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^ed(\d+)$").expect("Failed to compile ED_REGEX"));
@@ -541,43 +559,212 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         });
     }
 
-    // Exalted (ex5 -> 5d10 t7 t10, ex5t8 -> 5d10 t8 t10, ex5t8d9 -> 5d10 t8ds9)
-    if let Some(captures) = EX_REGEX.captures(input) {
+    // 1. Handle ex5t8ds10 → 5d10 t8ds10 (custom target + double, long form)
+    if let Some(captures) = EX_T_DS_REGEX.captures(input) {
         let count = &captures[1];
-        let target = captures.get(2).map_or("7", |m| m.as_str());
-        let double = captures.get(3).map_or("10", |m| m.as_str());
+        let target = &captures[2];
+        let double = &captures[3];
 
-        // Validate dice count - must be positive
+        // Validate dice count
         if let Ok(count_num) = count.parse::<u32>() {
             if count_num == 0 {
-                return None; // Invalid dice count
-            }
-        } else {
-            return None; // Invalid count format
-        }
-
-        // Validate target number - must be 1-10 for d10 dice
-        if let Ok(target_num) = target.parse::<u32>() {
-            if target_num == 0 || target_num > 10 {
-                return None; // Invalid target for d10 dice
-            }
-        } else {
-            return None; // Invalid target format
-        }
-
-        // Validate d-target - must be between target number and 10
-        if let Ok(double_num) = double.parse::<u32>() {
-            if double_num == 0 || double_num > 10 || double_num < target_num {
                 return None;
             }
         } else {
             return None;
         }
-    // the t#ds# notation will ensure that "Note: X+ = 1 success, Y+ = 2 successes" is shown for better reability
-    return Some(format!("{count}d10 t{target}ds{double}"));
-        
+
+        // Validate target
+        let target_num = match target.parse::<u32>() {
+            Ok(num) => {
+                if num == 0 || num > 10 {
+                    return None;
+                }
+                num
+            }
+            Err(_) => return None,
+        };
+
+        // Validate double (must be >= target)
+        let double_num = match double.parse::<u32>() {
+            Ok(num) => {
+                if num == 0 || num > 10 || num < target_num {
+                    return None;
+                }
+                num
+            }
+            Err(_) => return None,
+        };
+
+        return Some(format!("{count}d10 t{target_num}ds{double_num}"));
     }
 
+    // 2. Handle ex5t8d9 → 5d10 t8ds9 (custom target + double, short form)
+    if let Some(captures) = EX_T_D_REGEX.captures(input) {
+        let count = &captures[1];
+        let target = &captures[2];
+        let double = &captures[3];
+
+        // Validate dice count
+        if let Ok(count_num) = count.parse::<u32>() {
+            if count_num == 0 {
+                return None;
+            }
+        } else {
+            return None;
+        }
+
+        // Validate target
+        let target_num = match target.parse::<u32>() {
+            Ok(num) => {
+                if num == 0 || num > 10 {
+                    return None;
+                }
+                num
+            }
+            Err(_) => return None,
+        };
+
+        // Validate double (must be >= target)
+        let double_num = match double.parse::<u32>() {
+            Ok(num) => {
+                if num == 0 || num > 10 || num < target_num {
+                    return None;
+                }
+                num
+            }
+            Err(_) => return None,
+        };
+
+        return Some(format!("{count}d10 t{target_num}ds{double_num}"));
+    }
+
+    // 3. Handle ex7d8 → 7d10 t7ds8 (simple double, short form)
+    if let Some(captures) = EX_D_REGEX.captures(input) {
+        let count = &captures[1];
+        let double = &captures[2];
+
+        // Validate dice count
+        if let Ok(count_num) = count.parse::<u32>() {
+            if count_num == 0 {
+                return None;
+            }
+        } else {
+            return None;
+        }
+
+        let target_num = 7u32; // Default target
+
+        // Validate double (must be >= 7)
+        let double_num = match double.parse::<u32>() {
+            Ok(num) => {
+                if num == 0 || num > 10 || num < target_num {
+                    return None;
+                }
+                num
+            }
+            Err(_) => return None,
+        };
+
+        return Some(format!("{count}d10 t{target_num}ds{double_num}"));
+    }
+
+    // 4. Handle ex10d8t6 → 10d10 t6ds8 (explicit double and target, reversed)
+    if let Some(captures) = EX_DS_FULL_REGEX.captures(input) {
+        let count = &captures[1];
+        let double = &captures[2];
+        let target = &captures[3];
+
+        // Validate dice count
+        if let Ok(count_num) = count.parse::<u32>() {
+            if count_num == 0 {
+                return None;
+            }
+        } else {
+            return None;
+        }
+
+        // Validate target
+        let target_num = match target.parse::<u32>() {
+            Ok(num) => {
+                if num == 0 || num > 10 {
+                    return None;
+                }
+                num
+            }
+            Err(_) => return None,
+        };
+
+        // Validate double (must be >= target)
+        let double_num = match double.parse::<u32>() {
+            Ok(num) => {
+                if num == 0 || num > 10 || num < target_num {
+                    return None;
+                }
+                num
+            }
+            Err(_) => return None,
+        };
+
+        return Some(format!("{count}d10 t{target_num}ds{double_num}"));
+    }
+
+    // 5. Handle ex5ds9 → 5d10 t7ds9 (simple double, long form)
+    if let Some(captures) = EX_DS_SIMPLE_REGEX.captures(input) {
+        let count = &captures[1];
+        let double = &captures[2];
+
+        // Validate dice count
+        if let Ok(count_num) = count.parse::<u32>() {
+            if count_num == 0 {
+                return None;
+            }
+        } else {
+            return None;
+        }
+
+        let target_num = 7u32; // Default target
+
+        // Validate double (must be >= 7)
+        let double_num = match double.parse::<u32>() {
+            Ok(num) => {
+                if num == 0 || num > 10 || num < target_num {
+                    return None;
+                }
+                num
+            }
+            Err(_) => return None,
+        };
+
+        return Some(format!("{count}d10 t{target_num}ds{double_num}"));
+    }
+
+    // 6. Handle ex5, ex5t8 → old format (BACKWARD COMPATIBLE)
+    if let Some(captures) = EX_REGEX.captures(input) {
+        let count = &captures[1];
+        let target = captures.get(2).map_or("7", |m| m.as_str());
+
+        // Validate dice count
+        if let Ok(count_num) = count.parse::<u32>() {
+            if count_num == 0 {
+                return None;
+            }
+        } else {
+            return None;
+        }
+
+        // Validate target
+        if let Ok(target_num) = target.parse::<u32>() {
+            if target_num == 0 || target_num > 10 {
+                return None;
+            }
+        } else {
+            return None;
+        }
+
+        // IMPORTANT: Keep old format for backward compatibility!
+        return Some(format!("{count}d10 t{target} t10"));
+    }
 
     // Earthdawn system (ed1 through ed50)
     if let Some(captures) = ED_REGEX.captures(input) {

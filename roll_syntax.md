@@ -251,9 +251,32 @@
 - **Crit System**: Doubles (11, 22, 33, ..., 99, 00) are critical rolls
 - **Selection Logic**: Advantage prioritizes Crit Success > Success > Crit Failure > Failure
 
+### Exalted (White Wolf)
+- `ex5` → 5d10 t7ds10 (5 dice, target 7+, 10s count double)
+- `ex5t8` → 5d10 t8ds10 (5 dice, custom target 8+, 10s count double)
+- `ex10` → 10d10 t7ds10 (10 dice, default target 7+)
+- `ex3t6` → 3d10 t6ds10 (3 dice, easier target 6+)
+
+**Exalted Success Mechanics:**
+- **Standard Target**: 7+ = 1 success (default for most rolls)
+- **Double 10s**: Rolling 10 = 2 successes (Exalted signature mechanic)
+- **Custom Targets**: Use `exNtX` to set target number (e.g., `ex5t6` for easier rolls)
+- **Dice Pool**: N dice = Attribute + Ability + modifiers
+- **Specialty**: Use custom target for specific situations (e.g., `ex8t6` for specialty rolls)
+
+**Examples:**
+- `ex5` → Roll 5d10, each 7-9 = 1 success, each 10 = 2 successes
+- `ex5t8` → Roll 5d10, each 8-9 = 1 success, each 10 = 2 successes
+- `ex12t6` → Roll 12d10, target 6+ (stunts or charms lowering difficulty)
+- `3 ex5` → Roll 3 separate sets of 5d10 (e.g., multiple attacks)
+
+**Edition Notes:**
+- Works for Exalted 1st, 2nd, and 3rd editions
+- 3rd Edition: Default target remains 7, but some charms modify it
+- Use custom target syntax for difficulty adjustments from stunts/charms
+
 ### Other Popular Systems
 - **Shadowrun**: `sr6` → 6d6 t5 (6th edition)
-- **Exalted**: `ex5` → 5d10 t7 t10, `ex5t8` → 5d10 t8 t10
 - **Fudge/FATE**: `3df` → 3d3 fudge (shows +/blank/- symbols)
 - **AGE System**: `age` → 2d6 + 1d6 (Dragon dice)
 - **Year Zero**: `6yz` → 6d6 t6

@@ -580,7 +580,7 @@ fn test_division_by_zero_protection() {
 fn test_modifier_validation() {
     // Invalid modifier values
     assert_invalid("1d6 k0"); // Cannot keep 0 dice
-    assert_invalid("1d6 km0"); // Cannot keep 0 dice  
+    assert_invalid("1d6 km0"); // Cannot keep 0 dice
     assert_invalid("1d6 rg0"); // Cannot reroll on 0
     assert_invalid("1d6 e0"); // Cannot explode on 0
 }
