@@ -42,7 +42,7 @@ COPY src ./src
 RUN cargo build --release --locked
 
 # Runtime stage - UBI Minimal
-FROM registry.access.redhat.com/ubi${UBI_VERSION}/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi${UBI_VERSION}/ubi-minimal:9.7
 
 # Add metadata
 LABEL org.opencontainers.image.title="Dice Maiden Runtime"
@@ -58,15 +58,38 @@ RUN microdnf update -y && \
     microdnf clean all && \
     rm -rf /var/cache/yum
 
+# Create user to run container as non-root
+RUN useradd -m -u 1000 -s /bin/sh dicemaiden
+
 # Set up application directory and data volume
 WORKDIR /app
 
 # Copy the binary from builder stage
 COPY --from=builder /app/target/release/dicemaiden-rs /usr/local/bin/dicemaiden-rs
-RUN chmod +x /usr/local/bin/dicemaiden-rs
+RUN chmod 755 /usr/local/bin/dicemaiden-rs
 
 # Verify the binary exists and is executable
-RUN test -x /usr/local/bin/dicemaiden-rs && echo "Binary ready for execution"
+RUN test -x /usr/local/bin/dicemaiden-rs && echo "Binary xists and is executable"
+
+# Set ownership of application directory to non-root user
+RUN chown -R dicemaiden:dicemaiden /app
+
+# Switch to non-root user
+USER dicemaiden
+
+# Verify binary is executable by dicemaiden user
+RUN test -x /usr/local/bin/dicemaiden-rs && \
+    echo "User 'dicemaiden' can execute the binary" || \
+    (echo "ERROR: User 'dicemaiden' cannot execute binary!" && exit 1)
+
+# Verify dicemaiden can access the working directory
+RUN test -w /app && test -r /app && \
+    echo "User 'dicemaiden' has read/write access to /app" || \
+    (echo "ERROR: User 'dicemaiden' cannot access /app!" && exit 1)
+
+# This allows Docker/Kubernetes to monitor container health
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+    CMD pgrep -f dicemaiden-rs || exit 1
 
 # Set the entrypoint
 ENTRYPOINT ["/usr/local/bin/dicemaiden-rs"]

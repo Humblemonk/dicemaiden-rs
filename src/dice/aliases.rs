@@ -899,11 +899,10 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let hunger_dice = &captures[2];
 
         // Validate ranges
-        if let (Ok(pool), Ok(hunger)) = (pool_size.parse::<u32>(), hunger_dice.parse::<u32>()) {
-            if pool > 0 && pool <= 30 && hunger <= pool {
+        if let (Ok(pool), Ok(hunger)) = (pool_size.parse::<u32>(), hunger_dice.parse::<u32>())
+            && pool > 0 && pool <= 30 && hunger <= pool {
                 return Some(format!("{pool_size}d10 vtm5p{pool_size}h{hunger_dice}"));
             }
-        }
     }
 
     // Lasers & Feelings (2lf4, 2lf4l, 2lf4f)
