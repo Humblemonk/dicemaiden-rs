@@ -285,16 +285,14 @@ impl RollResult {
             format!("**{gb_damage}** damage")
         } else if let Some(successes) = self.successes {
             let mut result = format!("**{successes}** successes");
-            if let Some(failures) = self.failures {
-                if failures > 0 {
+            if let Some(failures) = self.failures
+                && failures > 0 {
                     result.push_str(&format!(" ({failures} failures)"));
                 }
-            }
-            if let Some(botches) = self.botches {
-                if botches > 0 {
+            if let Some(botches) = self.botches
+                && botches > 0 {
                     result.push_str(&format!(" ({botches} botches)"));
                 }
-            }
             result
         } else if let Some(botches) = self.botches {
             format!("**{}** total, **{}** botches", self.total, botches)
@@ -335,11 +333,10 @@ impl RollResult {
     /// Add comment and notes to the output
     fn add_comment_and_notes(&self, output: &mut String) {
         // Only add comment if not suppressed
-        if !self.suppress_comment {
-            if let Some(comment) = &self.comment {
+        if !self.suppress_comment
+            && let Some(comment) = &self.comment {
                 output.push_str(&format!(" Reason: `{comment}`"));
             }
-        }
 
         for note in &self.notes {
             output.push_str(&format!("\n*Note: {note}*"));

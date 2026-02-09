@@ -1,7 +1,7 @@
 use super::rng::get_dice_rng;
 use super::{DiceGroup, DiceRoll, HeroSystemType, LaserFeelingsType, Modifier, RollResult};
 use anyhow::{Result, anyhow};
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     // Validation check
@@ -256,8 +256,8 @@ fn apply_mathematical_modifiers(
     _rng: &mut impl Rng,
 ) -> Result<()> {
     // Check for special division pattern: Multiply(0) followed by Add(number)
-    if dice.modifiers.len() >= 2 {
-        if let (Modifier::Multiply(0), Modifier::Add(number)) =
+    if dice.modifiers.len() >= 2
+        && let (Modifier::Multiply(0), Modifier::Add(number)) =
             (&dice.modifiers[0], &dice.modifiers[1])
         {
             // This is our special "number / dice" case
@@ -273,7 +273,6 @@ fn apply_mathematical_modifiers(
             }
             return Ok(());
         }
-    }
 
     // Standard mathematical modifier processing
     apply_all_mathematical_modifiers(result, dice)?;

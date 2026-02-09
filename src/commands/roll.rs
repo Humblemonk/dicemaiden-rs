@@ -60,11 +60,10 @@ pub fn register_r_alias() -> CreateCommand {
 // Helper function to get the display name (nickname or username)
 fn get_display_name(command: &CommandInteraction) -> String {
     // Try to get the nickname from the member info (only available in guilds)
-    if let Some(member) = &command.member {
-        if let Some(nick) = &member.nick {
+    if let Some(member) = &command.member
+        && let Some(nick) = &member.nick {
             return nick.clone();
         }
-    }
 
     // Fall back to the user's global display name or username
     if !command

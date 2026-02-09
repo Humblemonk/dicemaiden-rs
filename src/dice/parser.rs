@@ -65,8 +65,8 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         let expression = &captures[2];
 
         // Only proceed with roll set logic if expression is valid
-        if is_valid_roll_set_expression(expression) {
-            if let Ok(count) = count_str.parse::<u32>() {
+        if is_valid_roll_set_expression(expression)
+            && let Ok(count) = count_str.parse::<u32>() {
                 // Add validation check for count range
                 if !(2..=20).contains(&count) {
                     return Err(anyhow!("Set count must be between 2 and 20"));
@@ -109,7 +109,6 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
                     }
                 }
             }
-        }
         // If not a valid roll set expression, fall through to single expression parsing
     }
 
@@ -126,8 +125,8 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
         let expression = &captures[2];
 
         // Only proceed with roll set logic if expression is valid
-        if is_valid_roll_set_expression(expression) {
-            if let Ok(count) = count_str.parse::<u32>() {
+        if is_valid_roll_set_expression(expression)
+            && let Ok(count) = count_str.parse::<u32>() {
                 // Add validation check for count range
                 if !(2..=20).contains(&count) {
                     return Err(anyhow!("Set count must be between 2 and 20"));
@@ -172,7 +171,6 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
                     return Ok(results);
                 }
             }
-        }
         // If not a valid roll set expression, fall through to single expression parsing
     }
 
@@ -350,15 +348,14 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
 
     // Handle D6 System alias expansion BEFORE general alias expansion
     // This prevents the "d6s5" -> "5d6 + 1d6ie" from being mis-parsed
-    if remaining.starts_with("d6s") {
-        if let Some(expanded) = super::aliases::expand_alias(remaining) {
+    if remaining.starts_with("d6s")
+        && let Some(expanded) = super::aliases::expand_alias(remaining) {
             // D6 System expansion: "d6s5" -> "1d1 d6s5"
             // This creates a dummy roll that triggers the D6System modifier
             let mut expanded_dice = parse_single_dice_expression(&expanded)?;
             transfer_dice_metadata(&dice, &mut expanded_dice);
             return Ok(expanded_dice);
         }
-    }
 
     // Check for simple advantage/disadvantage patterns (without additional modifiers)
     // Only do alias expansion, don't try to be clever about advantage detection here
@@ -965,9 +962,9 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
         let mut found_match = false;
 
         for (pattern, _) in &patterns {
-            if let Ok(regex) = Regex::new(pattern) {
-                if let Some(captures) = regex.captures(remaining) {
-                    if let Some(matched) = captures.get(1) {
+            if let Ok(regex) = Regex::new(pattern)
+                && let Some(captures) = regex.captures(remaining)
+                    && let Some(matched) = captures.get(1) {
                         let modifier = matched.as_str().to_string();
                         modifiers.push(modifier.clone());
 
@@ -977,8 +974,6 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
 
                         break;
                     }
-                }
-            }
         }
 
         if !found_match {
@@ -1110,8 +1105,8 @@ fn parse_base_dice(dice: &mut DiceRoll, part: &str) -> Result<()> {
 
     // If it's not a simple dice expression, it might be a combined expression
     // that needs to be split further
-    if part.contains('d') {
-        if let Some((dice_part, modifiers_part)) = split_dice_and_modifiers(part) {
+    if part.contains('d')
+        && let Some((dice_part, modifiers_part)) = split_dice_and_modifiers(part) {
             // Parse the dice part
             parse_simple_dice_part(dice, &dice_part)?;
 
@@ -1119,7 +1114,6 @@ fn parse_base_dice(dice: &mut DiceRoll, part: &str) -> Result<()> {
             parse_modifiers_from_part(dice, &modifiers_part)?;
             return Ok(());
         }
-    }
 
     Err(anyhow!("Invalid dice expression: {}", part))
 }
@@ -1177,8 +1171,8 @@ fn parse_all_modifiers(dice: &mut DiceRoll, parts: &[String]) -> Result<()> {
         let part = &parts[i];
 
         // Try parsing operator + operand pairs
-        if i + 1 < parts.len() {
-            if let Some(consumed) = try_parse_operator_pair(dice, &parts[i], &parts[i + 1])? {
+        if i + 1 < parts.len()
+            && let Some(consumed) = try_parse_operator_pair(dice, &parts[i], &parts[i + 1])? {
                 i += consumed;
 
                 // Check if we just created an AddDice and if following tokens are modifiers
@@ -1215,7 +1209,6 @@ fn parse_all_modifiers(dice: &mut DiceRoll, parts: &[String]) -> Result<()> {
                 }
                 continue;
             }
-        }
 
         // Check if this part is combined modifiers before parsing as single
         if is_combined_modifiers_token(part) {
@@ -1273,8 +1266,8 @@ fn is_combined_modifiers_token(input: &str) -> bool {
     ];
 
     for pattern in &modifier_patterns {
-        if let Ok(regex) = Regex::new(pattern) {
-            if let Some(captures) = regex.captures(input) {
+        if let Ok(regex) = Regex::new(pattern)
+            && let Some(captures) = regex.captures(input) {
                 let first_modifier = &captures[1];
                 let match_length = first_modifier.len();
 
@@ -1294,7 +1287,6 @@ fn is_combined_modifiers_token(input: &str) -> bool {
 
                 return result;
             }
-        }
     }
 
     false
@@ -1347,11 +1339,10 @@ fn is_modifier_start(input: &str) -> bool {
 
     // Check if the input starts with any of these patterns
     for pattern in &modifier_start_patterns {
-        if let Ok(regex) = Regex::new(pattern) {
-            if regex.is_match(input) {
+        if let Ok(regex) = Regex::new(pattern)
+            && regex.is_match(input) {
                 return true;
             }
-        }
     }
 
     false
@@ -1528,8 +1519,8 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
     if part == "conan" {
         return Ok(Modifier::ConanSkill(2)); // Default 2d20
     }
-    if let Some(stripped) = part.strip_prefix("conan") {
-        if let Ok(dice_count) = stripped.parse::<u32>() {
+    if let Some(stripped) = part.strip_prefix("conan")
+        && let Ok(dice_count) = stripped.parse::<u32>() {
             if (2..=5).contains(&dice_count) {
                 return Ok(Modifier::ConanSkill(dice_count));
             } else {
@@ -1539,14 +1530,13 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
                 ));
             }
         }
-    }
 
     // Conan combat dice handling (cd, cd4, cd10, etc.)
     if part == "cd" {
         return Ok(Modifier::ConanCombat(1)); // Default 1d6
     }
-    if let Some(stripped) = part.strip_prefix("cd") {
-        if let Ok(dice_count) = stripped.parse::<u32>() {
+    if let Some(stripped) = part.strip_prefix("cd")
+        && let Ok(dice_count) = stripped.parse::<u32>() {
             if dice_count > 0 && dice_count <= 100 {
                 // Reasonable limit
                 return Ok(Modifier::ConanCombat(dice_count));
@@ -1557,7 +1547,6 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
                 ));
             }
         }
-    }
 
     if is_multi_sided_dice_expression(part) {
         // This is additional dice that should be added to the roll
@@ -1581,11 +1570,10 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
                     .map_err(|_| anyhow!("Invalid explode value in '{}'", part))?,
             )
         };
-        if let Some(val) = num {
-            if val == 0 {
+        if let Some(val) = num
+            && val == 0 {
                 return Err(anyhow!("Cannot explode on 0"));
             }
-        }
         return Ok(Modifier::ExplodeIndefinite(num));
     }
 
@@ -1599,11 +1587,10 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
                     .map_err(|_| anyhow!("Invalid explode value in '{}'", part))?,
             )
         };
-        if let Some(val) = num {
-            if val == 0 {
+        if let Some(val) = num
+            && val == 0 {
                 return Err(anyhow!("Cannot explode on 0"));
             }
-        }
         return Ok(Modifier::Explode(num));
     }
 
@@ -2263,8 +2250,7 @@ fn is_multi_sided_dice_expression(part: &str) -> bool {
     if let Some(caps) = Regex::new(r"^(\d+)d([46]|8|10|12|20|100)$")
         .unwrap()
         .captures(part)
-    {
-        if let (Ok(count), Ok(sides)) = (caps[1].parse::<u32>(), caps[2].parse::<u32>()) {
+        && let (Ok(count), Ok(sides)) = (caps[1].parse::<u32>(), caps[2].parse::<u32>()) {
             // If count > 1, it's clearly additional dice, not a drop modifier
             if count > 1 {
                 return true;
@@ -2275,7 +2261,6 @@ fn is_multi_sided_dice_expression(part: &str) -> bool {
                 return true;
             }
         }
-    }
 
     // Pattern 4: Percentile dice (d% patterns)
     if part == "d%" || part.ends_with("d%") {
