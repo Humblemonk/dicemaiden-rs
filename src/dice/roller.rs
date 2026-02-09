@@ -259,20 +259,20 @@ fn apply_mathematical_modifiers(
     if dice.modifiers.len() >= 2
         && let (Modifier::Multiply(0), Modifier::Add(number)) =
             (&dice.modifiers[0], &dice.modifiers[1])
-        {
-            // This is our special "number / dice" case
-            if result.total == 0 {
-                return Err(anyhow!("Cannot divide by zero (dice result was 0)"));
-            }
-            result.total = number / result.total;
-
-            // IMPORTANT: Continue processing remaining modifiers starting from index 2
-            let remaining_modifiers = &dice.modifiers[2..];
-            if !remaining_modifiers.is_empty() {
-                apply_remaining_mathematical_modifiers(result, remaining_modifiers, dice)?;
-            }
-            return Ok(());
+    {
+        // This is our special "number / dice" case
+        if result.total == 0 {
+            return Err(anyhow!("Cannot divide by zero (dice result was 0)"));
         }
+        result.total = number / result.total;
+
+        // IMPORTANT: Continue processing remaining modifiers starting from index 2
+        let remaining_modifiers = &dice.modifiers[2..];
+        if !remaining_modifiers.is_empty() {
+            apply_remaining_mathematical_modifiers(result, remaining_modifiers, dice)?;
+        }
+        return Ok(());
+    }
 
     // Standard mathematical modifier processing
     apply_all_mathematical_modifiers(result, dice)?;
