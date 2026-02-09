@@ -11,6 +11,7 @@ LABEL org.opencontainers.image.description="Discord Dice bot"
 LABEL org.opencontainers.image.source="https://github.com/Humblemonk/dicemaiden-rs"
 
 # Install build dependencies in single layer
+# hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         pkg-config \
@@ -49,6 +50,7 @@ LABEL org.opencontainers.image.title="Dice Maiden Runtime"
 LABEL org.opencontainers.image.description="Runtime image for Dice Maiden Discord bot"
 
 # Install runtime dependencies
+# hadolint ignore=DL3041
 RUN microdnf update -y && \
     microdnf install -y \
         openssl-libs \

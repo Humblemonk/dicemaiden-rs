@@ -66,49 +66,50 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
 
         // Only proceed with roll set logic if expression is valid
         if is_valid_roll_set_expression(expression)
-            && let Ok(count) = count_str.parse::<u32>() {
-                // Add validation check for count range
-                if !(2..=20).contains(&count) {
-                    return Err(anyhow!("Set count must be between 2 and 20"));
+            && let Ok(count) = count_str.parse::<u32>()
+        {
+            // Add validation check for count range
+            if !(2..=20).contains(&count) {
+                return Err(anyhow!("Set count must be between 2 and 20"));
+            }
+
+            // Handle advantage/disadvantage patterns with modifiers in roll sets
+            let final_expression = if let Some(expanded) = super::aliases::expand_alias(expression)
+            {
+                expanded
+            } else if let Some(captures) = ADV_WITH_SIMPLE_MOD_REGEX.captures(expression) {
+                let advantage_sign = &captures[1];
+                let sides = &captures[2];
+                let operator = &captures[3];
+                let number = &captures[4];
+
+                // Expand the advantage/disadvantage part
+                let adv_alias = format!("{advantage_sign}d{sides}");
+                if let Some(expanded_adv) = super::aliases::expand_alias(&adv_alias) {
+                    format!("{expanded_adv} {operator} {number}")
+                } else {
+                    expression.to_string()
                 }
+            } else {
+                expression.to_string()
+            };
 
-                // Handle advantage/disadvantage patterns with modifiers in roll sets
-                let final_expression =
-                    if let Some(expanded) = super::aliases::expand_alias(expression) {
-                        expanded
-                    } else if let Some(captures) = ADV_WITH_SIMPLE_MOD_REGEX.captures(expression) {
-                        let advantage_sign = &captures[1];
-                        let sides = &captures[2];
-                        let operator = &captures[3];
-                        let number = &captures[4];
-
-                        // Expand the advantage/disadvantage part
-                        let adv_alias = format!("{advantage_sign}d{sides}");
-                        if let Some(expanded_adv) = super::aliases::expand_alias(&adv_alias) {
-                            format!("{expanded_adv} {operator} {number}")
-                        } else {
-                            expression.to_string()
-                        }
-                    } else {
-                        expression.to_string()
-                    };
-
-                // Now try to parse the (possibly expanded) expression
-                match parse_single_dice_expression(&final_expression) {
-                    Ok(dice) => {
-                        let mut results = Vec::with_capacity(count as usize);
-                        for i in 0..count {
-                            let mut set_dice = dice.clone();
-                            set_dice.label = Some(format!("Set {}", i + 1));
-                            results.push(set_dice);
-                        }
-                        return Ok(results);
+            // Now try to parse the (possibly expanded) expression
+            match parse_single_dice_expression(&final_expression) {
+                Ok(dice) => {
+                    let mut results = Vec::with_capacity(count as usize);
+                    for i in 0..count {
+                        let mut set_dice = dice.clone();
+                        set_dice.label = Some(format!("Set {}", i + 1));
+                        results.push(set_dice);
                     }
-                    Err(_e) => {
-                        // Fall through to other parsing methods
-                    }
+                    return Ok(results);
+                }
+                Err(_e) => {
+                    // Fall through to other parsing methods
                 }
             }
+        }
         // If not a valid roll set expression, fall through to single expression parsing
     }
 
@@ -126,51 +127,52 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
 
         // Only proceed with roll set logic if expression is valid
         if is_valid_roll_set_expression(expression)
-            && let Ok(count) = count_str.parse::<u32>() {
-                // Add validation check for count range
-                if !(2..=20).contains(&count) {
-                    return Err(anyhow!("Set count must be between 2 and 20"));
-                }
-
-                // Handle advantage/disadvantage patterns with modifiers in roll sets
-                let final_expression =
-                    if let Some(expanded) = super::aliases::expand_alias(expression) {
-                        // Direct alias match (like "+d20" -> "2d20 k1")
-                        expanded
-                    } else if let Some(captures) = ADV_WITH_SIMPLE_MOD_REGEX.captures(expression) {
-                        // Advantage/disadvantage with modifiers (like "+d20-1" or "+d20 * 2")
-                        let advantage_sign = &captures[1];
-                        let sides = &captures[2];
-                        let operator = &captures[3];
-                        let number = &captures[4];
-
-                        // Expand the advantage/disadvantage part
-                        let adv_alias = format!("{advantage_sign}d{sides}");
-                        if let Some(expanded_adv) = super::aliases::expand_alias(&adv_alias) {
-                            // Combine with the numeric modifier part
-                            format!("{expanded_adv} {operator} {number}")
-                        } else {
-                            expression.to_string()
-                        }
-                    } else {
-                        expression.to_string()
-                    };
-
-                // Now try to parse the (possibly expanded) expression
-                if let Ok(mut dice) = parse_single_dice_expression(&final_expression) {
-                    // Transfer the parsed flags to each set
-                    transfer_dice_metadata(&temp_dice, &mut dice);
-
-                    // Successfully parsed - create the roll set
-                    let mut results = Vec::with_capacity(count as usize);
-                    for i in 0..count {
-                        let mut set_dice = dice.clone();
-                        set_dice.label = Some(format!("Set {}", i + 1));
-                        results.push(set_dice);
-                    }
-                    return Ok(results);
-                }
+            && let Ok(count) = count_str.parse::<u32>()
+        {
+            // Add validation check for count range
+            if !(2..=20).contains(&count) {
+                return Err(anyhow!("Set count must be between 2 and 20"));
             }
+
+            // Handle advantage/disadvantage patterns with modifiers in roll sets
+            let final_expression = if let Some(expanded) = super::aliases::expand_alias(expression)
+            {
+                // Direct alias match (like "+d20" -> "2d20 k1")
+                expanded
+            } else if let Some(captures) = ADV_WITH_SIMPLE_MOD_REGEX.captures(expression) {
+                // Advantage/disadvantage with modifiers (like "+d20-1" or "+d20 * 2")
+                let advantage_sign = &captures[1];
+                let sides = &captures[2];
+                let operator = &captures[3];
+                let number = &captures[4];
+
+                // Expand the advantage/disadvantage part
+                let adv_alias = format!("{advantage_sign}d{sides}");
+                if let Some(expanded_adv) = super::aliases::expand_alias(&adv_alias) {
+                    // Combine with the numeric modifier part
+                    format!("{expanded_adv} {operator} {number}")
+                } else {
+                    expression.to_string()
+                }
+            } else {
+                expression.to_string()
+            };
+
+            // Now try to parse the (possibly expanded) expression
+            if let Ok(mut dice) = parse_single_dice_expression(&final_expression) {
+                // Transfer the parsed flags to each set
+                transfer_dice_metadata(&temp_dice, &mut dice);
+
+                // Successfully parsed - create the roll set
+                let mut results = Vec::with_capacity(count as usize);
+                for i in 0..count {
+                    let mut set_dice = dice.clone();
+                    set_dice.label = Some(format!("Set {}", i + 1));
+                    results.push(set_dice);
+                }
+                return Ok(results);
+            }
+        }
         // If not a valid roll set expression, fall through to single expression parsing
     }
 
@@ -349,13 +351,14 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     // Handle D6 System alias expansion BEFORE general alias expansion
     // This prevents the "d6s5" -> "5d6 + 1d6ie" from being mis-parsed
     if remaining.starts_with("d6s")
-        && let Some(expanded) = super::aliases::expand_alias(remaining) {
-            // D6 System expansion: "d6s5" -> "1d1 d6s5"
-            // This creates a dummy roll that triggers the D6System modifier
-            let mut expanded_dice = parse_single_dice_expression(&expanded)?;
-            transfer_dice_metadata(&dice, &mut expanded_dice);
-            return Ok(expanded_dice);
-        }
+        && let Some(expanded) = super::aliases::expand_alias(remaining)
+    {
+        // D6 System expansion: "d6s5" -> "1d1 d6s5"
+        // This creates a dummy roll that triggers the D6System modifier
+        let mut expanded_dice = parse_single_dice_expression(&expanded)?;
+        transfer_dice_metadata(&dice, &mut expanded_dice);
+        return Ok(expanded_dice);
+    }
 
     // Check for simple advantage/disadvantage patterns (without additional modifiers)
     // Only do alias expansion, don't try to be clever about advantage detection here
@@ -964,16 +967,17 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
         for (pattern, _) in &patterns {
             if let Ok(regex) = Regex::new(pattern)
                 && let Some(captures) = regex.captures(remaining)
-                    && let Some(matched) = captures.get(1) {
-                        let modifier = matched.as_str().to_string();
-                        modifiers.push(modifier.clone());
+                && let Some(matched) = captures.get(1)
+            {
+                let modifier = matched.as_str().to_string();
+                modifiers.push(modifier.clone());
 
-                        // Move past this modifier
-                        remaining = &remaining[matched.end()..];
-                        found_match = true;
+                // Move past this modifier
+                remaining = &remaining[matched.end()..];
+                found_match = true;
 
-                        break;
-                    }
+                break;
+            }
         }
 
         if !found_match {
@@ -1106,14 +1110,15 @@ fn parse_base_dice(dice: &mut DiceRoll, part: &str) -> Result<()> {
     // If it's not a simple dice expression, it might be a combined expression
     // that needs to be split further
     if part.contains('d')
-        && let Some((dice_part, modifiers_part)) = split_dice_and_modifiers(part) {
-            // Parse the dice part
-            parse_simple_dice_part(dice, &dice_part)?;
+        && let Some((dice_part, modifiers_part)) = split_dice_and_modifiers(part)
+    {
+        // Parse the dice part
+        parse_simple_dice_part(dice, &dice_part)?;
 
-            // Parse the modifiers part if any
-            parse_modifiers_from_part(dice, &modifiers_part)?;
-            return Ok(());
-        }
+        // Parse the modifiers part if any
+        parse_modifiers_from_part(dice, &modifiers_part)?;
+        return Ok(());
+    }
 
     Err(anyhow!("Invalid dice expression: {}", part))
 }
@@ -1172,43 +1177,44 @@ fn parse_all_modifiers(dice: &mut DiceRoll, parts: &[String]) -> Result<()> {
 
         // Try parsing operator + operand pairs
         if i + 1 < parts.len()
-            && let Some(consumed) = try_parse_operator_pair(dice, &parts[i], &parts[i + 1])? {
-                i += consumed;
+            && let Some(consumed) = try_parse_operator_pair(dice, &parts[i], &parts[i + 1])?
+        {
+            i += consumed;
 
-                // Check if we just created an AddDice and if following tokens are modifiers
-                if consumed == 2 && parts[i - 2] == "+" && parts[i - 1].contains('d') {
-                    // Check if following tokens are modifiers for the dice we just added
-                    let mut modifier_tokens = Vec::new();
-                    let mut j = i;
-                    while j < parts.len() && is_modifier_start(&parts[j]) {
-                        modifier_tokens.push(parts[j].clone());
-                        j += 1;
-                    }
+            // Check if we just created an AddDice and if following tokens are modifiers
+            if consumed == 2 && parts[i - 2] == "+" && parts[i - 1].contains('d') {
+                // Check if following tokens are modifiers for the dice we just added
+                let mut modifier_tokens = Vec::new();
+                let mut j = i;
+                while j < parts.len() && is_modifier_start(&parts[j]) {
+                    modifier_tokens.push(parts[j].clone());
+                    j += 1;
+                }
 
-                    if !modifier_tokens.is_empty() {
-                        // Handle combined modifiers properly
-                        if let Some(Modifier::AddDice(dice_roll)) = dice.modifiers.last_mut() {
-                            for token in &modifier_tokens {
-                                // Check if this token is combined modifiers
-                                if is_combined_modifiers_token(token) {
-                                    // Split combined modifiers and add each one
-                                    let combined_parts = split_combined_modifiers(token)?;
-                                    for combined_part in combined_parts {
-                                        let modifier = parse_single_modifier(&combined_part)?;
-                                        dice_roll.modifiers.push(modifier);
-                                    }
-                                } else {
-                                    // Single modifier
-                                    let modifier = parse_single_modifier(token)?;
+                if !modifier_tokens.is_empty() {
+                    // Handle combined modifiers properly
+                    if let Some(Modifier::AddDice(dice_roll)) = dice.modifiers.last_mut() {
+                        for token in &modifier_tokens {
+                            // Check if this token is combined modifiers
+                            if is_combined_modifiers_token(token) {
+                                // Split combined modifiers and add each one
+                                let combined_parts = split_combined_modifiers(token)?;
+                                for combined_part in combined_parts {
+                                    let modifier = parse_single_modifier(&combined_part)?;
                                     dice_roll.modifiers.push(modifier);
                                 }
+                            } else {
+                                // Single modifier
+                                let modifier = parse_single_modifier(token)?;
+                                dice_roll.modifiers.push(modifier);
                             }
                         }
-                        i += modifier_tokens.len(); // Skip the modifier tokens we just processed
                     }
+                    i += modifier_tokens.len(); // Skip the modifier tokens we just processed
                 }
-                continue;
             }
+            continue;
+        }
 
         // Check if this part is combined modifiers before parsing as single
         if is_combined_modifiers_token(part) {
@@ -1267,26 +1273,27 @@ fn is_combined_modifiers_token(input: &str) -> bool {
 
     for pattern in &modifier_patterns {
         if let Ok(regex) = Regex::new(pattern)
-            && let Some(captures) = regex.captures(input) {
-                let first_modifier = &captures[1];
-                let match_length = first_modifier.len();
+            && let Some(captures) = regex.captures(input)
+        {
+            let first_modifier = &captures[1];
+            let match_length = first_modifier.len();
 
-                // Safety check for zero-length matches
-                if match_length == 0 {
-                    continue;
-                }
-
-                // If the match is the entire string, it's a single modifier, not combined
-                if match_length == input.len() {
-                    return false;
-                }
-
-                // If there's more after the first modifier, check if it looks like more modifiers
-                let remaining = &input[match_length..];
-                let result = is_modifier_start(remaining);
-
-                return result;
+            // Safety check for zero-length matches
+            if match_length == 0 {
+                continue;
             }
+
+            // If the match is the entire string, it's a single modifier, not combined
+            if match_length == input.len() {
+                return false;
+            }
+
+            // If there's more after the first modifier, check if it looks like more modifiers
+            let remaining = &input[match_length..];
+            let result = is_modifier_start(remaining);
+
+            return result;
+        }
     }
 
     false
@@ -1340,9 +1347,10 @@ fn is_modifier_start(input: &str) -> bool {
     // Check if the input starts with any of these patterns
     for pattern in &modifier_start_patterns {
         if let Ok(regex) = Regex::new(pattern)
-            && regex.is_match(input) {
-                return true;
-            }
+            && regex.is_match(input)
+        {
+            return true;
+        }
     }
 
     false
@@ -1520,33 +1528,35 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::ConanSkill(2)); // Default 2d20
     }
     if let Some(stripped) = part.strip_prefix("conan")
-        && let Ok(dice_count) = stripped.parse::<u32>() {
-            if (2..=5).contains(&dice_count) {
-                return Ok(Modifier::ConanSkill(dice_count));
-            } else {
-                return Err(anyhow!(
-                    "Conan skill rolls support 2-5 dice, got {}",
-                    dice_count
-                ));
-            }
+        && let Ok(dice_count) = stripped.parse::<u32>()
+    {
+        if (2..=5).contains(&dice_count) {
+            return Ok(Modifier::ConanSkill(dice_count));
+        } else {
+            return Err(anyhow!(
+                "Conan skill rolls support 2-5 dice, got {}",
+                dice_count
+            ));
         }
+    }
 
     // Conan combat dice handling (cd, cd4, cd10, etc.)
     if part == "cd" {
         return Ok(Modifier::ConanCombat(1)); // Default 1d6
     }
     if let Some(stripped) = part.strip_prefix("cd")
-        && let Ok(dice_count) = stripped.parse::<u32>() {
-            if dice_count > 0 && dice_count <= 100 {
-                // Reasonable limit
-                return Ok(Modifier::ConanCombat(dice_count));
-            } else {
-                return Err(anyhow!(
-                    "Conan combat dice count must be 1-100, got {}",
-                    dice_count
-                ));
-            }
+        && let Ok(dice_count) = stripped.parse::<u32>()
+    {
+        if dice_count > 0 && dice_count <= 100 {
+            // Reasonable limit
+            return Ok(Modifier::ConanCombat(dice_count));
+        } else {
+            return Err(anyhow!(
+                "Conan combat dice count must be 1-100, got {}",
+                dice_count
+            ));
         }
+    }
 
     if is_multi_sided_dice_expression(part) {
         // This is additional dice that should be added to the roll
@@ -1571,9 +1581,10 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             )
         };
         if let Some(val) = num
-            && val == 0 {
-                return Err(anyhow!("Cannot explode on 0"));
-            }
+            && val == 0
+        {
+            return Err(anyhow!("Cannot explode on 0"));
+        }
         return Ok(Modifier::ExplodeIndefinite(num));
     }
 
@@ -1588,9 +1599,10 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             )
         };
         if let Some(val) = num
-            && val == 0 {
-                return Err(anyhow!("Cannot explode on 0"));
-            }
+            && val == 0
+        {
+            return Err(anyhow!("Cannot explode on 0"));
+        }
         return Ok(Modifier::Explode(num));
     }
 
@@ -2250,17 +2262,18 @@ fn is_multi_sided_dice_expression(part: &str) -> bool {
     if let Some(caps) = Regex::new(r"^(\d+)d([46]|8|10|12|20|100)$")
         .unwrap()
         .captures(part)
-        && let (Ok(count), Ok(sides)) = (caps[1].parse::<u32>(), caps[2].parse::<u32>()) {
-            // If count > 1, it's clearly additional dice, not a drop modifier
-            if count > 1 {
-                return true;
-            }
-            // For count=1, check sides - d4, d6, d8, d10, d12, d20, d100 are likely dice
-            // Exclude d1, d2, d3 which are likely drop modifiers
-            if sides >= 4 {
-                return true;
-            }
+        && let (Ok(count), Ok(sides)) = (caps[1].parse::<u32>(), caps[2].parse::<u32>())
+    {
+        // If count > 1, it's clearly additional dice, not a drop modifier
+        if count > 1 {
+            return true;
         }
+        // For count=1, check sides - d4, d6, d8, d10, d12, d20, d100 are likely dice
+        // Exclude d1, d2, d3 which are likely drop modifiers
+        if sides >= 4 {
+            return true;
+        }
+    }
 
     // Pattern 4: Percentile dice (d% patterns)
     if part == "d%" || part.ends_with("d%") {
