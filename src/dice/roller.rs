@@ -1,7 +1,7 @@
 use super::rng::get_dice_rng;
 use super::{DiceGroup, DiceRoll, HeroSystemType, LaserFeelingsType, Modifier, RollResult};
 use anyhow::{Result, anyhow};
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     // Validation check

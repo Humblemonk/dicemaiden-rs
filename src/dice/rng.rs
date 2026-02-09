@@ -2,7 +2,7 @@
 // Provides cryptographically secure randomness with multiple entropy sources
 
 use rand::rngs::StdRng; // Use StdRng instead of ChaCha20Rng (it's ChaCha20 internally)
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Creates an enhanced RNG with multiple entropy sources for maximum unpredictability
