@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.1] - 2026-02-24
+
+## Added
+
+- Resolved an issue related to fractional dice rolls with the Hero System
+
 ## [1.5.0] - 2025-08-24
 
 ## Added
