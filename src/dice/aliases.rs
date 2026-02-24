@@ -276,7 +276,7 @@ fn process_hero_system_dice(
         }
 
         let dice_expr = if has_fractional {
-            format!("{whole_dice}d6 + 1d3 {dice_type}")
+            format!("{whole_dice}d6 {dice_type} + 1d3")
         } else {
             format!("{whole_dice}d6 {dice_type}")
         };
