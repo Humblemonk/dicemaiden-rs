@@ -34,10 +34,13 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs
 
 # Build dependencies (this layer will be cached)
 # Use --lib to avoid building the binary, just dependencies
-RUN cargo build --release --locked --lib 2>/dev/null || true && rm -rf src
+RUN cargo build --release --lib 2>/dev/null || true && rm -rf src
 
 # Copy source code
 COPY src ./src
+
+# Prevent full rebuild due to newer timestamps on copied files
+RUN touch src/*.rs
 
 # Build the application
 RUN cargo build --release --locked
@@ -71,7 +74,7 @@ COPY --from=builder /app/target/release/dicemaiden-rs /usr/local/bin/dicemaiden-
 RUN chmod 755 /usr/local/bin/dicemaiden-rs
 
 # Verify the binary exists and is executable
-RUN test -x /usr/local/bin/dicemaiden-rs && echo "Binary xists and is executable"
+RUN test -x /usr/local/bin/dicemaiden-rs && echo "Binary exists and is executable"
 
 # Set ownership of application directory to non-root user
 RUN chown -R dicemaiden:dicemaiden /app
