@@ -561,7 +561,9 @@ async fn start_client_with_shard_strategy(
                 shard_count,
                 shard_count - 1
             );
-            client.start_shard_range(0..shard_count, shard_count).await
+            client
+                .start_shard_range(0..shard_count - 1, shard_count)
+                .await
         }
         "multi_process" => {
             // The range should be shard_start..(shard_start + shard_count)
