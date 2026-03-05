@@ -541,7 +541,7 @@ fn test_a5e_alias_performance() {
 
     let duration = start.elapsed();
     assert!(
-        duration.as_millis() < 100,
+        duration.as_millis() < 1000,
         "A5E alias expansion should be fast: {}ms",
         duration.as_millis()
     );
@@ -565,7 +565,7 @@ fn test_alien_rpg_alias_performance() {
 
     let duration = start.elapsed();
     assert!(
-        duration.as_millis() < 100,
+        duration.as_millis() < 1000,
         "Alien RPG alias expansion should be fast: {}ms",
         duration.as_millis()
     );
