@@ -3,14 +3,37 @@ use sqlx::{Row, sqlite::SqliteConnectOptions, sqlite::SqlitePool};
 use std::str::FromStr;
 use tracing::info;
 
+/// Walk up the directory tree from the current working directory until a
+/// directory containing `Cargo.toml` is found. Falls back to `current_dir()` when no `Cargo.toml` ancestor exists
+fn find_project_root() -> std::path::PathBuf {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let mut dir = cwd.as_path();
+    loop {
+        if dir.join("Cargo.toml").exists() {
+            return dir.to_path_buf();
+        }
+        match dir.parent() {
+            Some(parent) => dir = parent,
+            None => return cwd,
+        }
+    }
+}
+
 pub struct Database {
     pool: SqlitePool,
 }
 
 impl Database {
     pub async fn new() -> Result<Self> {
-        let database_url =
-            std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:main.db".to_string());
+        let database_url = match std::env::var("DATABASE_URL") {
+            Ok(url) => url,
+            Err(_) => {
+                let db_path = find_project_root().join("main.db");
+                format!("sqlite:{}", db_path.display())
+            }
+        };
+
+        info!("Using database at: {}", database_url);
 
         let pool = SqlitePool::connect_with(
             SqliteConnectOptions::from_str(&database_url)?.create_if_missing(true),

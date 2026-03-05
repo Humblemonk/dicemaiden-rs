@@ -551,17 +551,22 @@ async fn start_client_with_shard_strategy(
             client.start_autosharded().await
         }
         "manual" => {
-            warn!(
-                "Shards will start sequentially (~{} minutes total)",
-                (shard_count * 5) / 60
-            );
-            warn!("For faster startup, consider using multi-process sharding");
-            info!(
-                "Starting {} shards manually (0 to {})",
-                shard_count,
-                shard_count - 1
-            );
-            client.start_shard_range(0..shard_count, shard_count).await
+            if shard_count == 1 {
+                info!("Starting single shard");
+                client.start().await
+            } else {
+                warn!(
+                    "Shards will start sequentially (~{} minutes total)",
+                    (shard_count * 5) / 60
+                );
+                warn!("For faster startup, consider using multi-process sharding");
+                info!(
+                    "Starting {} shards manually (0 to {})",
+                    shard_count,
+                    shard_count - 1
+                );
+                client.start_shard_range(0..shard_count, shard_count).await
+            }
         }
         "multi_process" => {
             // The range should be shard_start..(shard_start + shard_count)
