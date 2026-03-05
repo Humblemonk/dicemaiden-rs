@@ -1,5 +1,6 @@
 use anyhow::Result;
-use sqlx::{Row, sqlite::SqlitePool};
+use sqlx::{Row, sqlite::SqliteConnectOptions, sqlite::SqlitePool};
+use std::str::FromStr;
 use tracing::info;
 
 pub struct Database {
@@ -11,7 +12,10 @@ impl Database {
         let database_url =
             std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:main.db".to_string());
 
-        let pool = SqlitePool::connect(&database_url).await?;
+        let pool = SqlitePool::connect_with(
+            SqliteConnectOptions::from_str(&database_url)?.create_if_missing(true),
+        )
+        .await?;
 
         Ok(Database { pool })
     }
