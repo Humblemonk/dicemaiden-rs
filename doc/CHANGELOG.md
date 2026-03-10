@@ -7,6 +7,7 @@
 - Resolved an issue related to fractional dice rolls with the Hero System
 - Resolved an issue with manual startup of single shard deployments
 - Added support for auto creation of databases
+- Hero System normal damage (`hsn`) now displays calculated BODY and STUN values
 
 ## [1.5.0] - 2025-08-24
 
