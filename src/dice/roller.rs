@@ -1414,8 +1414,34 @@ fn apply_hero_system_calculation(
 ) -> Result<()> {
     match hero_type {
         HeroSystemType::Normal => {
+            let mut body_damage: i32 = 0;
+            let stun_damage: i32 = result.total;
+            for group in result.dice_groups.iter() {
+                if group._description.ends_with("d3") {
+                    // There should only be a single d3 rolled for damage, so use the first one found
+                    match group.rolls[0] {
+                        3 => body_damage += 1,
+                        2 => {
+                            if rng.random_bool(0.5) {
+                                body_damage += 1;
+                            }
+                        } // 50% chance of a 2 adding body
+                        _ => (),
+                    }
+                } else {
+                    for roll in group.rolls.iter() {
+                        match roll {
+                            6 => body_damage += 2,
+                            2..=5 => body_damage += 1,
+                            _ => (),
+                        }
+                    }
+                }
+            }
             // Normal damage - just use the total as-is
-            result.notes.push("Normal damage".to_string());
+            result.notes.push(format!(
+                "Normal damage: {body_damage} BODY, {stun_damage} STUN"
+            ));
         }
         HeroSystemType::Killing => {
             // Killing damage: BODY = dice total, STUN = BODY × multiplier (1d3)
