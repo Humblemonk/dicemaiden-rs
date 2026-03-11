@@ -8,6 +8,7 @@
 - Resolved an issue with manual startup of single shard deployments
 - Added support for auto creation of databases
 - Hero System normal damage (`hsn`) now displays calculated BODY and STUN values
+- Fixed advantage/disadvantage rolls with modifiers failing when a comment was included (e.g. `+d20+5 ! testing`) (#175)
 
 ## [1.5.0] - 2025-08-24
 

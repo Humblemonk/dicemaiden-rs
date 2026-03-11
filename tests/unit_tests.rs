@@ -619,6 +619,21 @@ fn test_comments_and_labels_parsing() {
             "Multi-word comment",
         ),
         ("1d6", None, "No comment"),
+        (
+            "+d20+5 ! testing",
+            Some("testing"),
+            "Advantage with modifier and comment (issue #175)",
+        ),
+        (
+            "-d20+3 ! disadvantage roll",
+            Some("disadvantage roll"),
+            "Disadvantage with modifier and comment",
+        ),
+        (
+            "+d20-2 ! attack",
+            Some("attack"),
+            "Advantage with negative modifier and comment",
+        ),
     ];
 
     for (expression, expected_comment, description) in comment_tests {
