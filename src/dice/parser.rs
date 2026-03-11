@@ -180,18 +180,19 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     // But ONLY if we're not dealing with a roll set (no space + number at start)
     // Check for advantage/disadvantage with SIMPLE numeric modifiers ONLY
     // This handles cases like "+d20+5" or "-d20-3" but NOT "+d20 + d10"
-    if let Some(captures) = ADV_WITH_SIMPLE_MOD_REGEX.captures(input) {
+    // Use remaining_input (post-comment-stripping) so that "+d20+5 ! comment" works correctly.
+    if let Some(captures) = ADV_WITH_SIMPLE_MOD_REGEX.captures(remaining_input) {
         let advantage_sign = &captures[1];
         let sides = &captures[2];
         let operator = &captures[3];
         let number = &captures[4];
 
-        // Expand the advantage/disadvantage part
         let adv_alias = format!("{advantage_sign}d{sides}");
         if let Some(expanded_adv) = super::aliases::expand_alias(&adv_alias) {
-            // Combine with the numeric modifier part
             let full_expression = format!("{expanded_adv} {operator} {number}");
-            return Ok(vec![parse_single_dice_expression(&full_expression)?]);
+            let mut result_dice = parse_single_dice_expression(&full_expression)?;
+            transfer_dice_metadata(&temp_dice, &mut result_dice);
+            return Ok(vec![result_dice]);
         }
     }
 
