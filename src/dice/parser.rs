@@ -960,7 +960,8 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
             (r"^(aliens\d+)", "alien stress"),   // aliens1, aliens2, etc.
             (r"^(wwc\d+)", "wild worlds cut"),   // wwc2, wwc3, etc. (before basic ww)
             (r"^(ms\d+[ad]?|ms[ad]?|ms)", "mothership"),
-            (r"^(ww)", "wild worlds"), // ww (basic)
+            (r"^(ww)", "wild worlds"),           // ww (basic)
+            (r"^(plot|dp)", "plotweaver"),       // plot, dp
         ];
 
         let mut found_match = false;
@@ -1343,6 +1344,8 @@ fn is_modifier_start(input: &str) -> bool {
         r"^aliens\d+", // Alien stress modifiers: aliens1, aliens2, etc.
         r"^fitd$",     // Forged in the Dark (exact)
         r"^fitd0$",    // FitD zero dice (exact)
+        r"^plot$",     // Plot dice (exact)
+        r"^dp$",       // Plot dice (exact)
     ];
 
     // Check if the input starts with any of these patterns
@@ -1507,6 +1510,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         "mnm" => return Ok(Modifier::MutantsMasterminds),
         "c" => return Ok(Modifier::Cancel),
         "ww" => return Ok(Modifier::WildWorlds(None)),
+        "plot" | "dp" => return Ok(Modifier::PlotDie),
         _ => {}
     }
 

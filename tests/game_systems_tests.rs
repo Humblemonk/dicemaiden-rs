@@ -197,6 +197,8 @@ fn test_game_systems_comprehensive() {
         ("a5e +3 ex3", true, Some("total"), "A5E expertise level 3"),
         ("+a5e +5 ex1", true, Some("total"), "A5E with advantage"),
         ("-a5e +5 ex1", true, Some("total"), "A5E with disadvantage"),
+        // Plotweaver/Cosmere RPG
+        ("dp", true, Some("total"), "Plotweaver, plain plot die roll"),
     ];
 
     for (system, should_parse, expected_feature, description) in game_systems {
@@ -522,6 +524,34 @@ fn test_godbound_damage_mechanics() {
         .iter()
         .any(|note| note.contains("Straight damage"));
     assert!(has_straight_note, "Should have straight damage note");
+}
+
+#[test]
+fn test_plotweaver_plot_dice_mechanics() {
+    // Test plot dice symbols and ranges
+    let result = parse_and_roll("4dp").unwrap();
+    assert_eq!(result.len(), 1);
+
+    // Should have fudge symbols
+    assert!(result[0].plot_symbols.is_some());
+
+    // Should be in valid range (0 to 16 for 4dp)
+    assert!(result[0].total >= 0 && result[0].total <= 16);
+
+    let symbols = result[0].plot_symbols.as_ref().unwrap();
+    assert_eq!(symbols.len(), 4);
+
+    // Each symbol should be OPPORTUNITY, COMPLICATION (+X), or blank
+    for symbol in symbols {
+        assert!(
+            symbol == "OPPORTUNITY"
+                || symbol == "COMPLICATION (+2)"
+                || symbol == "COMPLICATION (+4)"
+                || symbol == "_",
+            "Wrong value: {}",
+            symbol
+        );
+    }
 }
 
 // ============================================================================

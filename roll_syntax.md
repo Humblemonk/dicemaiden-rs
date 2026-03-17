@@ -287,6 +287,7 @@
 - **Storypath**: `sp4` → 4d10 t8 ie10, `sp4t6` → 4d10 t6 ie10 (custom target)
 - **Sunsails**: `snm5` → 5d6 ie6 t4
 - **D6 System**: `d6s4` → 4d6 + 1d6 ie
+- **Plotweaver/Cosmerer RPG**: `dp` → d6 plot (Plot Die)
 
 ## System-Specific Examples
 

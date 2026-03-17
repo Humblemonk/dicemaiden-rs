@@ -131,6 +131,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         fitd_outcome: None,
         fitd_result: None,
         fitd_highest_die: None,
+        plot_symbols: None,
     };
 
     // Normal dice rolling flow for non-special systems
@@ -833,6 +834,9 @@ fn apply_special_system_modifiers(
             Modifier::Mothership(_, _) => {
                 // Mothership is handled in the main roll_dice function
                 // Don't process it here
+            }
+            Modifier::PlotDie => {
+                apply_plot_die_conversion(result)?;
             }
 
             // Skip mathematical modifiers here - they're handled by target processing or post-target processing
@@ -1569,6 +1573,7 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
         fitd_outcome: None,
         fitd_result: None,
         fitd_highest_die: None,
+        plot_symbols: None,
     };
 
     // Find the Savage Worlds modifier
@@ -1758,6 +1763,7 @@ fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResul
         fitd_outcome: None,
         fitd_result: None,
         fitd_highest_die: None,
+        plot_symbols: None,
     };
 
     // Find the D6 System modifier
@@ -1925,6 +1931,7 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
         fitd_outcome: None,
         fitd_result: None,
         fitd_highest_die: None,
+        plot_symbols: None,
     };
 
     // Find the Marvel Multiverse modifier
@@ -2448,6 +2455,7 @@ pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result
         fitd_outcome: None,
         fitd_result: None,
         fitd_highest_die: None,
+        plot_symbols: None,
     };
 
     let pool_size = dice.count;
@@ -2582,6 +2590,7 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
         fitd_outcome: None,
         fitd_result: None,
         fitd_highest_die: None,
+        plot_symbols: None,
     };
 
     // Find the ConanSkill modifier to get dice count
@@ -2773,6 +2782,7 @@ fn handle_conan_combat_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRe
         fitd_outcome: None,
         fitd_result: None,
         fitd_highest_die: None,
+        plot_symbols: None,
     };
 
     // Find the ConanCombat modifier to get dice count
@@ -2897,6 +2907,7 @@ fn handle_silhouette_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
         fitd_outcome: None,
         fitd_result: None,
         fitd_highest_die: None,
+        plot_symbols: None,
     };
 
     // Roll the dice pool
@@ -3288,6 +3299,7 @@ fn handle_vtm5_roll(
         fitd_outcome: None,
         fitd_result: None,
         fitd_highest_die: None,
+        plot_symbols: None,
     };
 
     let regular_dice = pool_size - hunger_dice;
@@ -3755,6 +3767,36 @@ fn apply_wild_worlds_mechanics(result: &mut RollResult, cut_count: Option<u32>) 
     Ok(())
 }
 
+fn apply_plot_die_conversion(result: &mut RollResult) -> Result<()> {
+    let mut symbols = Vec::new();
+    let mut plot_total = 0;
+
+    for &roll in &result.kept_rolls {
+        let (symbol, value) = match roll {
+            1 => ("COMPLICATION (+2)", 2),
+            2 => ("COMPLICATION (+4)", 4),
+            3 | 4 => ("_", 0), // Blank
+            5 | 6 => ("OPPORTUNITY", 0),
+            _ => return Err(anyhow!("Invalid Plot die value: {}", roll)),
+        };
+        symbols.push(symbol.to_string());
+        plot_total += value;
+    }
+
+    result.plot_symbols = Some(symbols);
+
+    let original_dice_total: i32 = result.kept_rolls.iter().sum();
+    let plot_adjustment = plot_total - original_dice_total;
+    result.total += plot_adjustment;
+
+    result.notes.push(
+        "Plot dice: 1=(COMPLICATION (+2)); 2=(COMPLICATION (+2)); 3, 4=(_); 5, 6=(OPPORTUNITY)"
+            .to_string()
+    );
+
+    Ok(())
+}
+
 /// Helper function to detect matching dice values (for twist detection)
 fn has_matching_dice(dice: &[i32]) -> bool {
     for i in 1..=6 {
@@ -3797,6 +3839,7 @@ pub fn handle_mutants_masterminds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Re
         fitd_outcome: None,
         fitd_result: None,
         fitd_highest_die: None,
+        plot_symbols: None,
     };
 
     // Roll the dice
@@ -4011,6 +4054,7 @@ fn handle_mothership_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
         fitd_outcome: None,
         fitd_result: None,
         fitd_highest_die: None,
+        plot_symbols: None,
     };
 
     // Add descriptive notes
