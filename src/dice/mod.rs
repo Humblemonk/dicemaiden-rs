@@ -98,6 +98,7 @@ pub enum Modifier {
     WildWorlds(Option<u32>),       // Wild Worlds RPG: None=basic, Some(n)=cut n highest dice
     Mothership(Option<u32>, bool), // Mothership RPG: (stat_target, is_advantage) - roll-under with doubles as crits
     MutantsMasterminds,            // Mutants & Masterminds degree system
+    PlotDie,                       // Plotweaver system plot die
 }
 
 #[derive(Debug, Clone)]
@@ -139,6 +140,7 @@ pub struct RollResult {
     pub fitd_outcome: Option<String>, // "SUCCESS", "PARTIAL SUCCESS", "FAILURE", "CRITICAL SUCCESS"
     pub fitd_result: Option<String>,  // Description of what the outcome means
     pub fitd_highest_die: Option<i32>, // The key die used for the result
+    pub plot_symbols: Option<Vec<String>>, // Store Plot dice symbols
 }
 
 impl RollResult {
@@ -146,6 +148,11 @@ impl RollResult {
     fn format_dice_display(&self) -> String {
         // Special handling for Fudge dice
         if let Some(ref symbols) = self.fudge_symbols {
+            return format!("`[{}]`", symbols.join(", "));
+        }
+
+        // Special handling for a Plot die
+        if let Some(ref symbols) = self.plot_symbols {
             return format!("`[{}]`", symbols.join(", "));
         }
 

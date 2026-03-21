@@ -192,6 +192,9 @@ static MNM_REGEX: Lazy<Regex> =
 static MS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^([+-])?ms(\d+)?$").expect("Failed to compile MS_REGEX"));
 
+static DP_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(\d+)dp$").expect("Failed to compile DP_REGEX"));
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -236,6 +239,7 @@ static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| 
     aliases.insert("ww6c1", "6d6 wwc1");
     aliases.insert("ww6c2", "6d6 wwc2");
     aliases.insert("ww6c3", "6d6 wwc3");
+    aliases.insert("dp", "1d6 plot");
     aliases
 });
 
@@ -557,6 +561,12 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             }
             _ => return None,
         });
+    }
+
+    // Plot dice (3dp -> 3d6 plot)
+    if let Some(captures) = DP_REGEX.captures(input) {
+        let count = &captures[1];
+        return Some(format!("{count}d6 plot"));
     }
 
     // 1. Handle ex5t8ds10 → 5d10 t8ds10 (custom target + double, long form)

@@ -146,6 +146,7 @@ fn test_mathematical_modifiers_with_game_systems() {
         // Special systems
         ("gb + 1d4", false, "Godbound damage with addition"),
         ("4df + 2", false, "Fudge dice with addition"),
+        ("2dp + 2", false, "Plot dice with addition"),
     ];
 
     for (expression, is_success_based, description) in system_modifier_tests {
@@ -178,7 +179,10 @@ fn test_mathematical_modifiers_with_game_systems() {
         } else {
             // For non-success systems, verify we have a meaningful total or special handling
             assert!(
-                roll.total != 0 || roll.godbound_damage.is_some() || roll.fudge_symbols.is_some(),
+                roll.total != 0
+                    || roll.godbound_damage.is_some()
+                    || roll.fudge_symbols.is_some()
+                    || roll.plot_symbols.is_some(),
                 "Non-success system '{}' should have total or special output: {}",
                 expression,
                 description
@@ -187,7 +191,9 @@ fn test_mathematical_modifiers_with_game_systems() {
 
         // All systems should produce some output
         assert!(
-            !roll.individual_rolls.is_empty() || roll.fudge_symbols.is_some(),
+            !roll.individual_rolls.is_empty()
+                || roll.fudge_symbols.is_some()
+                || roll.plot_symbols.is_some(),
             "System modifier test '{}' should produce dice output: {}",
             expression,
             description
