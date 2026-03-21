@@ -5617,10 +5617,7 @@ fn test_plotweaver_plot_dice_mechanics() {
 
     for symbol in symbols {
         assert!(
-            symbol == "Opp"
-                || symbol == "C+2"
-                || symbol == "C+4"
-                || symbol == "_",
+            symbol == "Opp" || symbol == "C+2" || symbol == "C+4" || symbol == "_",
             "Unexpected plot die symbol: {}",
             symbol
         );
@@ -5640,19 +5637,10 @@ fn test_plotweaver_single_die() {
 #[test]
 fn test_plotweaver_alias_expansion() {
     // dp expands to 1d6 plot
-    assert_eq!(
-        aliases::expand_alias("dp"),
-        Some("1d6 plot".to_string())
-    );
+    assert_eq!(aliases::expand_alias("dp"), Some("1d6 plot".to_string()));
     // Ndp expands to Nd6 plot
-    assert_eq!(
-        aliases::expand_alias("3dp"),
-        Some("3d6 plot".to_string())
-    );
-    assert_eq!(
-        aliases::expand_alias("10dp"),
-        Some("10d6 plot".to_string())
-    );
+    assert_eq!(aliases::expand_alias("3dp"), Some("3d6 plot".to_string()));
+    assert_eq!(aliases::expand_alias("10dp"), Some("10d6 plot".to_string()));
 }
 
 #[test]
