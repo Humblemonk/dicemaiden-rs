@@ -199,6 +199,7 @@ fn test_game_systems_comprehensive() {
         ("-a5e +5 ex1", true, Some("total"), "A5E with disadvantage"),
         // Plotweaver/Cosmere RPG
         ("dp", true, Some("total"), "Plotweaver, plain plot die roll"),
+        ("4dp", true, Some("total"), "Plotweaver, 4 plot dice"),
     ];
 
     for (system, should_parse, expected_feature, description) in game_systems {
@@ -524,34 +525,6 @@ fn test_godbound_damage_mechanics() {
         .iter()
         .any(|note| note.contains("Straight damage"));
     assert!(has_straight_note, "Should have straight damage note");
-}
-
-#[test]
-fn test_plotweaver_plot_dice_mechanics() {
-    // Test plot dice symbols and ranges
-    let result = parse_and_roll("4dp").unwrap();
-    assert_eq!(result.len(), 1);
-
-    // Should have fudge symbols
-    assert!(result[0].plot_symbols.is_some());
-
-    // Should be in valid range (0 to 16 for 4dp)
-    assert!(result[0].total >= 0 && result[0].total <= 16);
-
-    let symbols = result[0].plot_symbols.as_ref().unwrap();
-    assert_eq!(symbols.len(), 4);
-
-    // Each symbol should be OPPORTUNITY, COMPLICATION (+X), or blank
-    for symbol in symbols {
-        assert!(
-            symbol == "OPPORTUNITY"
-                || symbol == "COMPLICATION (+2)"
-                || symbol == "COMPLICATION (+4)"
-                || symbol == "_",
-            "Wrong value: {}",
-            symbol
-        );
-    }
 }
 
 // ============================================================================
@@ -5622,4 +5595,77 @@ fn test_exalted_double_success_validation() {
     // Valid cases
     assert!(aliases::expand_alias("ex5ds7").is_some()); // 7 = 7 (valid)
     assert!(aliases::expand_alias("ex5ds10").is_some()); // 10 > 7 (valid)
+}
+
+// ============================================================================
+// PLOTWEAVER / COSMERE RPG
+// ============================================================================
+
+#[test]
+fn test_plotweaver_plot_dice_mechanics() {
+    let result = parse_and_roll("4dp").unwrap();
+    assert_eq!(result.len(), 1);
+
+    // Should have plot symbols
+    assert!(result[0].plot_symbols.is_some());
+
+    // Total should be in valid range: 0 to 16 for 4dp (max 4 × COMPLICATION +4)
+    assert!(result[0].total >= 0 && result[0].total <= 16);
+
+    let symbols = result[0].plot_symbols.as_ref().unwrap();
+    assert_eq!(symbols.len(), 4);
+
+    for symbol in symbols {
+        assert!(
+            symbol == "Opp"
+                || symbol == "C+2"
+                || symbol == "C+4"
+                || symbol == "_",
+            "Unexpected plot die symbol: {}",
+            symbol
+        );
+    }
+}
+
+#[test]
+fn test_plotweaver_single_die() {
+    let result = parse_and_roll("dp").unwrap();
+    assert_eq!(result.len(), 1);
+    assert!(result[0].plot_symbols.is_some());
+    let symbols = result[0].plot_symbols.as_ref().unwrap();
+    assert_eq!(symbols.len(), 1);
+    assert!(result[0].total >= 0 && result[0].total <= 4);
+}
+
+#[test]
+fn test_plotweaver_alias_expansion() {
+    // dp expands to 1d6 plot
+    assert_eq!(
+        aliases::expand_alias("dp"),
+        Some("1d6 plot".to_string())
+    );
+    // Ndp expands to Nd6 plot
+    assert_eq!(
+        aliases::expand_alias("3dp"),
+        Some("3d6 plot".to_string())
+    );
+    assert_eq!(
+        aliases::expand_alias("10dp"),
+        Some("10d6 plot".to_string())
+    );
+}
+
+#[test]
+fn test_plotweaver_doesnt_break_existing() {
+    // Ensure dp alias doesn't shadow other d-prefixed patterns
+    let cases = [
+        ("dh", true, "Dark Heresy unchanged"),
+        ("dndstats", true, "DnD stats unchanged"),
+        ("1d6", true, "Plain d6 unchanged"),
+        ("2d6 t4", true, "Target roll unchanged"),
+    ];
+    for (input, should_work, desc) in cases {
+        let result = parse_and_roll(input);
+        assert_eq!(result.is_ok(), should_work, "{desc}: {input}");
+    }
 }

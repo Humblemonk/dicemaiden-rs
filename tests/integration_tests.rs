@@ -443,7 +443,6 @@ fn test_help_system_integration() {
     let system_help = help_text::generate_system_help();
     assert!(system_help.contains("Game System Examples"));
     assert!(system_help.contains("Fudge/FATE"));
-    assert!(system_help.contains("Plotweaver/Cosmere RPG"));
     assert!(system_help.len() > 100);
 }
 

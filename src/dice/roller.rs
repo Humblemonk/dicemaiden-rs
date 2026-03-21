@@ -837,6 +837,7 @@ fn apply_special_system_modifiers(
             }
             Modifier::PlotDie => {
                 apply_plot_die_conversion(result)?;
+                has_special_system = true;
             }
 
             // Skip mathematical modifiers here - they're handled by target processing or post-target processing
@@ -3773,10 +3774,10 @@ fn apply_plot_die_conversion(result: &mut RollResult) -> Result<()> {
 
     for &roll in &result.kept_rolls {
         let (symbol, value) = match roll {
-            1 => ("COMPLICATION (+2)", 2),
-            2 => ("COMPLICATION (+4)", 4),
-            3 | 4 => ("_", 0), // Blank
-            5 | 6 => ("OPPORTUNITY", 0),
+            1 => ("C+2", 2),
+            2 => ("C+4", 4),
+            3 | 4 => ("_", 0),
+            5 | 6 => ("Opp", 0),
             _ => return Err(anyhow!("Invalid Plot die value: {}", roll)),
         };
         symbols.push(symbol.to_string());
@@ -3788,11 +3789,6 @@ fn apply_plot_die_conversion(result: &mut RollResult) -> Result<()> {
     let original_dice_total: i32 = result.kept_rolls.iter().sum();
     let plot_adjustment = plot_total - original_dice_total;
     result.total += plot_adjustment;
-
-    result.notes.push(
-        "Plot dice: 1=(COMPLICATION (+2)); 2=(COMPLICATION (+2)); 3, 4=(_); 5, 6=(OPPORTUNITY)"
-            .to_string()
-    );
 
     Ok(())
 }

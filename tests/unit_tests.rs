@@ -179,7 +179,10 @@ fn test_mathematical_modifiers_with_game_systems() {
         } else {
             // For non-success systems, verify we have a meaningful total or special handling
             assert!(
-                roll.total != 0 || roll.godbound_damage.is_some() || roll.fudge_symbols.is_some(),
+                roll.total != 0
+                    || roll.godbound_damage.is_some()
+                    || roll.fudge_symbols.is_some()
+                    || roll.plot_symbols.is_some(),
                 "Non-success system '{}' should have total or special output: {}",
                 expression,
                 description

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.2] - 2026-3-21
+
+## Added
+
+- Plotweaver: added Cosmere RPG plot die support (based on PR #180)
+
 ## [1.5.1] - 2026-02-24
 
 ## Added

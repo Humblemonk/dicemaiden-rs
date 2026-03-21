@@ -99,7 +99,6 @@ pub fn generate_alias_help() -> String {
 • `cpr` → Cyberpunk Red 1d10 cpr (critical success on 10, critical failure on 1)
 • `conan3` → 3d20 conan (3d20 skill roll)
 • `sil#` → Silhouette system: roll #d6, keep highest, extra 6s add +1 (e.g., sil3, sil5)
-• `dp` → d6 plot (Plot dice showing OPPORTUNITY/blank/COMPLICATION(+2/4) symbols)
 
 Use `/roll help system` for specific examples!"#
         .to_string()
@@ -152,10 +151,6 @@ pub fn generate_system_help() -> String {
 **Brave New World**
 • `bnw3` → 3d6 pool, take highest die, 6s explode into new results
 • `bnw5 + 2` → 5-die pool with +2 modifier (applied after taking highest)
-
-**Plotweaver/Cosmere RPG:**
-• `/roll dp` or `/roll 1dp` - Plot dice showing OPPORTUNITY/blank/COMPLICATION(+2/4) symbols
-• Values: **OPPORTUNITY** = 0, (blank) = 0, **COMPLICATION (+2)** = 2
 
 **Other Systems:**
 • `/roll dh 4d10` - Dark Heresy (righteous fury on 10s)
