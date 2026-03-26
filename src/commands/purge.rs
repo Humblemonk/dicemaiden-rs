@@ -1,3 +1,10 @@
+//! `/purge` slash-command handler.
+//!
+//! Deletes 2–100 recent messages from the current channel. Requires the
+//! **Manage Messages** or **Administrator** permission, enforced both via
+//! `default_member_permissions` and at runtime. Falls back to sequential
+//! single-message deletion if Discord's bulk-delete endpoint fails.
+
 use anyhow::Result;
 use serenity::{
     all::{CommandDataOptionValue, CommandInteraction, CommandOptionType, GetMessages},

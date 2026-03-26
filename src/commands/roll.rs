@@ -1,3 +1,20 @@
+//! `/roll` (and `/r`) slash-command handler.
+//!
+//! Registers the commands, accepts the user's `dice` option string, drives the
+//! dice engine, and formats the result into a Discord message.  Handles the `p`
+//! (private/ephemeral) flag and enforces Discord's 2 000-character message limit.
+//!
+//! # Data flow
+//!
+//! ```text
+//! /roll <dice>
+//!   └─ dice::parse_and_roll(input)
+//!         ├─ parser::parse_dice_string  →  Vec<DiceRoll>
+//!         └─ roller::roll_dice (×N)     →  Vec<RollResult>
+//!              └─ format_multiple_results_with_limit  →  String
+//!                   └─ CommandResponse { content, ephemeral }
+//! ```
+
 use crate::DatabaseContainer;
 use crate::dice;
 use crate::help_text; // Import the shared help text module from src root

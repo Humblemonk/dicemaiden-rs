@@ -1,3 +1,44 @@
+//! Game-system alias expansion: short user-facing syntax → canonical dice expression.
+//!
+//! [`expand_alias`] is called by the parser before any other processing.  If
+//! the raw input matches a known alias pattern it is rewritten into a standard
+//! `NdS [modifiers]` expression (or a multi-roll expression for systems that
+//! need it) and parsing continues normally.
+//!
+//! # Supported aliases (summary)
+//!
+//! | Prefix / pattern | System                               |
+//! |------------------|--------------------------------------|
+//! | `alien`          | Alien RPG (Year Zero Engine)         |
+//! | `+d` / `-d`      | Advantage / disadvantage (d20, etc.) |
+//! | `Nwod` / `Ncod`  | World of Darkness / Chronicles       |
+//! | `wng`            | Warhammer: Age of Sigmar – Soulbound |
+//! | `sw`             | Savage Worlds trait dice             |
+//! | `gb` / `gbs`     | Godbound damage                      |
+//! | `df`             | Fate / Fudge dice                    |
+//! | `dh`             | Dark Heresy                          |
+//! | `sr`             | Shadowrun                            |
+//! | `sp`             | Splittermond                         |
+//! | `yz`             | Year Zero Engine (generic)           |
+//! | `snm`            | Stars Without Number                 |
+//! | `d6s`            | D6 System                            |
+//! | `hs`             | Hero System                          |
+//! | `ex`             | Exalted                              |
+//! | `ms` / `ms2`     | Mothership RPG                       |
+//! | `ola` / `old`    | Open Legend RPG                      |
+//!
+//! See `roll_syntax.md` for the full syntax reference.  All regex patterns are
+//! compiled once at startup via `once_cell::Lazy`.
+//!
+//! # Adding a new alias
+//!
+//! 1. Check `roll_syntax.md` — the new prefix must not be a prefix of, or
+//!    prefixed by, any existing identifier (prefix-matching conflicts are silent
+//!    and hard to debug).
+//! 2. Add a `Lazy<Regex>` constant near the top of this file.
+//! 3. Add a match arm in `expand_alias`.
+//! 4. Document the syntax in `roll_syntax.md`.
+
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashMap;

@@ -1,3 +1,42 @@
+//! Roll executor: `DiceRoll` → `RollResult`.
+//!
+//! The public entry point is [`roll_dice`].  It inspects the [`Modifier`] list
+//! on the incoming [`DiceRoll`] and dispatches to a specialised handler for any
+//! game system that needs non-standard resolution.  All other rolls go through
+//! the standard pipeline described below.
+//!
+//! # Standard pipeline
+//!
+//! ```text
+//! 1. Roll N dice (sides S)
+//! 2. apply_dice_modifying_modifiers   — explode, reroll
+//! 3. apply_keep_drop_modifiers        — keep high/low/middle, drop lowest
+//! 4. sum kept dice → result.total
+//! 5. apply_mathematical_modifiers     — +N, -N, *N, /N, +Nd6, …
+//! 6. apply_special_system_modifiers   — success counting, botch, Godbound, …
+//! 7. sort rolls (unless `ul` flag set)
+//! ```
+//!
+//! **Drop before explode** is intentional: dice that are dropped are never
+//! reconsidered for explosion.  Do not change this ordering.
+//!
+//! # Specialised handlers
+//! | Handler function                  | System                        |
+//! |-----------------------------------|-------------------------------|
+//! | `handle_conan_skill_roll`         | Conan 2d20 skill checks       |
+//! | `handle_conan_combat_roll`        | Conan combat / hit location   |
+//! | `handle_d6_system_roll`           | D6 System (wild die)          |
+//! | `handle_marvel_multiverse_roll`   | Marvel Multiverse RPG         |
+//! | `handle_savage_worlds_roll`       | Savage Worlds (trait + wild)  |
+//! | `handle_brave_new_world_roll`     | Brave New World               |
+//! | `handle_silhouette_roll`          | Silhouette (count highest)    |
+//! | `handle_vtm5_roll`                | Vampire: the Masquerade 5e    |
+//! | `handle_mutants_masterminds_roll` | Mutants & Masterminds DC 10   |
+//! | `handle_mothership_roll`          | Mothership RPG (1d100 ≤ stat) |
+//!
+//! RNG is obtained fresh per call via `rng::get_dice_rng` (ChaCha20 / StdRng
+//! seeded with OS entropy + timestamp + thread/process/ASLR entropy).
+
 use super::rng::get_dice_rng;
 use super::{DiceGroup, DiceRoll, HeroSystemType, LaserFeelingsType, Modifier, RollResult};
 use anyhow::{Result, anyhow};
