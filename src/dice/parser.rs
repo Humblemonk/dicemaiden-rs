@@ -1,3 +1,43 @@
+//! Dice expression parser: text → `Vec<DiceRoll>`.
+//!
+//! The public entry point is [`parse_dice_string`].  It accepts a free-form
+//! string typed by a Discord user and returns a list of [`DiceRoll`] values
+//! that the roller can execute.
+//!
+//! # Parsing pipeline
+//!
+//! ```text
+//! raw input
+//!   │
+//!   ├─ alias expansion (aliases::expand_alias)
+//!   ├─ semicolon split → multiple independent rolls
+//!   ├─ roll-set detection  "N <expr>"  (e.g. "6 4d6 k3")
+//!   └─ parse_single_dice_expression
+//!         ├─ label extraction   "(Attack) …"
+//!         ├─ comment extraction "… ! Fire damage"
+//!         ├─ flags (p, s, nr, ul)
+//!         ├─ dice core  NdS  or  d%
+//!         └─ split_combined_modifiers → Vec<Modifier>
+//! ```
+//!
+//! # Prefix-matching hazards
+//!
+//! Modifiers are matched in declaration order inside `split_combined_modifiers`.
+//! **Multi-character prefixes must appear before their single-character
+//! counterparts** — e.g. `ie`/`irg`/`ir` before `e`/`r`, `km`/`kl` before
+//! `k`, `tl` before `t`.  Before adding a new modifier prefix, check
+//! `roll_syntax.md` for conflicts.
+//!
+//! # Limits
+//!
+//! | Constraint          | Value   |
+//! |---------------------|---------|
+//! | Max input length    | 1 000 chars |
+//! | Roll-set count      | 2 – 20  |
+//! | Multi-roll segments | up to 4 |
+//!
+//! All regex patterns are compiled once at startup via `once_cell::Lazy`.
+
 use super::{DiceRoll, HeroSystemType, LaserFeelingsType, Modifier};
 use anyhow::{Result, anyhow};
 use once_cell::sync::Lazy;

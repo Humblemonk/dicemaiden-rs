@@ -1,3 +1,37 @@
+//! Core domain types and the top-level `parse_and_roll` convenience function.
+//!
+//! Everything in the dice engine revolves around three types:
+//!
+//! * [`DiceRoll`] — a fully-parsed dice expression ready to be executed.
+//!   Produced by `parser::parse_dice_string`.
+//! * [`RollResult`] — the outcome of executing one `DiceRoll`.
+//!   Produced by `roller::roll_dice`.
+//! * [`Modifier`] — an enum variant attached to a `DiceRoll` that changes how
+//!   the roll is resolved (exploding, keep/drop, success counting, game-system
+//!   specific logic, …).
+//!
+//! [`DiceGroup`] records the individual dice that belong to one "roll event"
+//! (e.g. the base dice vs. an exploded pool) and is used by the formatter to
+//! produce the per-dice breakdown shown in Discord messages.
+//!
+//! # Adding a new game system
+//!
+//! Follow this sequence — every step is required:
+//!
+//! 1. `aliases.rs`            — add alias expansion
+//! 2. **this file**           — add a `Modifier` variant
+//! 3. `parser.rs`             — add parsing in `split_combined_modifiers`
+//! 4. `roller.rs`             — add roll execution logic
+//! 5. `roll.rs`               — add display / formatting logic
+//! 6. `game_systems_tests.rs` — add table-driven tests
+//! 7. `roll_syntax.md`        — document the new syntax
+//!
+//! # Modifier ordering invariant
+//!
+//! **Drop before explode.**  Dropped dice are never reconsidered for explosion.
+//! This is intentional game-design behaviour and is covered by tests — do not
+//! change the ordering.
+
 pub mod aliases;
 pub mod parser;
 pub mod rng;

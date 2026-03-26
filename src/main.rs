@@ -1,3 +1,47 @@
+//! Bot entry point and Discord gateway management.
+//!
+//! Initialises the SQLite database, resolves the shard strategy from environment
+//! variables, builds the Serenity [`Client`], and starts the Discord gateway.
+//!
+//! # Shard strategies
+//!
+//! | `USE_AUTOSHARDING` | `SHARD_COUNT` | `SHARD_START` / `TOTAL_SHARDS` | Strategy          |
+//! |--------------------|---------------|----------------------------------|-------------------|
+//! | `true`             | —             | —                                | autoshard         |
+//! | unset              | set           | both set                         | multi_process     |
+//! | unset              | set           | unset                            | manual            |
+//! | unset              | unset         | —                                | single            |
+//!
+//! In **multi-process** mode several bot processes each own a contiguous shard
+//! range (`SHARD_START..SHARD_START+SHARD_COUNT`), sharing a single SQLite DB
+//! via the `process_stats` table.  Single-process mode uses `shard_stats`.
+//!
+//! # Environment variables
+//!
+//! | Variable            | Required | Description                                      |
+//! |---------------------|----------|--------------------------------------------------|
+//! | `DISCORD_TOKEN`     | ✓        | Bot token from the Discord developer portal      |
+//! | `DATABASE_URL`      |          | SQLite URL; defaults to `./main.db`              |
+//! | `GUILD_ID`          |          | Register commands to one guild (dev/testing)     |
+//! | `SHARD_COUNT`       |          | Number of shards for this process                |
+//! | `SHARD_START`       |          | First shard ID in multi-process deployments      |
+//! | `TOTAL_SHARDS`      |          | Total shards across all processes                |
+//! | `USE_AUTOSHARDING`  |          | Let Discord decide the shard count (`true`)      |
+//! | `MAX_CONCURRENCY`   |          | Hint; overridden by Discord's reported value     |
+//!
+//! # Event handler
+//!
+//! [`Handler::ready`] fires once per shard connection.  Only shard 0 registers
+//! slash commands (`/roll`, `/r`, `/help`, `/purge`) to avoid duplicate
+//! registrations when running many shards.
+//!
+//! [`Handler::interaction_create`] dispatches incoming slash-command interactions
+//! to `commands::roll`, `commands::help`, or `commands::purge`.
+//!
+//! A background task collects per-shard guild counts and process memory usage
+//! every 15 minutes and writes them to the database.  The task listens for
+//! SIGTERM/SIGINT/Ctrl-C and shuts down cleanly via a `broadcast` channel.
+
 use anyhow::Result;
 use dicemaiden_rs::{DatabaseContainer, ShardManagerContainer, commands, database};
 use serenity::{

@@ -1,3 +1,37 @@
+//! SQLite persistence layer for bot statistics.
+//!
+//! All database access goes through the [`Database`] struct, which wraps a
+//! `sqlx::SqlitePool`.  Only prepared statements are used — never string
+//! concatenation.
+//!
+//! # Schema
+//!
+//! ## `shard_stats` — single-process deployments
+//!
+//! | Column         | Type      | Description                         |
+//! |----------------|-----------|-------------------------------------|
+//! | `shard_id`     | INT PK    | Discord shard ID (0-indexed)        |
+//! | `server_count` | INT       | Guilds visible to this shard        |
+//! | `mem`          | REAL      | Process memory in MB (shard 0 only) |
+//! | `timestamp`    | DATETIME  | Last update time                    |
+//!
+//! ## `process_stats` — multi-process deployments
+//!
+//! | Column         | Type      | Description                          |
+//! |----------------|-----------|--------------------------------------|
+//! | `process_id`   | TEXT PK   | `process_<shard_start>_<pid>`        |
+//! | `shard_start`  | INT       | First shard owned by this process    |
+//! | `shard_count`  | INT       | Number of shards in this process     |
+//! | `total_shards` | INT       | Total shards across all processes    |
+//! | `server_count` | INT       | Guilds visible to this process       |
+//! | `memory_mb`    | REAL      | RSS memory for this process          |
+//! | `timestamp`    | DATETIME  | Last update time                     |
+//!
+//! Stats are written every 15 minutes by `main::collect_shard_stats_with_shutdown`.
+//! Old `process_stats` rows are pruned by [`Database::cleanup_old_process_stats`].
+//! The database file location is controlled by the `DATABASE_URL` environment
+//! variable; it defaults to `main.db` in the project root.
+
 use anyhow::Result;
 use sqlx::{Row, sqlite::SqliteConnectOptions, sqlite::SqlitePool};
 use std::str::FromStr;

@@ -1,5 +1,6 @@
-// Shared help text module to eliminate duplication between commands
-// This file should be placed at src/help_text.rs
+//! Static Discord-formatted help strings for the `/help` command.
+//! Kept in a separate module so the text can be shared without duplication
+//! if additional consumers are added (e.g. a web dashboard).
 
 pub fn generate_basic_help() -> String {
     r#"🎲 **Dice Maiden** 🎲

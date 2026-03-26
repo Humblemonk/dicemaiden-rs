@@ -1,5 +1,29 @@
-// Enhanced random number generation for dice rolling
-// Provides cryptographically secure randomness with multiple entropy sources
+//! Enhanced random-number generation for dice rolling.
+//!
+//! All dice in Dice Maiden use [`get_dice_rng`] (an alias for
+//! [`create_enhanced_rng`]).  This returns a [`rand::rngs::StdRng`] (ChaCha20
+//! internally) seeded with multiple independent entropy sources so that rapid
+//! successive rolls — common in a busy Discord server — are highly unlikely to
+//! share seed state:
+//!
+//! | Entropy source       | Bytes  | Notes                              |
+//! |----------------------|--------|------------------------------------|
+//! | OS / `getrandom`     | 16     | Cryptographically secure; primary  |
+//! | Nanosecond timestamp | 4      | Sub-microsecond temporal jitter    |
+//! | Thread ID (hashed)   | 4      | Async task diversity               |
+//! | Process ID           | 4      | Per-process uniqueness             |
+//! | Stack address (ASLR) | 8 → 32 | XOR-diffused across whole seed     |
+//!
+//! If `getrandom` fails (extremely rare; sandboxed environments), the function
+//! falls back to a timestamp × PID seed for the primary 16 bytes.
+//!
+//! [`create_fast_rng`] returns a [`rand::rngs::SmallRng`] for benchmarks and
+//! scenarios where speed matters more than cryptographic quality.
+//!
+//! # Usage note
+//!
+//! `rand 0.10` requires importing **both** `rand::Rng` (for trait bounds) and
+//! `rand::RngExt` (for `.random()` / `.random_range()` method calls).
 
 use rand::rngs::StdRng; // Use StdRng instead of ChaCha20Rng (it's ChaCha20 internally)
 use rand::{RngExt, SeedableRng};
