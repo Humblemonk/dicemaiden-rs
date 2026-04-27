@@ -345,12 +345,10 @@ async fn main() -> Result<()> {
                     warn!("  Set SHARD_START and TOTAL_SHARDS environment variables");
 
                     if manual_count < recommended_shards {
-                        let guilds_per_shard = if manual_count > 0 {
-                            // Estimate based on typical large bot ratios
-                            2500 * recommended_shards / manual_count
-                        } else {
-                            0
-                        };
+                        // Estimate based on typical large bot ratios; zero if manual_count is 0
+                        let guilds_per_shard = (2500 * recommended_shards)
+                            .checked_div(manual_count)
+                            .unwrap_or(0);
 
                         if guilds_per_shard > 2500 {
                             warn!(

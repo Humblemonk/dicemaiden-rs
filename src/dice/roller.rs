@@ -543,12 +543,10 @@ fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) ->
                 expression_parts.push("-".to_string());
                 expression_parts.push(format!("{value}"));
             }
-            Modifier::Multiply(value) => {
+            Modifier::Multiply(value) if *value != 0 => {
                 // Skip the special marker (multiply by 0)
-                if *value != 0 {
-                    expression_parts.push("*".to_string());
-                    expression_parts.push(format!("{value}"));
-                }
+                expression_parts.push("*".to_string());
+                expression_parts.push(format!("{value}"));
             }
             Modifier::Divide(value) => {
                 if *value == 0 {
