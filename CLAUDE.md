@@ -42,7 +42,7 @@ src/
 **Data flow:** `parser.rs` → `roller.rs` → `commands/roll.rs` → Discord message.
 Aliases expand *before* parsing (`aliases.rs` output is a standard expression string).
 
-The Ruby artifacts in the repo root (`Gemfile`, `.rubocop*.yml`) relate to the original
+The Ruby artifacts in the repository root (`Gemfile`, `.rubocop*.yml`) relate to the original
 Ruby bot's history/tooling — they are not part of the Rust build. Don't modify them.
 
 ## Parser Invariants (critical)
