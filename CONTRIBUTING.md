@@ -145,7 +145,7 @@ New syntax or game systems need cases for **all** of the following:
 - Roll sets
 - Boundary and limit values
 
-**Bug fixes must include a regression test** reproducing the original bug, added alongside the fix.
+**Bugfixes must include a regression test** reproducing the original bug, added alongside the fix.
 
 ---
 
