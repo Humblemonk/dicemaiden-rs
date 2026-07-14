@@ -31,7 +31,7 @@ Thanks for your interest in contributing! Dice Maiden is an open-source Discord 
 
 ### Requirements
 
-- Rust 1.87+
+- Rust 1.90+ (see `rust-version` in `Cargo.toml`)
 - A Discord bot token (for manual testing; not needed to run the test suite)
 - SQLite (the bot creates the database automatically)
 
@@ -62,6 +62,8 @@ When running the bot locally for manual testing, set `GUILD_ID` in your `.env` t
 
 ### Before you write any code
 
+**Dice syntax is a public API.** This bot runs on hundreds of thousands of servers, and a silently changed roll result is the worst possible bug. Never change the behavior of an existing expression unless the change is explicitly requested. If your change *might* alter existing behavior and you're unsure, raise the compatibility question in your PR or an issue instead of deciding yourself.
+
 Read [`roll_syntax.md`](roll_syntax.md) to understand the existing dice syntax. The parser uses **prefix matching**, so new syntax identifiers must not overlap with — or be a prefix of — any existing ones. Conflicts are a real risk and can silently break unrelated rolls.
 
 ### Data flow
@@ -70,10 +72,14 @@ Read [`roll_syntax.md`](roll_syntax.md) to understand the existing dice syntax. 
 src/dice/parser.rs → src/dice/roller.rs → src/commands/roll.rs → Discord message
 ```
 
+- **`src/dice/aliases.rs`** — expands game system shorthand into standard expressions. Alias expansion happens **before** parsing; its output is an ordinary expression string.
 - **`src/dice/parser.rs`** — turns a dice expression string into `Vec<DiceRoll>`
 - **`src/dice/roller.rs`** — executes rolls, applies modifiers, returns `Vec<RollResult>`
 - **`src/commands/roll.rs`** — formats results into a Discord message string
-- **`src/dice/aliases.rs`** — expands game system shorthand into standard expressions
+
+### Display formatting constraints
+
+Discord enforces a hard message length cap (2000 characters). If you touch formatting in `src/commands/roll.rs`, output must stay within the cap even for large roll sets — prefer truncation with a notice over a failed send. Existing formatting code shows the established fallback pattern.
 
 ### Mandatory quality check
 
@@ -129,6 +135,18 @@ for (input, expected) in cases {
 
 Write tests **before** or **alongside** your implementation — not after.
 
+### What sufficient coverage looks like
+
+New syntax or game systems need cases for **all** of the following:
+
+- The happy path
+- Combination with common modifiers
+- Comments (`! text`)
+- Roll sets
+- Boundary and limit values
+
+**Bug fixes must include a regression test** reproducing the original bug, added alongside the fix.
+
 ---
 
 ## Code Standards
@@ -138,6 +156,7 @@ Write tests **before** or **alongside** your implementation — not after.
 - Return `anyhow::Result<T>` from all fallible functions
 - Use `?` for error propagation — avoid deep `match`/`if let` nesting
 - Use `tracing::{info!, warn!, error!, debug!}` for all logging
+- All randomness goes through `src/dice/rng.rs` — never instantiate ad-hoc RNGs elsewhere
 
 ### Forbidden
 
@@ -148,14 +167,21 @@ Write tests **before** or **alongside** your implementation — not after.
 | `println!()` | `tracing::info!` |
 | `todo!()` / `unimplemented!()` in final code | Implement it or leave it out |
 | String concatenation in SQL | Prepared statements only |
+| Ad-hoc RNGs (`rand::rng()`, etc.) | `src/dice/rng.rs` |
 | Unnecessary `.clone()` | Prefer borrowing |
 
 ### Style
 
 - Meaningful names: `dice_count` not `n`, `shard_id` not `id`
-- Exhaustive match arms — avoid wildcard `_` that silently swallows variants
+- Exhaustive match arms — avoid wildcard `_` that silently swallows variants (especially on the `Modifier` enum, where a missed arm means a modifier is silently ignored)
 - Delete replaced code — do not leave old and new implementations side by side
 - No versioned function names (`process_v2`, `handle_new`)
+
+### Docs to keep in sync
+
+- `roll_syntax.md` — update with any syntax change
+- `env.example` — update when adding or changing an environment variable
+- `README.md` — update if your change affects env vars, commands, or deployment
 
 ---
 
