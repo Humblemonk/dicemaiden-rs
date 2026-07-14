@@ -5,6 +5,7 @@ A powerful Discord dice rolling bot written in Rust using the Serenity framework
 <a href="https://top.gg/bot/377701707943116800">
     <img src="https://top.gg/api/widget/377701707943116800.svg" alt="Dice Maiden" />
 </a>
+</p>
 
 ## Features
 
@@ -21,7 +22,7 @@ A powerful Discord dice rolling bot written in Rust using the Serenity framework
 
 This will authorize the bot for your server and you should see it in your default public channel. The bot will have permissions to read, send and manage messages.
 
-**Note:** It is recommended to review your app integration settings found under Server Settings > Integrations. From here you can restrict the bot slash commands to specific channels
+**Note:** Users need the **Use Application Commands** permission to use slash commands. It is also recommended to review your app integration settings found under Server Settings > Integrations. From here you can restrict the bot slash commands to specific channels.
 
 ## Commands
 
@@ -38,8 +39,6 @@ This will authorize the bot for your server and you should see it in your defaul
 
 Supported dice rolls and game systems can be [found here!](roll_syntax.md)
 
-**NOTE: USERS WILL NEED THE ROLE "USE APPLICATION COMMANDS" TO USE SLASH COMMANDS**
-
 ## Local Instance Setup
 
 1. **Clone the repository**
@@ -51,7 +50,7 @@ Supported dice rolls and game systems can be [found here!](roll_syntax.md)
 2. **Set up environment**
    ```bash
    cp env.example .env
-   # Edit .env and add your Discord bot token. review the other ENV variables found in this documentation
+   # Edit .env and add your Discord bot token. Review the other ENV variables found in this documentation
    ```
 
 3. **Build and run**
@@ -81,11 +80,11 @@ https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=27487
 ### Environment Variables
 - `DISCORD_TOKEN` - Your Discord bot token (required)
 - `GUILD_ID` - Guild ID for testing commands (optional)
-- `DATABASE_URL` - SQLite database path. Defaults to sqlite:main.db . This database is automatically created if it doesn't exist (optional)
+- `DATABASE_URL` - SQLite database path. Defaults to sqlite:main.db, resolved relative to the working directory. This database is automatically created if it doesn't exist (optional)
 - `SHARD_COUNT` - Manual number of shards to use. Defaults to 1 for small bots (optional)
 - `USE_AUTOSHARDING` - Set to true to use discord recommended shard count. Defaults to false (optional)
 - `MAX_CONCURRENCY` - Max concurrent shard connections. Discord will override this with your bots actual limit (optional)
-- `RUST_LOG` - Log level (default: info)
+- `RUST_LOG` - Log level (default: info). Supports per-module filtering via `EnvFilter` syntax; recommended for production: `RUST_LOG=warn,dicemaiden_rs=info,serenity::gateway=info`
 - `SHARD_START` - Starting shard ID for the process (needed for multi-process sharding)
 - `TOTAL_SHARDS` - Total shards across all processes (needed for multi-process sharding)
 
@@ -93,9 +92,8 @@ You can customize the build further by modifying `Cargo.toml` dependencies.
 
 ## Development
 
-
 ### Requirements
-- Rust 1.87+
+- Rust 1.90+ (see `rust-version` in `Cargo.toml`)
 - Discord bot token
 - SQLite database (automatically created for bot statistics)
 - Dependencies - For a detailed list, review [Cargo.toml](Cargo.toml)
@@ -113,6 +111,12 @@ cargo test
 
 # Run with logging
 RUST_LOG=debug cargo run
+```
+
+Before submitting changes, make sure the full quality gate passes:
+
+```bash
+cargo clippy -- -D warnings && cargo fmt --check && cargo test
 ```
 
 ### Project Structure
@@ -143,10 +147,9 @@ tests/
 
 ## Deployment
 
-
 ### Docker
 ```dockerfile
-FROM rust:1.87-slim-bookworm as builder
+FROM rust:1.90-slim-bookworm AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -160,13 +163,15 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 
 # Create dummy source to build dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN mkdir src \
+    && echo "fn main() {}" > src/main.rs \
+    && touch src/lib.rs
 RUN cargo build --release && rm -rf src
 
 # Copy actual source code
 COPY . .
 # Force rebuild of our code but reuse dependencies
-RUN touch src/main.rs && cargo build --release
+RUN touch src/main.rs src/lib.rs && cargo build --release
 
 FROM debian:bookworm-slim
 
@@ -188,23 +193,42 @@ WORKDIR /data
 CMD ["dicemaiden-rs"]
 ```
 
+**Build and run:**
+```bash
+docker build -t dicemaiden-rs .
+
+# .env must contain at least DISCORD_TOKEN; the named volume persists the SQLite database
+docker run -d \
+  --name dicemaiden \
+  --restart unless-stopped \
+  --env-file .env \
+  -v dicemaiden-data:/data \
+  dicemaiden-rs
+```
+
 ### Systemd Service
 ```ini
 [Unit]
 Description=Dice Maiden
 After=network-online.target
 Wants=network-online.target
+# Rate-limit restarts: an unbounded restart loop during a network outage can
+# exhaust Discord's daily session start budget and invalidate your token.
+StartLimitIntervalSec=1800
+StartLimitBurst=5
 
 [Service]
 Type=simple
 User=dicebot
 Group=dicebot
-WorkingDirectory=/opt/dicemaiden-rs
-Environment=RUST_LOG=info
+# Working directory must be writable: the default DATABASE_URL (sqlite:main.db)
+# resolves relative to it, and ProtectSystem=strict blocks writes elsewhere.
+WorkingDirectory=/opt/dicemaiden-rs/data
+Environment=RUST_LOG=warn,dicemaiden_rs=info,serenity::gateway=info
 EnvironmentFile=/opt/dicemaiden-rs/.env
 ExecStart=/opt/dicemaiden-rs/target/release/dicemaiden-rs
 Restart=always
-RestartSec=10
+RestartSec=60
 TimeoutStartSec=300
 TimeoutStopSec=120
 
@@ -218,6 +242,7 @@ PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
 ```
+
 ### Multi-Process Sharding
 ```bash
 # Example: 3 processes handling 64 shards total
@@ -243,11 +268,18 @@ This Rust implementation maintains full compatibility with the original DiceMaid
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code standards, and how to submit a pull request.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Verify the quality gate passes: `cargo clippy -- -D warnings && cargo fmt --check && cargo test`
+6. Submit a pull request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor workflow.
 
 ## License
 
-This project is licensed under the GPLv3 License
+This project is licensed under the [GPLv3 License](LICENSE)
 
 ## Acknowledgments
 
