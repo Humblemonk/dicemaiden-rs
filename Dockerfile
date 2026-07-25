@@ -1,6 +1,6 @@
 # Build arguments for version pinning
 ARG RUST_VERSION=1.90.0
-ARG UBI_VERSION=9.7
+ARG UBI_VERSION=latest
 
 # ---------- Build stage ----------
 FROM rust:${RUST_VERSION} AS builder
@@ -36,14 +36,13 @@ LABEL org.opencontainers.image.title="Dice Maiden" \
       org.opencontainers.image.source="https://github.com/Humblemonk/dicemaiden-rs"
 
 # TLS is rustls end to end (serenity rustls_backend, sqlx runtime-tokio-rustls) and
-# sqlx bundles libsqlite3-sys, so openssl-libs and sqlite-libs are not linked.
-# procps-ng provides pgrep for the healthcheck; it is not present in ubi-minimal.
+# sqlx bundles libsqlite3-sys, so openssl-libs and sqlite-libs are not linked;
+# `ldd` on the built binary shows only libgcc_s, libm and libc.
 # hadolint ignore=DL3041
 RUN microdnf update -y && \
     microdnf install -y --nodocs \
         ca-certificates \
-        tzdata \
-        procps-ng && \
+        tzdata && \
     microdnf clean all && \
     rm -rf /var/cache/dnf
 
@@ -56,8 +55,5 @@ WORKDIR /app
 RUN chown dicemaiden:dicemaiden /app
 
 USER dicemaiden
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-    CMD pgrep -f dicemaiden-rs || exit 1
 
 ENTRYPOINT ["/usr/local/bin/dicemaiden-rs"]
