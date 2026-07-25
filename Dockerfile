@@ -1,100 +1,63 @@
 # Build arguments for version pinning
 ARG RUST_VERSION=1.90.0
-ARG UBI_VERSION=9
+ARG UBI_VERSION=9.7
 
-# Use official Rust image for building (faster, more reliable)
+# ---------- Build stage ----------
 FROM rust:${RUST_VERSION} AS builder
 
-# Add metadata labels
-LABEL org.opencontainers.image.title="Dice Maiden"
-LABEL org.opencontainers.image.description="Discord Dice bot"
-LABEL org.opencontainers.image.source="https://github.com/Humblemonk/dicemaiden-rs"
-
-# Install build dependencies in single layer
-# hadolint ignore=DL3008
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        pkg-config \
-        libssl-dev && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# Set environment variables for linking
-ENV OPENSSL_STATIC=1
-ENV PKG_CONFIG_ALLOW_CROSS=1
-
-# Set up the working directory
 WORKDIR /app
 
-# Copy manifest files first for better caching
+# Prime the dependency cache. Both dummy targets are required: the crate has an
+# autodiscovered src/lib.rs, so a main.rs-only stub cannot build the real target set.
+# `cargo clean -p` drops the stub's own artifacts and fingerprints while leaving every
+# dependency compiled; a plain rm of target/release/deps misses libdicemaiden_rs-*.rlib
+# and all of .fingerprint/, which silently links the stub into the real binary.
 COPY Cargo.toml Cargo.lock ./
+RUN mkdir -p src && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "" > src/lib.rs && \
+    cargo build --release --locked && \
+    cargo clean --release -p dicemaiden-rs && \
+    rm -rf src
 
-# Create a dummy main.rs to build dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
-
-# Build dependencies (this layer will be cached)
-# Use --lib to avoid building the binary, just dependencies
-RUN cargo build --release --lib 2>/dev/null || true && rm -rf src
-
-# Copy source code
+# COPY preserves the build context's mtimes, which are older than the stub build above.
+# Without the touch, cargo's fingerprint check treats the real sources as fresh and
+# reuses the stub. Do not remove this.
 COPY src ./src
+RUN find src -name '*.rs' -exec touch {} + && \
+    cargo build --release --locked && \
+    ldd target/release/dicemaiden-rs
 
-# Prevent full rebuild due to newer timestamps on copied files
-RUN touch src/*.rs
+# ---------- Runtime stage ----------
+FROM registry.access.redhat.com/ubi9/ubi-minimal:${UBI_VERSION}
 
-# Build the application
-RUN cargo build --release --locked
+LABEL org.opencontainers.image.title="Dice Maiden" \
+      org.opencontainers.image.description="Discord dice bot" \
+      org.opencontainers.image.source="https://github.com/Humblemonk/dicemaiden-rs"
 
-# Runtime stage - UBI Minimal
-FROM registry.access.redhat.com/ubi${UBI_VERSION}/ubi-minimal:9.7
-
-# Add metadata
-LABEL org.opencontainers.image.title="Dice Maiden Runtime"
-LABEL org.opencontainers.image.description="Runtime image for Dice Maiden Discord bot"
-
-# Install runtime dependencies
+# TLS is rustls end to end (serenity rustls_backend, sqlx runtime-tokio-rustls) and
+# sqlx bundles libsqlite3-sys, so openssl-libs and sqlite-libs are not linked.
+# procps-ng provides pgrep for the healthcheck; it is not present in ubi-minimal.
 # hadolint ignore=DL3041
 RUN microdnf update -y && \
-    microdnf install -y \
-        openssl-libs \
+    microdnf install -y --nodocs \
         ca-certificates \
         tzdata \
-        sqlite-libs && \
+        procps-ng && \
     microdnf clean all && \
-    rm -rf /var/cache/yum
+    rm -rf /var/cache/dnf
 
-# Create user to run container as non-root
 RUN useradd -m -u 1000 -s /bin/sh dicemaiden
 
-# Set up application directory and data volume
+COPY --from=builder --chmod=755 /app/target/release/dicemaiden-rs /usr/local/bin/dicemaiden-rs
+
+# DATABASE_URL defaults to ./main.db, so the working directory must be writable.
 WORKDIR /app
+RUN chown dicemaiden:dicemaiden /app
 
-# Copy the binary from builder stage
-COPY --from=builder /app/target/release/dicemaiden-rs /usr/local/bin/dicemaiden-rs
-RUN chmod 755 /usr/local/bin/dicemaiden-rs
-
-# Verify the binary exists and is executable
-RUN test -x /usr/local/bin/dicemaiden-rs && echo "Binary exists and is executable"
-
-# Set ownership of application directory to non-root user
-RUN chown -R dicemaiden:dicemaiden /app
-
-# Switch to non-root user
 USER dicemaiden
 
-# Verify binary is executable by dicemaiden user
-RUN test -x /usr/local/bin/dicemaiden-rs && \
-    echo "User 'dicemaiden' can execute the binary" || \
-    (echo "ERROR: User 'dicemaiden' cannot execute binary!" && exit 1)
-
-# Verify dicemaiden can access the working directory
-RUN test -w /app && test -r /app && \
-    echo "User 'dicemaiden' has read/write access to /app" || \
-    (echo "ERROR: User 'dicemaiden' cannot access /app!" && exit 1)
-
-# This allows Docker/Kubernetes to monitor container health
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
     CMD pgrep -f dicemaiden-rs || exit 1
 
-# Set the entrypoint
 ENTRYPOINT ["/usr/local/bin/dicemaiden-rs"]
