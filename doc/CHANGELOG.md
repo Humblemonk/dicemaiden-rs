@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.3] - 2026-8-09
+
+## Added
+
+- Added support for Open Legend System
+
 ## [1.5.2] - 2026-3-21
 
 ## Added

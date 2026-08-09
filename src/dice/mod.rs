@@ -31,6 +31,13 @@
 //! **Drop before explode.**  Dropped dice are never reconsidered for explosion.
 //! This is intentional game-design behaviour and is covered by tests — do not
 //! change the ordering.
+//!
+//! The one exception runs the *other* way round: `d#`/`k#` are applied *after*
+//! explosions, so exploded dice can themselves be dropped.  Open Legend needs
+//! the drop to happen against the initial pool only, so
+//! [`Modifier::Advantage`] / [`Modifier::Disadvantage`] are resolved in
+//! `roller::roll_dice` before any explosion runs.  Both orderings are covered
+//! by tests — do not merge them.
 
 pub mod aliases;
 pub mod parser;
@@ -88,6 +95,8 @@ pub enum Modifier {
     Explode(Option<u32>),                   // e or e#
     ExplodeIndefinite(Option<u32>),         // ie or ie#
     Drop(u32),                              // d#
+    Advantage(u32),                         // adv# - drop # lowest before exploding
+    Disadvantage(u32),                      // dis# - drop # highest before exploding
     KeepHigh(u32),                          // k#
     KeepLow(u32),                           // kl#
     KeepMiddle(u32),                        // km#

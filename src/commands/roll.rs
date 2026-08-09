@@ -127,12 +127,22 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
         .unwrap_or("1d6");
 
     // Handle special commands using shared help text
-    match dice_expr.trim().to_lowercase().as_str() {
-        "help" => return Ok(CommandResponse::private(help_text::generate_basic_help())),
-        "help alias" => return Ok(CommandResponse::private(help_text::generate_alias_help())),
-        "help system" => return Ok(CommandResponse::private(help_text::generate_system_help())),
-        "help a5e" => return Ok(CommandResponse::private(help_text::generate_a5e_help())),
-        "help aliens" => return Ok(CommandResponse::private(help_text::generate_aliens_help())),
+    let normalized = dice_expr.trim().to_lowercase();
+
+    if normalized == "help" {
+        return Ok(CommandResponse::private(help_text::generate_basic_help()));
+    }
+
+    // Topics resolve through the same table as the /help command, so the two
+    // surfaces cannot drift apart. An unrecognised topic deliberately falls
+    // through to dice parsing rather than returning help.
+    if let Some(topic) = normalized.strip_prefix("help ")
+        && let Some(topic_help) = help_text::generate_topic_help(topic.trim())
+    {
+        return Ok(CommandResponse::private(topic_help));
+    }
+
+    match normalized.as_str() {
         "donate" => return Ok(CommandResponse::public(generate_donate_text())),
         "bot-info" => {
             let bot_info = generate_bot_info(ctx).await?;

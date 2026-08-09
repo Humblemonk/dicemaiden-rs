@@ -5657,3 +5657,350 @@ fn test_plotweaver_doesnt_break_existing() {
         assert_eq!(result.is_ok(), should_work, "{desc}: {input}");
     }
 }
+
+// ============================================================================
+// OPEN LEGEND RPG
+// ============================================================================
+
+#[test]
+fn test_open_legend_alias_expansion() {
+    // SRD Attribute Overview table: score → attribute dice, all exploding
+    let attribute_scores = vec![
+        ("ol0", "1d20 ie20"),
+        ("ol1", "1d20 ie20 + 1d4 ie4"),
+        ("ol2", "1d20 ie20 + 1d6 ie6"),
+        ("ol3", "1d20 ie20 + 1d8 ie8"),
+        ("ol4", "1d20 ie20 + 1d10 ie10"),
+        ("ol5", "1d20 ie20 + 2d6 ie6"),
+        ("ol6", "1d20 ie20 + 2d8 ie8"),
+        ("ol7", "1d20 ie20 + 2d10 ie10"),
+        ("ol8", "1d20 ie20 + 3d8 ie8"),
+        ("ol9", "1d20 ie20 + 3d10 ie10"),
+        ("ol10", "1d20 ie20 + 4d8 ie8"),
+    ];
+
+    for (alias, expected) in attribute_scores {
+        assert_eq!(
+            aliases::expand_alias(alias),
+            Some(expected.to_string()),
+            "Open Legend '{alias}' should expand to '{expected}'"
+        );
+        assert_valid(alias);
+    }
+
+    // Advantage/disadvantage attach to the attribute dice, not the d20
+    let advantage_cases = vec![
+        ("ol5a1", "1d20 ie20 + 2d6 ie6 adv1"),
+        ("ol5a2", "1d20 ie20 + 2d6 ie6 adv2"),
+        ("ol5d1", "1d20 ie20 + 2d6 ie6 dis1"),
+        ("ol3d2", "1d20 ie20 + 1d8 ie8 dis2"),
+        ("ol10a3", "1d20 ie20 + 4d8 ie8 adv3"),
+    ];
+
+    for (alias, expected) in advantage_cases {
+        assert_eq!(
+            aliases::expand_alias(alias),
+            Some(expected.to_string()),
+            "Open Legend '{alias}' should expand to '{expected}'"
+        );
+        assert_valid(alias);
+    }
+
+    // With no attribute dice the d20 itself gets advantage, capped at level 1
+    // (SRD: "Advantage and Disadvantage Without Attribute Dice")
+    let zero_attribute_cases = vec![
+        ("ol0a1", "1d20 ie20 adv1"),
+        ("ol0a4", "1d20 ie20 adv1"),
+        ("ol0d1", "1d20 ie20 dis1"),
+        ("ol0d9", "1d20 ie20 dis1"),
+    ];
+
+    for (alias, expected) in zero_attribute_cases {
+        assert_eq!(
+            aliases::expand_alias(alias),
+            Some(expected.to_string()),
+            "Open Legend '{alias}' should expand to '{expected}'"
+        );
+        assert_valid(alias);
+    }
+
+    // Scores outside 0-10 are not Open Legend aliases
+    for invalid in ["ol11", "ol99", "ol", "ol5a", "ol5x1"] {
+        assert_eq!(
+            aliases::expand_alias(invalid),
+            None,
+            "'{invalid}' should not expand as an Open Legend alias"
+        );
+    }
+}
+
+// Dice dropped by an added dice group (`+ 2d6 ie6 adv1`) are recorded on that
+// group rather than on the top-level result, so count both.
+fn total_dropped_dice(result: &dicemaiden_rs::dice::RollResult) -> usize {
+    result.dropped_rolls.len()
+        + result
+            .dice_groups
+            .iter()
+            .map(|group| group.dropped_rolls.len())
+            .sum::<usize>()
+}
+
+#[test]
+fn test_open_legend_roll_results() {
+    // ol5 = 1d20 + 2d6, so the minimum possible total is 3
+    for _ in 0..50 {
+        let results = parse_and_roll("ol5").expect("ol5 should roll");
+        assert_eq!(results.len(), 1, "ol5 should produce one result");
+        assert!(
+            results[0].total >= 3,
+            "ol5 total should be at least 3, got {}",
+            results[0].total
+        );
+    }
+
+    // Advantage rolls one extra attribute die and discards one
+    for _ in 0..50 {
+        let results = parse_and_roll("ol5a1").expect("ol5a1 should roll");
+        assert_eq!(
+            total_dropped_dice(&results[0]),
+            1,
+            "ol5a1 should drop exactly one die"
+        );
+    }
+
+    for _ in 0..50 {
+        let results = parse_and_roll("ol7d2").expect("ol7d2 should roll");
+        assert_eq!(
+            total_dropped_dice(&results[0]),
+            2,
+            "ol7d2 should drop exactly two dice"
+        );
+    }
+}
+
+#[test]
+fn test_advantage_disadvantage_drops_before_exploding() {
+    // The `ul` flag keeps dice in roll order, so individual_rolls[0] is the
+    // surviving die from the initial pool and everything after it came from
+    // explosions. This is the mechanic requested in issue #148: the drop is
+    // resolved against the initial pool only.
+    for _ in 0..500 {
+        let results = parse_and_roll("ul 1d6 ie6 adv1").expect("advantage should roll");
+        let result = &results[0];
+
+        assert_eq!(
+            result.dropped_rolls.len(),
+            1,
+            "adv1 should drop exactly one die"
+        );
+
+        let survivor = result.individual_rolls[0];
+        assert!(
+            result.dropped_rolls[0] <= survivor,
+            "advantage must drop the lowest die of the initial pool: dropped {} but kept {}",
+            result.dropped_rolls[0],
+            survivor
+        );
+
+        // A surviving max roll still explodes — the drop happens first
+        if survivor == 6 {
+            assert!(
+                result.individual_rolls.len() > 1,
+                "a surviving 6 must explode after the drop"
+            );
+        }
+
+        // Exploded dice are exempt from the drop, so a low explosion result
+        // never displaces the die that was already discarded
+        assert!(
+            result.individual_rolls.len() == 1 || result.individual_rolls[0] == 6,
+            "only a max roll should produce extra dice"
+        );
+    }
+
+    for _ in 0..500 {
+        let results = parse_and_roll("ul 1d6 ie6 dis1").expect("disadvantage should roll");
+        let result = &results[0];
+
+        assert_eq!(
+            result.dropped_rolls.len(),
+            1,
+            "dis1 should drop exactly one die"
+        );
+
+        let survivor = result.individual_rolls[0];
+        assert!(
+            result.dropped_rolls[0] >= survivor,
+            "disadvantage must drop the highest die of the initial pool: dropped {} but kept {}",
+            result.dropped_rolls[0],
+            survivor
+        );
+
+        if survivor == 6 {
+            assert!(
+                result.individual_rolls.len() > 1,
+                "a surviving 6 must explode even though the highest die was dropped"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_advantage_disadvantage_pool_size() {
+    // Every level adds one die to the initial pool and discards one
+    let pool_cases = vec![
+        ("3d6 adv1", 3, 1),
+        ("3d6 adv3", 3, 3),
+        ("3d6 dis1", 3, 1),
+        ("2d10 dis4", 2, 4),
+        ("1d20 adv1", 1, 1),
+    ];
+
+    for (expression, expected_kept, expected_dropped) in pool_cases {
+        let results = parse_and_roll(expression).expect("expression should roll");
+        let result = &results[0];
+
+        assert_eq!(
+            result.individual_rolls.len(),
+            expected_kept,
+            "'{expression}' should keep {expected_kept} dice"
+        );
+        assert_eq!(
+            result.dropped_rolls.len(),
+            expected_dropped,
+            "'{expression}' should drop {expected_dropped} dice"
+        );
+        assert_eq!(
+            result.total,
+            result.individual_rolls.iter().sum::<i32>(),
+            "'{expression}' total should only count kept dice"
+        );
+    }
+}
+
+#[test]
+fn test_advantage_disadvantage_cancel_out() {
+    // SRD: "find the difference between the two values"
+    let netting_cases = vec![
+        ("3d6 adv1 dis1", 3, 0),
+        ("3d6 adv2 dis1", 3, 1),
+        ("3d6 adv1 dis3", 3, 2),
+        ("3d6 adv0", 3, 0),
+        ("3d6 dis0", 3, 0),
+    ];
+
+    for (expression, expected_kept, expected_dropped) in netting_cases {
+        let results = parse_and_roll(expression).expect("expression should roll");
+        let result = &results[0];
+
+        assert_eq!(
+            result.individual_rolls.len(),
+            expected_kept,
+            "'{expression}' should keep {expected_kept} dice"
+        );
+        assert_eq!(
+            result.dropped_rolls.len(),
+            expected_dropped,
+            "'{expression}' should drop {expected_dropped} dice"
+        );
+    }
+}
+
+#[test]
+fn test_advantage_disadvantage_with_other_modifiers() {
+    // Combines with math, comments, labels, flags and roll sets
+    for expression in [
+        "2d6 ie6 adv1 + 5",
+        "2d6 adv1 - 2",
+        "4d6 dis2 * 2",
+        "2d6 ie6 adv1 ! Open Legend attack",
+        "(Attack) 1d20 ie20 + 2d6 ie6 adv1",
+        "s 2d6 adv1",
+        "p 2d6 dis1",
+        "ul 2d6 adv1",
+        "1d20 ie20 + 2d6 ie6 adv1 ; 1d20 ie20 + 1d8 ie8 dis1",
+    ] {
+        assert_valid(expression);
+    }
+
+    // Comment survives the modifier
+    let results = parse_and_roll("2d6 ie6 adv1 ! Open Legend attack").expect("should roll");
+    assert_eq!(
+        results[0].comment,
+        Some("Open Legend attack".to_string()),
+        "comment should be preserved alongside adv1"
+    );
+
+    // Roll sets
+    let results = parse_and_roll("3 ol5a1").expect("roll sets should work");
+    assert_eq!(results.len(), 3, "should produce 3 sets");
+    for (index, result) in results.iter().enumerate() {
+        assert_eq!(result.label, Some(format!("Set {}", index + 1)));
+    }
+
+    // Keep/drop still run after explosions, unchanged by this feature
+    let results = parse_and_roll("2d6 ie6 adv1 k1").expect("should roll");
+    assert_eq!(
+        results[0].individual_rolls.len(),
+        1,
+        "k1 should still keep exactly one die after exploding"
+    );
+}
+
+#[test]
+fn test_advantage_disadvantage_limits() {
+    // The extra dice count against the 500 dice cap
+    assert!(
+        parse_and_roll("500d6 adv1").is_err(),
+        "advantage extras should respect the 500 dice limit"
+    );
+    assert!(
+        parse_and_roll("499d6 adv1").is_ok(),
+        "499d6 plus one advantage die is exactly at the limit"
+    );
+    assert!(
+        parse_and_roll("4d6 adv501").is_err(),
+        "advantage level above 500 should be rejected"
+    );
+
+    // Malformed levels
+    for invalid in ["4d6 adv", "4d6 dis", "4d6 advx", "4d6 dis-1"] {
+        assert!(
+            parse_and_roll(invalid).is_err(),
+            "'{invalid}' should be rejected"
+        );
+    }
+}
+
+#[test]
+fn test_open_legend_doesnt_break_existing_syntax() {
+    // `adv`/`dis` must not shadow the d-prefixed and e-prefixed tokens they sit near
+    let cases = [
+        ("4d6 d1", "drop lowest unchanged"),
+        ("4d6 e6", "explode unchanged"),
+        ("dh 4d10", "Dark Heresy unchanged"),
+        ("d6s4", "D6 System unchanged"),
+        ("3df", "Fudge unchanged"),
+        ("4d3 fudge", "Fudge modifier unchanged"),
+        ("+d20", "d20 advantage alias unchanged"),
+        ("-d20", "d20 disadvantage alias unchanged"),
+        ("dndstats", "DnD stats unchanged"),
+        ("alien4", "Alien unchanged"),
+        ("ms45", "Mothership unchanged"),
+    ];
+
+    for (input, description) in cases {
+        assert!(
+            parse_and_roll(input).is_ok(),
+            "{description}: '{input}' should still parse"
+        );
+    }
+
+    // Drop after explode is still the behaviour for d#/k#
+    let results = parse_and_roll("2d6 ie6 d1").expect("should roll");
+    assert_eq!(
+        results[0].dropped_rolls.len(),
+        1,
+        "d1 should still drop exactly one die"
+    );
+}

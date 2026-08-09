@@ -9,6 +9,7 @@
 ### Core Modifiers
 - **Exploding**: `e6` (explode on 6), `e` (explode on max), `ie6` (explode indefinitely)
 - **Keep/Drop**: `k3` (keep 3 highest), `kl2` (keep 2 lowest), `km2` (keep 2 middle), `d1` (drop 1 lowest)
+- **Advantage/Disadvantage**: `adv1` (roll 1 extra die, drop 1 lowest, *then* explode), `dis1` (roll 1 extra die, drop 1 highest, *then* explode)
 - **Rerolls**: `r2` (reroll ≤2 once), `ir2` (reroll ≤2 indefinitely), `rg2` (reroll ≥ 2 once), `irg2` (reroll ≥ 2 indefinitely)
 - **Success Counting**: `t7` (count successes ≥7), `tl6` (count successes ≤6), `f1` (count failures ≤1)
 - **Double Success**: `t7ds10` (target 7+, double success on 10; defaults to target value), `tl6ds5` (target 6-, double success on 5)
@@ -242,6 +243,42 @@
   - **6-10 below DC**:  2 degrees of failure
   - **11-15 below DC**: 3 degrees of failure
 
+### Open Legend
+- `ol5` → 1d20 ie20 + 2d6 ie6 (action roll for attribute score 5)
+- `ol5a2` → 1d20 ie20 + 2d6 ie6 adv2 (advantage 2)
+- `ol5d1` → 1d20 ie20 + 2d6 ie6 dis1 (disadvantage 1)
+- `ol0` → 1d20 ie20 (attribute score 0 — no attribute dice)
+
+**Attribute Dice Table:**
+
+| Score | Dice | Score | Dice |
+| --- | --- | --- | --- |
+| 0 | none | 6 | 2d8 |
+| 1 | 1d4 | 7 | 2d10 |
+| 2 | 1d6 | 8 | 3d8 |
+| 3 | 1d8 | 9 | 3d10 |
+| 4 | 1d10 | 10 | 4d8 |
+| 5 | 2d6 | | |
+
+**Advantage and Disadvantage (`adv#` / `dis#`):**
+- Roll one extra die per level, then discard that many dice — the **lowest** for
+  advantage, the **highest** for disadvantage
+- The discard happens **before** exploding, so dice gained from explosions are never
+  discarded, and a die that survives the discard still explodes normally
+- Advantage and disadvantage cancel each other out: `adv2 dis1` is the same as `adv1`
+- These are generic modifiers — `2d6 ie6 adv1` works outside Open Legend too
+- Contrast with `d1` / `k3`, which are applied **after** exploding and can therefore
+  drop exploded dice
+
+**Attribute score 0:** advantage/disadvantage applies to the d20 itself and is capped
+at level 1, so `ol0a3` is treated as `ol0a1` (`1d20 ie20 adv1`).
+
+**Examples:**
+- `ol5a1` → Roll 1d20 + 3d6, drop the lowest d6, then explode what remains
+- `ol7d2` → Roll 1d20 + 4d10, drop the 2 highest d10, then explode what remains
+- `3 ol5` → Roll 3 separate Open Legend action rolls
+- `ol5a1 ! Attack the ogre` → Advantage roll with a comment
+
 ### Mothership RPG
 - `ms`    → 1d100 roll-under (default target 50)
 - `ms45`  → 1d100 roll-under Strength 45
@@ -351,5 +388,9 @@
 - `/roll help` or `/help` - Basic dice syntax help
 - `/roll help alias` or `/help alias` - Game system aliases
 - `/roll help system` or `/help system` - Detailed system examples
+- `/roll help a5e` or `/help a5e` - Level Up Advanced 5E expertise dice
+- `/roll help aliens` or `/help aliens` - Alien RPG stress and panic
+- `/roll help mothership` or `/help mothership` - Mothership RPG stat checks
+- `/roll help ol` or `/help ol` - Open Legend advantage/disadvantage
 - `/roll donate` - Support information
 - `/purge X` - Purge recent messages in channel

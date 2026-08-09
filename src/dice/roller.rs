@@ -8,17 +8,22 @@
 //! # Standard pipeline
 //!
 //! ```text
-//! 1. Roll N dice (sides S)
-//! 2. apply_dice_modifying_modifiers   — explode, reroll
-//! 3. apply_keep_drop_modifiers        — keep high/low/middle, drop lowest
-//! 4. sum kept dice → result.total
-//! 5. apply_mathematical_modifiers     — +N, -N, *N, /N, +Nd6, …
-//! 6. apply_special_system_modifiers   — success counting, botch, Godbound, …
-//! 7. sort rolls (unless `ul` flag set)
+//! 1. Roll N (+ advantage/disadvantage extras) dice (sides S)
+//! 2. drop the advantage/disadvantage surplus  — adv#, dis#
+//! 3. apply_dice_modifying_modifiers   — explode, reroll
+//! 4. apply_keep_drop_modifiers        — keep high/low/middle, drop lowest
+//! 5. sum kept dice → result.total
+//! 6. apply_mathematical_modifiers     — +N, -N, *N, /N, +Nd6, …
+//! 7. apply_special_system_modifiers   — success counting, botch, Godbound, …
+//! 8. sort rolls (unless `ul` flag set)
 //! ```
 //!
 //! **Drop before explode** is intentional: dice that are dropped are never
 //! reconsidered for explosion.  Do not change this ordering.
+//!
+//! Step 2 and step 4 are deliberately distinct.  `d#`/`k#` (step 4) run after
+//! explosions and can therefore drop exploded dice; `adv#`/`dis#` (step 2) run
+//! against the initial pool only, which is what Open Legend requires.
 //!
 //! # Specialised handlers
 //! | Handler function                  | System                        |
@@ -41,6 +46,23 @@ use super::rng::get_dice_rng;
 use super::{DiceGroup, DiceRoll, HeroSystemType, LaserFeelingsType, Modifier, RollResult};
 use anyhow::{Result, anyhow};
 use rand::{Rng, RngExt};
+
+/// Mirrors the parser's `Maximum 500 dice allowed` cap, which is enforced
+/// against the written dice count before advantage extras are known.
+const MAX_DICE_POOL: u64 = 500;
+
+/// Net advantage level: advantage and disadvantage cancel each other out, per
+/// the Open Legend SRD ("find the difference between the two values").
+/// Positive is advantage, negative is disadvantage.
+fn net_advantage_level(modifiers: &[Modifier]) -> i64 {
+    modifiers
+        .iter()
+        .fold(0i64, |level, modifier| match modifier {
+            Modifier::Advantage(count) => level + i64::from(*count),
+            Modifier::Disadvantage(count) => level - i64::from(*count),
+            _ => level,
+        })
+}
 
 pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     // Validation check
@@ -173,21 +195,45 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         plot_symbols: None,
     };
 
+    // Advantage/disadvantage rolls extra dice into the initial pool; the surplus
+    // is discarded below, before any explosion runs.
+    let advantage_level = net_advantage_level(&dice.modifiers);
+    let extra_dice = advantage_level.unsigned_abs();
+    let pool_size = u64::from(dice.count) + extra_dice;
+
+    if pool_size > MAX_DICE_POOL {
+        return Err(anyhow!(
+            "Maximum {MAX_DICE_POOL} dice allowed (advantage/disadvantage adds {extra_dice} dice)"
+        ));
+    }
+
     // Normal dice rolling flow for non-special systems
     // Initial dice rolls
-    for _ in 0..dice.count {
+    for _ in 0..pool_size {
         let roll = rng.random_range(1..=dice.sides as i32);
         result.individual_rolls.push(roll);
     }
 
     // Create initial dice group for the base dice
     let base_group = DiceGroup {
-        _description: format!("{}d{}", dice.count, dice.sides),
+        _description: format!("{}d{}", pool_size, dice.sides),
         rolls: result.individual_rolls.clone(),
         dropped_rolls: Vec::new(),
         modifier_type: "base".to_string(),
     };
     result.dice_groups.push(base_group);
+
+    // Discard the advantage/disadvantage surplus *before* exploding, so dice
+    // gained from explosions are never reconsidered for the drop.
+    if extra_dice > 0 {
+        let surplus = extra_dice as usize;
+        if advantage_level > 0 {
+            drop_dice(&mut result, surplus)?;
+        } else {
+            drop_highest_dice(&mut result, surplus);
+        }
+        update_base_group(&mut result);
+    }
 
     // Apply modifiers in the correct order for mathematical precedence
     // 1. Apply dice-modifying modifiers first (exploding, rerolls, etc.)
@@ -948,8 +994,14 @@ fn sort_result_rolls(result: &mut RollResult) {
 // Helper function to update the base group with current rolls
 fn update_base_group(result: &mut RollResult) {
     if let Some(base_group) = result.dice_groups.get_mut(0) {
+        // The base group lists every die that was rolled; dropped dice are
+        // rendered separately (struck through) from `result.dropped_rolls`, so
+        // repeating them in the group would print them twice.
         base_group.rolls = result.individual_rolls.clone();
-        base_group.dropped_rolls = result.dropped_rolls.clone();
+        base_group
+            .rolls
+            .extend(result.dropped_rolls.iter().copied());
+        base_group.dropped_rolls.clear();
     }
 }
 
@@ -1343,6 +1395,24 @@ fn drop_dice(result: &mut RollResult, count: usize) -> Result<()> {
     drop_lowest_dice(result, &mut rolls, count_to_drop);
 
     Ok(())
+}
+
+// Mirror of drop_dice for the highest dice, used by disadvantage
+fn drop_highest_dice(result: &mut RollResult, count: usize) {
+    let mut sorted_rolls = result.individual_rolls.clone();
+    sorted_rolls.sort_by(|a, b| b.cmp(a)); // Highest first
+
+    for _ in 0..count.min(sorted_rolls.len()) {
+        if let Some(pos) = result
+            .individual_rolls
+            .iter()
+            .position(|&roll| roll == sorted_rolls[0])
+        {
+            let dropped = result.individual_rolls.remove(pos);
+            result.dropped_rolls.push(dropped);
+            sorted_rolls.remove(0);
+        }
+    }
 }
 
 // Helper function to drop lowest dice, reducing duplication
