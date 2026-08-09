@@ -973,6 +973,8 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
         // COMPLETE patterns array in correct order
         let patterns = [
             (r"^(ie\d*)", "indefinite explode"), // ie, ie6 (BEFORE regular explode)
+            (r"^(adv\d+)", "advantage"),         // adv1 (BEFORE alien)
+            (r"^(dis\d+)", "disadvantage"),      // dis1 (BEFORE drop and d6s)
             (r"^(irg\d+)", "indefinite reroll greater"), // irg5 (BEFORE rg)
             (r"^(ir\d+)", "indefinite reroll"),  // ir1 (BEFORE regular reroll)
             (r"^(km\d+)", "keep middle"),        // km3 (BEFORE regular keep)
@@ -1298,6 +1300,8 @@ fn is_combined_modifiers_token(input: &str) -> bool {
     // Check if it starts with common modifier patterns and has more after the first one
     let modifier_patterns = [
         r"^(ie\d*)",  // Indefinite explode first (longer pattern)
+        r"^(adv\d+)", // Advantage (before explode)
+        r"^(dis\d+)", // Disadvantage (before drop)
         r"^(irg\d+)", // Indefinite reroll greater
         r"^(ir\d+)",  // Indefinite reroll
         r"^(km\d+)",  // Keep middle
@@ -1355,6 +1359,8 @@ fn is_modifier_start(input: &str) -> bool {
     // Check if it starts with any known modifier pattern (not requiring it to be complete)
     let modifier_start_patterns = [
         r"^ie\d*",  // Indefinite explode: ie, ie6
+        r"^adv\d+", // Advantage: adv1 (before explode)
+        r"^dis\d+", // Disadvantage: dis1 (before drop)
         r"^irg\d+", // Indefinite reroll greater: irg5
         r"^ir\d+",  // Indefinite reroll: ir1
         r"^km\d+",  // Keep middle: km3
@@ -1498,10 +1504,36 @@ fn parse_complex_dice_expression(input: &str) -> Result<DiceRoll> {
     }
 }
 
+// Shared level parsing for the advantage/disadvantage modifiers. The upper
+// bound mirrors the 500 dice cap, since each level rolls one extra die.
+fn parse_advantage_level(digits: &str, part: &str) -> Result<u32> {
+    let level: u32 = digits
+        .parse()
+        .map_err(|_| anyhow!("Invalid advantage/disadvantage level in '{}'", part))?;
+
+    if level > 500 {
+        return Err(anyhow!("Maximum advantage/disadvantage level is 500"));
+    }
+
+    Ok(level)
+}
+
 fn parse_single_modifier(part: &str) -> Result<Modifier> {
     // Reject standalone 'l' - it should only appear in d6l aliases
     if part == "l" {
         return Err(anyhow!("Unrecognized modifier pattern: 'l' in 'l'"));
+    }
+
+    // Advantage/disadvantage before anything that could claim the 'd' or 'a'
+    // prefix (drop, d6s, standalone dice expressions, alien)
+    if let Some(stripped) = part.strip_prefix("adv") {
+        return Ok(Modifier::Advantage(parse_advantage_level(stripped, part)?));
+    }
+
+    if let Some(stripped) = part.strip_prefix("dis") {
+        return Ok(Modifier::Disadvantage(parse_advantage_level(
+            stripped, part,
+        )?));
     }
 
     // Check for Alien RPG modifiers first

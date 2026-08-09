@@ -447,6 +447,73 @@ fn test_help_system_integration() {
 }
 
 #[test]
+fn test_help_topics_within_discord_message_limit() {
+    // Help responses are sent verbatim, with none of the truncation that
+    // format_multiple_results_with_limit applies to roll output, so a topic
+    // that outgrows Discord's 2000 character cap fails to send entirely.
+    // Discord counts UTF-16 code units, which is what the emoji and arrows
+    // in these strings actually cost.
+    for topic in help_text::HELP_TOPICS {
+        let text = help_text::generate_topic_help(topic)
+            .unwrap_or_else(|| panic!("HELP_TOPICS lists '{topic}' but it has no help text"));
+
+        let units = text.encode_utf16().count();
+        assert!(
+            units <= 2000,
+            "/help {topic} is {units} UTF-16 units, over Discord's 2000 limit — \
+             split it into its own topic rather than growing this page"
+        );
+    }
+}
+
+#[test]
+fn test_help_topic_dispatch_is_shared() {
+    // Both /help <topic> and /roll help <topic> resolve through
+    // generate_topic_help, so every advertised topic must resolve and no
+    // surface can advertise a topic the other cannot serve.
+    for topic in help_text::HELP_TOPICS {
+        let text = help_text::generate_topic_help(topic)
+            .unwrap_or_else(|| panic!("advertised topic '{topic}' does not resolve"));
+        assert!(
+            text.len() > 100,
+            "topic '{topic}' resolved to suspiciously short text"
+        );
+    }
+
+    // Unknown topics must not resolve — /roll relies on this to let
+    // non-help input fall through to the dice parser
+    for unknown in ["nonexistent", "", "OL", "help"] {
+        assert!(
+            help_text::generate_topic_help(unknown).is_none(),
+            "'{unknown}' should not resolve as a help topic"
+        );
+    }
+
+    assert!(
+        help_text::HELP_TOPICS.contains(&"basic"),
+        "basic is the documented default topic"
+    );
+    assert!(
+        help_text::HELP_TOPICS.len() <= 25,
+        "Discord allows at most 25 slash-command choices per option"
+    );
+}
+
+#[test]
+fn test_open_legend_help_topic() {
+    let help = help_text::generate_open_legend_help();
+    assert!(help.contains("Open Legend"));
+    assert!(help.contains("ol5a2"));
+    assert!(help.contains("adv#"));
+
+    // Discoverable from the alias quick-reference
+    assert!(
+        help_text::generate_alias_help().contains("/help ol"),
+        "alias help should point at the Open Legend topic"
+    );
+}
+
+#[test]
 fn test_error_scenarios() {
     // Test error handling in realistic scenarios
     let error_scenarios = vec![

@@ -25,6 +25,7 @@
 //! | `hs`             | Hero System                          |
 //! | `ex`             | Exalted                              |
 //! | `ms` / `ms2`     | Mothership RPG                       |
+//! | `ol5` / `ol5a2`  | Open Legend RPG                      |
 //! | `ola` / `old`    | Open Legend RPG                      |
 //!
 //! See `roll_syntax.md` for the full syntax reference.  All regex patterns are
@@ -118,6 +119,10 @@ static HS_FRAC_REGEX: Lazy<Regex> =
 
 static EX_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^ex(\d+)(?:t(\d+))?$").expect("Failed to compile EX_REGEX"));
+
+static OL_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^ol(\d{1,2})(?:\s*([ad])(\d+))?$").expect("Failed to compile OL_REGEX")
+});
 
 // Exalted with custom target and double success: ex5t8ds10 → 5d10 t8ds10
 static EX_T_DS_REGEX: Lazy<Regex> =
@@ -382,6 +387,11 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     // Handle Wild Worlds RPG aliases
     if let Some(wild_worlds_result) = expand_wild_worlds_alias(input) {
         return Some(wild_worlds_result);
+    }
+
+    // Handle Open Legend RPG aliases
+    if let Some(open_legend_result) = expand_open_legend_alias(input) {
+        return Some(open_legend_result);
     }
 
     if let Some(captures) = SR_REGEX.captures(input) {
@@ -1449,6 +1459,65 @@ fn expand_wild_worlds_alias(input: &str) -> Option<String> {
     }
 
     None
+}
+
+/// Open Legend attribute dice, per the SRD Attribute Overview table.
+/// Score 0 grants no attribute dice — the d20 is rolled alone.
+fn open_legend_attribute_dice(score: u32) -> Option<(u32, u32)> {
+    match score {
+        1 => Some((1, 4)),
+        2 => Some((1, 6)),
+        3 => Some((1, 8)),
+        4 => Some((1, 10)),
+        5 => Some((2, 6)),
+        6 => Some((2, 8)),
+        7 => Some((2, 10)),
+        8 => Some((3, 8)),
+        9 => Some((3, 10)),
+        10 => Some((4, 8)),
+        _ => None,
+    }
+}
+
+/// `ol5` → `1d20 ie20 + 2d6 ie6`, `ol5a2` → advantage 2, `ol5d1` → disadvantage 1.
+///
+/// Advantage/disadvantage rolls extra *attribute* dice and drops the surplus
+/// before explosions, which is what `adv#`/`dis#` do. With no attribute dice
+/// (score 0) the SRD instead rolls 2d20 and keeps the better/worse, and caps
+/// the level at 1 — `adv1`/`dis1` on the d20 expresses exactly that.
+fn expand_open_legend_alias(input: &str) -> Option<String> {
+    let captures = OL_REGEX.captures(input)?;
+
+    let score: u32 = captures[1].parse().ok()?;
+    if score > 10 {
+        return None;
+    }
+
+    let level: u32 = match captures.get(3) {
+        Some(digits) => digits.as_str().parse().ok()?,
+        None => 0,
+    };
+    let modifier_name = match captures.get(2).map(|m| m.as_str()) {
+        Some("a") => "adv",
+        Some("d") => "dis",
+        _ => "",
+    };
+
+    let Some((count, sides)) = open_legend_attribute_dice(score) else {
+        // No attribute dice: advantage/disadvantage applies to the d20 and
+        // cannot exceed 1 (SRD: "Advantage and Disadvantage Without Attribute Dice")
+        return Some(match level {
+            0 => "1d20 ie20".to_string(),
+            _ => format!("1d20 ie20 {modifier_name}1"),
+        });
+    };
+
+    let attribute_dice = match level {
+        0 => format!("{count}d{sides} ie{sides}"),
+        _ => format!("{count}d{sides} ie{sides} {modifier_name}{level}"),
+    };
+
+    Some(format!("1d20 ie20 + {attribute_dice}"))
 }
 
 fn expand_mothership_alias(input: &str) -> Option<String> {

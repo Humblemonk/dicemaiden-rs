@@ -1,6 +1,44 @@
 //! Static Discord-formatted help strings for the `/help` command.
 //! Kept in a separate module so the text can be shared without duplication
 //! if additional consumers are added (e.g. a web dashboard).
+//!
+//! # Adding a help topic
+//!
+//! Add the `generate_*_help` function, then add its name to [`HELP_TOPICS`] and
+//! a match arm to [`generate_topic_help`].  Both `/help <topic>` and
+//! `/roll help <topic>` dispatch through those two, and the slash-command
+//! choices are built from `HELP_TOPICS`, so a topic added there shows up on
+//! every surface at once — there is no second list to keep in sync.
+
+/// Every valid `/help` topic, in the order they are offered as slash-command
+/// choices.  Discord allows at most 25 choices per option.
+pub const HELP_TOPICS: &[&str] = &[
+    "basic",
+    "alias",
+    "system",
+    "a5e",
+    "aliens",
+    "mothership",
+    "ol",
+];
+
+/// Resolve a topic name to its help text, or `None` if the topic is unknown.
+///
+/// Callers decide what an unknown topic means: `/help` falls back to the basic
+/// page, while `/roll help <topic>` lets it fall through to dice parsing so a
+/// roll that merely starts with "help" still reaches the parser.
+pub fn generate_topic_help(topic: &str) -> Option<String> {
+    Some(match topic {
+        "basic" => generate_basic_help(),
+        "alias" => generate_alias_help(),
+        "system" => generate_system_help(),
+        "a5e" => generate_a5e_help(),
+        "aliens" => generate_aliens_help(),
+        "mothership" => generate_mothership_help(),
+        "ol" => generate_open_legend_help(),
+        _ => return None,
+    })
+}
 
 pub fn generate_basic_help() -> String {
     r#"🎲 **Dice Maiden** 🎲
@@ -18,9 +56,11 @@ pub fn generate_basic_help() -> String {
 • `e6` or `e` - Explode on 6s (or max value)
 • `ie6` - Explode indefinitely on 6s
 • `d2` - Drop lowest 2 dice
-• `k3` - Keep highest 3 dice  
+• `k3` - Keep highest 3 dice
 • `kl2` - Keep lowest 2 dice
 • `km2` - Keep middle 2 dice
+• `adv1` - Advantage 1: roll 1 extra die, drop the lowest, then explode
+• `dis1` - Disadvantage 1: roll 1 extra die, drop the highest, then explode
 • `rg3` - Reroll dice ≥ 3
 • `irg3` - Reroll ≥ 3 indefinitely
 • `r2` - Reroll dice ≤ 2 once
@@ -97,9 +137,10 @@ pub fn generate_alias_help() -> String {
 • `dd34` → 1d3*10 + 1d4 (double-digit d66 style)
 • `ed15` → Earthdawn step 15
 • `cs 3` → Cypher System 1d20 cs3 (Level 3 task, target 9+)
-• `cpr` → Cyberpunk Red 1d10 cpr (critical success on 10, critical failure on 1)
+• `cpr` → Cyberpunk Red (see `/help system`)
 • `conan3` → 3d20 conan (3d20 skill roll)
-• `sil#` → Silhouette system: roll #d6, keep highest, extra 6s add +1 (e.g., sil3, sil5)
+• `sil3` → Silhouette (see `/help system`)
+• `ol5` → Open Legend action roll (see `/help ol`)
 
 Use `/roll help system` for specific examples!"#
         .to_string()
@@ -258,6 +299,42 @@ When stress dice show **1s**, you must make a panic roll:
 • 1-3: Low stress, manageable risk
 • 4-6: Moderate stress, noticeable panic effects
 • 7-10: High stress, severe consequences likely
+
+Use `/help` for basic syntax and `/help alias` for more shortcuts!"#
+        .to_string()
+}
+
+pub fn generate_open_legend_help() -> String {
+    r#"🎲 **Open Legend RPG** 🎲
+
+**Note:**
+- Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+- If you experience a bug, please report the issue on GitHub!
+
+An action roll is 1d20 plus your attribute dice. Everything explodes on its maximum value.
+
+**Basic Rolls:**
+- `ol5` → 1d20 ie20 + 2d6 ie6 (attribute score 5)
+- `ol0` → 1d20 ie20 (attribute score 0, no attribute dice)
+- `3 ol5` → Roll 3 separate action rolls
+
+**Attribute Dice:**
+- 1 → 1d4 | 2 → 1d6 | 3 → 1d8 | 4 → 1d10 | 5 → 2d6
+- 6 → 2d8 | 7 → 2d10 | 8 → 3d8 | 9 → 3d10 | 10 → 4d8
+
+**Advantage / Disadvantage:**
+- `ol5a2` → Advantage 2 (roll 2 extra attribute dice, drop the 2 lowest)
+- `ol5d1` → Disadvantage 1 (roll 1 extra attribute die, drop the highest)
+- The drop happens **before** exploding, so exploded dice are never dropped
+- A die that survives the drop still explodes normally
+- Advantage and disadvantage cancel out: `a2` with `d1` nets to advantage 1
+- With attribute score 0 the d20 itself is rolled twice, capped at level 1
+
+**Generic Modifiers:**
+`adv#` and `dis#` work on any roll, not just Open Legend:
+- `2d6 ie6 adv1` → Roll 3d6, drop the lowest, then explode what remains
+- `4d10 ie10 dis2` → Roll 6d10, drop the 2 highest, then explode what remains
+- Contrast with `d1`/`k3`, which are applied **after** exploding
 
 Use `/help` for basic syntax and `/help alias` for more shortcuts!"#
         .to_string()
