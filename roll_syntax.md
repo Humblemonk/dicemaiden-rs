@@ -279,6 +279,38 @@ at level 1, so `ol0a3` is treated as `ol0a1` (`1d20 ie20 adv1`).
 - `3 ol5` → Roll 3 separate Open Legend action rolls
 - `ol5a1 ! Attack the ogre` → Advantage roll with a comment
 
+### Essence20 (Renegade Game Studios)
+- `ess1d8` → 1d20 + 1d8 (skill test with a d8 skill die)
+- `ess1d8s` → 1d20 + the d8/d6/d4/d2 ladder, keeping the highest (specialization)
+- `+ess1d8` → Edge: roll 2d20, keep the higher, then add the skill die
+- `-ess1d8` → Snag: roll 2d20, keep the lower, then add the skill die
+- `ess1d8 + 3` → skill test with a flat +3
+- The dice count may be omitted for single-die ranks: `essd8` is `ess1d8`
+
+**Skill Die Ladder:**
+
+| Rank | Die | Rank | Die |
+| --- | --- | --- | --- |
+| 1 | d2 | 5 | d10 |
+| 2 | d4 | 6 | d12 |
+| 3 | d6 | 7 | 2d8 |
+| 4 | d8 | 8 | 3d6 |
+
+**Specializations (`s` suffix):**
+- Roll your skill die *and every die below it on the ladder*
+- Only the highest single result is added to the d20; the rest are shown struck through
+- The 2d8 and 3d6 ranks count as one result each — their dice are summed
+
+**Critical Success:** any rank that comes up all-maximum is a critical success, even when a
+different rank was the one added — a d4 showing 4 crits while the d8 supplies the total.
+Every skill die counts, down to the d2 on a 2; 2d8 and 3d6 crit only on 16 and 18. The d20
+is not a skill die and cannot crit, so a natural 20 is reported separately.
+
+**Examples:**
+- `ess1d8s ! Swimming` → specialization roll with a comment
+- `3 ess1d10` → three separate skill tests
+- `+ess3d6s + 2` → Edge with a 3d6 specialization and a +2 modifier
+
 ### Mothership RPG
 - `ms`    → 1d100 roll-under (default target 50)
 - `ms45`  → 1d100 roll-under Strength 45

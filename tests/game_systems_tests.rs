@@ -6004,3 +6004,318 @@ fn test_open_legend_doesnt_break_existing_syntax() {
         "d1 should still drop exactly one die"
     );
 }
+
+// ============================================================================
+// ESSENCE20 (Renegade Game Studios)
+// ============================================================================
+
+/// Every die rolled for the skill portion of an Essence20 test: the rank that
+/// was kept plus, for a specialization, the lower ranks that lost.
+fn essence20_skill_dice(result: &dicemaiden_rs::dice::RollResult) -> Vec<i32> {
+    let skill_group = result
+        .dice_groups
+        .get(1)
+        .expect("Essence20 rolls add a skill dice group after the d20");
+
+    let mut dice = skill_group.rolls.clone();
+    dice.extend(skill_group.dropped_rolls.iter().copied());
+    dice
+}
+
+fn essence20_has_note(result: &dicemaiden_rs::dice::RollResult, needle: &str) -> bool {
+    result.notes.iter().any(|note| note.contains(needle))
+}
+
+#[test]
+fn test_essence20_alias_expansion() {
+    // The skill die ladder: d2 → d4 → d6 → d8 → d10 → d12 → 2d8 → 3d6.
+    // The rank number, not the dice notation, is carried into the modifier.
+    let ranks = vec![
+        ("ess1d2", "1d20 ess1"),
+        ("ess1d4", "1d20 ess2"),
+        ("ess1d6", "1d20 ess3"),
+        ("ess1d8", "1d20 ess4"),
+        ("ess1d10", "1d20 ess5"),
+        ("ess1d12", "1d20 ess6"),
+        ("ess2d8", "1d20 ess7"),
+        ("ess3d6", "1d20 ess8"),
+        // The dice count may be omitted for single-die ranks
+        ("essd8", "1d20 ess4"),
+        ("essd12", "1d20 ess6"),
+    ];
+
+    for (alias, expected) in ranks {
+        assert_eq!(
+            aliases::expand_alias(alias),
+            Some(expected.to_string()),
+            "Essence20 '{alias}' should expand to '{expected}'"
+        );
+        assert_valid(alias);
+    }
+
+    // Specializations roll the whole ladder up to the character's rank
+    let specializations = vec![
+        ("ess1d2s", "1d20 esss1"),
+        ("ess1d8s", "1d20 esss4"),
+        ("ess2d8s", "1d20 esss7"),
+        ("ess3d6s", "1d20 esss8"),
+    ];
+
+    for (alias, expected) in specializations {
+        assert_eq!(
+            aliases::expand_alias(alias),
+            Some(expected.to_string()),
+            "Essence20 '{alias}' should expand to '{expected}'"
+        );
+        assert_valid(alias);
+    }
+
+    // Edge rolls 2d20 and keeps the higher, Snag keeps the lower
+    let edge_and_snag = vec![
+        ("+ess1d8", "2d20 k1 ess4"),
+        ("-ess1d8", "2d20 kl1 ess4"),
+        ("+ess3d6s", "2d20 k1 esss8"),
+        ("-ess1d10s", "2d20 kl1 esss5"),
+    ];
+
+    for (alias, expected) in edge_and_snag {
+        assert_eq!(
+            aliases::expand_alias(alias),
+            Some(expected.to_string()),
+            "Essence20 '{alias}' should expand to '{expected}'"
+        );
+        assert_valid(alias);
+    }
+
+    // Flat modifiers ride along with the alias
+    let with_modifiers = vec![
+        ("ess1d8+3", "1d20 ess4 +3"),
+        ("ess1d8 + 3", "1d20 ess4 +3"),
+        ("ess1d8s-2", "1d20 esss4 -2"),
+        ("+ess2d8 + 1", "2d20 k1 ess7 +1"),
+    ];
+
+    for (alias, expected) in with_modifiers {
+        assert_eq!(
+            aliases::expand_alias(alias),
+            Some(expected.to_string()),
+            "Essence20 '{alias}' should expand to '{expected}'"
+        );
+        assert_valid(alias);
+    }
+
+    // Dice that are not on the skill ladder are not Essence20 aliases
+    for invalid in [
+        "ess1d20", "ess1d3", "ess2d6", "ess3d8", "ess2d10", "ess", "essd", "ess1d8x",
+    ] {
+        assert_eq!(
+            aliases::expand_alias(invalid),
+            None,
+            "'{invalid}' should not expand as an Essence20 alias"
+        );
+    }
+
+    // Rank numbers outside the ladder are rejected by the modifier parser
+    for invalid in ["1d20 ess0", "1d20 ess9", "1d20 esss0", "1d20 esss9"] {
+        assert_invalid(invalid);
+    }
+}
+
+#[test]
+fn test_essence20_skill_dice_added_to_d20() {
+    // (alias, dice rolled for the skill portion, highest possible skill result)
+    let cases = vec![
+        ("ess1d2", 1, 2),
+        ("ess1d8", 1, 8),
+        ("ess2d8", 2, 16),
+        ("ess3d6", 3, 18),
+        // A specialization rolls its own rank and every rank below it
+        ("ess1d2s", 1, 2),
+        ("ess1d4s", 2, 4),
+        ("ess1d8s", 4, 8),
+        ("ess1d12s", 6, 12),
+        ("ess2d8s", 8, 16),
+        ("ess3d6s", 11, 18),
+    ];
+
+    for (alias, expected_dice, max_skill_result) in cases {
+        for _ in 0..50 {
+            let results = parse_and_roll(alias).expect("Essence20 roll should parse");
+            let result = &results[0];
+
+            let skill_dice = essence20_skill_dice(result);
+            assert_eq!(
+                skill_dice.len(),
+                expected_dice,
+                "'{alias}' should roll {expected_dice} skill dice, got {skill_dice:?}"
+            );
+
+            // Exactly one rank counts; the rest are discarded
+            let kept: i32 = result.dice_groups[1].rolls.iter().sum();
+            let d20: i32 = result.kept_rolls.iter().sum();
+            assert_eq!(
+                result.total,
+                d20 + kept,
+                "'{alias}' total should be the d20 plus the kept skill rank"
+            );
+            assert!(
+                (1..=max_skill_result).contains(&kept),
+                "'{alias}' kept skill result {kept} out of range 1..={max_skill_result}"
+            );
+
+            // No discarded die can beat the rank that was kept
+            for discarded in &result.dice_groups[1].dropped_rolls {
+                assert!(
+                    *discarded <= kept,
+                    "'{alias}' discarded {discarded} but kept only {kept}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_essence20_critical_success_notes() {
+    // Renegade counts a maximum on *any* skill die as a critical success — the
+    // d2 included, and the multi-die ranks only when every die shows its max.
+    let single_rank_cases = vec![
+        ("ess1d2", 2),
+        ("ess1d4", 4),
+        ("ess1d8", 8),
+        ("ess2d8", 16),
+        ("ess3d6", 18),
+    ];
+
+    for (alias, rank_maximum) in single_rank_cases {
+        for _ in 0..200 {
+            let results = parse_and_roll(alias).expect("Essence20 roll should parse");
+            let result = &results[0];
+
+            let rank_total: i32 = essence20_skill_dice(result).iter().sum();
+            assert_eq!(
+                essence20_has_note(result, "CRITICAL SUCCESS"),
+                rank_total == rank_maximum,
+                "'{alias}' crits exactly when the rank totals {rank_maximum}, got {rank_total}"
+            );
+        }
+    }
+
+    // A specialization crits off any rank on the ladder, including one that
+    // lost. With `ess1d4s` (d4 + d2) a 4 can only have come from the d4, so the
+    // crit must be reported and must name that die.
+    for _ in 0..300 {
+        let results = parse_and_roll("ess1d4s").expect("ess1d4s should roll");
+        let result = &results[0];
+
+        if essence20_skill_dice(result).contains(&4) {
+            assert!(
+                essence20_has_note(result, "Maximum rolled on d4"),
+                "a d4 showing its maximum is a critical success even when discarded: {:?}",
+                result.notes
+            );
+        }
+    }
+
+    // A natural 20 on the d20 is called out separately from a skill die crit
+    for _ in 0..200 {
+        let results = parse_and_roll("ess1d8").expect("ess1d8 should roll");
+        let result = &results[0];
+        assert_eq!(
+            essence20_has_note(result, "Natural 20"),
+            result.kept_rolls.contains(&20),
+            "the natural 20 note must track the kept d20"
+        );
+    }
+}
+
+#[test]
+fn test_essence20_edge_and_snag() {
+    for _ in 0..100 {
+        let results = parse_and_roll("+ess1d8").expect("Edge should roll");
+        let result = &results[0];
+        assert_eq!(result.dropped_rolls.len(), 1, "Edge drops the lower d20");
+        assert!(
+            result.kept_rolls[0] >= result.dropped_rolls[0],
+            "Edge keeps the higher d20"
+        );
+    }
+
+    for _ in 0..100 {
+        let results = parse_and_roll("-ess1d8").expect("Snag should roll");
+        let result = &results[0];
+        assert_eq!(result.dropped_rolls.len(), 1, "Snag drops the higher d20");
+        assert!(
+            result.kept_rolls[0] <= result.dropped_rolls[0],
+            "Snag keeps the lower d20"
+        );
+    }
+}
+
+#[test]
+fn test_essence20_with_comments_sets_and_flags() {
+    // Comments
+    let results = parse_and_roll("ess1d8 ! Athletics").expect("comment should parse");
+    assert_eq!(results[0].comment, Some("Athletics".to_string()));
+
+    let results = parse_and_roll("ess1d8s ! Swimming").expect("comment should parse");
+    assert_eq!(results[0].comment, Some("Swimming".to_string()));
+
+    // Roll sets
+    let results = parse_and_roll("3 ess1d8").expect("roll set should parse");
+    assert_eq!(results.len(), 3, "3 ess1d8 should produce three rolls");
+    for result in &results {
+        assert_eq!(essence20_skill_dice(result).len(), 1);
+    }
+
+    let results = parse_and_roll("2 ess1d8s ! Stealth").expect("roll set should parse");
+    assert_eq!(results.len(), 2);
+    for result in &results {
+        assert_eq!(essence20_skill_dice(result).len(), 4);
+    }
+
+    // Flags
+    let results = parse_and_roll("p ess1d8").expect("private flag should parse");
+    assert!(results[0].private, "p flag should carry through the alias");
+
+    let results = parse_and_roll("s ess2d8s").expect("simple flag should parse");
+    assert!(results[0].simple, "s flag should carry through the alias");
+
+    // Flat modifiers reach the total
+    for _ in 0..50 {
+        let results = parse_and_roll("ess1d8 + 3").expect("modifier should parse");
+        let result = &results[0];
+        let kept: i32 = result.dice_groups[1].rolls.iter().sum();
+        let d20: i32 = result.kept_rolls.iter().sum();
+        assert_eq!(result.total, d20 + kept + 3, "+3 should be added once");
+    }
+}
+
+#[test]
+fn test_essence20_doesnt_break_existing_syntax() {
+    // `ess` sits in front of the single-character explode prefix and next to
+    // the `ex`/`ed` aliases, none of which may change behaviour
+    let cases = [
+        ("4d6 e", "explode on max unchanged"),
+        ("4d6 e6", "explode on 6 unchanged"),
+        ("4d6 ie6", "indefinite explode unchanged"),
+        ("ex5", "Exalted unchanged"),
+        ("ex5t8", "Exalted with target unchanged"),
+        ("ed15", "Earthdawn unchanged"),
+        ("ed4e20", "Earthdawn 4E unchanged"),
+        ("a5e +5 ex1", "A5E unchanged"),
+        ("2d6 e6 k1", "combined modifiers unchanged"),
+    ];
+
+    for (input, description) in cases {
+        assert!(
+            parse_and_roll(input).is_ok(),
+            "{description}: '{input}' should still parse"
+        );
+    }
+
+    // Exalted still expands to its own syntax, not an Essence20 skill die
+    assert_eq!(
+        aliases::expand_alias("ex5"),
+        Some("5d10 t7 t10".to_string())
+    );
+}

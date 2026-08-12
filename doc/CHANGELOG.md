@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.4] - 2027-8-12
+
+## Added
+
+- Added support for Essence20 System
+
 ## [1.5.3] - 2026-8-09
 
 ## Added

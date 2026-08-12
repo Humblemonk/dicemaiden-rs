@@ -27,6 +27,7 @@
 //! | `ms` / `ms2`     | Mothership RPG                       |
 //! | `ol5` / `ol5a2`  | Open Legend RPG                      |
 //! | `ola` / `old`    | Open Legend RPG                      |
+//! | `ess1d8`         | Essence20 (Renegade Game Studios)    |
 //!
 //! See `roll_syntax.md` for the full syntax reference.  All regex patterns are
 //! compiled once at startup via `once_cell::Lazy`.
@@ -241,6 +242,13 @@ static MS_REGEX: Lazy<Regex> =
 static DP_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)dp$").expect("Failed to compile DP_REGEX"));
 
+// Essence20: optional Edge/Snag sign, skill die, optional specialization `s`,
+// optional flat modifier — `ess1d8`, `essd8`, `ess2d8s`, `+ess3d6`, `-ess1d10 +2`
+static ESS_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^([+-])?ess(\d*)d(\d+)(s)?(?:\s*([+-]\s*\d+))?$")
+        .expect("Failed to compile ESS_REGEX")
+});
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -392,6 +400,12 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     // Handle Open Legend RPG aliases
     if let Some(open_legend_result) = expand_open_legend_alias(input) {
         return Some(open_legend_result);
+    }
+
+    // Handle Essence20 aliases (before `ex`/`ed`, which share no prefix but sit
+    // in the same alphabetical neighbourhood)
+    if let Some(essence20_result) = expand_essence20_alias(input) {
+        return Some(essence20_result);
     }
 
     if let Some(captures) = SR_REGEX.captures(input) {
@@ -1518,6 +1532,45 @@ fn expand_open_legend_alias(input: &str) -> Option<String> {
     };
 
     Some(format!("1d20 ie20 + {attribute_dice}"))
+}
+
+/// Essence20 (Renegade Game Studios) skill test: `1d20` plus a skill die.
+///
+/// `ess1d8` → `1d20 ess4`, `ess1d8s` (specialization) → `1d20 esss4`,
+/// `+ess1d8` (Edge) → `2d20 k1 ess4`, `-ess1d8` (Snag) → `2d20 kl1 ess4`.
+///
+/// The skill die is carried as its rank number rather than as dice notation so
+/// the modifier token stays free of the `d` that the parser uses to recognise
+/// dice expressions.  `1d2` is a legal rank, so the count may be omitted
+/// (`essd8`) but only ranks on the ladder expand.
+fn expand_essence20_alias(input: &str) -> Option<String> {
+    let captures = ESS_REGEX.captures(input)?;
+
+    let count: u32 = match captures.get(2).map(|m| m.as_str()).unwrap_or("") {
+        "" => 1,
+        digits => digits.parse().ok()?,
+    };
+    let sides: u32 = captures[3].parse().ok()?;
+    let rank = super::essence20_rank_number(count, sides)?;
+
+    let skill_die = match captures.get(4) {
+        Some(_) => format!("esss{rank}"),
+        None => format!("ess{rank}"),
+    };
+
+    // Edge rolls 2d20 and keeps the higher, Snag keeps the lower
+    let d20 = match captures.get(1).map(|m| m.as_str()) {
+        Some("+") => "2d20 k1",
+        Some("-") => "2d20 kl1",
+        _ => "1d20",
+    };
+
+    let modifier = match captures.get(5) {
+        Some(m) => format!(" {}", m.as_str().replace(' ', "")),
+        None => String::new(),
+    };
+
+    Some(format!("{d20} {skill_die}{modifier}"))
 }
 
 fn expand_mothership_alias(input: &str) -> Option<String> {

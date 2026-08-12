@@ -38,7 +38,7 @@
 //!
 //! All regex patterns are compiled once at startup via `once_cell::Lazy`.
 
-use super::{DiceRoll, HeroSystemType, LaserFeelingsType, Modifier};
+use super::{DiceRoll, ESSENCE20_RANKS, HeroSystemType, LaserFeelingsType, Modifier};
 use anyhow::{Result, anyhow};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -986,6 +986,7 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
             (r"^(r\d+)", "reroll"),              // r1
             (r"^(t\d+)", "target"),              // t4, t7
             (r"^(f\d+)", "failure"),             // f1
+            (r"^(esss?\d+)", "essence20"),       // ess4, esss4 (BEFORE explode)
             (r"^(e\d*)", "explode"),             // e, e6 (AFTER indefinite explode)
             (r"^(b\d*)", "botch"),               // b, b1
             (r"^(c)", "cancel"),                 // c
@@ -1358,23 +1359,24 @@ fn is_modifier_start(input: &str) -> bool {
 
     // Check if it starts with any known modifier pattern (not requiring it to be complete)
     let modifier_start_patterns = [
-        r"^ie\d*",  // Indefinite explode: ie, ie6
-        r"^adv\d+", // Advantage: adv1 (before explode)
-        r"^dis\d+", // Disadvantage: dis1 (before drop)
-        r"^irg\d+", // Indefinite reroll greater: irg5
-        r"^ir\d+",  // Indefinite reroll: ir1
-        r"^km\d+",  // Keep middle: km3
-        r"^kl\d+",  // Keep low: kl2
-        r"^tl\d+",  // Target lower: tl5
-        r"^rg\d+",  // Reroll greater: rg5
-        r"^k\d+",   // Keep high: k3
-        r"^d\d+",   // Drop: d1
-        r"^r\d+",   // Reroll: r1
-        r"^t\d+",   // Target: t4, t7 - CRITICAL FOR D6 LEGENDS
-        r"^f\d+",   // Failure: f1 - CRITICAL FOR D6 LEGENDS
-        r"^e\d*",   // Explode: e, e6
-        r"^b\d*",   // Botch: b, b1
-        r"^c$",     // Cancel: c (exact match)
+        r"^ie\d*",    // Indefinite explode: ie, ie6
+        r"^adv\d+",   // Advantage: adv1 (before explode)
+        r"^dis\d+",   // Disadvantage: dis1 (before drop)
+        r"^irg\d+",   // Indefinite reroll greater: irg5
+        r"^ir\d+",    // Indefinite reroll: ir1
+        r"^km\d+",    // Keep middle: km3
+        r"^kl\d+",    // Keep low: kl2
+        r"^tl\d+",    // Target lower: tl5
+        r"^rg\d+",    // Reroll greater: rg5
+        r"^k\d+",     // Keep high: k3
+        r"^d\d+",     // Drop: d1
+        r"^r\d+",     // Reroll: r1
+        r"^t\d+",     // Target: t4, t7 - CRITICAL FOR D6 LEGENDS
+        r"^f\d+",     // Failure: f1 - CRITICAL FOR D6 LEGENDS
+        r"^esss?\d+", // Essence20 skill die: ess4, esss4 (before explode)
+        r"^e\d*",     // Explode: e, e6
+        r"^b\d*",     // Botch: b, b1
+        r"^c$",       // Cancel: c (exact match)
         // System modifiers
         r"^wng",       // Wrath & Glory patterns
         r"^gb$",       // Godbound (exact)
@@ -1518,6 +1520,23 @@ fn parse_advantage_level(digits: &str, part: &str) -> Result<u32> {
     Ok(level)
 }
 
+// Essence20 skill dice are carried as a rank number into `ESSENCE20_RANKS`
+// (1 = d2 … 8 = 3d6) so the modifier token never contains a `d`.
+fn parse_essence20_rank(digits: &str, part: &str, specialization: bool) -> Result<Modifier> {
+    let rank: u32 = digits
+        .parse()
+        .map_err(|_| anyhow!("Invalid Essence20 skill rank in '{}'", part))?;
+
+    let highest_rank = ESSENCE20_RANKS.len() as u32;
+    if !(1..=highest_rank).contains(&rank) {
+        return Err(anyhow!(
+            "Essence20 skill rank must be 1-{highest_rank}, got {rank}"
+        ));
+    }
+
+    Ok(Modifier::Essence20(rank, specialization))
+}
+
 fn parse_single_modifier(part: &str) -> Result<Modifier> {
     // Reject standalone 'l' - it should only appear in d6l aliases
     if part == "l" {
@@ -1534,6 +1553,17 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::Disadvantage(parse_advantage_level(
             stripped, part,
         )?));
+    }
+
+    // Essence20 skill dice must be matched before the single-character `e`
+    // explode prefix would claim them.  `esss#` (specialization) first, since
+    // `ess#` is a prefix of it.
+    if let Some(stripped) = part.strip_prefix("esss") {
+        return parse_essence20_rank(stripped, part, true);
+    }
+
+    if let Some(stripped) = part.strip_prefix("ess") {
+        return parse_essence20_rank(stripped, part, false);
     }
 
     // Check for Alien RPG modifiers first
