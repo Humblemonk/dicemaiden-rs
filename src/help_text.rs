@@ -20,6 +20,7 @@ pub const HELP_TOPICS: &[&str] = &[
     "aliens",
     "mothership",
     "ol",
+    "ess",
 ];
 
 /// Resolve a topic name to its help text, or `None` if the topic is unknown.
@@ -36,6 +37,7 @@ pub fn generate_topic_help(topic: &str) -> Option<String> {
         "aliens" => generate_aliens_help(),
         "mothership" => generate_mothership_help(),
         "ol" => generate_open_legend_help(),
+        "ess" => generate_essence20_help(),
         _ => return None,
     })
 }
@@ -111,8 +113,7 @@ pub fn generate_alias_help() -> String {
 • `save +3` → 1d20 +3
 • `+d20` → 2d20 k1 (advantage)
 • `-d20` → 2d20 kl1 (disadvantage)
-• `+d%` → Percentile advantage (roll-under systems)
-• `-d%` → Percentile disadvantage (roll-under systems)
+• `+d%` / `-d%` → Percentile advantage / disadvantage (roll-under)
 
 **Hero System 5th Edition:**
 • `2hsn` → 2d6 hsn (normal damage)
@@ -141,6 +142,7 @@ pub fn generate_alias_help() -> String {
 • `conan3` → 3d20 conan (3d20 skill roll)
 • `sil3` → Silhouette (see `/help system`)
 • `ol5` → Open Legend action roll (see `/help ol`)
+• `ess1d8` → Essence20 skill test (see `/help ess`)
 
 Use `/roll help system` for specific examples!"#
         .to_string()
@@ -337,6 +339,44 @@ An action roll is 1d20 plus your attribute dice. Everything explodes on its maxi
 - Contrast with `d1`/`k3`, which are applied **after** exploding
 
 Use `/help` for basic syntax and `/help alias` for more shortcuts!"#
+        .to_string()
+}
+
+pub fn generate_essence20_help() -> String {
+    r#"🎲 **Essence20 (Renegade Game Studios)** 🎲
+
+**Note:**
+- Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+- If you experience a bug, please report the issue on GitHub!
+
+A skill test is 1d20 plus your skill die. Used by the Power Rangers, G.I. Joe and Transformers RPGs.
+
+**Basic Rolls:**
+- `ess1d8` → 1d20 + 1d8 (d8 skill die)
+- `essd8` → same thing, the dice count is optional
+- `ess1d8 + 3` → skill test with a flat +3
+- `3 ess1d8` → three separate skill tests
+
+**Skill Die Ladder:**
+- d2 → d4 → d6 → d8 → d10 → d12 → 2d8 → 3d6
+
+**Specializations (add `s`):**
+- `ess1d8s` → rolls d8, d6, d4 and d2, adding only the highest to the d20
+- The dice that lost are shown struck through
+- 2d8 and 3d6 count as a single result each (their dice are summed)
+
+**Edge and Snag:**
+- `+ess1d8` → Edge: roll 2d20, keep the higher
+- `-ess1d8` → Snag: roll 2d20, keep the lower
+- Both combine with specializations: `+ess1d8s`
+
+**Critical Success:**
+- Any skill die showing its maximum is a critical success, even if a bigger die
+  was the one added — a d4 showing 4 crits while the d8 supplies the total
+- Every skill die counts, down to the d2 on a 2; 2d8 and 3d6 crit on 16 and 18
+- The d20 is not a skill die, so a natural 20 is reported separately
+
+Use `/help` for basic syntax and `/help alias` for more game systems!"#
         .to_string()
 }
 

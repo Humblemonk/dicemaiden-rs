@@ -71,6 +71,31 @@ pub enum HeroSystemType {
     Hit,     // hsh - to hit roll (3d6 roll-under)
 }
 
+/// Essence20 skill-die ranks, lowest to highest, as `(count, sides)`.
+///
+/// A skill test is `1d20` plus the character's rank.  With a *specialization*
+/// the character rolls their own rank **and every rank below it**, keeping the
+/// single highest result (Renegade Game Studios, Essence20 core rules).
+pub const ESSENCE20_RANKS: [(u32, u32); 8] = [
+    (1, 2),
+    (1, 4),
+    (1, 6),
+    (1, 8),
+    (1, 10),
+    (1, 12),
+    (2, 8),
+    (3, 6),
+];
+
+/// 1-based rank number of `count`d`sides` in [`ESSENCE20_RANKS`], or `None` if
+/// it is not a legal Essence20 skill die.
+pub fn essence20_rank_number(count: u32, sides: u32) -> Option<u32> {
+    ESSENCE20_RANKS
+        .iter()
+        .position(|&rank| rank == (count, sides))
+        .map(|index| index as u32 + 1)
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum LaserFeelingsType {
     Lasers,   // Roll <= target for success
@@ -142,6 +167,7 @@ pub enum Modifier {
     Mothership(Option<u32>, bool), // Mothership RPG: (stat_target, is_advantage) - roll-under with doubles as crits
     MutantsMasterminds,            // Mutants & Masterminds degree system
     PlotDie,                       // Plotweaver system plot die
+    Essence20(u32, bool),          // ess# / esss# - (skill rank 1-8, specialization)
 }
 
 #[derive(Debug, Clone)]

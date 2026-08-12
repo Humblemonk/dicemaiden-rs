@@ -43,7 +43,9 @@
 //! seeded with OS entropy + timestamp + thread/process/ASLR entropy).
 
 use super::rng::get_dice_rng;
-use super::{DiceGroup, DiceRoll, HeroSystemType, LaserFeelingsType, Modifier, RollResult};
+use super::{
+    DiceGroup, DiceRoll, ESSENCE20_RANKS, HeroSystemType, LaserFeelingsType, Modifier, RollResult,
+};
 use anyhow::{Result, anyhow};
 use rand::{Rng, RngExt};
 
@@ -921,6 +923,9 @@ fn apply_special_system_modifiers(
             Modifier::PlotDie => {
                 apply_plot_die_conversion(result)?;
                 has_special_system = true;
+            }
+            Modifier::Essence20(rank, specialization) => {
+                apply_essence20_skill_dice(result, rng, *rank, *specialization, dice.sides)?;
             }
 
             // Skip mathematical modifiers here - they're handled by target processing or post-target processing
@@ -2247,6 +2252,122 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
     }
 
     Ok(result)
+}
+
+/// One Essence20 skill rank as rolled: the dice it is made of and their total.
+struct Essence20RankRoll {
+    count: u32,
+    sides: u32,
+    rolls: Vec<i32>,
+    total: i32,
+}
+
+impl Essence20RankRoll {
+    fn label(&self) -> String {
+        if self.count == 1 {
+            format!("d{}", self.sides)
+        } else {
+            format!("{}d{}", self.count, self.sides)
+        }
+    }
+
+    /// A rank scores a critical success when every die in it shows its maximum.
+    /// This includes the d2 — Renegade counts a maximum on *any* skill die, so
+    /// a small skill die is a boon rather than a penalty.
+    fn is_critical(&self) -> bool {
+        self.total == (self.count * self.sides) as i32
+    }
+}
+
+/// Essence20 skill dice: roll the character's skill rank and add it to the d20.
+///
+/// With a specialization the character also rolls every *lower* rank and keeps
+/// the single highest result; the ranks that lost are shown struck through.
+/// Any rank that comes up all-maximum is a critical success, so a lower rank is
+/// worth watching even when a bigger one supplies the total.  The d20 is not a
+/// skill die and so cannot crit — a natural 20 is reported on its own.
+fn apply_essence20_skill_dice(
+    result: &mut RollResult,
+    rng: &mut impl Rng,
+    rank: u32,
+    specialization: bool,
+    base_sides: u32,
+) -> Result<()> {
+    let highest_rank = rank as usize; // validated 1..=ESSENCE20_RANKS.len() by the parser
+    let lowest_rank = if specialization { 1 } else { highest_rank };
+
+    // Rolled highest rank first, so a tie on totals keeps the larger die
+    let mut rolled: Vec<Essence20RankRoll> = Vec::new();
+    for rank_number in (lowest_rank..=highest_rank).rev() {
+        let (count, sides) = ESSENCE20_RANKS[rank_number - 1];
+        let rolls: Vec<i32> = (0..count)
+            .map(|_| rng.random_range(1..=sides as i32))
+            .collect();
+        let total = rolls.iter().sum();
+        rolled.push(Essence20RankRoll {
+            count,
+            sides,
+            rolls,
+            total,
+        });
+    }
+
+    let mut kept = 0;
+    for (index, rank_roll) in rolled.iter().enumerate() {
+        if rank_roll.total > rolled[kept].total {
+            kept = index;
+        }
+    }
+
+    result.total += rolled[kept].total;
+
+    let discarded: Vec<i32> = rolled
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| *index != kept)
+        .flat_map(|(_, rank_roll)| rank_roll.rolls.iter().copied())
+        .collect();
+
+    result.dice_groups.push(DiceGroup {
+        _description: rolled[kept].label(),
+        rolls: rolled[kept].rolls.clone(),
+        dropped_rolls: discarded,
+        modifier_type: "add".to_string(),
+    });
+
+    let critical_ranks: Vec<String> = rolled
+        .iter()
+        .filter(|rank_roll| rank_roll.is_critical())
+        .map(|rank_roll| rank_roll.label())
+        .collect();
+
+    if !critical_ranks.is_empty() {
+        result.notes.push(format!(
+            "💥 **CRITICAL SUCCESS!** Maximum rolled on {}",
+            critical_ranks.join(", ")
+        ));
+    }
+
+    if base_sides == 20 && result.kept_rolls.contains(&20) {
+        result
+            .notes
+            .push("🎯 **Natural 20** on the d20".to_string());
+    }
+
+    if specialization {
+        let ladder: Vec<String> = rolled
+            .iter()
+            .map(|rank_roll| rank_roll.label())
+            .collect::<Vec<_>>();
+        result.notes.push(format!(
+            "Specialization: kept {} ({}) — highest of {}",
+            rolled[kept].label(),
+            rolled[kept].total,
+            ladder.join(", ")
+        ));
+    }
+
+    Ok(())
 }
 
 fn apply_cyberpunk_red_mechanics(result: &mut RollResult, rng: &mut impl Rng) -> Result<()> {
