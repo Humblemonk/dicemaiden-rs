@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.5] - 2027-8-16
+
+## Added
+
+- Added support for The Darkest House
+
 ## [1.5.4] - 2027-8-12
 
 ## Added

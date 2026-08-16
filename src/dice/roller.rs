@@ -927,6 +927,9 @@ fn apply_special_system_modifiers(
             Modifier::Essence20(rank, specialization) => {
                 apply_essence20_skill_dice(result, rng, *rank, *specialization, dice.sides)?;
             }
+            Modifier::DarkestHouse(called_upon) => {
+                apply_darkest_house_die(result, rng, *called_upon)?;
+            }
 
             // Skip mathematical modifiers here - they're handled by target processing or post-target processing
             Modifier::Add(_)
@@ -4017,6 +4020,54 @@ fn apply_plot_die_conversion(result: &mut RollResult) -> Result<()> {
     let original_dice_total: i32 = result.kept_rolls.iter().sum();
     let plot_adjustment = plot_total - original_dice_total;
     result.total += plot_adjustment;
+
+    Ok(())
+}
+
+/// The Darkest House (Monte Cook Games) House Die.
+///
+/// Every action roll — never a damage roll — is accompanied by an extra d6.
+/// The House Die does not affect success or failure; if it is higher than the
+/// dice used for the action, the house acts.  With a Boon or a Bane only the
+/// two dice actually used count, so the discarded die is ignored here.
+///
+/// "Calling upon the house" (`tdhc`) adds the House Die to the result instead:
+/// the house then acts automatically and the character gains a Doom.
+fn apply_darkest_house_die(
+    result: &mut RollResult,
+    rng: &mut impl Rng,
+    called_upon: bool,
+) -> Result<()> {
+    let action_dice = if result.kept_rolls.is_empty() {
+        &result.individual_rolls
+    } else {
+        &result.kept_rolls
+    };
+
+    let highest_action_die = *action_dice
+        .iter()
+        .max()
+        .ok_or_else(|| anyhow!("No dice rolled for The Darkest House"))?;
+
+    let house_die = rng.random_range(1..=6);
+
+    if called_upon {
+        result.total += house_die;
+        result.notes.push(format!(
+            "House Die: [{house_die}] added to the roll - 🏚️ The House acts, and you gain 1 Doom"
+        ));
+        return Ok(());
+    }
+
+    if house_die > highest_action_die {
+        result
+            .notes
+            .push(format!("House Die: [{house_die}] - 🏚️ The House acts"));
+    } else {
+        result
+            .notes
+            .push(format!("House Die: [{house_die}] - The House waits"));
+    }
 
     Ok(())
 }
