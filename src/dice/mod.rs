@@ -168,6 +168,7 @@ pub enum Modifier {
     MutantsMasterminds,            // Mutants & Masterminds degree system
     PlotDie,                       // Plotweaver system plot die
     Essence20(u32, bool),          // ess# / esss# - (skill rank 1-8, specialization)
+    DarkestHouse(bool),            // tdh / tdhc - House Die (true = called upon the house)
 }
 
 #[derive(Debug, Clone)]

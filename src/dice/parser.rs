@@ -977,6 +977,7 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
             (r"^(dis\d+)", "disadvantage"),      // dis1 (BEFORE drop and d6s)
             (r"^(irg\d+)", "indefinite reroll greater"), // irg5 (BEFORE rg)
             (r"^(ir\d+)", "indefinite reroll"),  // ir1 (BEFORE regular reroll)
+            (r"^(tdhc?)", "darkest house"),      // tdhc, tdh (BEFORE target and drop)
             (r"^(km\d+)", "keep middle"),        // km3 (BEFORE regular keep)
             (r"^(kl\d+)", "keep low"),           // kl2 (BEFORE regular keep)
             (r"^(tl\d+)", "target lower"),       // tl5 (BEFORE regular target)
@@ -1393,6 +1394,7 @@ fn is_modifier_start(input: &str) -> bool {
         r"^fitd$",     // Forged in the Dark (exact)
         r"^fitd0$",    // FitD zero dice (exact)
         r"^plot$",     // Plotweaver/Cosmere RPG plot die (exact)
+        r"^tdhc?$",    // The Darkest House die: tdh, tdhc (exact)
     ];
 
     // Check if the input starts with any of these patterns
@@ -1612,6 +1614,8 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         "c" => return Ok(Modifier::Cancel),
         "ww" => return Ok(Modifier::WildWorlds(None)),
         "plot" => return Ok(Modifier::PlotDie),
+        "tdh" => return Ok(Modifier::DarkestHouse(false)),
+        "tdhc" => return Ok(Modifier::DarkestHouse(true)),
         _ => {}
     }
 

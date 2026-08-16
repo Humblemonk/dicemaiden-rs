@@ -311,6 +311,34 @@ is not a skill die and cannot crit, so a natural 20 is reported separately.
 - `3 ess1d10` → three separate skill tests
 - `+ess3d6s + 2` → Edge with a 3d6 specialization and a +2 modifier
 
+### The Darkest House (Monte Cook Games)
+- `tdh4` → 2d6 + Rating 4, plus the House Die
+- `tdh4b` → Boon: roll 3d6, discard the lowest, then add the Rating
+- `tdh4n` → Bane: roll 3d6, discard the highest, then add the Rating
+- `tdh4 +1` → any flat modifier (proficiency, equipment, …) folds into the Rating
+- `tdh4c` → call upon the house (see below)
+
+**Task Resolution:** roll 2d6 and add your Rating, aiming for 7 plus the Rating of the task
+or opponent. A task rated 6 or more below you succeeds automatically; 6 or more above you
+fails automatically.
+
+**The House Die:** every action roll — never a damage roll — is accompanied by an extra d6.
+It has no effect on success or failure, but if it is **higher** than the dice used for the
+action, the house acts. A tie is not higher, so the house waits. With a Boon or a Bane only
+the two dice actually used count; the discarded die is ignored.
+
+**Calling Upon the House (`c`):** adds the House Die to your result. The house then acts
+automatically and your character gains 1 Doom. Combines with Boons and Banes: `tdh4bc`.
+
+**Damage:** `Wound Rating = 1d6 + attack Rating − defense Rating`, with no House Die. Use
+plain dice syntax — `1d6 + 4 - 2` — and `adv1` / `dis1` for a Boon or Bane on the damage die
+(`1d6 adv1 + 4 - 2`). A result of 0 or less is a scratch with no mechanical effect.
+
+**Examples:**
+- `tdh4 ! Pick the lock` → rating check with a comment
+- `3 tdh4` → three separate checks, each with its own House Die
+- `tdh4nc` → Bane, calling upon the house
+
 ### Mothership RPG
 - `ms`    → 1d100 roll-under (default target 50)
 - `ms45`  → 1d100 roll-under Strength 45

@@ -6319,3 +6319,287 @@ fn test_essence20_doesnt_break_existing_syntax() {
         Some("5d10 t7 t10".to_string())
     );
 }
+
+// ============================================================================
+// THE DARKEST HOUSE (MONTE COOK GAMES) TESTS
+// ============================================================================
+
+/// The House Die value recorded in the roll's notes.
+fn darkest_house_die(result: &dicemaiden_rs::dice::RollResult) -> i32 {
+    let note = result
+        .notes
+        .iter()
+        .find(|note| note.starts_with("House Die: ["))
+        .expect("every action roll should record a House Die");
+
+    let start = note.find('[').expect("House Die note should have a value") + 1;
+    let end = note.find(']').expect("House Die note should have a value");
+    note[start..end]
+        .parse()
+        .expect("House Die note should hold a number")
+}
+
+fn darkest_house_acts(result: &dicemaiden_rs::dice::RollResult) -> bool {
+    result
+        .notes
+        .iter()
+        .any(|note| note.contains("The House acts"))
+}
+
+#[test]
+fn test_darkest_house_alias_expansion() {
+    // A check is 2d6 + Rating; a Boon rolls a third die and discards the
+    // lowest, a Bane discards the highest, and `c` calls upon the house.
+    let cases = vec![
+        ("tdh4", "2d6 tdh + 4"),
+        ("tdh0", "2d6 tdh"),
+        ("tdh10", "2d6 tdh + 10"),
+        ("tdh4b", "2d6 adv1 tdh + 4"),
+        ("tdh4n", "2d6 dis1 tdh + 4"),
+        ("tdh4c", "2d6 tdhc + 4"),
+        ("tdh4bc", "2d6 adv1 tdhc + 4"),
+        ("tdh4nc", "2d6 dis1 tdhc + 4"),
+        // Proficiency and other flat modifiers fold into the Rating
+        ("tdh4+1", "2d6 tdh + 5"),
+        ("tdh4 +1", "2d6 tdh + 5"),
+        ("tdh4 + 1", "2d6 tdh + 5"),
+        ("tdh4b + 1", "2d6 adv1 tdh + 5"),
+        ("tdh4 -1", "2d6 tdh + 3"),
+        ("tdh3 - 5", "2d6 tdh - 2"),
+        ("tdh3 - 3", "2d6 tdh"),
+    ];
+
+    for (alias, expected) in cases {
+        assert_eq!(
+            aliases::expand_alias(alias),
+            Some(expected.to_string()),
+            "Darkest House '{alias}' should expand to '{expected}'"
+        );
+        assert_valid(alias);
+    }
+
+    // Malformed Darkest House aliases are not aliases at all
+    for invalid in [
+        "tdh", "tdhb", "tdhc", "tdh4x", "tdhc4", "tdh4cb", "tdh4bn", "tdh-4",
+    ] {
+        assert_eq!(
+            aliases::expand_alias(invalid),
+            None,
+            "'{invalid}' should not expand as a Darkest House alias"
+        );
+    }
+}
+
+#[test]
+fn test_darkest_house_die_does_not_affect_the_total() {
+    // "The House Die has no effect on success or failure" - the total is the
+    // two action dice plus the Rating, never the House Die.
+    for alias in ["tdh4", "tdh4b", "tdh4n"] {
+        for _ in 0..40 {
+            let results = parse_and_roll(alias).expect("Darkest House roll should parse");
+            let result = &results[0];
+
+            let action_total: i32 = result.kept_rolls.iter().sum();
+            assert_eq!(
+                result.total,
+                action_total + 4,
+                "'{alias}' total should be the action dice plus the Rating"
+            );
+
+            let house_die = darkest_house_die(result);
+            assert!(
+                (1..=6).contains(&house_die),
+                "House Die should be a d6, got {house_die}"
+            );
+            assert_eq!(
+                result.kept_rolls.len(),
+                2,
+                "'{alias}' should resolve on exactly two action dice"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_darkest_house_boon_and_bane() {
+    // A Boon rolls an additional d6 and discards the lowest die; a Bane
+    // discards the highest.  Never more than three action dice.
+    for _ in 0..40 {
+        let results = parse_and_roll("tdh4b").expect("Boon should parse");
+        let result = &results[0];
+
+        assert_eq!(result.dropped_rolls.len(), 1, "a Boon discards one die");
+        let lowest_kept = *result.kept_rolls.iter().min().expect("kept dice");
+        assert!(
+            result.dropped_rolls[0] <= lowest_kept,
+            "a Boon should discard the lowest die: kept {:?}, dropped {:?}",
+            result.kept_rolls,
+            result.dropped_rolls
+        );
+
+        let results = parse_and_roll("tdh4n").expect("Bane should parse");
+        let result = &results[0];
+
+        assert_eq!(result.dropped_rolls.len(), 1, "a Bane discards one die");
+        let highest_kept = *result.kept_rolls.iter().max().expect("kept dice");
+        assert!(
+            result.dropped_rolls[0] >= highest_kept,
+            "a Bane should discard the highest die: kept {:?}, dropped {:?}",
+            result.kept_rolls,
+            result.dropped_rolls
+        );
+    }
+}
+
+#[test]
+fn test_darkest_house_acts_when_house_die_is_higher() {
+    // The house acts when the House Die is higher than the dice used for the
+    // action.  A tie is not "higher", so the house waits.
+    let mut saw_acts = false;
+    let mut saw_waits = false;
+    let mut saw_tie = false;
+
+    for _ in 0..120 {
+        for alias in ["tdh4", "tdh4b", "tdh4n"] {
+            let results = parse_and_roll(alias).expect("Darkest House roll should parse");
+            let result = &results[0];
+
+            let house_die = darkest_house_die(result);
+            let highest_action_die = *result.kept_rolls.iter().max().expect("action dice");
+
+            assert_eq!(
+                darkest_house_acts(result),
+                house_die > highest_action_die,
+                "'{alias}': House Die {house_die} against action dice {:?}",
+                result.kept_rolls
+            );
+
+            // The discarded Boon/Bane die is not one of the dice used, so it
+            // never decides whether the house acts
+            if house_die > highest_action_die {
+                saw_acts = true;
+            } else {
+                saw_waits = true;
+            }
+            if house_die == highest_action_die {
+                saw_tie = true;
+            }
+        }
+    }
+
+    assert!(saw_acts, "the house should sometimes act");
+    assert!(saw_waits, "the house should sometimes wait");
+    assert!(saw_tie, "ties should occur and leave the house waiting");
+}
+
+#[test]
+fn test_darkest_house_calling_upon_the_house() {
+    // Calling upon the house adds the House Die to the result; the house then
+    // acts automatically and the character gains a Doom.
+    for _ in 0..60 {
+        let results = parse_and_roll("tdh4c").expect("call upon the house should parse");
+        let result = &results[0];
+
+        let action_total: i32 = result.kept_rolls.iter().sum();
+        let house_die = darkest_house_die(result);
+
+        assert_eq!(
+            result.total,
+            action_total + 4 + house_die,
+            "the called-upon House Die should be added to the total"
+        );
+        assert!(
+            darkest_house_acts(result),
+            "calling upon the house always makes the house act"
+        );
+        assert!(
+            result.notes.iter().any(|note| note.contains("1 Doom")),
+            "calling upon the house should record the Doom"
+        );
+    }
+}
+
+#[test]
+fn test_darkest_house_damage_rolls_have_no_house_die() {
+    // Wound Rating = 1d6 + attack Rating - defense Rating, and the House Die
+    // is never rolled for damage.  This is plain dice syntax, with `adv1` /
+    // `dis1` covering a Boon or Bane on the damage die.
+    for expression in ["1d6 + 4 - 2", "1d6 adv1 + 4 - 2", "1d6 dis1 + 4 - 2"] {
+        let results = parse_and_roll(expression).expect("damage roll should parse");
+        let result = &results[0];
+
+        assert!(
+            !result
+                .notes
+                .iter()
+                .any(|note| note.starts_with("House Die: [")),
+            "'{expression}' is a damage roll and must not roll the House Die"
+        );
+
+        let dice_total: i32 = result.kept_rolls.iter().sum();
+        assert_eq!(result.total, dice_total + 2);
+    }
+}
+
+#[test]
+fn test_darkest_house_with_comments_sets_and_flags() {
+    // Comments
+    let results = parse_and_roll("tdh4 ! Pick the lock").expect("comment should parse");
+    assert_eq!(results[0].comment, Some("Pick the lock".to_string()));
+
+    let results = parse_and_roll("tdh4bc ! Desperate").expect("comment should parse");
+    assert_eq!(results[0].comment, Some("Desperate".to_string()));
+
+    // Roll sets - each check rolls its own House Die
+    let results = parse_and_roll("3 tdh4").expect("roll set should parse");
+    assert_eq!(results.len(), 3, "3 tdh4 should produce three rolls");
+    for result in &results {
+        assert!((1..=6).contains(&darkest_house_die(result)));
+    }
+
+    let results = parse_and_roll("2 tdh4n ! Fog").expect("roll set should parse");
+    assert_eq!(results.len(), 2);
+    for result in &results {
+        assert_eq!(result.dropped_rolls.len(), 1);
+    }
+
+    // Flags
+    let results = parse_and_roll("p tdh4").expect("private flag should parse");
+    assert!(results[0].private, "p flag should carry through the alias");
+
+    let results = parse_and_roll("s tdh4b").expect("simple flag should parse");
+    assert!(results[0].simple, "s flag should carry through the alias");
+
+    // Boundary ratings
+    for alias in ["tdh0", "tdh1", "tdh10", "tdh99"] {
+        assert_valid(alias);
+    }
+}
+
+#[test]
+fn test_darkest_house_doesnt_break_existing_syntax() {
+    // `tdh` is matched ahead of the target and drop prefixes, none of which
+    // may change behaviour
+    let cases = [
+        ("4d6 t4", "target unchanged"),
+        ("4d6 tl3", "target lower unchanged"),
+        ("4d6 t7ds10", "double success unchanged"),
+        ("4d6 d1", "drop unchanged"),
+        ("dh", "Dark Heresy unchanged"),
+        ("dh 2d10", "Dark Heresy dice unchanged"),
+        ("dheart", "Daggerheart unchanged"),
+        ("4d6 t4f1", "combined modifiers unchanged"),
+        ("2d6 adv1", "advantage unchanged"),
+        ("2d6 dis1", "disadvantage unchanged"),
+    ];
+
+    for (input, description) in cases {
+        assert!(
+            parse_and_roll(input).is_ok(),
+            "{description}: '{input}' should still parse"
+        );
+    }
+
+    // Dark Heresy still expands to its own syntax, not a Darkest House check
+    assert_eq!(aliases::expand_alias("dh"), Some("1d10 dh".to_string()));
+}

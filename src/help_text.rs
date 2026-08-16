@@ -21,6 +21,7 @@ pub const HELP_TOPICS: &[&str] = &[
     "mothership",
     "ol",
     "ess",
+    "tdh",
 ];
 
 /// Resolve a topic name to its help text, or `None` if the topic is unknown.
@@ -38,6 +39,7 @@ pub fn generate_topic_help(topic: &str) -> Option<String> {
         "mothership" => generate_mothership_help(),
         "ol" => generate_open_legend_help(),
         "ess" => generate_essence20_help(),
+        "tdh" => generate_darkest_house_help(),
         _ => return None,
     })
 }
@@ -141,8 +143,9 @@ pub fn generate_alias_help() -> String {
 • `cpr` → Cyberpunk Red (see `/help system`)
 • `conan3` → 3d20 conan (3d20 skill roll)
 • `sil3` → Silhouette (see `/help system`)
-• `ol5` → Open Legend action roll (see `/help ol`)
-• `ess1d8` → Essence20 skill test (see `/help ess`)
+• `ol5` → Open Legend (`/help ol`)
+• `ess1d8` → Essence20 (`/help ess`)
+• `tdh4` → The Darkest House (`/help tdh`)
 
 Use `/roll help system` for specific examples!"#
         .to_string()
@@ -339,6 +342,46 @@ An action roll is 1d20 plus your attribute dice. Everything explodes on its maxi
 - Contrast with `d1`/`k3`, which are applied **after** exploding
 
 Use `/help` for basic syntax and `/help alias` for more shortcuts!"#
+        .to_string()
+}
+
+pub fn generate_darkest_house_help() -> String {
+    r#"🎲 **The Darkest House (Monte Cook Games)** 🎲
+
+**Note:**
+- Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+- If you experience a bug, please report the issue on GitHub!
+
+Everything is 2d6 plus your Rating, aiming for 7 plus the Rating of the task or opponent.
+
+**Basic Rolls:**
+- `tdh4` → 2d6 + Rating 4, plus the House Die
+- `tdh4 +1` → any flat modifier folds into the Rating
+- `3 tdh4` → three separate checks
+
+**Boons and Banes:**
+- `tdh4b` → Boon: roll 3d6 and discard the lowest
+- `tdh4n` → Bane: roll 3d6 and discard the highest
+- Boons and Banes cancel each other out, and never add more than one die
+
+**The House Die:**
+- Rolled with every action, but never with damage
+- It does not affect success or failure
+- If it is higher than the dice used for the action, 🏚️ the house acts
+- A tie is not higher, so the house waits
+- With a Boon or Bane the discarded die does not count
+
+**Calling Upon the House (add `c`):**
+- `tdh4c` → the House Die is added to your result
+- The house then acts automatically and you gain 1 Doom
+- Combines with Boons and Banes: `tdh4bc`
+
+**Damage (no House Die):**
+- Wound Rating = 1d6 + attack Rating - defense Rating → `1d6 + 4 - 2`
+- Boon or Bane on damage: `1d6 adv1 + 4 - 2` / `1d6 dis1 + 4 - 2`
+- A result of 0 or less is a scratch with no mechanical effect
+
+Use `/help` for basic syntax and `/help alias` for more game systems!"#
         .to_string()
 }
 

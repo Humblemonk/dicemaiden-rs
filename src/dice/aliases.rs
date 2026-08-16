@@ -28,6 +28,7 @@
 //! | `ol5` / `ol5a2`  | Open Legend RPG                      |
 //! | `ola` / `old`    | Open Legend RPG                      |
 //! | `ess1d8`         | Essence20 (Renegade Game Studios)    |
+//! | `tdh`            | The Darkest House (Monte Cook Games) |
 //!
 //! See `roll_syntax.md` for the full syntax reference.  All regex patterns are
 //! compiled once at startup via `once_cell::Lazy`.
@@ -249,6 +250,13 @@ static ESS_REGEX: Lazy<Regex> = Lazy::new(|| {
         .expect("Failed to compile ESS_REGEX")
 });
 
+// The Darkest House: rating, optional Boon (`b`) / Bane (`n`), optional
+// "call upon the house" (`c`), optional flat modifier —
+// `tdh4`, `tdh4b`, `tdh4n`, `tdh4c`, `tdh4bc`, `tdh4 +1`
+static TDH_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^tdh(\d+)([bn])?(c)?(?:\s*([+-]\s*\d+))?$").expect("Failed to compile TDH_REGEX")
+});
+
 // Use static storage for commonly used alias mappings
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
@@ -406,6 +414,11 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     // in the same alphabetical neighbourhood)
     if let Some(essence20_result) = expand_essence20_alias(input) {
         return Some(essence20_result);
+    }
+
+    // Handle The Darkest House aliases
+    if let Some(darkest_house_result) = expand_darkest_house_alias(input) {
+        return Some(darkest_house_result);
     }
 
     if let Some(captures) = SR_REGEX.captures(input) {
@@ -1571,6 +1584,43 @@ fn expand_essence20_alias(input: &str) -> Option<String> {
     };
 
     Some(format!("{d20} {skill_die}{modifier}"))
+}
+
+/// The Darkest House (Monte Cook Games) — `2d6 + Rating` plus the House Die.
+///
+/// A Boon rolls a third die and discards the lowest; a Bane discards the
+/// highest, which is exactly what `adv1` / `dis1` already do.  `c` marks
+/// "calling upon the house", where the House Die is added to the result.
+/// The rating and any flat modifier (proficiency, armour, …) are folded into a
+/// single addition.
+fn expand_darkest_house_alias(input: &str) -> Option<String> {
+    let captures = TDH_REGEX.captures(input)?;
+
+    let rating: i64 = captures[1].parse().ok()?;
+    let flat_modifier: i64 = match captures.get(4) {
+        Some(matched) => matched.as_str().replace(' ', "").parse().ok()?,
+        None => 0,
+    };
+    let total = rating + flat_modifier;
+
+    let dice = match captures.get(2).map(|m| m.as_str()) {
+        Some("b") => "2d6 adv1",
+        Some("n") => "2d6 dis1",
+        _ => "2d6",
+    };
+
+    let house_die = match captures.get(3) {
+        Some(_) => "tdhc",
+        None => "tdh",
+    };
+
+    let modifier = match total {
+        0 => String::new(),
+        positive if positive > 0 => format!(" + {positive}"),
+        negative => format!(" - {}", -negative),
+    };
+
+    Some(format!("{dice} {house_die}{modifier}"))
 }
 
 fn expand_mothership_alias(input: &str) -> Option<String> {
