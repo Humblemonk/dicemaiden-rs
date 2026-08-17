@@ -5,42 +5,9 @@
 #   kubectl exec deploy/dicemaiden-rs -- quota.sh
 set -eu
 
-# Read /app/.env without executing it. Sourcing is unsafe here: a value containing
-# spaces or shell metacharacters gets run as a command, and the bot's dotenv parser
-# accepts lines that /bin/sh does not. Variables already set in the environment win,
-# matching dotenv and Kubernetes deployments where values come from a Secret.
-load_env() {
-	[ -f "$1" ] || return 0
-	while IFS= read -r line || [ -n "$line" ]; do
-		line=${line%$CR}
-		line=${line#"${line%%[![:space:]]*}"}
-		case $line in
-		'' | '#'*) continue ;;
-		esac
-		line=${line#export }
-		case $line in
-		*=*) ;;
-		*) continue ;;
-		esac
-		key=${line%%=*}
-		value=${line#*=}
-		key=${key%"${key##*[![:space:]]}"}
-		value=${value#"${value%%[![:space:]]*}"}
-		case $key in
-		'' | *[!A-Za-z0-9_]* | [0-9]*) continue ;;
-		esac
-		case $value in
-		\"*\") value=${value#\"} value=${value%\"} ;;
-		\'*\') value=${value#\'} value=${value%\'} ;;
-		esac
-		if env | grep -q "^${key}="; then
-			continue
-		fi
-		export "${key}=${value}"
-	done <"$1"
-}
-
-CR=$(printf '\r')
+# shellcheck source=tools/dicemaiden-env.sh
+# shellcheck disable=SC1091
+. "$(dirname "$0")/dicemaiden-env.sh"
 load_env /app/.env
 
 : "${DISCORD_TOKEN:?DISCORD_TOKEN not set}"

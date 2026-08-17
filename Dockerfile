@@ -39,8 +39,8 @@ LABEL org.opencontainers.image.title="Dice Maiden" \
 # sqlx bundles libsqlite3-sys, so openssl-libs and sqlite-libs are not linked by the
 # bot; `ldd` on the built binary shows only libgcc_s, libm and libc.
 #
-# sqlite and jq exist solely for the manual spot-check scripts in /app/tools. curl is
-# already present in the base image as curl-minimal. None of these are used by the bot.
+# sqlite and jq exist solely for the manual spot-check scripts in tools/. curl is already
+# present in the base image as curl-minimal. None of these are used by the bot itself.
 # hadolint ignore=DL3041
 RUN microdnf update -y && \
     microdnf install -y --nodocs \
@@ -49,20 +49,23 @@ RUN microdnf update -y && \
         sqlite \
         jq && \
     microdnf clean all && \
-    rm -rf /var/cache/dnf
+    rm -rf /var/cache/dnf && \
+    sqlite3 --version && jq --version
 
 RUN useradd -m -u 1000 -s /bin/sh dicemaiden
 
 COPY --from=builder --chmod=755 /app/target/release/dicemaiden-rs /usr/local/bin/dicemaiden-rs
 
 # Operator spot-check scripts, run by hand against a live deployment:
-#   kubectl exec deploy/dicemaiden -- /app/tools/topgg.sh --dry-run
-#   kubectl exec deploy/dicemaiden -- /app/tools/quota.sh
-# Left root-owned and world-readable — the bot user needs to execute them, not edit them.
-COPY --chmod=755 tools/topgg.sh tools/quota.sh /app/tools/
+#   kubectl exec deploy/dicemaiden-rs -- topgg.sh --dry-run
+# These live in /usr/local/bin rather than /app because the statistics database is a
+# mounted volume in production, and the mount shadows anything placed under /app.
+COPY --chmod=755 tools/topgg.sh tools/quota.sh /usr/local/bin/
+# Sourced by both scripts via $(dirname "$0"), so it must sit alongside them. Not
+# executable: it is a library, not a command.
+COPY --chmod=644 tools/dicemaiden-env.sh /usr/local/bin/
 
 # DATABASE_URL defaults to ./main.db, so the working directory must be writable.
-# The chown is deliberately non-recursive: /app/tools stays root-owned.
 WORKDIR /app
 RUN chown dicemaiden:dicemaiden /app
 
