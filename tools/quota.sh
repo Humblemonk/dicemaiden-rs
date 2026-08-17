@@ -45,8 +45,18 @@ load_env /app/.env
 
 : "${DISCORD_TOKEN:?DISCORD_TOKEN not set}"
 
-curl -sf -H "Authorization: Bot ${DISCORD_TOKEN}" \
-	https://discord.com/api/v10/gateway/bot |
+# Captured rather than piped straight into jq: a pipeline reports the exit status of
+# its last command, so a failed curl would otherwise leave the script exiting 0 with no
+# output. --proto pins https and no -L means the Authorization header cannot follow a
+# redirect to another host.
+if ! response=$(curl -sf --proto '=https' --connect-timeout 10 --max-time 30 \
+	-H "Authorization: Bot ${DISCORD_TOKEN}" \
+	https://discord.com/api/v10/gateway/bot); then
+	echo "request to discord.com/api/v10/gateway/bot failed" >&2
+	exit 1
+fi
+
+printf '%s' "$response" |
 	jq -r '
         "recommended shards : \(.shards)",
         "sessions remaining : \(.session_start_limit.remaining)/\(.session_start_limit.total)",
