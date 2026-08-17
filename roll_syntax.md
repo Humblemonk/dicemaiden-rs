@@ -2,28 +2,27 @@
 
 ## Contents
 
-- [Basic Usage](#basic-usage)
-  - [Core Modifiers](#core-modifiers)
-  - [Special Flags](#special-flags)
-  - [Advanced Features](#advanced-features)
+- [Basic Usage](#basic-usage) — [Core Modifiers](#core-modifiers) · [Special Flags](#special-flags) · [Advanced Features](#advanced-features)
 - [Game System Aliases](#game-system-aliases)
 - [System-Specific Examples](#system-specific-examples)
 - [Help Commands](#help-commands)
 
-**Game Systems**
+### Jump to a Game System
 
 | | | |
 | --- | --- | --- |
-| [Alien RPG (Year Zero Engine)](#alien-rpg-year-zero-engine) | [Exalted (White Wolf)](#exalted-white-wolf) | [Savage Worlds](#savage-worlds) |
-| [Brave New World Pool System](#brave-new-world-pool-system) | [Forged in the Dark](#forged-in-the-dark) | [Silhouette System (Dream Pod 9)](#silhouette-system-dream-pod-9) |
-| [Conan](#conan) | [Godbound](#godbound) | [The Darkest House (Monte Cook Games)](#the-darkest-house-monte-cook-games) |
-| [Cyberpunk Red](#cyberpunk-red) | [Hero System 5th Edition](#hero-system-5th-edition) | [Vampire: The Masquerade 5th Edition](#vampire-the-masquerade-5th-edition) |
-| [Cypher System](#cypher-system) | [Lasers & Feelings](#lasers--feelings) | [Warhammer 40k Wrath & Glory](#warhammer-40k-wrath--glory) |
-| [D&D/Pathfinder](#ddpathfinder) | [Level Up Advanced 5th Edition (A5E)](#level-up-advanced-5th-edition-a5e) | [Wild Worlds](#wild-worlds) |
-| [D6 Legends (Success-based with Wild Die)](#d6-legends-success-based-with-wild-die) | [Marvel Multiverse RPG](#marvel-multiverse-rpg) | [Witcher d10 System](#witcher-d10-system) |
-| [Daggerheart](#daggerheart) | [Mothership RPG](#mothership-rpg) | [World of Darkness / Chronicles of Darkness](#world-of-darkness--chronicles-of-darkness) |
-| [Dark Heresy 2nd Edition](#dark-heresy-2nd-edition) | [Mutants and Masterminds](#mutants-and-masterminds) | [Other Popular Systems](#other-popular-systems) |
-| [Essence20 (Renegade Game Studios)](#essence20-renegade-game-studios) | [Open Legend](#open-legend) |  |
+| [Alien RPG](#alien-rpg-year-zero-engine) | [Brave New World](#brave-new-world-pool-system) | [Conan](#conan) |
+| [Cyberpunk Red](#cyberpunk-red) | [Cypher System](#cypher-system) | [D&D / Pathfinder](#ddpathfinder) |
+| [D6 Legends](#d6-legends-success-based-with-wild-die) | [Daggerheart](#daggerheart) | [The Darkest House](#the-darkest-house-monte-cook-games) |
+| [Dark Heresy 2e](#dark-heresy-2nd-edition) | [Essence20](#essence20-renegade-game-studios) | [Exalted](#exalted-white-wolf) |
+| [Forged in the Dark](#forged-in-the-dark) | [Godbound](#godbound) | [Hero System 5e](#hero-system-5th-edition) |
+| [Lasers & Feelings](#lasers--feelings) | [Level Up A5E](#level-up-advanced-5th-edition-a5e) | [Marvel Multiverse](#marvel-multiverse-rpg) |
+| [Mothership](#mothership-rpg) | [Mutants & Masterminds](#mutants-and-masterminds) | [Open Legend](#open-legend) |
+| [Savage Worlds](#savage-worlds) | [Silhouette](#silhouette-system-dream-pod-9) | [Vampire: The Masquerade 5e](#vampire-the-masquerade-5th-edition) |
+| [Warhammer 40k W&G](#warhammer-40k-wrath--glory) | [Wild Worlds](#wild-worlds) | [Witcher d10](#witcher-d10-system) |
+| [World of Darkness / CoD](#world-of-darkness--chronicles-of-darkness) |  |  |
+
+Systems without a dedicated alias are listed under [Other Popular Systems](#other-popular-systems).
 
 ## Basic Usage
 - `/roll 2d6` - Roll two six-sided dice
