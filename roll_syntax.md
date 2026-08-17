@@ -1,5 +1,30 @@
 # Dice Rolling Syntax
 
+## Contents
+
+- [Basic Usage](#basic-usage)
+  - [Core Modifiers](#core-modifiers)
+  - [Special Flags](#special-flags)
+  - [Advanced Features](#advanced-features)
+- [Game System Aliases](#game-system-aliases)
+- [System-Specific Examples](#system-specific-examples)
+- [Help Commands](#help-commands)
+
+**Game Systems**
+
+| | | |
+| --- | --- | --- |
+| [Alien RPG (Year Zero Engine)](#alien-rpg-year-zero-engine) | [Exalted (White Wolf)](#exalted-white-wolf) | [Savage Worlds](#savage-worlds) |
+| [Brave New World Pool System](#brave-new-world-pool-system) | [Forged in the Dark](#forged-in-the-dark) | [Silhouette System (Dream Pod 9)](#silhouette-system-dream-pod-9) |
+| [Conan](#conan) | [Godbound](#godbound) | [The Darkest House (Monte Cook Games)](#the-darkest-house-monte-cook-games) |
+| [Cyberpunk Red](#cyberpunk-red) | [Hero System 5th Edition](#hero-system-5th-edition) | [Vampire: The Masquerade 5th Edition](#vampire-the-masquerade-5th-edition) |
+| [Cypher System](#cypher-system) | [Lasers & Feelings](#lasers--feelings) | [Warhammer 40k Wrath & Glory](#warhammer-40k-wrath--glory) |
+| [D&D/Pathfinder](#ddpathfinder) | [Level Up Advanced 5th Edition (A5E)](#level-up-advanced-5th-edition-a5e) | [Wild Worlds](#wild-worlds) |
+| [D6 Legends (Success-based with Wild Die)](#d6-legends-success-based-with-wild-die) | [Marvel Multiverse RPG](#marvel-multiverse-rpg) | [Witcher d10 System](#witcher-d10-system) |
+| [Daggerheart](#daggerheart) | [Mothership RPG](#mothership-rpg) | [World of Darkness / Chronicles of Darkness](#world-of-darkness--chronicles-of-darkness) |
+| [Dark Heresy 2nd Edition](#dark-heresy-2nd-edition) | [Mutants and Masterminds](#mutants-and-masterminds) | [Other Popular Systems](#other-popular-systems) |
+| [Essence20 (Renegade Game Studios)](#essence20-renegade-game-studios) | [Open Legend](#open-legend) |  |
+
 ## Basic Usage
 - `/roll 2d6` - Roll two six-sided dice
 - `/roll 3d6 + 5` - Roll 3d6 and add 5
