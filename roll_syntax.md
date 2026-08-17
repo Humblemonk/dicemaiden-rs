@@ -1,5 +1,29 @@
 # Dice Rolling Syntax
 
+## Contents
+
+- [Basic Usage](#basic-usage) — [Core Modifiers](#core-modifiers) · [Special Flags](#special-flags) · [Advanced Features](#advanced-features)
+- [Game System Aliases](#game-system-aliases)
+- [System-Specific Examples](#system-specific-examples)
+- [Help Commands](#help-commands)
+
+### Jump to a Game System
+
+| | | |
+| --- | --- | --- |
+| [Alien RPG](#alien-rpg-year-zero-engine) | [Brave New World](#brave-new-world-pool-system) | [Conan](#conan) |
+| [Cyberpunk Red](#cyberpunk-red) | [Cypher System](#cypher-system) | [D&D / Pathfinder](#ddpathfinder) |
+| [D6 Legends](#d6-legends-success-based-with-wild-die) | [Daggerheart](#daggerheart) | [The Darkest House](#the-darkest-house-monte-cook-games) |
+| [Dark Heresy 2e](#dark-heresy-2nd-edition) | [Essence20](#essence20-renegade-game-studios) | [Exalted](#exalted-white-wolf) |
+| [Forged in the Dark](#forged-in-the-dark) | [Godbound](#godbound) | [Hero System 5e](#hero-system-5th-edition) |
+| [Lasers & Feelings](#lasers--feelings) | [Level Up A5E](#level-up-advanced-5th-edition-a5e) | [Marvel Multiverse](#marvel-multiverse-rpg) |
+| [Mothership](#mothership-rpg) | [Mutants & Masterminds](#mutants-and-masterminds) | [Open Legend](#open-legend) |
+| [Savage Worlds](#savage-worlds) | [Silhouette](#silhouette-system-dream-pod-9) | [Vampire: The Masquerade 5e](#vampire-the-masquerade-5th-edition) |
+| [Warhammer 40k W&G](#warhammer-40k-wrath--glory) | [Wild Worlds](#wild-worlds) | [Witcher d10](#witcher-d10-system) |
+| [World of Darkness / CoD](#world-of-darkness--chronicles-of-darkness) |  |  |
+
+Systems without a dedicated alias are listed under [Other Popular Systems](#other-popular-systems).
+
 ## Basic Usage
 - `/roll 2d6` - Roll two six-sided dice
 - `/roll 3d6 + 5` - Roll 3d6 and add 5
