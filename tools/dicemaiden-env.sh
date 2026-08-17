@@ -1,4 +1,7 @@
-# Shared .env loading for the spot-check scripts. Sourced, not executed.
+#!/bin/sh
+# Shared .env loading for the spot-check scripts. Intended to be sourced, not run;
+# the shebang and executable bit exist to satisfy super-linter's BASH_EXEC check.
+# Executing it directly defines load_env in a subshell and exits, doing nothing.
 #
 # Read a KEY=VALUE file without executing it. Sourcing an .env is unsafe: a value
 # containing spaces or shell metacharacters gets run as a command, and the bot's dotenv
