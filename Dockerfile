@@ -36,13 +36,18 @@ LABEL org.opencontainers.image.title="Dice Maiden" \
       org.opencontainers.image.source="https://github.com/Humblemonk/dicemaiden-rs"
 
 # TLS is rustls end to end (serenity rustls_backend, sqlx runtime-tokio-rustls) and
-# sqlx bundles libsqlite3-sys, so openssl-libs and sqlite-libs are not linked;
-# `ldd` on the built binary shows only libgcc_s, libm and libc.
+# sqlx bundles libsqlite3-sys, so openssl-libs and sqlite-libs are not linked by the
+# bot; `ldd` on the built binary shows only libgcc_s, libm and libc.
+#
+# sqlite and jq exist solely for the manual spot-check scripts in /app/tools. curl is
+# already present in the base image as curl-minimal. None of these are used by the bot.
 # hadolint ignore=DL3041
 RUN microdnf update -y && \
     microdnf install -y --nodocs \
         ca-certificates \
-        tzdata && \
+        tzdata \
+        sqlite \
+        jq && \
     microdnf clean all && \
     rm -rf /var/cache/dnf
 
@@ -50,7 +55,14 @@ RUN useradd -m -u 1000 -s /bin/sh dicemaiden
 
 COPY --from=builder --chmod=755 /app/target/release/dicemaiden-rs /usr/local/bin/dicemaiden-rs
 
+# Operator spot-check scripts, run by hand against a live deployment:
+#   kubectl exec deploy/dicemaiden -- /app/tools/topgg.sh --dry-run
+#   kubectl exec deploy/dicemaiden -- /app/tools/quota.sh
+# Left root-owned and world-readable — the bot user needs to execute them, not edit them.
+COPY --chmod=755 tools/topgg.sh tools/quota.sh /app/tools/
+
 # DATABASE_URL defaults to ./main.db, so the working directory must be writable.
+# The chown is deliberately non-recursive: /app/tools stays root-owned.
 WORKDIR /app
 RUN chown dicemaiden:dicemaiden /app
 
