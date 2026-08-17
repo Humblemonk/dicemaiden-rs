@@ -216,7 +216,9 @@ COPY --from=builder --chmod=755 /app/target/release/dicemaiden-rs /usr/local/bin
 #   kubectl exec deploy/dicemaiden-rs -- topgg.sh --dry-run
 # These live in /usr/local/bin rather than /app because the statistics database is a
 # mounted volume in production, and the mount shadows anything placed under /app.
-COPY --chmod=755 tools/topgg.sh tools/quota.sh /usr/local/bin/
+# dicemaiden-env.sh is sourced by both scripts via $(dirname "$0"), so it must sit
+# alongside them.
+COPY --chmod=755 tools/topgg.sh tools/quota.sh tools/dicemaiden-env.sh /usr/local/bin/
 
 # DATABASE_URL defaults to ./main.db, so the working directory must be writable.
 WORKDIR /app

@@ -5,12 +5,10 @@
 #   kubectl exec deploy/dicemaiden-rs -- topgg.sh --dry-run
 set -eu
 
-if [ -f /app/.env ]; then
-	set -a
-	# shellcheck disable=SC1091
-	. /app/.env
-	set +a
-fi
+# shellcheck source=tools/dicemaiden-env.sh
+# shellcheck disable=SC1091
+. "$(dirname "$0")/dicemaiden-env.sh"
+load_env /app/.env
 
 # Your bot's Application ID from the Discord developer portal — the same number
 # that appears in your bot's top.gg URL.
@@ -69,7 +67,9 @@ if [ -z "$token" ]; then
 	exit 1
 fi
 
+# --proto pins https; no -L, so the Authorization header cannot follow a redirect.
 response=$(curl -s -w '\n%{http_code}' -X POST \
+	--proto '=https' --connect-timeout 10 --max-time 30 \
 	-H "Authorization: ${token}" \
 	-H 'Content-Type: application/json' \
 	-d "{\"shard_count\": ${shards}, \"server_count\": ${servers}}" \
@@ -83,6 +83,8 @@ if [ "$code" = "200" ]; then
 	echo "submitted"
 else
 	echo "top.gg rejected the update: HTTP ${code}" >&2
-	[ -n "$body" ] && echo "$body" >&2
+	if [ -n "$body" ]; then
+		printf '%s\n' "$body" >&2
+	fi
 	exit 1
 fi
