@@ -87,6 +87,8 @@ https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=27487
 - `RUST_LOG` - Log level (default: info). Supports per-module filtering via `EnvFilter` syntax; recommended for production: `RUST_LOG=warn,dicemaiden_rs=info,serenity::gateway=info`
 - `SHARD_START` - Starting shard ID for the process (needed for multi-process sharding)
 - `TOTAL_SHARDS` - Total shards across all processes (needed for multi-process sharding)
+- `TOPGG_BOT_ID` - Your bot's Application ID. Only used by `tools/topgg.sh` (optional)
+- `TOPGG_TOKEN` - top.gg API token. Only used by `tools/topgg.sh`; the legacy name `API` is still accepted when this is unset (optional)
 
 You can customize the build further by modifying `Cargo.toml` dependencies.
 
@@ -148,61 +150,94 @@ tests/
 ## Deployment
 
 ### Docker
-```dockerfile
-FROM rust:1.90-slim-bookworm AS builder
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+This is the `Dockerfile` from the repository root, reproduced verbatim.
+
+```dockerfile
+# Build arguments for version pinning
+ARG RUST_VERSION=1.90.0
+ARG UBI_VERSION=latest
+
+# ---------- Build stage ----------
+FROM rust:${RUST_VERSION} AS builder
 
 WORKDIR /app
 
-# Copy manifest files first for better layer caching
+# Prime the dependency cache. Both dummy targets are required: the crate has an
+# autodiscovered src/lib.rs, so a main.rs-only stub cannot build the real target set.
+# `cargo clean -p` drops the stub's own artifacts and fingerprints while leaving every
+# dependency compiled; a plain rm of target/release/deps misses libdicemaiden_rs-*.rlib
+# and all of .fingerprint/, which silently links the stub into the real binary.
 COPY Cargo.toml Cargo.lock ./
+RUN mkdir -p src && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "" > src/lib.rs && \
+    cargo build --release --locked && \
+    cargo clean --release -p dicemaiden-rs && \
+    rm -rf src
 
-# Create dummy source to build dependencies
-RUN mkdir src \
-    && echo "fn main() {}" > src/main.rs \
-    && touch src/lib.rs
-RUN cargo build --release && rm -rf src
+# COPY preserves the build context's mtimes, which are older than the stub build above.
+# Without the touch, cargo's fingerprint check treats the real sources as fresh and
+# reuses the stub. Do not remove this.
+COPY src ./src
+RUN find src -name '*.rs' -exec touch {} + && \
+    cargo build --release --locked && \
+    ldd target/release/dicemaiden-rs
 
-# Copy actual source code
-COPY . .
-# Force rebuild of our code but reuse dependencies
-RUN touch src/main.rs src/lib.rs && cargo build --release
+# ---------- Runtime stage ----------
+FROM registry.access.redhat.com/ubi9/ubi-minimal:${UBI_VERSION}
 
-FROM debian:bookworm-slim
+LABEL org.opencontainers.image.title="Dice Maiden" \
+      org.opencontainers.image.description="Discord dice bot" \
+      org.opencontainers.image.source="https://github.com/Humblemonk/dicemaiden-rs"
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    sqlite3 \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd -m -u 1000 dicebot
+# TLS is rustls end to end (serenity rustls_backend, sqlx runtime-tokio-rustls) and
+# sqlx bundles libsqlite3-sys, so openssl-libs and sqlite-libs are not linked by the
+# bot; `ldd` on the built binary shows only libgcc_s, libm and libc.
+#
+# sqlite and jq exist solely for the manual spot-check scripts in tools/. curl is already
+# present in the base image as curl-minimal. None of these are used by the bot itself.
+# hadolint ignore=DL3041
+RUN microdnf update -y && \
+    microdnf install -y --nodocs \
+        ca-certificates \
+        tzdata \
+        sqlite \
+        jq && \
+    microdnf clean all && \
+    rm -rf /var/cache/dnf && \
+    sqlite3 --version && jq --version
 
-COPY --from=builder /app/target/release/dicemaiden-rs /usr/local/bin/
+RUN useradd -m -u 1000 -s /bin/sh dicemaiden
 
-# Create data directory for SQLite database
-RUN mkdir -p /data && chown dicebot:dicebot /data
+COPY --from=builder --chmod=755 /app/target/release/dicemaiden-rs /usr/local/bin/dicemaiden-rs
 
-USER dicebot
-WORKDIR /data
+# Operator spot-check scripts, run by hand against a live deployment:
+#   kubectl exec deploy/dicemaiden-rs -- topgg.sh --dry-run
+# These live in /usr/local/bin rather than /app because the statistics database is a
+# mounted volume in production, and the mount shadows anything placed under /app.
+COPY --chmod=755 tools/topgg.sh tools/quota.sh /usr/local/bin/
 
-CMD ["dicemaiden-rs"]
+# DATABASE_URL defaults to ./main.db, so the working directory must be writable.
+WORKDIR /app
+RUN chown dicemaiden:dicemaiden /app
+
+USER dicemaiden
+
+ENTRYPOINT ["/usr/local/bin/dicemaiden-rs"]
 ```
 
 **Build and run:**
 ```bash
 docker build -t dicemaiden-rs .
 
-# .env must contain at least DISCORD_TOKEN; the named volume persists the SQLite database
+# .env must contain at least DISCORD_TOKEN; the named volume persists the SQLite
+# database, which lives in the working directory (/app) by default
 docker run -d \
   --name dicemaiden \
   --restart unless-stopped \
   --env-file .env \
-  -v dicemaiden-data:/data \
+  -v dicemaiden-data:/app \
   dicemaiden-rs
 ```
 

@@ -2,7 +2,7 @@
 # Check the remaining Discord session start quota for today.
 #
 # Intended to be run by hand against a live deployment:
-#   kubectl exec deploy/dicemaiden -- /app/tools/quota.sh
+#   kubectl exec deploy/dicemaiden-rs -- quota.sh
 set -eu
 
 if [ -f /app/.env ]; then

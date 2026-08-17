@@ -2,7 +2,7 @@
 # Submit (or preview, with --dry-run) the current server count to top.gg.
 #
 # Intended to be run by hand against a live deployment:
-#   kubectl exec deploy/dicemaiden -- /app/tools/topgg.sh --dry-run
+#   kubectl exec deploy/dicemaiden-rs -- topgg.sh --dry-run
 set -eu
 
 if [ -f /app/.env ]; then
@@ -16,11 +16,17 @@ fi
 # that appears in your bot's top.gg URL.
 : "${TOPGG_BOT_ID:?TOPGG_BOT_ID not set}"
 
-# DATABASE_URL is a sqlx URL (sqlite:/app/main.db or sqlite:///app/main.db).
+# DATABASE_URL is a sqlx URL (sqlite:data/main.db, sqlite:/app/data/main.db,
+# sqlite:///app/data/main.db). Relative paths resolve against /app, which is both
+# the bot's WORKDIR and the volume mount point in production.
 if [ -n "${DATABASE_URL:-}" ]; then
 	db=${DATABASE_URL#sqlite:}
 	db=${db#//}
 	db=${db%%\?*}
+	case "$db" in
+	/*) ;;
+	*) db=/app/$db ;;
+	esac
 else
 	db=/app/main.db
 fi
@@ -56,7 +62,12 @@ if [ "${1:-}" = "--dry-run" ]; then
 	exit 0
 fi
 
-token=${TOPGG_TOKEN:-${API:?TOPGG_TOKEN not set}}
+# API is the legacy name for this token, kept so existing deployments keep working.
+token=${TOPGG_TOKEN:-${API:-}}
+if [ -z "$token" ]; then
+	echo "neither TOPGG_TOKEN nor API is set" >&2
+	exit 1
+fi
 
 response=$(curl -s -w '\n%{http_code}' -X POST \
 	-H "Authorization: ${token}" \
