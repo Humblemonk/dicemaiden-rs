@@ -119,6 +119,7 @@ pub enum Modifier {
     Divide(i32),
     Explode(Option<u32>),                   // e or e#
     ExplodeIndefinite(Option<u32>),         // ie or ie#
+    Implode(Option<u32>),                   // i or i#
     Drop(u32),                              // d#
     Advantage(u32),                         // adv# - drop # lowest before exploding
     Disadvantage(u32),                      // dis# - drop # highest before exploding
@@ -211,6 +212,10 @@ pub struct RollResult {
     pub fitd_result: Option<String>,  // Description of what the outcome means
     pub fitd_highest_die: Option<i32>, // The key die used for the result
     pub plot_symbols: Option<Vec<String>>, // Store Plot dice symbols
+    // Imploded dice (`i` / `i#`): rolled extras stored as positive values and
+    // subtracted from the total. Kept out of `kept_rolls` so they are never
+    // dropped, kept, or counted as successes.
+    pub implosion_rolls: Vec<i32>,
 }
 
 impl RollResult {
