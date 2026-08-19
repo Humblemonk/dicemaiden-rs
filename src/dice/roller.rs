@@ -10,7 +10,7 @@
 //! ```text
 //! 1. Roll N (+ advantage/disadvantage extras) dice (sides S)
 //! 2. drop the advantage/disadvantage surplus  — adv#, dis#
-//! 3. apply_dice_modifying_modifiers   — explode, reroll
+//! 3. apply_dice_modifying_modifiers   — explode, implode, reroll
 //! 4. apply_keep_drop_modifiers        — keep high/low/middle, drop lowest
 //! 5. sum kept dice → result.total
 //! 6. apply_mathematical_modifiers     — +N, -N, *N, /N, +Nd6, …
@@ -24,6 +24,10 @@
 //! Step 2 and step 4 are deliberately distinct.  `d#`/`k#` (step 4) run after
 //! explosions and can therefore drop exploded dice; `adv#`/`dis#` (step 2) run
 //! against the initial pool only, which is what Open Legend requires.
+//!
+//! Imploded dice (`i#`) never enter the pool at all: they are held in
+//! `implosion_rolls` and subtracted at step 5, so no keep/drop or success
+//! count can ever see them.
 //!
 //! # Specialised handlers
 //! | Handler function                  | System                        |

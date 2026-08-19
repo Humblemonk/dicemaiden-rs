@@ -2,7 +2,7 @@
 
 ## Contents
 
-- [Basic Usage](#basic-usage) — [Core Modifiers](#core-modifiers) · [Imploding Dice](#imploding-dice) · [Special Flags](#special-flags) · [Advanced Features](#advanced-features)
+- [Basic Usage](#basic-usage) — [Core Modifiers](#core-modifiers) · [How Modifiers Combine](#how-modifiers-combine) · [Special Flags](#special-flags) · [Advanced Features](#advanced-features)
 - [Game System Aliases](#game-system-aliases)
 - [System-Specific Examples](#system-specific-examples)
 - [Help Commands](#help-commands)
@@ -32,7 +32,7 @@ Systems without a dedicated alias are listed under [Other Popular Systems](#othe
 
 ### Core Modifiers
 - **Exploding**: `e6` (explode on 6), `e` (explode on max), `ie6` (explode indefinitely)
-- **Imploding**: `i1` (implode on 1 or lower), `i` (implode on 1) — see [Imploding Dice](#imploding-dice)
+- **Imploding**: `i` (implode on 1), `i3` (implode on 3 or lower) — subtracts an extra die instead of adding one
 - **Keep/Drop**: `k3` (keep 3 highest), `kl2` (keep 2 lowest), `km2` (keep 2 middle), `d1` (drop 1 lowest)
 - **Advantage/Disadvantage**: `adv1` (roll 1 extra die, drop 1 lowest, *then* explode), `dis1` (roll 1 extra die, drop 1 highest, *then* explode)
 - **Rerolls**: `r2` (reroll ≤2 once), `ir2` (reroll ≤2 indefinitely), `rg2` (reroll ≥ 2 once), `irg2` (reroll ≥ 2 indefinitely)
@@ -42,27 +42,21 @@ Systems without a dedicated alias are listed under [Other Popular Systems](#othe
 - **Math Operations**: `+5`, `-3`, `*2`, `/2`
 - **Additional Dice**: `+2d6`, `-1d4` (add/subtract dice rolls)
 
-### Imploding Dice
-The mirror image of exploding dice: where `e#` rolls an extra die and **adds** it,
-`i#` rolls an extra die and **subtracts** it.
+### How Modifiers Combine
+Modifiers apply in stages, not in the order you type them:
 
-- `i` → implode on 1 (the minimum face), just as `e` explodes on the maximum
-- `i#` → implode on **# or lower**, just as `e#` explodes on # or higher
-- Each qualifying die implodes **once** — imploded dice never implode or explode again
-- Only the dice named in the expression can implode, so `1d10 e10 i1` and `1d10 i1 e10`
-  behave identically: the die gained from an explosion is never eligible to implode
-- The subtraction is part of the dice total, so it happens *before* `+5`, `*2` and friends
-- Imploded dice are not part of the pool: `k3`, `d1` and the like can never discard the
-  penalty, and success counting (`t7`) never counts them
+1. `adv#` / `dis#` roll extra dice and discard, **before** anything explodes
+2. Exploding, imploding and rerolls, applied in the order written
+3. `k#` / `d#` / `kl#` / `km#` keep or drop from what remains
+4. The dice are totalled, minus any imploded dice
+5. Math (`+5`, `*2`, `+2d6`) applies to that total
+6. Success counting (`t#`, `f#`, `b#`) counts the dice that survived stage 3
 
-**Examples:**
-- `4d6 i1` → Roll 4d6; every 1 subtracts a fresh d6 from the total
-- `6d10 i3` → Roll 6d10; every die showing 3 or less subtracts a fresh d10
-- `1d10 i1 e10` → A d10 that implodes on a 1 and explodes on a 10 (see also `cpr`)
-
-**Success-counting pools:** `i#` adjusts totals, so it has no effect on a roll that
-reports successes (`t7`, `tl6`, …). To make low dice cost you successes, use `f#`,
-which counts failures and subtracts them: `6d10 t7 f1`.
+- `k3` and `d1` run after exploding, so they can keep or drop an exploded die;
+  `adv#` / `dis#` discard beforehand, so they never can
+- Imploded dice never join the pool — they can't be kept, dropped, or counted
+- `i#` therefore does nothing on a success-counting roll; use `f#` to make low
+  dice cost successes
 
 ### Special Flags
 - **`p`** - Private roll (only you see results)
@@ -194,7 +188,7 @@ which counts failures and subtracts them: `6d10 t7 f1`.
 - Critical Success (10): Roll another d10 and add to total
 - Critical Failure (1): Roll another d10 and subtract from total
 - Each explosion happens only once per roll
-- The same die built by hand is `1d10 i1 e10` — see [Imploding Dice](#imploding-dice)
+- The same die built by hand is `1d10 i1 e10` (implode on 1, explode on 10)
 
 ### Cypher System
 - `cs 1` - Level 1 task (target 3+, routine)
