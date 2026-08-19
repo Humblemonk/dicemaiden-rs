@@ -4,7 +4,7 @@
 
 ## Added
 
--  Added imploding dice (`i` / `i#`): the mirror of exploding dice, subtracting an extra die from the total (#145)
+- Added imploding dice (`i` / `i#`): the mirror of exploding dice, subtracting an extra die from the total (#145)
 
 - Fixed Cyberpunk Red and Witcher critical failures displaying the subtracted die as a negative (e.g. `[1] - [-5]`), or as the Marvel logo when a 1 was subtracted
 
