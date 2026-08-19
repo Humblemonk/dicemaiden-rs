@@ -977,6 +977,7 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
             (r"^(dis\d+)", "disadvantage"),      // dis1 (BEFORE drop and d6s)
             (r"^(irg\d+)", "indefinite reroll greater"), // irg5 (BEFORE rg)
             (r"^(ir\d+)", "indefinite reroll"),  // ir1 (BEFORE regular reroll)
+            (r"^(i\d*)", "implode"),             // i, i2 (AFTER ie/irg/ir)
             (r"^(tdhc?)", "darkest house"),      // tdhc, tdh (BEFORE target and drop)
             (r"^(km\d+)", "keep middle"),        // km3 (BEFORE regular keep)
             (r"^(kl\d+)", "keep low"),           // kl2 (BEFORE regular keep)
@@ -1306,6 +1307,7 @@ fn is_combined_modifiers_token(input: &str) -> bool {
         r"^(dis\d+)", // Disadvantage (before drop)
         r"^(irg\d+)", // Indefinite reroll greater
         r"^(ir\d+)",  // Indefinite reroll
+        r"^(i\d*)",   // Implode (AFTER ie/irg/ir)
         r"^(km\d+)",  // Keep middle
         r"^(kl\d+)",  // Keep low
         r"^(tl\d+)",  // Target lower (must come before regular target)
@@ -1355,7 +1357,8 @@ fn is_modifier_start(input: &str) -> bool {
 
     // Special case: Don't treat single letters as modifiers if they could be part of game system aliases
     if input.len() == 1 {
-        return matches!(input, "c"); // Cancel is the only single-letter modifier
+        // Cancel and implode are the only single-letter modifiers
+        return matches!(input, "c" | "i");
     }
 
     // Check if it starts with any known modifier pattern (not requiring it to be complete)
@@ -1365,6 +1368,7 @@ fn is_modifier_start(input: &str) -> bool {
         r"^dis\d+",   // Disadvantage: dis1 (before drop)
         r"^irg\d+",   // Indefinite reroll greater: irg5
         r"^ir\d+",    // Indefinite reroll: ir1
+        r"^i\d*",     // Implode: i, i2 (AFTER ie/irg/ir)
         r"^km\d+",    // Keep middle: km3
         r"^kl\d+",    // Keep low: kl2
         r"^tl\d+",    // Target lower: tl5
@@ -1802,6 +1806,26 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             return Err(anyhow!("Cannot reroll on 0 - invalid threshold"));
         }
         return Ok(Modifier::Reroll(num));
+    }
+
+    // Imploding dice - MUST stay after `ie`, `irg` and `ir`, which all start
+    // with the same 'i' prefix and would otherwise be claimed here.
+    if let Some(stripped) = part.strip_prefix('i') {
+        let num = if stripped.is_empty() {
+            None
+        } else {
+            Some(
+                stripped
+                    .parse()
+                    .map_err(|_| anyhow!("Invalid implode value in '{}'", part))?,
+            )
+        };
+        if let Some(val) = num
+            && val == 0
+        {
+            return Err(anyhow!("Cannot implode on 0"));
+        }
+        return Ok(Modifier::Implode(num));
     }
 
     if let Some(stripped) = part.strip_prefix("km") {

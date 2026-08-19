@@ -439,6 +439,49 @@ fn test_witcher_mechanics() {
 }
 
 #[test]
+fn test_critical_failure_subtraction_display() {
+    // A critical failure subtracts its die via a "subtract" dice group, which
+    // already renders the minus sign. The subtracted die must therefore be
+    // stored positive: a negative printed "- [-3]", and a subtracted 1 hit the
+    // `-1` Marvel-logo sentinel in format_dice_groups and printed "**M**".
+    for expression in ["cpr", "wit"] {
+        let mut saw_critical_failure = false;
+
+        for _ in 0..500 {
+            let result = parse_and_roll(expression).unwrap();
+            let roll = &result[0];
+            let output = roll.to_string();
+
+            assert!(
+                !output.contains("**M**"),
+                "'{expression}' printed the Marvel logo: {output}"
+            );
+            assert!(
+                !output.contains("`[-"),
+                "'{expression}' printed a negative die: {output}"
+            );
+
+            if roll.notes.iter().any(|n| n.contains("CRITICAL FAILURE")) {
+                saw_critical_failure = true;
+                assert!(
+                    output.contains(" - `["),
+                    "'{expression}' critical failure should subtract a group: {output}"
+                );
+                assert!(
+                    roll.individual_rolls.iter().all(|&d| (1..=10).contains(&d)),
+                    "'{expression}' individual rolls should be d10 faces: {roll:?}"
+                );
+            }
+        }
+
+        assert!(
+            saw_critical_failure,
+            "'{expression}' never rolled a critical failure in 500 attempts"
+        );
+    }
+}
+
+#[test]
 fn test_wrath_glory_mechanics() {
     // Test W&G success counting and wrath dice
     let result = parse_and_roll("wng 4d6").unwrap();

@@ -453,6 +453,258 @@ fn test_exploding_dice() {
 }
 
 #[test]
+fn test_imploding_dice_parsing() {
+    // (input, expected modifier on the parsed roll)
+    let parse_cases = vec![
+        ("4d6 i", Modifier::Implode(None)),
+        ("4d6i", Modifier::Implode(None)),
+        ("4d6 i1", Modifier::Implode(Some(1))),
+        ("4d6i2", Modifier::Implode(Some(2))),
+        ("1d10 i10", Modifier::Implode(Some(10))),
+    ];
+
+    for (input, expected) in parse_cases {
+        let result = parser::parse_dice_string(input).unwrap();
+        let modifier = result[0]
+            .modifiers
+            .iter()
+            .find(|m| matches!(m, Modifier::Implode(_)))
+            .unwrap_or_else(|| panic!("No Implode modifier parsed from '{}'", input));
+
+        match (modifier, &expected) {
+            (Modifier::Implode(actual), Modifier::Implode(want)) => assert_eq!(
+                actual, want,
+                "Wrong implode threshold for '{}': {:?}",
+                input, actual
+            ),
+            _ => unreachable!(),
+        }
+    }
+
+    // Valid combinations
+    let valid = vec![
+        "4d6 i1 e6",
+        "4d6i1e6",
+        "1d10 i1 e10", // The Cyberpunk-style die from issue #145
+        "1d10 e10 i1",
+        "4d6 i1 k3",
+        "4d6i1k3",
+        "4d6 i1 d1",
+        "6d10 i1 t7",
+        "4d6 i1 + 5",
+        "4d6 i1 - 2",
+        "4d6 i1 * 2",
+        "4d6 i1 + 2d8",
+        "3 4d6 i1",
+        "4d6 i1 ! imploding test",
+        "(Damage) 4d6 i1",
+        "500d1000 i500",
+    ];
+    for input in valid {
+        assert_valid(input);
+    }
+
+    // i0 is rejected, exactly like e0
+    assert_invalid("4d6 i0");
+    assert_invalid("4d6i0");
+}
+
+#[test]
+fn test_imploding_dice_mechanics() {
+    // `i` implodes on the minimum face only; every imploded die subtracts a
+    // fresh die from the total, so the result can drop below the dice sum.
+    for _ in 0..200 {
+        let result = parse_and_roll("4d6 i1").unwrap();
+        let roll = &result[0];
+
+        let kept_sum: i32 = roll.kept_rolls.iter().sum();
+        let implosion_sum: i32 = roll.implosion_rolls.iter().sum();
+
+        // One implosion per die showing a 1, and no more
+        let ones = roll.kept_rolls.iter().filter(|&&d| d == 1).count();
+        assert_eq!(
+            roll.implosion_rolls.len(),
+            ones,
+            "Expected one imploded die per 1 rolled: {:?}",
+            roll
+        );
+
+        // Imploded dice are subtracted, and are valid faces of the die
+        assert_eq!(roll.total, kept_sum - implosion_sum);
+        assert!(roll.implosion_rolls.iter().all(|&d| (1..=6).contains(&d)));
+
+        // Imploded dice never join the dice pool
+        assert_eq!(roll.individual_rolls.len(), 4);
+    }
+
+    // `i#` implodes on anything at or below the threshold
+    for _ in 0..200 {
+        let result = parse_and_roll("6d10 i3").unwrap();
+        let roll = &result[0];
+        let low_dice = roll.kept_rolls.iter().filter(|&&d| d <= 3).count();
+        assert_eq!(roll.implosion_rolls.len(), low_dice);
+    }
+
+    // i10 on a d10 implodes every die, exactly once each (no chaining)
+    for _ in 0..50 {
+        let result = parse_and_roll("5d10 i10").unwrap();
+        assert_eq!(result[0].implosion_rolls.len(), 5);
+    }
+
+    // Dice that never meet the threshold never implode
+    for _ in 0..50 {
+        let result = parse_and_roll("5d10 i1").unwrap();
+        let roll = &result[0];
+        if !roll.kept_rolls.contains(&1) {
+            assert!(roll.implosion_rolls.is_empty());
+            assert_eq!(roll.total, roll.kept_rolls.iter().sum::<i32>());
+        }
+    }
+}
+
+#[test]
+fn test_imploding_dice_combinations() {
+    // Implosion is applied to the dice total before mathematical modifiers
+    for _ in 0..100 {
+        let result = parse_and_roll("4d6 i1 + 5").unwrap();
+        let roll = &result[0];
+        let implosion_sum: i32 = roll.implosion_rolls.iter().sum();
+        assert_eq!(
+            roll.total,
+            roll.kept_rolls.iter().sum::<i32>() - implosion_sum + 5
+        );
+    }
+
+    // Imploded dice are not droppable or keepable - the penalty survives k/d
+    for _ in 0..200 {
+        let result = parse_and_roll("4d6 i1 k2").unwrap();
+        let roll = &result[0];
+        assert_eq!(roll.kept_rolls.len(), 2);
+        assert_eq!(
+            roll.total,
+            roll.kept_rolls.iter().sum::<i32>() - roll.implosion_rolls.iter().sum::<i32>()
+        );
+    }
+
+    // Only dice rolled from the expression implode - dice gained from an
+    // explosion never do, whichever order the two modifiers are written in
+    for expression in ["1d10 i1 e10", "1d10 e10 i1"] {
+        for _ in 0..300 {
+            let result = parse_and_roll(expression).unwrap();
+            let roll = &result[0];
+            assert!(
+                roll.implosion_rolls.len() <= 1,
+                "'{}' imploded an exploded die: {:?}",
+                expression,
+                roll
+            );
+        }
+    }
+
+    // With target counting the roll reports successes; imploded dice are not
+    // dice in the pool, so they neither add nor remove successes
+    for _ in 0..200 {
+        let result = parse_and_roll("6d10 i1 t7").unwrap();
+        let roll = &result[0];
+        let hits = roll.kept_rolls.iter().filter(|&&d| d >= 7).count() as i32;
+        assert_eq!(roll.successes, Some(hits));
+    }
+
+    // Roll sets and comments carry implosion through untouched
+    let result = parse_and_roll("3 4d6 i1 ! imploding").unwrap();
+    assert_eq!(result.len(), 3);
+    for roll in &result {
+        assert_eq!(
+            roll.total,
+            roll.kept_rolls.iter().sum::<i32>() - roll.implosion_rolls.iter().sum::<i32>()
+        );
+    }
+}
+
+#[test]
+fn test_imploding_dice_display() {
+    // Imploded dice render as a subtracted group, never as a negative value
+    for _ in 0..300 {
+        let result = parse_and_roll("6d6 i2").unwrap();
+        let roll = &result[0];
+        let output = roll.to_string();
+
+        if roll.implosion_rolls.is_empty() {
+            assert!(
+                !output.contains(" - `["),
+                "Unexpected subtraction: {output}"
+            );
+        } else {
+            assert!(
+                output.contains(" - `["),
+                "Imploded dice should display as a subtracted group: {output}"
+            );
+            assert!(
+                !output.contains("`[-"),
+                "Imploded dice must not display as negatives: {output}"
+            );
+            assert!(
+                !output.contains("**M**"),
+                "Imploded 1 collided with the Marvel logo sentinel: {output}"
+            );
+
+            let note = if roll.implosion_rolls.len() == 1 {
+                "1 die imploded".to_string()
+            } else {
+                format!("{} dice imploded", roll.implosion_rolls.len())
+            };
+            assert!(
+                roll.notes.contains(&note),
+                "Missing note '{note}': {output}"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_implode_does_not_break_other_i_modifiers() {
+    // `i` is a prefix of ie/ir/irg - these must keep their existing meaning
+    let prefix_cases = vec![
+        ("4d6 ie", Modifier::ExplodeIndefinite(None)),
+        ("4d6 ie6", Modifier::ExplodeIndefinite(Some(6))),
+        ("4d6 ir1", Modifier::RerollIndefinite(1)),
+        ("4d6 irg5", Modifier::RerollGreaterIndefinite(5)),
+        ("4d6ie6", Modifier::ExplodeIndefinite(Some(6))),
+        ("4d6ir1", Modifier::RerollIndefinite(1)),
+        ("4d6irg5", Modifier::RerollGreaterIndefinite(5)),
+    ];
+
+    for (input, expected) in prefix_cases {
+        let result = parser::parse_dice_string(input).unwrap();
+        let matched = result[0].modifiers.iter().any(|m| match (m, &expected) {
+            (Modifier::ExplodeIndefinite(a), Modifier::ExplodeIndefinite(b)) => a == b,
+            (Modifier::RerollIndefinite(a), Modifier::RerollIndefinite(b)) => a == b,
+            (Modifier::RerollGreaterIndefinite(a), Modifier::RerollGreaterIndefinite(b)) => a == b,
+            _ => false,
+        });
+        assert!(
+            matched,
+            "'{}' should parse as {:?}, got {:?}",
+            input, expected, result[0].modifiers
+        );
+        assert!(
+            !result[0]
+                .modifiers
+                .iter()
+                .any(|m| matches!(m, Modifier::Implode(_))),
+            "'{}' must not parse as an implode modifier: {:?}",
+            input,
+            result[0].modifiers
+        );
+    }
+
+    // Combined tokens mixing implode with its longer-prefixed neighbours
+    for input in ["4d6i1ie6", "4d6ir1i1", "4d6i1k2", "4d6e6i1"] {
+        assert_valid(input);
+    }
+}
+
+#[test]
 fn test_keep_drop_modifiers() {
     let keep_drop_patterns = vec![
         "4d6k3", "4d6d1", "4d6kl2", "4d6km2", "4d20k2d1", "8d6km3d2", // Complex combinations

@@ -2,7 +2,7 @@
 
 ## Contents
 
-- [Basic Usage](#basic-usage) — [Core Modifiers](#core-modifiers) · [Special Flags](#special-flags) · [Advanced Features](#advanced-features)
+- [Basic Usage](#basic-usage) — [Core Modifiers](#core-modifiers) · [Imploding Dice](#imploding-dice) · [Special Flags](#special-flags) · [Advanced Features](#advanced-features)
 - [Game System Aliases](#game-system-aliases)
 - [System-Specific Examples](#system-specific-examples)
 - [Help Commands](#help-commands)
@@ -32,6 +32,7 @@ Systems without a dedicated alias are listed under [Other Popular Systems](#othe
 
 ### Core Modifiers
 - **Exploding**: `e6` (explode on 6), `e` (explode on max), `ie6` (explode indefinitely)
+- **Imploding**: `i1` (implode on 1 or lower), `i` (implode on 1) — see [Imploding Dice](#imploding-dice)
 - **Keep/Drop**: `k3` (keep 3 highest), `kl2` (keep 2 lowest), `km2` (keep 2 middle), `d1` (drop 1 lowest)
 - **Advantage/Disadvantage**: `adv1` (roll 1 extra die, drop 1 lowest, *then* explode), `dis1` (roll 1 extra die, drop 1 highest, *then* explode)
 - **Rerolls**: `r2` (reroll ≤2 once), `ir2` (reroll ≤2 indefinitely), `rg2` (reroll ≥ 2 once), `irg2` (reroll ≥ 2 indefinitely)
@@ -40,6 +41,28 @@ Systems without a dedicated alias are listed under [Other Popular Systems](#othe
 - **Botch Counting**: `b1` (count botches ≤1), `b` (count botches ≤1)
 - **Math Operations**: `+5`, `-3`, `*2`, `/2`
 - **Additional Dice**: `+2d6`, `-1d4` (add/subtract dice rolls)
+
+### Imploding Dice
+The mirror image of exploding dice: where `e#` rolls an extra die and **adds** it,
+`i#` rolls an extra die and **subtracts** it.
+
+- `i` → implode on 1 (the minimum face), just as `e` explodes on the maximum
+- `i#` → implode on **# or lower**, just as `e#` explodes on # or higher
+- Each qualifying die implodes **once** — imploded dice never implode or explode again
+- Only the dice named in the expression can implode, so `1d10 e10 i1` and `1d10 i1 e10`
+  behave identically: the die gained from an explosion is never eligible to implode
+- The subtraction is part of the dice total, so it happens *before* `+5`, `*2` and friends
+- Imploded dice are not part of the pool: `k3`, `d1` and the like can never discard the
+  penalty, and success counting (`t7`) never counts them
+
+**Examples:**
+- `4d6 i1` → Roll 4d6; every 1 subtracts a fresh d6 from the total
+- `6d10 i3` → Roll 6d10; every die showing 3 or less subtracts a fresh d10
+- `1d10 i1 e10` → A d10 that implodes on a 1 and explodes on a 10 (see also `cpr`)
+
+**Success-counting pools:** `i#` adjusts totals, so it has no effect on a roll that
+reports successes (`t7`, `tl6`, …). To make low dice cost you successes, use `f#`,
+which counts failures and subtracts them: `6d10 t7 f1`.
 
 ### Special Flags
 - **`p`** - Private roll (only you see results)
@@ -171,6 +194,7 @@ Systems without a dedicated alias are listed under [Other Popular Systems](#othe
 - Critical Success (10): Roll another d10 and add to total
 - Critical Failure (1): Roll another d10 and subtract from total
 - Each explosion happens only once per roll
+- The same die built by hand is `1d10 i1 e10` — see [Imploding Dice](#imploding-dice)
 
 ### Cypher System
 - `cs 1` - Level 1 task (target 3+, routine)
@@ -466,6 +490,7 @@ plain dice syntax — `1d6 + 4 - 2` — and `adv1` / `dis1` for a Boon or Bane o
 /roll 6 4d6                                        # 6 sets of 4d6
 /roll 4d100 ; 10d6 e6 k8 +4; 3d10 k2; ul 3d100     # Four separate rolls
 /roll 4d10 t8 ie10 f1                              # Chronicles of Darkness with botches
+/roll 4d6 i1 e6 + 2                                # 4d6, 1s subtract a die, 6s add one, +2
 ```
 
 ## Help Commands

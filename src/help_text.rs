@@ -59,6 +59,7 @@ pub fn generate_basic_help() -> String {
 **Modifiers:**
 • `e6` or `e` - Explode on 6s (or max value)
 • `ie6` - Explode indefinitely on 6s
+• `i1` or `i` - Implode on 1s (or lower): subtract an extra die from the total
 • `d2` - Drop lowest 2 dice
 • `k3` - Keep highest 3 dice
 • `kl2` - Keep lowest 2 dice

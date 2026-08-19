@@ -195,6 +195,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         fitd_result: None,
         fitd_highest_die: None,
         plot_symbols: None,
+        implosion_rolls: Vec::new(),
     };
 
     // Advantage/disadvantage rolls extra dice into the initial pool; the surplus
@@ -250,6 +251,9 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     }
     result.total = result.kept_rolls.iter().sum();
 
+    // 3b. Subtract imploded dice from the dice total, before any math modifiers
+    result.total -= result.implosion_rolls.iter().sum::<i32>();
+
     // 4. Apply mathematical modifiers (add, subtract, multiply, divide)
     apply_mathematical_modifiers(&mut result, &dice, &mut rng)?;
 
@@ -270,6 +274,11 @@ fn apply_dice_modifying_modifiers(
     rng: &mut impl Rng,
     dice: &DiceRoll,
 ) -> Result<()> {
+    // Dice present before any modifier ran. Explosions append to
+    // `individual_rolls`; implode must only ever consider the dice that were
+    // actually rolled from the expression, so that `e10 i1` and `i1 e10` agree.
+    let original_dice_count = result.individual_rolls.len();
+
     for modifier in &dice.modifiers {
         match modifier {
             Modifier::Explode(threshold) => {
@@ -279,6 +288,9 @@ fn apply_dice_modifying_modifiers(
             Modifier::ExplodeIndefinite(threshold) => {
                 explode_dice(result, rng, *threshold, dice.sides, true, dice)?;
                 update_base_group(result);
+            }
+            Modifier::Implode(threshold) => {
+                implode_dice(result, rng, *threshold, dice.sides, original_dice_count)?;
             }
             Modifier::Reroll(threshold) => {
                 reroll_dice(result, rng, *threshold, dice.sides, false)?;
@@ -1367,6 +1379,48 @@ fn add_explosion_notes(
     }
 }
 
+// Imploding dice: the mirror of `explode_dice`. Every original die at or below
+// the threshold rolls one extra die whose value is *subtracted* from the total.
+// Imploded dice never chain, and they are deliberately kept out of
+// `individual_rolls`/`kept_rolls` so keep/drop and target counting ignore them.
+fn implode_dice(
+    result: &mut RollResult,
+    rng: &mut impl Rng,
+    threshold: Option<u32>,
+    dice_sides: u32,
+    original_dice_count: usize,
+) -> Result<()> {
+    let implode_on = threshold.unwrap_or(1);
+    let considered = original_dice_count.min(result.individual_rolls.len());
+
+    let imploded: Vec<i32> = result.individual_rolls[..considered]
+        .iter()
+        .filter(|&&roll| roll <= implode_on as i32)
+        .map(|_| rng.random_range(1..=dice_sides as i32))
+        .collect();
+
+    if imploded.is_empty() {
+        return Ok(());
+    }
+
+    result.notes.push(if imploded.len() == 1 {
+        "1 die imploded".to_string()
+    } else {
+        format!("{} dice imploded", imploded.len())
+    });
+
+    result.dice_groups.push(DiceGroup {
+        _description: "imploded dice".to_string(),
+        rolls: imploded.clone(),
+        dropped_rolls: Vec::new(),
+        modifier_type: "subtract".to_string(),
+    });
+
+    result.implosion_rolls.extend(imploded);
+
+    Ok(())
+}
+
 // Better drop dice with proper error handling
 fn drop_dice(result: &mut RollResult, count: usize) -> Result<()> {
     let available_dice = result.individual_rolls.len();
@@ -1690,6 +1744,7 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
         fitd_result: None,
         fitd_highest_die: None,
         plot_symbols: None,
+        implosion_rolls: Vec::new(),
     };
 
     // Find the Savage Worlds modifier
@@ -1880,6 +1935,7 @@ fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResul
         fitd_result: None,
         fitd_highest_die: None,
         plot_symbols: None,
+        implosion_rolls: Vec::new(),
     };
 
     // Find the D6 System modifier
@@ -2048,6 +2104,7 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
         fitd_result: None,
         fitd_highest_die: None,
         plot_symbols: None,
+        implosion_rolls: Vec::new(),
     };
 
     // Find the Marvel Multiverse modifier
@@ -2397,7 +2454,11 @@ fn apply_cyberpunk_red_mechanics(result: &mut RollResult, rng: &mut impl Rng) ->
         1 => {
             // Critical Failure: Roll another d10 and subtract it
             let additional_roll = rng.random_range(1..=10);
-            additional_rolls.push(-additional_roll); // Store as negative for display
+            // Stored positive: the dice group carrying these rolls is already
+            // typed "subtract", which renders the minus sign. Storing a negative
+            // here printed "- [-3]" and, for a subtracted 1, collided with the
+            // `-1` Marvel-logo sentinel in `format_dice_groups`.
+            additional_rolls.push(additional_roll);
             total_result -= additional_roll;
             explosion_notes.push(format!(
                 "💀 **CRITICAL FAILURE!** Rolled 1, subtracted {additional_roll}"
@@ -2438,7 +2499,7 @@ fn apply_cyberpunk_red_mechanics(result: &mut RollResult, rng: &mut impl Rng) ->
         result.dice_groups = vec![base_group, explosion_group];
 
         // Add the actual additional roll to individual_rolls for display
-        result.individual_rolls.push(additional_rolls[0].abs());
+        result.individual_rolls.push(additional_rolls[0]);
     }
 
     // Update totals and kept rolls
@@ -2535,7 +2596,11 @@ fn apply_witcher_mechanics(result: &mut RollResult, rng: &mut impl Rng) -> Resul
             1 => {
                 // Critical Failure: Roll another d10 and subtract it
                 let additional_roll = rng.random_range(1..=10);
-                additional_rolls.push(-additional_roll); // Store as negative for display
+                // Stored positive: the dice group carrying these rolls is already
+                // typed "subtract", which renders the minus sign. Storing a negative
+                // here printed "- [-3]" and, for a subtracted 1, collided with the
+                // `-1` Marvel-logo sentinel in `format_dice_groups`.
+                additional_rolls.push(additional_roll);
                 total_result -= additional_roll;
                 explosion_count += 1;
 
@@ -2592,9 +2657,9 @@ fn apply_witcher_mechanics(result: &mut RollResult, rng: &mut impl Rng) -> Resul
         result.dice_groups = vec![base_group, explosion_group];
 
         // Add the actual additional rolls to individual_rolls for display
-        for &roll in &additional_rolls {
-            result.individual_rolls.push(roll.abs());
-        }
+        result
+            .individual_rolls
+            .extend(additional_rolls.iter().copied());
     }
 
     // Update totals and kept rolls
@@ -2688,6 +2753,7 @@ pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result
         fitd_result: None,
         fitd_highest_die: None,
         plot_symbols: None,
+        implosion_rolls: Vec::new(),
     };
 
     let pool_size = dice.count;
@@ -2823,6 +2889,7 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
         fitd_result: None,
         fitd_highest_die: None,
         plot_symbols: None,
+        implosion_rolls: Vec::new(),
     };
 
     // Find the ConanSkill modifier to get dice count
@@ -3015,6 +3082,7 @@ fn handle_conan_combat_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRe
         fitd_result: None,
         fitd_highest_die: None,
         plot_symbols: None,
+        implosion_rolls: Vec::new(),
     };
 
     // Find the ConanCombat modifier to get dice count
@@ -3140,6 +3208,7 @@ fn handle_silhouette_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
         fitd_result: None,
         fitd_highest_die: None,
         plot_symbols: None,
+        implosion_rolls: Vec::new(),
     };
 
     // Roll the dice pool
@@ -3532,6 +3601,7 @@ fn handle_vtm5_roll(
         fitd_result: None,
         fitd_highest_die: None,
         plot_symbols: None,
+        implosion_rolls: Vec::new(),
     };
 
     let regular_dice = pool_size - hunger_dice;
@@ -4115,6 +4185,7 @@ pub fn handle_mutants_masterminds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Re
         fitd_result: None,
         fitd_highest_die: None,
         plot_symbols: None,
+        implosion_rolls: Vec::new(),
     };
 
     // Roll the dice
@@ -4330,6 +4401,7 @@ fn handle_mothership_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
         fitd_result: None,
         fitd_highest_die: None,
         plot_symbols: None,
+        implosion_rolls: Vec::new(),
     };
 
     // Add descriptive notes
