@@ -1,12 +1,20 @@
 # Changelog
 
-## [1.5.5] - 2027-8-16
+## [1.5.6] - 2026-8-19
+
+## Added
+
+-  Added imploding dice (`i` / `i#`): the mirror of exploding dice, subtracting an extra die from the total (#145)
+
+- Fixed Cyberpunk Red and Witcher critical failures displaying the subtracted die as a negative (e.g. `[1] - [-5]`), or as the Marvel logo when a 1 was subtracted
+
+## [1.5.5] - 2026-8-16
 
 ## Added
 
 - Added support for The Darkest House
 
-## [1.5.4] - 2027-8-12
+## [1.5.4] - 2026-8-12
 
 ## Added
 
