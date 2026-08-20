@@ -6,7 +6,7 @@
 // - Cross-system compatibility
 // - Game system modifiers and edge cases
 
-use dicemaiden_rs::{dice::aliases, parse_and_roll};
+use dicemaiden_rs::{dice::aliases, dice::roller::wfrp_test_outcome, parse_and_roll};
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -421,6 +421,429 @@ fn test_cyberpunk_red_mechanics() {
         // Should be in valid range (-9 to 20 with explosions)
         assert!(result[0].total >= -9 && result[0].total <= 20);
     }
+}
+
+#[test]
+fn test_cyberpunk_red_damage_expansion() {
+    // `cpd` is the damage roll: Nd6 summed straight, with no explosion.
+    let cases = vec![
+        ("cpd1", "1d6 cpd"),
+        ("cpd3", "3d6 cpd"),
+        ("cpd10", "10d6 cpd"),
+        ("cpd4 + 2", "4d6 cpd + 2"),
+        ("cpd4+2", "4d6 cpd +2"),
+        ("cpd5 - 1", "5d6 cpd - 1"),
+    ];
+
+    for (input, expected) in cases {
+        assert_eq!(
+            aliases::expand_alias(input),
+            Some(expected.to_string()),
+            "'{input}' should expand to '{expected}'"
+        );
+    }
+}
+
+#[test]
+fn test_cyberpunk_red_damage_mechanics() {
+    // The total stays a plain sum: the table subtracts armor SP from it, so the
+    // Critical Injury's 5 bonus damage (which ignores armor) is never added in.
+    let mut saw_critical_injury = false;
+
+    for _ in 0..60 {
+        let result = parse_and_roll("cpd6").unwrap();
+        assert_eq!(result.len(), 1);
+        let roll = &result[0];
+
+        assert_eq!(roll.individual_rolls.len(), 6);
+        assert!(
+            roll.individual_rolls
+                .iter()
+                .all(|&die| (1..=6).contains(&die))
+        );
+        assert!(
+            roll.successes.is_none(),
+            "cpd is a damage total, not a pool"
+        );
+
+        let sum: i32 = roll.individual_rolls.iter().sum();
+        assert_eq!(
+            roll.total, sum,
+            "cpd total must be the plain sum of the d6s"
+        );
+
+        let sixes = roll
+            .individual_rolls
+            .iter()
+            .filter(|&&die| die == 6)
+            .count();
+        let has_note = roll
+            .notes
+            .iter()
+            .any(|note| note.contains("CRITICAL INJURY"));
+        assert_eq!(
+            sixes >= 2,
+            has_note,
+            "Critical Injury fires exactly on 2+ sixes: {roll:?}"
+        );
+
+        if has_note {
+            saw_critical_injury = true;
+            assert!(
+                roll.notes
+                    .iter()
+                    .any(|note| note.contains("Critical Injury roll:")),
+                "a Critical Injury must roll 2d6 for the table: {roll:?}"
+            );
+        }
+    }
+
+    assert!(
+        saw_critical_injury,
+        "6d6 should produce a Critical Injury within 60 rolls"
+    );
+}
+
+#[test]
+fn test_cyberpunk_red_damage_single_die_never_crits() {
+    // One die cannot show two 6s, so `cpd1` can never inflict a Critical Injury.
+    for _ in 0..30 {
+        let result = parse_and_roll("cpd1").unwrap();
+        assert!(
+            !result[0]
+                .notes
+                .iter()
+                .any(|note| note.contains("CRITICAL INJURY")),
+            "1d6 cannot crit: {:?}",
+            result[0]
+        );
+    }
+}
+
+#[test]
+fn test_cyberpunk_red_damage_autofire_multiplier() {
+    // Autofire is 2d6 x multiplier, and RAW checks the raw 2d6 for double 6s
+    // before multiplying - so the crit check must not see the multiplied total.
+    for _ in 0..60 {
+        let result = parse_and_roll("cpd2 * 3").unwrap();
+        let roll = &result[0];
+
+        let sum: i32 = roll.individual_rolls.iter().sum();
+        assert_eq!(
+            roll.total,
+            sum * 3,
+            "multiplier applies to the damage total"
+        );
+
+        let sixes = roll
+            .individual_rolls
+            .iter()
+            .filter(|&&die| die == 6)
+            .count();
+        assert_eq!(
+            sixes == 2,
+            roll.notes
+                .iter()
+                .any(|note| note.contains("CRITICAL INJURY")),
+            "double 6s crit regardless of the multiplier: {roll:?}"
+        );
+    }
+}
+
+#[test]
+fn test_cyberpunk_red_damage_math_modifiers() {
+    let cases = vec![
+        ("cpd3 + 5", "damage with a flat bonus"),
+        ("cpd3 - 2", "damage with a penalty"),
+        ("cpd2 * 4", "autofire multiplier"),
+        ("cpd4 / 2", "halved damage"),
+    ];
+
+    for (input, description) in cases {
+        let result = parse_and_roll(input);
+        assert!(result.is_ok(), "'{input}' ({description}) should parse");
+    }
+}
+
+#[test]
+fn test_cyberpunk_red_damage_comments_and_sets() {
+    // Comments
+    let result = parse_and_roll("cpd5 ! heavy pistol").unwrap();
+    assert_eq!(result[0].comment.as_deref(), Some("heavy pistol"));
+
+    // Roll sets - an area attack crits each target separately
+    let result = parse_and_roll("3 cpd6").unwrap();
+    assert_eq!(result.len(), 3);
+    for roll in &result {
+        assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+        assert_eq!(roll.individual_rolls.len(), 6);
+    }
+}
+
+#[test]
+fn test_cyberpunk_red_damage_boundaries() {
+    assert_valid("cpd1");
+    assert_valid("cpd500");
+    assert_invalid("cpd0");
+    assert_invalid("cpd501");
+
+    // `cpd` counts 6s, so it is meaningless on anything but d6
+    assert!(
+        parse_and_roll("3d10 cpd").is_err(),
+        "cpd must reject non-d6 dice"
+    );
+}
+
+#[test]
+fn test_cyberpunk_red_prefix_regression() {
+    // `cpd` shares two characters with `cpr` and one with `c` (cancel), both of
+    // which the parser matches by prefix. Pin all three plus the neighbouring
+    // `cd` (Conan combat) so a future token cannot silently steal one.
+    let cases = vec![
+        ("cpd3", "3d6 cpd"),
+        ("cpr", "1d10 cpr"),
+        ("cpr + 5", "1d10 cpr + 5"),
+    ];
+
+    for (input, expected) in cases {
+        assert_eq!(
+            aliases::expand_alias(input),
+            Some(expected.to_string()),
+            "'{input}' should expand to '{expected}'"
+        );
+    }
+
+    for input in ["cpd3", "cpr", "cd4", "4wod8c", "conan3cd4"] {
+        assert_valid(input);
+    }
+}
+
+#[test]
+fn test_wfrp_success_level_table() {
+    // (target, roll, success, success levels)
+    let cases = vec![
+        // Success Levels are the tens digit of the target minus the tens of the roll
+        (67, 22, true, 4),
+        (67, 30, true, 3),
+        (67, 65, true, 0),
+        (67, 68, false, 0),
+        (67, 88, false, -2),
+        (39, 40, false, -1),
+        (50, 50, true, 0),
+        (50, 51, false, 0),
+        (20, 95, false, -7),
+        // 01-05 always succeeds, with at least +1 SL
+        (5, 3, true, 1),
+        (5, 5, true, 1),
+        (99, 1, true, 9),
+        (0, 1, true, 1),
+        // 96-00 always fails, with at most -1 SL
+        (100, 96, false, -1),
+        (100, 100, false, -1),
+        (99, 99, false, -1),
+    ];
+
+    for (target, roll, success, success_levels) in cases {
+        let outcome = wfrp_test_outcome(target, roll);
+        assert_eq!(
+            (outcome.success, outcome.success_levels),
+            (success, success_levels),
+            "target {target}, roll {roll}"
+        );
+    }
+}
+
+#[test]
+fn test_wfrp_zero_success_levels_keep_their_sign() {
+    // WFRP distinguishes +0 (scraped a success) from -0 (missed on the ones
+    // digit), which the integer total cannot carry on its own.
+    let scraped = wfrp_test_outcome(67, 65);
+    assert!(scraped.success);
+    assert_eq!(scraped.signed_success_levels(), "+0");
+
+    let missed = wfrp_test_outcome(67, 68);
+    assert!(!missed.success);
+    assert_eq!(missed.signed_success_levels(), "-0");
+
+    assert_eq!(wfrp_test_outcome(67, 22).signed_success_levels(), "+4");
+    assert_eq!(wfrp_test_outcome(67, 88).signed_success_levels(), "-2");
+}
+
+#[test]
+fn test_wfrp_success_level_sign_matches_outcome() {
+    // Across every target and roll, a success never reports negative SL and a
+    // failure never reports positive SL.
+    for target in 0..=200 {
+        for roll in 1..=100 {
+            let outcome = wfrp_test_outcome(target, roll);
+            if outcome.success {
+                assert!(
+                    outcome.success_levels >= 0,
+                    "target {target}, roll {roll} succeeded with {} SL",
+                    outcome.success_levels
+                );
+            } else {
+                assert!(
+                    outcome.success_levels <= 0,
+                    "target {target}, roll {roll} failed with {} SL",
+                    outcome.success_levels
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_wfrp_doubles_are_astounding() {
+    // Doubles are Astounding Success or Failure - a Critical or Fumble in
+    // combat - independently of the Success Levels.
+    for roll in [11, 22, 33, 44, 55, 66, 77, 88, 99, 100] {
+        assert!(
+            wfrp_test_outcome(50, roll).is_double,
+            "{roll} should be a double (100 stands in for 00)"
+        );
+    }
+
+    for roll in [1, 12, 21, 45, 67, 90, 98] {
+        assert!(
+            !wfrp_test_outcome(50, roll).is_double,
+            "{roll} should not be a double"
+        );
+    }
+}
+
+#[test]
+fn test_wfrp_automatic_bands() {
+    for roll in 1..=5 {
+        let outcome = wfrp_test_outcome(10, roll);
+        assert!(outcome.is_automatic && outcome.success, "roll {roll}");
+        assert!(outcome.success_levels >= 1, "roll {roll} floors at +1 SL");
+    }
+
+    for roll in 96..=100 {
+        let outcome = wfrp_test_outcome(90, roll);
+        assert!(outcome.is_automatic && !outcome.success, "roll {roll}");
+        assert!(outcome.success_levels <= -1, "roll {roll} caps at -1 SL");
+    }
+
+    // Outside the bands the target decides
+    for roll in [6, 50, 95] {
+        assert!(!wfrp_test_outcome(50, roll).is_automatic, "roll {roll}");
+    }
+}
+
+#[test]
+fn test_wfrp_alias_expansion() {
+    // Difficulty modifiers adjust the target, not the roll: WFRP is roll-under,
+    // so they are folded into the target when the alias expands.
+    let cases = vec![
+        ("wfrp67", "1d100 wfrp67"),
+        ("wfrp1", "1d100 wfrp1"),
+        ("wfrp100", "1d100 wfrp100"),
+        ("wfrp67 + 20", "1d100 wfrp87"),
+        ("wfrp67+20", "1d100 wfrp87"),
+        ("wfrp67 - 30", "1d100 wfrp37"),
+        ("wfrp90 + 20", "1d100 wfrp110"),
+        // A Very Hard test of a weak skill floors at 0: only an 01-05 succeeds
+        ("wfrp10 - 30", "1d100 wfrp0"),
+    ];
+
+    for (input, expected) in cases {
+        assert_eq!(
+            aliases::expand_alias(input),
+            Some(expected.to_string()),
+            "'{input}' should expand to '{expected}'"
+        );
+    }
+
+    // A bare Characteristic or Skill outside 1-100 is not a legal target
+    assert_eq!(aliases::expand_alias("wfrp0"), None);
+    assert_eq!(aliases::expand_alias("wfrp101"), None);
+}
+
+#[test]
+fn test_wfrp_roll_behavior() {
+    for _ in 0..25 {
+        let result = parse_and_roll("wfrp67").unwrap();
+        assert_eq!(result.len(), 1);
+        let roll = &result[0];
+
+        assert_eq!(roll.individual_rolls.len(), 1);
+        let die = roll.individual_rolls[0];
+        assert!((1..=100).contains(&die), "d100 out of range: {die}");
+
+        // The total is the Success Level, and the notes carry the verdict
+        let outcome = wfrp_test_outcome(67, die);
+        assert_eq!(roll.total, outcome.success_levels, "die {die}");
+        assert!(roll.successes.is_none(), "SL is not a success count");
+        assert!(roll.failures.is_none());
+
+        let verdict = &roll.notes[0];
+        assert!(
+            verdict.contains("SUCCESS") || verdict.contains("FAILURE"),
+            "missing verdict: {verdict}"
+        );
+        assert!(
+            verdict.contains(&format!("{} SL", outcome.signed_success_levels())),
+            "note should carry the signed SL: {verdict}"
+        );
+        assert!(verdict.contains("Target 67"));
+
+        assert_eq!(
+            outcome.is_double,
+            roll.notes.iter().any(|note| note.contains("ASTOUNDING")),
+            "doubles note should track the die: {die}"
+        );
+    }
+}
+
+#[test]
+fn test_wfrp_comments_and_sets() {
+    let result = parse_and_roll("wfrp67 ! perception test").unwrap();
+    assert_eq!(result[0].comment.as_deref(), Some("perception test"));
+
+    let result = parse_and_roll("3 wfrp45").unwrap();
+    assert_eq!(result.len(), 3);
+    for roll in &result {
+        assert!(roll.label.as_ref().unwrap().starts_with("Set "));
+        assert_eq!(roll.individual_rolls.len(), 1);
+    }
+
+    assert_valid("p wfrp67");
+    assert_valid("s wfrp67");
+    assert_valid("wfrp67 ; wfrp30");
+}
+
+#[test]
+fn test_wfrp_boundaries() {
+    assert_valid("wfrp1");
+    assert_valid("wfrp100");
+    assert_valid("wfrp100 + 40");
+    assert_valid("wfrp10 - 30");
+    assert_invalid("wfrp0");
+    assert_invalid("wfrp101");
+    assert_invalid("wfrp");
+
+    // The folded target is capped, so no modifier can outrun the parser
+    assert!(parse_and_roll("wfrp100 + 500").is_ok());
+    assert!(parse_and_roll("1d100 wfrp201").is_err());
+}
+
+#[test]
+fn test_wfrp_prefix_regression() {
+    // `wfrp` shares its first letter with several tokens the parser matches by
+    // prefix. Pin them so a future `w` token cannot silently steal one.
+    for input in [
+        "wfrp67", "wng 4d6", "wit", "ww3", "ww4c2", "bnw3", "sw8", "4wod8", "3wh4+",
+    ] {
+        assert_valid(input);
+    }
+
+    assert_eq!(
+        aliases::expand_alias("wit"),
+        Some("1d10 wit".to_string()),
+        "wfrp must not disturb the Witcher alias"
+    );
 }
 
 #[test]
@@ -4400,7 +4823,8 @@ fn test_fitd_unique_namespace() {
     // Get all existing non-FitD aliases for comparison
     let existing_patterns = vec![
         "sw", "cod", "wod", "ex", "alien", "vtm", "lf", "cs", "sp", "dd", "yz", "wh", "ed", "snm",
-        "gb", "gbs", "hs", "dh", "cpr", "wit", "df", "age", "attack", "skill", "save",
+        "gb", "gbs", "hs", "dh", "cpr", "cpd", "wit", "wfrp", "df", "age", "attack", "skill",
+        "save",
     ];
 
     for fitd_pattern in &fitd_patterns {
@@ -4593,7 +5017,7 @@ fn test_backward_compatibility_complete() {
         "sw8", "4cod", "4codr", "4wod8", "4wod8c", "attack", "skill", "save", "+d20", "-d20",
         "dndstats", "2hsn", "3hsk", "3hsh", "gb", "gbs", "3df", "4df", "sr6", "ex5", "6yz", "age",
         "3wh4+", "dd34", "ed15", "cs 3", "cpr", "conan3", "sil3", "alien4", "alien4s2", "vtm5h2",
-        "2lf4", "sp4", "snm5", "wit", "mm", "bnw3",
+        "2lf4", "sp4", "snm5", "wit", "mm", "bnw3", "cpd3", "wfrp67",
     ];
 
     for system in all_documented_systems {
@@ -5465,7 +5889,8 @@ fn test_mothership_unique_namespace() {
     // Get all existing non-Mothership aliases for comparison
     let existing_patterns = vec![
         "mm", "mnm", "sw", "cod", "wod", "ex", "alien", "vtm", "lf", "cs", "sp", "dd", "yz", "wh",
-        "ed", "snm", "gb", "gbs", "hs", "dh", "cpr", "wit", "df", "age", "attack", "skill", "save",
+        "ed", "snm", "gb", "gbs", "hs", "dh", "cpr", "cpd", "wit", "wfrp", "df", "age", "attack",
+        "skill", "save",
     ];
 
     for ms_pattern in &ms_patterns {

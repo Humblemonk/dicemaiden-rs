@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0] - 20206-8-20
+
+## Added
+
+- Added Warhammer Fantasy RPG system
+- Added syntax update to cyberpunk red
+
 ## [1.5.6] - 2026-8-19
 
 ## Added

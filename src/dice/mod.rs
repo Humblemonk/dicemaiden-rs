@@ -111,6 +111,12 @@ impl fmt::Display for LaserFeelingsType {
     }
 }
 
+/// Highest effective WFRP target a difficulty modifier can produce. A base
+/// Characteristic or Skill caps at 100; Easy (+20) and Very Easy (+40) tests
+/// push past it, and beyond this everything short of an automatic failure
+/// succeeds anyway.
+pub const WFRP_MAX_TARGET: u32 = 200;
+
 #[derive(Debug, Clone)]
 pub enum Modifier {
     Add(i32),
@@ -151,6 +157,8 @@ pub enum Modifier {
     Shadowrun(u32),
     MarvelMultiverse(i32, i32), // (edges, troubles) - already calculated net values
     CyberpunkRed,
+    CyberpunkRedDamage, // cpd - Nd6 damage, 2+ sixes = Critical Injury
+    Wfrp(u32),          // wfrp# - Warhammer Fantasy 4e roll-under with Success Levels
     Witcher,
     CypherSystem(u32),
     BraveNewWorld(u32),

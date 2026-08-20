@@ -100,6 +100,15 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         return handle_conan_combat_roll(dice, &mut rng);
     }
 
+    let has_wfrp = dice
+        .modifiers
+        .iter()
+        .any(|m| matches!(m, Modifier::Wfrp(_)));
+
+    if has_wfrp {
+        return handle_wfrp_roll(dice, &mut rng);
+    }
+
     // Check if this is a D6 System roll - handle it specially
     let has_d6_system = dice
         .modifiers
@@ -899,6 +908,9 @@ fn apply_special_system_modifiers(
                 apply_cyberpunk_red_mechanics(result, rng)?;
                 has_special_system = true;
             }
+            Modifier::CyberpunkRedDamage => {
+                apply_cyberpunk_red_damage(result, rng, dice.sides)?;
+            }
             Modifier::Witcher => {
                 apply_witcher_mechanics(result, rng)?;
                 has_special_system = true;
@@ -934,6 +946,10 @@ fn apply_special_system_modifiers(
             }
             Modifier::Mothership(_, _) => {
                 // Mothership is handled in the main roll_dice function
+                // Don't process it here
+            }
+            Modifier::Wfrp(_) => {
+                // WFRP is handled in the main roll_dice function
                 // Don't process it here
             }
             Modifier::PlotDie => {
@@ -2512,6 +2528,55 @@ fn apply_cyberpunk_red_mechanics(result: &mut RollResult, rng: &mut impl Rng) ->
 
     // Add explosion notes only (no system note)
     result.notes.extend(explosion_notes);
+
+    Ok(())
+}
+
+// Cyberpunk Red damage (`cpd`): the dice total stays a plain sum, because the
+// table subtracts the target's armor SP from it (and doubles it for an aimed
+// head shot) before anything else happens.
+//
+// Two or more 6s inflict a Critical Injury. Its 5 bonus damage is deliberately
+// NOT added to the total: RAW, that damage goes straight to Hit Points without
+// ablating armor and without being modified by hit location, so it cannot ride
+// along on a number that armor is about to reduce. The Critical Injury lands
+// even when no damage at all got through the target's SP.
+//
+// The 6s are counted before any `*` multiplier is applied, which is what makes
+// autofire (`cpd2 * 3`) come out right: RAW checks the raw 2d6 for double 6s
+// and multiplies afterwards.
+//
+// The 2d6 table roll is made here, but the injury tables themselves are
+// corebook content and are not reproduced -- the player looks up the number.
+fn apply_cyberpunk_red_damage(
+    result: &mut RollResult,
+    rng: &mut impl Rng,
+    sides: u32,
+) -> Result<()> {
+    if sides != 6 {
+        return Err(anyhow!("Cyberpunk Red damage only works with d6 dice"));
+    }
+
+    let sixes = result
+        .individual_rolls
+        .iter()
+        .filter(|&&roll| roll == 6)
+        .count();
+
+    if sixes < 2 {
+        return Ok(());
+    }
+
+    let first_injury_die = rng.random_range(1..=6);
+    let second_injury_die = rng.random_range(1..=6);
+    let injury_total = first_injury_die + second_injury_die;
+
+    result.notes.push(format!(
+        "💥 **CRITICAL INJURY!** ({sixes} sixes) - +5 damage direct to Hit Points, ignores armor SP"
+    ));
+    result.notes.push(format!(
+        "Critical Injury roll: [{first_injury_die}, {second_injury_die}] = {injury_total} (Body table; Head table on an aimed head shot)"
+    ));
 
     Ok(())
 }
@@ -4271,6 +4336,169 @@ pub fn handle_mutants_masterminds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Re
     }
 
     Ok(result)
+}
+
+// Warhammer Fantasy Roleplay 4e (`wfrp#`): roll-under d100 reporting Success
+// Levels rather than a die total.
+//
+// SL is the tens digit of the target minus the tens digit of the roll, so the
+// roll total carries the SL and the note carries the verdict. The note has to,
+// because WFRP distinguishes +0 (scraped a success) from -0 (just missed) and
+// an integer cannot.
+//
+// Two RAW rules ride on top of the subtraction:
+//   - 01-05 always succeeds and 96-00 always fails, whatever the target. The SL
+//     is then floored at +1 or capped at -1, "whichever is higher/lower", so an
+//     automatic result never reports a better SL than it earned.
+//   - Any double (11, 22 ... 99, 00) makes a success Astounding and a failure
+//     Astounding in the other direction - a Critical Hit or Fumble in combat.
+//     This is independent of SL and applies to the same roll.
+//
+// The die is rolled 1-100 with 100 standing in for 00, which is what puts
+// 96-00 in the automatic failure band and gives 00 a tens digit of 10.
+/// The reading of a single WFRP test, separated from the rolling so every
+/// target/roll pair can be checked directly.
+pub struct WfrpTest {
+    pub success: bool,
+    pub success_levels: i32,
+    /// A double (11, 22 ... 99, 00): Astounding Success or Failure, and a
+    /// Critical Hit or Fumble in combat.
+    pub is_double: bool,
+    /// Inside the 01-05 or 96-00 band, where the roll decides on its own.
+    pub is_automatic: bool,
+}
+
+impl WfrpTest {
+    /// Success Levels as WFRP writes them, including the "-0" of a test that
+    /// failed on the ones digit alone.
+    pub fn signed_success_levels(&self) -> String {
+        if self.success_levels > 0 {
+            format!("+{}", self.success_levels)
+        } else if self.success_levels == 0 {
+            // WFRP writes both, and they mean different things: +0 scraped a
+            // success, -0 missed by the ones digit alone.
+            if self.success { "+0" } else { "-0" }.to_string()
+        } else {
+            self.success_levels.to_string()
+        }
+    }
+
+    fn notes(&self, target: i32) -> Vec<String> {
+        let verdict = match (self.success, self.is_automatic) {
+            (true, true) => "**AUTOMATIC SUCCESS** (01-05)",
+            (true, false) => "**SUCCESS**",
+            (false, true) => "**AUTOMATIC FAILURE** (96-00)",
+            (false, false) => "**FAILURE**",
+        };
+
+        let mut notes = vec![format!(
+            "{verdict} - {} SL (Target {target})",
+            self.signed_success_levels()
+        )];
+
+        if self.is_double {
+            notes.push(
+                if self.success {
+                    "**ASTOUNDING SUCCESS** (doubles) - Critical Hit in combat"
+                } else {
+                    "**ASTOUNDING FAILURE** (doubles) - Fumble in combat"
+                }
+                .to_string(),
+            );
+        }
+
+        notes
+    }
+}
+
+/// Read a d100 against a WFRP target. `roll` is 1-100, with 100 standing in
+/// for 00 - which is what places 96-00 in the automatic failure band and gives
+/// 00 a tens digit of 10.
+pub fn wfrp_test_outcome(target: i32, roll: i32) -> WfrpTest {
+    let automatic_success = roll <= 5;
+    let automatic_failure = roll >= 96;
+
+    let success = if automatic_success {
+        true
+    } else if automatic_failure {
+        false
+    } else {
+        roll <= target
+    };
+
+    // Success Levels are the tens digit of the target minus the tens digit of
+    // the roll. An automatic result is then floored at +1 or capped at -1,
+    // "whichever is higher/lower", so it never reports a better SL than earned.
+    let rolled_success_levels = target / 10 - roll / 10;
+    let success_levels = if automatic_success {
+        rolled_success_levels.max(1)
+    } else if automatic_failure {
+        rolled_success_levels.min(-1)
+    } else {
+        rolled_success_levels
+    };
+
+    WfrpTest {
+        success,
+        success_levels,
+        is_double: roll == 100 || roll / 10 == roll % 10,
+        is_automatic: automatic_success || automatic_failure,
+    }
+}
+
+fn handle_wfrp_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
+    let target = dice
+        .modifiers
+        .iter()
+        .find_map(|m| {
+            if let Modifier::Wfrp(target) = m {
+                Some(*target)
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| anyhow!("Expected WFRP modifier"))? as i32;
+
+    let roll = rng.random_range(1..=100);
+    let outcome = wfrp_test_outcome(target, roll);
+    let notes = outcome.notes(target);
+
+    Ok(RollResult {
+        individual_rolls: vec![roll],
+        kept_rolls: vec![roll],
+        dropped_rolls: Vec::new(),
+        // The total is the SL, not the die: a WFRP test is read in Success
+        // Levels, and the die itself is already shown in the roll display.
+        total: outcome.success_levels,
+        // Left unset so the value slot prints the SL. `successes` would print
+        // "N successes", which is a different quantity from a Success Level.
+        successes: None,
+        failures: None,
+        botches: None,
+        comment: dice.comment.clone(),
+        label: dice.label.clone(),
+        notes,
+        dice_groups: Vec::new(),
+        original_expression: dice.original_expression.clone(),
+        simple: dice.simple,
+        no_results: dice.no_results,
+        private: dice.private,
+        godbound_damage: None,
+        fudge_symbols: None,
+        wng_wrath_die: None,
+        wng_icons: None,
+        wng_exalted_icons: None,
+        wng_wrath_dice: None,
+        suppress_comment: false,
+        alien_stress_level: None,
+        alien_panic_roll: None,
+        alien_stress_ones: None,
+        fitd_outcome: None,
+        fitd_result: None,
+        fitd_highest_die: None,
+        plot_symbols: None,
+        implosion_rolls: Vec::new(),
+    })
 }
 
 fn handle_mothership_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {

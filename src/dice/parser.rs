@@ -38,7 +38,9 @@
 //!
 //! All regex patterns are compiled once at startup via `once_cell::Lazy`.
 
-use super::{DiceRoll, ESSENCE20_RANKS, HeroSystemType, LaserFeelingsType, Modifier};
+use super::{
+    DiceRoll, ESSENCE20_RANKS, HeroSystemType, LaserFeelingsType, Modifier, WFRP_MAX_TARGET,
+};
 use anyhow::{Result, anyhow};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -991,7 +993,9 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
             (r"^(esss?\d+)", "essence20"),       // ess4, esss4 (BEFORE explode)
             (r"^(e\d*)", "explode"),             // e, e6 (AFTER indefinite explode)
             (r"^(b\d*)", "botch"),               // b, b1
+            (r"^(cpd)", "cyberpunk red damage"), // cpd (BEFORE cancel's bare `c`)
             (r"^(c)", "cancel"),                 // c
+            (r"^(wfrp\d+)", "warhammer fantasy"), // wfrp67 (BEFORE wng/wit/ww)
             (r"^(wng\d*t?)", "wrath & glory"),   // wng patterns
             (r"^(gb|gbs)", "godbound"),          // gb, gbs
             (r"^(hs[nkh])", "hero system"),      // hsn, hsk, hsh
@@ -1383,6 +1387,7 @@ fn is_modifier_start(input: &str) -> bool {
         r"^b\d*",     // Botch: b, b1
         r"^c$",       // Cancel: c (exact match)
         // System modifiers
+        r"^wfrp\d+",   // Warhammer Fantasy 4e: wfrp67
         r"^wng",       // Wrath & Glory patterns
         r"^gb$",       // Godbound (exact)
         r"^gbs$",      // Godbound straight (exact)
@@ -1392,6 +1397,7 @@ fn is_modifier_start(input: &str) -> bool {
         r"^df$",       // Fudge dice (exact)
         r"^d6s\d+",    // D6 System
         r"^cpr$",      // Cyberpunk Red (exact)
+        r"^cpd$",      // Cyberpunk Red damage (exact)
         r"^wit$",      // Witcher (exact)
         r"^alien$",    // Alien base modifier (exact)
         r"^aliens\d+", // Alien stress modifiers: aliens1, aliens2, etc.
@@ -1612,6 +1618,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         "gb" => return Ok(Modifier::Godbound(false)),
         "gbs" => return Ok(Modifier::Godbound(true)),
         "cpr" => return Ok(Modifier::CyberpunkRed),
+        "cpd" => return Ok(Modifier::CyberpunkRedDamage),
         "wit" => return Ok(Modifier::Witcher),
         "bnw" => return Ok(Modifier::BraveNewWorld(0)),
         "mnm" => return Ok(Modifier::MutantsMasterminds),
@@ -1635,6 +1642,24 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             ));
         }
         return Ok(Modifier::CypherSystem(level));
+    }
+
+    // Warhammer Fantasy 4e target: wfrp67. The alias folds difficulty modifiers
+    // into this number, so a target above 100 is legitimate here even though a
+    // bare Characteristic or Skill never is.
+    if let Some(stripped) = part.strip_prefix("wfrp")
+        && !stripped.is_empty()
+        && stripped.chars().all(|c| c.is_ascii_digit())
+    {
+        let target: u32 = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid WFRP target in '{}'", part))?;
+        if target > WFRP_MAX_TARGET {
+            return Err(anyhow!(
+                "Maximum WFRP target is {WFRP_MAX_TARGET}, got {target}"
+            ));
+        }
+        return Ok(Modifier::Wfrp(target));
     }
 
     // Conan skill roll handling (conan, conan3, conan4, conan5)

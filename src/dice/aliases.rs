@@ -29,6 +29,8 @@
 //! | `ola` / `old`    | Open Legend RPG                      |
 //! | `ess1d8`         | Essence20 (Renegade Game Studios)    |
 //! | `tdh`            | The Darkest House (Monte Cook Games) |
+//! | `cpr` / `cpd`    | Cyberpunk Red skill check / damage    |
+//! | `wfrp`           | Warhammer Fantasy Roleplay 4e         |
 //!
 //! See `roll_syntax.md` for the full syntax reference.  All regex patterns are
 //! compiled once at startup via `once_cell::Lazy`.
@@ -161,8 +163,21 @@ static MM_REGEX: Lazy<Regex> = Lazy::new(|| {
 static CPR_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^cpr(?:\s*([+-]\s*\d+))?$").expect("Failed to compile CPR_REGEX"));
 
+// Cyberpunk Red damage: cpd3 -> 3d6 cpd. Distinct from `cpr` (the 1d10 skill
+// check) at the third character, so neither is a prefix of the other.
+static CPD_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^cpd(\d+)(?:\s*([+-]\s*\d+))?$").expect("Failed to compile CPD_REGEX")
+});
+
 static WIT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^wit(?:\s*([+-]\s*\d+))?$").expect("Failed to compile WIT_REGEX"));
+
+// Warhammer Fantasy Roleplay 4e: wfrp67 -> 1d100 wfrp67. Difficulty modifiers
+// adjust the target rather than the roll (WFRP is roll-under), so `wfrp67 + 20`
+// folds into a target of 87 at expansion time rather than reaching the total.
+static WFRP_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^wfrp(\d+)(?:\s*([+-])\s*(\d+))?$").expect("Failed to compile WFRP_REGEX")
+});
 
 static CS_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^cs\s+(\d+)(?:\s*([+-]\s*\d+))?$").expect("Failed to compile CS_REGEX")
@@ -902,6 +917,17 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         }
     }
 
+    if let Some(captures) = CPD_REGEX.captures(input) {
+        let dice_count = captures.get(1).map(|m| m.as_str()).unwrap_or("");
+        let modifier = captures.get(2).map(|m| m.as_str().trim()).unwrap_or("");
+
+        if modifier.is_empty() {
+            return Some(format!("{dice_count}d6 cpd"));
+        } else {
+            return Some(format!("{dice_count}d6 cpd {modifier}"));
+        }
+    }
+
     if let Some(captures) = WIT_REGEX.captures(input) {
         let modifier = captures.get(1).map(|m| m.as_str().trim()).unwrap_or("");
 
@@ -910,6 +936,34 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         } else {
             return Some(format!("1d10 wit {modifier}"));
         }
+    }
+
+    if let Some(captures) = WFRP_REGEX.captures(input) {
+        let base_target: i64 = captures.get(1)?.as_str().parse().ok()?;
+
+        // A Characteristic or Skill above 100 is not a legal starting target;
+        // difficulty modifiers are what push the effective target past it.
+        if !(1..=100).contains(&base_target) {
+            return None;
+        }
+
+        let target = match (captures.get(2), captures.get(3)) {
+            (Some(sign), Some(amount)) => {
+                let amount: i64 = amount.as_str().parse().ok()?;
+                if sign.as_str() == "+" {
+                    base_target + amount
+                } else {
+                    base_target - amount
+                }
+            }
+            _ => base_target,
+        };
+
+        // A modifier can drive the target to or below zero (a Very Hard test of
+        // an unskilled Characteristic). Nothing then succeeds but an 01-05.
+        let target = target.clamp(0, i64::from(crate::dice::WFRP_MAX_TARGET));
+
+        return Some(format!("1d100 wfrp{target}"));
     }
 
     if let Some(captures) = CS_REGEX.captures(input) {

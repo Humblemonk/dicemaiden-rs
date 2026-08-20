@@ -22,6 +22,8 @@ pub const HELP_TOPICS: &[&str] = &[
     "ol",
     "ess",
     "tdh",
+    "cpr",
+    "wfrp",
 ];
 
 /// Resolve a topic name to its help text, or `None` if the topic is unknown.
@@ -40,6 +42,8 @@ pub fn generate_topic_help(topic: &str) -> Option<String> {
         "ol" => generate_open_legend_help(),
         "ess" => generate_essence20_help(),
         "tdh" => generate_darkest_house_help(),
+        "cpr" => generate_cyberpunk_red_help(),
+        "wfrp" => generate_wfrp_help(),
         _ => return None,
     })
 }
@@ -101,7 +105,7 @@ pub fn generate_alias_help() -> String {
 
 **Savage Worlds:**
 • `sw8` → 1d8 ie8 + 1d6 ie6 k1 (d8 trait + d6 wild, keep highest)
-• `sw10` → 1d10 ie10 + 1d6 ie6 k1 (d10 trait + d6 wild, keep highest)
+• `sw10` → 1d10 ie10 + 1d6 ie6 k1 (d10 trait + wild die)
 
 **World/Chronicles of Darkness:**
 • `4cod` → 4d10 t8 ie10 (Chronicles of Darkness standard)
@@ -124,8 +128,8 @@ pub fn generate_alias_help() -> String {
 • `3hsh` → 3d6 hsh (to-hit roll)
 
 **Godbound:**
-• `gb` → 1d20 gb (basic d20 with damage chart)
-• `gbs` → 1d20 gbs (basic d20 with straight damage)
+• `gb` → 1d20 gb (d20 with damage chart)
+• `gbs` → 1d20 gbs (d20 with straight damage)
 • `gb 3d8` → 3d8 gb (3d8 with damage chart conversion)
 • `gbs 2d10` → 2d10 gbs (2d10 straight damage)
 
@@ -141,9 +145,10 @@ pub fn generate_alias_help() -> String {
 • `dd34` → 1d3*10 + 1d4 (double-digit d66 style)
 • `ed15` → Earthdawn step 15
 • `cs 3` → Cypher System 1d20 cs3 (Level 3 task, target 9+)
-• `cpr` → Cyberpunk Red (see `/help system`)
+• `cpr` / `cpd3` → Cyberpunk Red (`/help cpr`)
+• `wfrp67` → WFRP 4e (`/help wfrp`)
 • `conan3` → 3d20 conan (3d20 skill roll)
-• `sil3` → Silhouette (see `/help system`)
+• `sil3` → Silhouette (`/help system`)
 • `ol5` → Open Legend (`/help ol`)
 • `ess1d8` → Essence20 (`/help ess`)
 • `tdh4` → The Darkest House (`/help tdh`)
@@ -343,6 +348,71 @@ An action roll is 1d20 plus your attribute dice. Everything explodes on its maxi
 - Contrast with `d1`/`k3`, which are applied **after** exploding
 
 Use `/help` for basic syntax and `/help alias` for more shortcuts!"#
+        .to_string()
+}
+
+pub fn generate_wfrp_help() -> String {
+    r#"🎲 **Warhammer Fantasy Roleplay 4e** 🎲
+
+**Note:**
+- Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+- If you experience a bug, please report the issue on GitHub!
+
+Roll d100 against a Characteristic or Skill and succeed on equal or lower.
+
+**Tests:**
+- `wfrp67` → test a Characteristic or Skill of 67
+- `wfrp67 + 20` → Easy test: the modifier adjusts the target, giving 87
+- `wfrp67 - 30` → Very Hard test, target 37
+- `3 wfrp45` → three separate tests
+
+**Success Levels:**
+- SL is the tens digit of the target minus the tens digit of the roll
+- Target 67, roll 22 → +4 SL; roll 88 → -2 SL
+- The result shown is the SL; the note carries the verdict
+- `+0` scraped a success, `-0` missed on the ones digit alone
+
+**Automatic Results:**
+- 01-05 always succeeds, scoring at least +1 SL
+- 96-00 always fails, scoring at most -1 SL
+- The die is rolled 1-100, with 100 standing in for 00
+
+**Doubles:**
+- 11, 22 ... 99, 00 are an Astounding Success or Astounding Failure
+- In combat that is a Critical Hit or a Fumble
+- Independent of SL: both apply to the same roll"#
+        .to_string()
+}
+
+pub fn generate_cyberpunk_red_help() -> String {
+    r#"🎲 **Cyberpunk Red** 🎲
+
+**Note:**
+- Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+- If you experience a bug, please report the issue on GitHub!
+
+**Skill Checks (1d10 + STAT + SKILL):**
+- `cpr` → 1d10 with Critical Success and Critical Failure
+- `cpr + 5` → add your STAT + SKILL total
+- Critical Success (10): roll another d10 and add it
+- Critical Failure (1): roll another d10 and subtract it
+- Neither chains: a second 10 or 1 is just a number
+- The same die built by hand is `1d10 i1 e10`
+
+**Damage (Nd6):**
+- `cpd3` → 3d6 damage, totalled straight
+- `cpd4 + 2` → damage with a modifier
+- `cpd2 * 3` → autofire: 2d6 multiplied by 3
+- `cpd3 * 2` → aimed head shot: damage doubled
+- `5 cpd6` → area attack: one roll per target
+
+**Critical Injuries:**
+- Two or more 6s on the damage dice inflict a Critical Injury
+- It lands even if no damage got through the target's armor SP
+- 2d6 is rolled for you: look it up on the Body table, or the Head table
+  if you took an Aimed Shot at the head
+- The 5 bonus damage goes direct to Hit Points, so it is NOT in the total:
+  it ignores armor SP and hit location, while the total is what SP comes off"#
         .to_string()
 }
 

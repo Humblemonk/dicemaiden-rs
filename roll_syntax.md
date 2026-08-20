@@ -19,8 +19,8 @@
 | [Lasers & Feelings](#lasers--feelings) | [Level Up A5E](#level-up-advanced-5th-edition-a5e) | [Marvel Multiverse](#marvel-multiverse-rpg) |
 | [Mothership](#mothership-rpg) | [Mutants & Masterminds](#mutants-and-masterminds) | [Open Legend](#open-legend) |
 | [Savage Worlds](#savage-worlds) | [Silhouette](#silhouette-system-dream-pod-9) | [Vampire: The Masquerade 5e](#vampire-the-masquerade-5th-edition) |
-| [Warhammer 40k W&G](#warhammer-40k-wrath--glory) | [Wild Worlds](#wild-worlds) | [Witcher d10](#witcher-d10-system) |
-| [World of Darkness / CoD](#world-of-darkness--chronicles-of-darkness) |  |  |
+| [Warhammer 40k W&G](#warhammer-40k-wrath--glory) | [Warhammer Fantasy 4e](#warhammer-fantasy-roleplay-4e) | [Wild Worlds](#wild-worlds) |
+| [Witcher d10](#witcher-d10-system) | [World of Darkness / CoD](#world-of-darkness--chronicles-of-darkness) |  |
 
 Systems without a dedicated alias are listed under [Other Popular Systems](#other-popular-systems).
 
@@ -190,6 +190,19 @@ Modifiers apply in stages, not in the order you type them:
 - Each explosion happens only once per roll
 - The same die built by hand is `1d10 i1 e10` (implode on 1, explode on 10)
 
+**Damage rolls**
+- `cpd3` → 3d6 cpd (weapon damage, plain sum)
+- `cpd4 + 2` → 4d6 cpd + 2 (with modifier)
+- `cpd2 * 3` → autofire: 2d6 multiplied by 3
+- `cpd3 * 2` → aimed head shot: damage doubled
+- `5 cpd6` → area attack: each target's damage and Critical Injury rolled separately
+- Critical Injury: two or more 6s on the damage dice, whether or not any damage
+  got through the target's armor
+- A Critical Injury rolls 2d6 for the table (Body by default, Head on an aimed
+  head shot) and deals 5 bonus damage **direct to Hit Points**
+- The 5 bonus damage is not added to the roll total: it ignores armor SP and hit
+  location, while the total is what armor is subtracted from
+
 ### Cypher System
 - `cs 1` - Level 1 task (target 3+, routine)
 - `cs 3` - Level 3 task (target 9+, typical)
@@ -231,6 +244,20 @@ Modifiers apply in stages, not in the order you type them:
 - `wng dn3 5d6` → 5d6 with difficulty 3 (shows PASS/FAIL)
 - `wng 4d6 !soak` → 4d6 soak roll (uses total, not successes)
 - `wng dn4 6d6 !exempt` → 6d6 exempt test without wrath die
+
+### Warhammer Fantasy Roleplay 4e
+- `wfrp67` → 1d100 against a Characteristic or Skill of 67
+- `wfrp67 + 20` → Easy test: the modifier adjusts the target, giving 87
+- `wfrp67 - 30` → Very Hard test, target 37
+- `3 wfrp45` → three separate tests
+- Success if the roll is equal to or lower than the target
+- Success Levels: tens digit of the target minus tens digit of the roll
+- The result shown is the SL, and the note carries the verdict; `+0` scraped a
+  success while `-0` missed on the ones digit alone
+- Rolls of 01-05 always succeed (at least +1 SL), 96-00 always fail (at most -1 SL)
+- Doubles (11, 22 ... 99, 00) are an Astounding Success or Failure: a Critical
+  Hit or Fumble in combat
+- The die is rolled 1-100, with 100 standing in for 00
 
 ### Marvel Multiverse RPG
 - `mm` → 3d6 Marvel Multiverse basic roll
