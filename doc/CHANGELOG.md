@@ -1,8 +1,10 @@
 # Changelog
 
-## [1.6.0] - 2026-8-20
+## [1.6.0] - 2026-08-20
 
 ## Added
+
+Finally caught up on over 2+ years of feature requests!
 
 - Added Warhammer Fantasy RPG system
 - Added syntax update to cyberpunk red
@@ -15,25 +17,25 @@
 
 - Fixed Cyberpunk Red and Witcher critical failures displaying the subtracted die as a negative (e.g. `[1] - [-5]`), or as the Marvel logo when a 1 was subtracted
 
-## [1.5.5] - 2026-8-16
+## [1.5.5] - 2026-08-16
 
 ## Added
 
 - Added support for The Darkest House
 
-## [1.5.4] - 2026-8-12
+## [1.5.4] - 2026-08-12
 
 ## Added
 
 - Added support for Essence20 System
 
-## [1.5.3] - 2026-8-09
+## [1.5.3] - 2026-08-09
 
 ## Added
 
 - Added support for Open Legend System
 
-## [1.5.2] - 2026-3-21
+## [1.5.2] - 2026-03-21
 
 ## Added
 
