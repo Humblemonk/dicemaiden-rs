@@ -84,7 +84,7 @@ See [`env.example`](env.example) for the full annotated list.
 ### Container
 
 A production [`Dockerfile`](Dockerfile) is included — build it directly rather than copying
-one out of this README:
+one out of these docs:
 
 ```bash
 docker build -t dicemaiden-rs .
