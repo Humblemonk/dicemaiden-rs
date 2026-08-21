@@ -8,6 +8,7 @@ Thanks for your interest in contributing! Dice Maiden is an open-source Discord 
 
 - [Getting Started](#getting-started)
 - [Development Setup](#development-setup)
+- [Project Structure](#project-structure)
 - [Making Changes](#making-changes)
 - [Adding a New Game System](#adding-a-new-game-system)
 - [Testing](#testing)
@@ -58,6 +59,31 @@ When running the bot locally for manual testing, set `GUILD_ID` in your `.env` t
 
 ---
 
+## Project Structure
+
+```text
+src/
+├── main.rs             # Entry point, Discord client setup, sharding
+├── database.rs         # SQLite shard statistics — prepared statements only
+├── help_text.rs        # Shared help text for all help commands
+├── lib.rs              # Exposes internals to the test suite
+├── dice/
+│   ├── mod.rs          # Core types: DiceRoll, RollResult, Modifier enum
+│   ├── parser.rs       # Expression string → Vec<DiceRoll>; syntax validation
+│   ├── roller.rs       # Roll execution and modifier application → Vec<RollResult>
+│   ├── rng.rs          # Cryptographically secure RNG, multiple entropy sources
+│   └── aliases.rs      # Game system shorthand → standard expression expansion
+└── commands/
+    ├── mod.rs          # Command exports, CommandResponse type
+    ├── roll.rs         # Roll command + result formatting for Discord
+    ├── help.rs         # Topic-based help
+    └── purge.rs        # Message purge with permission checking
+```
+
+Test files live in `tests/` — see [Testing](#testing) below.
+
+---
+
 ## Making Changes
 
 ### Before you write any code
@@ -68,14 +94,12 @@ Read [`roll_syntax.md`](roll_syntax.md) to understand the existing dice syntax. 
 
 ### Data flow
 
-```
+```text
 src/dice/parser.rs → src/dice/roller.rs → src/commands/roll.rs → Discord message
 ```
 
-- **`src/dice/aliases.rs`** — expands game system shorthand into standard expressions. Alias expansion happens **before** parsing; its output is an ordinary expression string.
-- **`src/dice/parser.rs`** — turns a dice expression string into `Vec<DiceRoll>`
-- **`src/dice/roller.rs`** — executes rolls, applies modifiers, returns `Vec<RollResult>`
-- **`src/commands/roll.rs`** — formats results into a Discord message string
+Alias expansion happens **before** parsing — `aliases.rs` output is an ordinary expression
+string that the parser treats no differently from one a user typed by hand.
 
 ### Display formatting constraints
 

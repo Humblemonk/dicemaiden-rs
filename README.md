@@ -1,271 +1,115 @@
-# DiceMaiden - Rust Edition
+# Dice Maiden — Rust Edition
 
-A powerful Discord dice rolling bot written in Rust using the Serenity framework. This is a complete rewrite of the original [DiceMaiden](https://github.com/Humblemonk/DiceMaiden) Ruby bot, featuring all the same functionality with improved performance and memory safety.
+A Discord dice rolling bot for tabletop RPGs. Supports complex dice expressions, exploding
+dice, keep/drop, success counting, and built-in aliases for 30+ game systems.
+
+A complete rewrite of the original [DiceMaiden](https://github.com/Humblemonk/DiceMaiden)
+Ruby bot in Rust.
+
 <p align="center">
 <a href="https://top.gg/bot/377701707943116800">
     <img src="https://top.gg/api/widget/377701707943116800.svg" alt="Dice Maiden" />
 </a>
 </p>
 
-## Features
+## Add to Your Server
 
-- **Comprehensive Dice Rolling**: Support for complex dice expressions with modifiers
-- **Game System Aliases**: Built-in support for popular RPG systems
-- **Slash Commands**: Modern Discord integration with `/roll` and `/r` commands
-- **Advanced Modifiers**: Exploding dice, keep/drop, rerolls, success counting, and more
-- **Multiple Roll Types**: Single rolls, roll sets, and multi-roll expressions
-- **Message Management**: Purge command for cleaning up chat
+[**Click here to add Dice Maiden**](https://discord.com/api/oauth2/authorize?client_id=572301609305112596&permissions=274878000128&scope=bot%20applications.commands)
 
-## Quick Install
+The bot appears in your default public channel with permission to read, send, and manage
+messages.
 
-[**Click here to add Dice Maiden to your server**](https://discord.com/api/oauth2/authorize?client_id=572301609305112596&permissions=274878000128&scope=bot%20applications.commands)
+> **Users need the "Use Application Commands" permission to use slash commands.**
 
-This will authorize the bot for your server and you should see it in your default public channel. The bot will have permissions to read, send and manage messages.
-
-**Note:** Users need the **Use Application Commands** permission to use slash commands. It is also recommended to review your app integration settings found under Server Settings > Integrations. From here you can restrict the bot slash commands to specific channels.
+To restrict the bot to specific channels, go to **Server Settings → Integrations → Dice Maiden**.
 
 ## Commands
 
-- `/roll <dice>` - Roll dice using RPG notation
-- `/r <dice>` - Short alias for roll
-- `/help [topic]` - Show help (topics: basic, alias, system)
-- `/purge <count>` - Delete recent messages (requires permissions)
+| Command | Description |
+| --- | --- |
+| `/roll <dice>` | Roll dice using RPG notation |
+| `/r <dice>` | Short alias for `/roll` |
+| `/help [topic]` | Help — topics: `basic`, `alias`, `system`, `a5e`, `aliens`, `mothership` |
+| `/purge <count>` | Delete recent messages (requires Manage Messages) |
+| `/roll donate` | Support information |
+| `/roll bot-info` | Bot statistics |
 
-## Dice Rolling Syntax
+## Rolling Dice
 
-### Example Dice Roll
+![Example roll](https://github.com/user-attachments/assets/0371ff72-e3da-4400-9e1b-8063ef8554a7)
 
-![readme](https://github.com/user-attachments/assets/0371ff72-e3da-4400-9e1b-8063ef8554a7)
-
-Supported dice rolls and game systems can be [found here!](roll_syntax.md)
-
-## Local Instance Setup
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Humblemonk/dicemaiden-rs.git
-   cd dicemaiden-rs
-   ```
-
-2. **Set up environment**
-   ```bash
-   cp env.example .env
-   # Edit .env and add your Discord bot token. Review the other ENV variables found in this documentation
-   ```
-
-3. **Build and run**
-   ```bash
-   cargo build --release
-   cargo run
-   ```
-
-### Discord Bot Setup
-
-1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
-2. Create a new application and bot
-3. Copy the bot token to your `.env` file
-4. Invite the bot to your server with the following permissions:
-   - Send Messages
-   - Use Slash Commands
-   - Manage Messages (for purge command)
-   - Read Message History
-
-**Invite URL Template:**
 ```text
-https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=274878000128&scope=bot%20applications.commands
+/roll 2d6 + 3           # Basic roll with modifier
+/roll 4d6 k3            # Keep the 3 highest
+/roll 10d6 e6 k8 +4     # Explode 6s, keep 8 highest, add 4
+/roll 4d10 t8 ie10 f1   # Success counting with botches
+/roll 6 4d6             # Six sets of 4d6
+/roll (Fireball) 8d6 ! AOE   # Labeled roll with a comment
 ```
 
-## Configuration
+**[Full syntax reference and game system aliases →](roll_syntax.md)**
+
+## Self-Hosting
+
+Requires Rust 1.90+ and a Discord bot token. SQLite is created automatically.
+
+```bash
+git clone https://github.com/Humblemonk/dicemaiden-rs.git
+cd dicemaiden-rs
+cp env.example .env      # add your DISCORD_TOKEN
+cargo build --release
+cargo run --release
+```
+
+Create your bot at the [Discord Developer Portal](https://discord.com/developers/applications)
+and invite it with Send Messages, Use Slash Commands, Manage Messages, and Read Message
+History.
 
 ### Environment Variables
-- `DISCORD_TOKEN` - Your Discord bot token (required)
-- `GUILD_ID` - Guild ID for testing commands (optional)
-- `DATABASE_URL` - SQLite database path. Defaults to sqlite:main.db, resolved relative to the working directory. This database is automatically created if it doesn't exist (optional)
-- `SHARD_COUNT` - Manual number of shards to use. Defaults to 1 for small bots (optional)
-- `USE_AUTOSHARDING` - Set to true to use discord recommended shard count. Defaults to false (optional)
-- `MAX_CONCURRENCY` - Max concurrent shard connections. Discord will override this with your bots actual limit (optional)
-- `RUST_LOG` - Log level (default: info). Supports per-module filtering via `EnvFilter` syntax; recommended for production: `RUST_LOG=warn,dicemaiden_rs=info,serenity::gateway=info`
-- `SHARD_START` - Starting shard ID for the process (needed for multi-process sharding)
-- `TOTAL_SHARDS` - Total shards across all processes (needed for multi-process sharding)
-- `TOPGG_BOT_ID` - Your bot's Application ID. Only used by `tools/topgg.sh` (optional)
-- `TOPGG_TOKEN` - top.gg API token. Only used by `tools/topgg.sh`; the legacy name `API` is still accepted when this is unset (optional)
 
-You can customize the build further by modifying `Cargo.toml` dependencies.
+See [`env.example`](env.example) for the full annotated list.
 
-## Development
+| Variable | Required | Description |
+| --- | --- | --- |
+| `DISCORD_TOKEN` | ✓ | Bot token from the Discord developer portal |
+| `DATABASE_URL` | | SQLite path — defaults to `./main.db`, created if missing |
+| `GUILD_ID` | | Register commands to one guild for instant testing |
+| `SHARD_COUNT` | | Shards for this process — defaults to 1 |
+| `USE_AUTOSHARDING` | | `true` lets Discord pick the shard count |
+| `SHARD_START` | | First shard ID (multi-process sharding) |
+| `TOTAL_SHARDS` | | Total shards across all processes (multi-process sharding) |
+| `MAX_CONCURRENCY` | | Hint only — Discord overrides with your bot's real limit |
+| `RUST_LOG` | | Log level — defaults to `info` |
 
-### Requirements
-- Rust 1.90+ (see `rust-version` in `Cargo.toml`)
-- Discord bot token
-- SQLite database (automatically created for bot statistics)
-- Dependencies - For a detailed list, review [Cargo.toml](Cargo.toml)
+### Container
 
-### Building
-```bash
-# Development build
-cargo build
+A production [`Dockerfile`](Dockerfile) is included — build it directly rather than copying
+one out of these docs:
 
-# Release build
-cargo build --release
-
-# Run tests
-cargo test
-
-# Run with logging
-RUST_LOG=debug cargo run
-```
-
-Before submitting changes, make sure the full quality gate passes:
-
-```bash
-cargo clippy -- -D warnings && cargo fmt --check && cargo test
-```
-
-### Project Structure
-```text
-src/
-├── main.rs             # Application entry point and Discord client setup
-├── database.rs         # SQLite database management for shard statistics
-├── help_text.rs        # Shared help text generation for all help commands
-├── lib.rs              # Shared libraries required for unit tests
-├── dice/
-│   ├── mod.rs          # Dice module exports and core types (DiceRoll, RollResult, etc.)
-│   ├── parser.rs       # Dice expression parsing and syntax validation
-│   ├── roller.rs       # Dice rolling execution and modifier application
-│   ├── rng.rs          # Enhanced cryptographically secure RNG with multiple entropy sources
-│   └── aliases.rs      # Game system aliases and expression expansions
-└── commands/
-    ├── mod.rs          # Command module exports and CommandResponse type
-    ├── roll.rs         # Roll command implementation with system info
-    ├── help.rs         # Help command with topic-based help system
-    └── purge.rs        # Message purge command with permission checking
-
-tests/
-├── unit_tests.rs           # Core dice logic, parsing, rolling
-├── game_systems_tests.rs   # All game system tests (consolidated)
-├── integration_tests.rs    # End-to-end functionality
-└── performance_tests.rs    # Performance and limit testing
-```
-
-## Deployment
-
-### Docker
-
-This is the `Dockerfile` from the repository root, reproduced verbatim.
-
-```dockerfile
-# Build arguments for version pinning
-ARG RUST_VERSION=1.90.0
-ARG UBI_VERSION=latest
-
-# ---------- Build stage ----------
-FROM rust:${RUST_VERSION} AS builder
-
-WORKDIR /app
-
-# Prime the dependency cache. Both dummy targets are required: the crate has an
-# autodiscovered src/lib.rs, so a main.rs-only stub cannot build the real target set.
-# `cargo clean -p` drops the stub's own artifacts and fingerprints while leaving every
-# dependency compiled; a plain rm of target/release/deps misses libdicemaiden_rs-*.rlib
-# and all of .fingerprint/, which silently links the stub into the real binary.
-COPY Cargo.toml Cargo.lock ./
-RUN mkdir -p src && \
-    echo "fn main() {}" > src/main.rs && \
-    echo "" > src/lib.rs && \
-    cargo build --release --locked && \
-    cargo clean --release -p dicemaiden-rs && \
-    rm -rf src
-
-# COPY preserves the build context's mtimes, which are older than the stub build above.
-# Without the touch, cargo's fingerprint check treats the real sources as fresh and
-# reuses the stub. Do not remove this.
-COPY src ./src
-RUN find src -name '*.rs' -exec touch {} + && \
-    cargo build --release --locked && \
-    ldd target/release/dicemaiden-rs
-
-# ---------- Runtime stage ----------
-FROM registry.access.redhat.com/ubi9/ubi-minimal:${UBI_VERSION}
-
-LABEL org.opencontainers.image.title="Dice Maiden" \
-      org.opencontainers.image.description="Discord dice bot" \
-      org.opencontainers.image.source="https://github.com/Humblemonk/dicemaiden-rs"
-
-# TLS is rustls end to end (serenity rustls_backend, sqlx runtime-tokio-rustls) and
-# sqlx bundles libsqlite3-sys, so openssl-libs and sqlite-libs are not linked by the
-# bot; `ldd` on the built binary shows only libgcc_s, libm and libc.
-#
-# sqlite and jq exist solely for the manual spot-check scripts in tools/. curl is already
-# present in the base image as curl-minimal. None of these are used by the bot itself.
-# hadolint ignore=DL3041
-RUN microdnf update -y && \
-    microdnf install -y --nodocs \
-        ca-certificates \
-        tzdata \
-        sqlite \
-        jq && \
-    microdnf clean all && \
-    rm -rf /var/cache/dnf && \
-    sqlite3 --version && jq --version
-
-RUN useradd -m -u 1000 -s /bin/sh dicemaiden
-
-COPY --from=builder --chmod=755 /app/target/release/dicemaiden-rs /usr/local/bin/dicemaiden-rs
-
-# Operator spot-check scripts, run by hand against a live deployment:
-#   kubectl exec deploy/dicemaiden-rs -- topgg.sh --dry-run
-# These live in /usr/local/bin rather than /app because the statistics database is a
-# mounted volume in production, and the mount shadows anything placed under /app.
-# dicemaiden-env.sh is sourced by both scripts via $(dirname "$0"), so it must sit
-# alongside them.
-COPY --chmod=755 tools/topgg.sh tools/quota.sh tools/dicemaiden-env.sh /usr/local/bin/
-
-# DATABASE_URL defaults to ./main.db, so the working directory must be writable.
-WORKDIR /app
-RUN chown dicemaiden:dicemaiden /app
-
-USER dicemaiden
-
-ENTRYPOINT ["/usr/local/bin/dicemaiden-rs"]
-```
-
-**Build and run:**
 ```bash
 docker build -t dicemaiden-rs .
-
-# .env must contain at least DISCORD_TOKEN; the named volume persists the SQLite
-# database, which lives in the working directory (/app) by default
-docker run -d \
-  --name dicemaiden \
-  --restart unless-stopped \
-  --env-file .env \
-  -v dicemaiden-data:/app \
-  dicemaiden-rs
+docker run --env-file .env -v dicemaiden-data:/app/data dicemaiden-rs
 ```
 
-### Systemd Service
+<details>
+<summary><b>Systemd service</b></summary>
+
 ```ini
 [Unit]
 Description=Dice Maiden
 After=network-online.target
 Wants=network-online.target
-# Rate-limit restarts: an unbounded restart loop during a network outage can
-# exhaust Discord's daily session start budget and invalidate your token.
-StartLimitIntervalSec=1800
-StartLimitBurst=5
 
 [Service]
 Type=simple
 User=dicebot
 Group=dicebot
-# Working directory must be writable: the default DATABASE_URL (sqlite:main.db)
-# resolves relative to it, and ProtectSystem=strict blocks writes elsewhere.
-WorkingDirectory=/opt/dicemaiden-rs/data
-Environment=RUST_LOG=warn,dicemaiden_rs=info,serenity::gateway=info
+WorkingDirectory=/opt/dicemaiden-rs
+Environment=RUST_LOG=info
 EnvironmentFile=/opt/dicemaiden-rs/.env
 ExecStart=/opt/dicemaiden-rs/target/release/dicemaiden-rs
 Restart=always
-RestartSec=60
+RestartSec=10
 TimeoutStartSec=300
 TimeoutStopSec=120
 
@@ -280,52 +124,33 @@ PrivateTmp=true
 WantedBy=multi-user.target
 ```
 
-### Multi-Process Sharding
+</details>
+
+<details>
+<summary><b>Multi-process sharding</b></summary>
+
+Each process owns a contiguous shard range and shares one SQLite database.
+
 ```bash
-# Example: 3 processes handling 64 shards total
-# Process 1: shards 0-20
-SHARD_COUNT=21 SHARD_START=0 TOTAL_SHARDS=64 ./dicemaiden-rs &
-
-# Process 2: shards 21-41  
-SHARD_COUNT=21 SHARD_START=21 TOTAL_SHARDS=64 ./dicemaiden-rs &
-
-# Process 3: shards 42-63
-SHARD_COUNT=22 SHARD_START=42 TOTAL_SHARDS=64 ./dicemaiden-rs &
+# 3 processes handling 64 shards total
+SHARD_COUNT=21 SHARD_START=0  TOTAL_SHARDS=64 ./dicemaiden-rs &   # shards 0-20
+SHARD_COUNT=21 SHARD_START=21 TOTAL_SHARDS=64 ./dicemaiden-rs &   # shards 21-41
+SHARD_COUNT=22 SHARD_START=42 TOTAL_SHARDS=64 ./dicemaiden-rs &   # shards 42-63
 ```
 
-## Differences from Original
-
-This Rust implementation maintains full compatibility with the original DiceMaiden's dice syntax while offering:
-
-- **Better Performance**: Rust's zero-cost abstractions and memory safety plus low memory utilization
-- **Modern Discord API**: Native slash command support
-- **Type Safety**: Compile-time guarantees prevent runtime errors
-- **Easier Deployment**: Single binary with no runtime dependencies
-- **Better Error Handling**: Comprehensive error messages and recovery
+</details>
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Verify the quality gate passes: `cargo clippy -- -D warnings && cargo fmt --check && cargo test`
-6. Submit a pull request
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor workflow.
+Setup, code standards, testing patterns, and the process for adding a new game system are in
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under the [GPLv3 License](LICENSE)
-
-## Acknowledgments
-
-- Original [DiceMaiden](https://github.com/Humblemonk/DiceMaiden) by Humblemonk and many awesome contributors!
-- [Serenity](https://github.com/serenity-rs/serenity) Discord library
-- The Rust community for excellent crates and documentation
+GPLv3
 
 ## Support
 
-- Create an issue for bugs or feature requests
-- Check the documentation for dice syntax questions
-- Join the [Discord community](https://discord.gg/AYNcxc9NeU) for help and discussion
+- [Open an issue](https://github.com/Humblemonk/dicemaiden-rs/issues) for bugs or feature requests
+- [Join the Discord](https://discord.gg/AYNcxc9NeU) for help and discussion
+- [`roll_syntax.md`](roll_syntax.md) for dice syntax questions
