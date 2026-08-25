@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.6.1] - 2026-08-25
+
+## Fixed
+
+- Substantially improved dice parsing performance across the board. Every roll is resolved
+  faster, and long or modifier-heavy expressions that previously took a noticeable amount of
+  time now complete almost instantly.
+- Fixed an issue where sustained roll traffic could make the bot stop responding on a group
+  of servers until it was restarted manually. Rolls no longer consume enough processing time
+  to interfere with the bot's connection to Discord.
+
+## Changed
+
+- `/roll bot-info` now requires the Administrator permission. It reports process and server
+  statistics intended for bot operators, and gathering them is expensive enough that it is no
+  longer available on the public roll path.
+
 ## [1.6.0] - 2026-08-20
 
 ## Added

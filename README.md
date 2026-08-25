@@ -32,7 +32,7 @@ To restrict the bot to specific channels, go to **Server Settings → Integratio
 | `/help [topic]` | Help — topics: `basic`, `alias`, `system`, `a5e`, `aliens`, `mothership` |
 | `/purge <count>` | Delete recent messages (requires Manage Messages) |
 | `/roll donate` | Support information |
-| `/roll bot-info` | Bot statistics |
+| `/roll bot-info` | Bot statistics (requires Administrator) |
 
 ## Rolling Dice
 

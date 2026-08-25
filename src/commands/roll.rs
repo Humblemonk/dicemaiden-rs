@@ -4,6 +4,9 @@
 //! dice engine, and formats the result into a Discord message.  Handles the `p`
 //! (private/ephemeral) flag and enforces Discord's 2 000-character message limit.
 //!
+//! The `bot-info` sub-command is restricted to guild administrators — see
+//! [`is_guild_administrator`].
+//!
 //! # Data flow
 //!
 //! ```text
@@ -19,6 +22,7 @@ use crate::DatabaseContainer;
 use crate::dice;
 use crate::help_text; // Import the shared help text module from src root
 use anyhow::Result;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serenity::{
     all::{CommandDataOptionValue, CommandInteraction, CommandOptionType},
@@ -145,6 +149,14 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
     match normalized.as_str() {
         "donate" => return Ok(CommandResponse::public(generate_donate_text())),
         "bot-info" => {
+            // Operator-only: generating this report scans /proc and walks the
+            // full guild cache, so it is gated to server administrators rather
+            // than exposed on the public roll path.
+            if !is_guild_administrator(command) {
+                return Ok(CommandResponse::private(
+                    "❌ You need the 'Administrator' permission to use `bot-info`.".to_string(),
+                ));
+            }
             let bot_info = generate_bot_info(ctx).await?;
             return Ok(CommandResponse::public(bot_info));
         }
@@ -229,6 +241,17 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
             }
         }
     }
+}
+
+/// True when the invoking member holds the **Administrator** permission in the
+/// guild the command came from. Returns false in DMs, where the permission has
+/// no meaning.
+fn is_guild_administrator(command: &CommandInteraction) -> bool {
+    command
+        .member
+        .as_ref()
+        .and_then(|member| member.permissions)
+        .is_some_and(|perms| perms.administrator())
 }
 
 fn generate_donate_text() -> String {
@@ -416,16 +439,18 @@ async fn get_database_stats(ctx: &Context) -> String {
 /// - "(roll to hit) 1d20+2" -> "1d20+2"
 /// - "2d6 ! fire damage" -> "2d6"
 /// - "(attack) 1d20+5 ! with sword" -> "1d20+5"
-fn strip_label_and_comment_from_expression(expr: &str) -> String {
-    let mut cleaned = expr.to_string();
+static LEADING_LABEL_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\s*\([^)]*\)\s*").expect("Failed to compile LEADING_LABEL_REGEX"));
 
+static TRAILING_COMMENT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\s*!\s*.*$").expect("Failed to compile TRAILING_COMMENT_REGEX"));
+
+fn strip_label_and_comment_from_expression(expr: &str) -> String {
     // Remove labels in parentheses at the beginning: (label) dice_expression
-    let label_regex = Regex::new(r"^\s*\([^)]*\)\s*").unwrap();
-    cleaned = label_regex.replace(&cleaned, "").to_string();
+    let cleaned = LEADING_LABEL_REGEX.replace(expr, "");
 
     // Remove comments (everything after ! including the !)
-    let comment_regex = Regex::new(r"\s*!\s*.*$").unwrap();
-    cleaned = comment_regex.replace(&cleaned, "").to_string();
+    let cleaned = TRAILING_COMMENT_REGEX.replace(&cleaned, "");
 
     cleaned.trim().to_string()
 }

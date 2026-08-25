@@ -313,7 +313,7 @@ fn test_add_dice_with_modifiers() {
         // Verify that we have dice from both the base and added dice
         // (exact count depends on modifiers like keep/drop)
         assert!(
-            roll.individual_rolls.len() >= 1,
+            !roll.individual_rolls.is_empty(),
             "Should have at least one die result for '{}'",
             expression
         );
@@ -777,7 +777,7 @@ fn test_target_system_modifiers() {
         // Both should produce reasonable success counts
         let success_count = results[0].successes.unwrap();
         assert!(
-            success_count >= 0 && success_count <= 25,
+            (0..=25).contains(&success_count),
             "Success count {} should be reasonable for '{}': {}",
             success_count,
             expression,
@@ -1078,8 +1078,7 @@ fn test_special_flags_comprehensive() {
     for invalid_test in invalid_flag_tests {
         let result = parse_and_roll(invalid_test);
         // These might parse but shouldn't set flags incorrectly
-        if result.is_ok() {
-            let results = result.unwrap();
+        if let Ok(results) = result {
             // Just verify it doesn't crash - specific behavior may vary
             assert!(!results.is_empty());
         }
@@ -1118,7 +1117,7 @@ fn test_percentile_dice_variants() {
 
         // Verify total is in valid range
         let min_total = expected_count as i32;
-        let max_total = expected_count as i32 * expected_sides as i32;
+        let max_total = expected_count as i32 * expected_sides;
         assert!(
             results[0].total >= min_total && results[0].total <= max_total,
             "Total {} should be between {} and {} for '{}': {}",
@@ -1187,20 +1186,18 @@ fn test_edge_case_modifier_combinations() {
     for edge_case in edge_cases {
         let result = parse_and_roll(edge_case);
         // These should either work or fail gracefully
-        if result.is_err() {
-            println!(
-                "Edge case '{}' failed as expected: {:?}",
-                edge_case,
-                result.err()
-            );
-        } else {
-            println!("Edge case '{}' parsed successfully", edge_case);
-            let results = result.unwrap();
-            assert!(
-                !results.is_empty(),
-                "Should have results for '{}'",
-                edge_case
-            );
+        match result {
+            Ok(results) => {
+                println!("Edge case '{}' parsed successfully", edge_case);
+                assert!(
+                    !results.is_empty(),
+                    "Should have results for '{}'",
+                    edge_case
+                );
+            }
+            Err(error) => {
+                println!("Edge case '{}' failed as expected: {:?}", edge_case, error);
+            }
         }
     }
 }
@@ -1280,7 +1277,7 @@ fn test_complex_mathematical_expressions() {
         if expression.contains(" + ") {
             // Addition should increase success count by the modifier value
             assert!(
-                success_count >= 0 && success_count <= 3,
+                (0..=3).contains(&success_count),
                 "Success-based addition test '{}' should have 0-3 successes (3 dice), got {}: {}",
                 expression,
                 success_count,
@@ -1787,7 +1784,7 @@ fn test_single_dice_group_with_keep() {
         );
 
         // For now, just verify the dice group exists and has reasonable structure
-        assert!(group.rolls.len() > 0, "Should have some dice rolled");
+        assert!(!group.rolls.is_empty(), "Should have some dice rolled");
 
         // If keep modifiers are working, we should see some dropped dice
         if group.dropped_rolls.len() != expected_dropped {
@@ -2243,8 +2240,7 @@ fn test_lasers_feelings_no_standalone_l_conflict() {
         }
 
         // Verify the roll works as expected
-        if result.is_ok() {
-            let results = result.unwrap();
+        if let Ok(results) = result {
             assert!(
                 results[0].successes.is_some(),
                 "L&F '{}' should have success counting",
@@ -2424,7 +2420,7 @@ mod test_issue_94_minimal {
         assert!(roll.successes.is_some(), "Should have success counting");
         let success_count = roll.successes.unwrap();
         assert!(
-            success_count >= 0 && success_count <= 1,
+            (0..=1).contains(&success_count),
             "1d12+2 t8 should have 0-1 successes, got {}",
             success_count
         );
@@ -2441,7 +2437,7 @@ mod test_issue_94_minimal {
             );
             let success_count = roll.successes.unwrap();
             assert!(
-                success_count >= 0 && success_count <= 1,
+                (0..=1).contains(&success_count),
                 "Roll set {} should have 0-1 successes, got {}",
                 i,
                 success_count

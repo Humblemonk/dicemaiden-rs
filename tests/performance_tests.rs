@@ -215,7 +215,7 @@ fn test_semicolon_roll_limits() {
         "Five rolls should fail"
     );
 
-    let many_rolls = vec!["1d6"; 10].join(";");
+    let many_rolls = ["1d6"; 10].join(";");
     assert!(
         parse_and_roll(&many_rolls).is_err(),
         "Many rolls should fail"
@@ -250,7 +250,7 @@ fn test_explosion_limits() {
     // Normal explosions should work
     let result = parse_and_roll("1d6 e6").unwrap();
     assert!(
-        result[0].individual_rolls.len() >= 1,
+        !result[0].individual_rolls.is_empty(),
         "Should have at least original roll"
     );
     assert!(
@@ -611,6 +611,112 @@ fn test_alien_panic_roll_performance() {
             avg_time,
             max_ms,
             panic_count
+        );
+    }
+}
+
+// ============================================================================
+// REGEX COMPILATION REGRESSION GUARDS
+// ============================================================================
+//
+// Background: every regex in `parser.rs` was once compiled on each call rather
+// than once at startup. Compilation costs ~35us against ~1us of matching, and
+// the parser evaluates ~20 patterns per input token, so a 966-character roll
+// spent ~165ms of pure CPU rebuilding the same automata. On the gateway runtime
+// that starved Serenity's shard runners until their heartbeats failed and the
+// shards entered a reconnect loop.
+//
+// The two guards below protect the fix from opposite directions: the lint
+// catches a reintroduced `Regex::new` in a function body statically, and the
+// budget test catches any other cause of a large parsing slowdown.
+
+/// Best-of-N wall time in microseconds. Best-of is used rather than mean
+/// because it is far more robust to scheduler noise on shared CI runners.
+fn best_parse_micros(expression: &str, runs: usize) -> u128 {
+    let mut best = u128::MAX;
+    for _ in 0..runs {
+        let start = Instant::now();
+        let _ = parse_and_roll(expression);
+        best = best.min(start.elapsed().as_micros());
+    }
+    best
+}
+
+/// Rejects `Regex::new` anywhere outside a `static` initialiser in `src/`.
+///
+/// Regexes must be hoisted into `static ... : Lazy<Regex>` (or
+/// `Lazy<Vec<Regex>>`) so they compile once per process instead of once per
+/// call. This is a static check, so unlike a timing test it cannot flake.
+///
+/// The rule is expressed as an allowlist — a regex is legal *only* inside a
+/// `static` item — rather than as a denylist of `fn` bodies. A denylist has to
+/// enumerate every construct that can hold code (`fn`, `impl`, `trait`, a
+/// `const` initialiser, a macro body) and silently misses whatever it forgets.
+#[test]
+fn test_regexes_are_hoisted_to_statics() {
+    // Every source file that constructs regexes. Add new ones here.
+    let sources = vec![
+        ("dice/parser.rs", include_str!("../src/dice/parser.rs")),
+        ("dice/aliases.rs", include_str!("../src/dice/aliases.rs")),
+        ("dice/mod.rs", include_str!("../src/dice/mod.rs")),
+        ("commands/roll.rs", include_str!("../src/commands/roll.rs")),
+    ];
+
+    let mut offenders: Vec<String> = Vec::new();
+
+    for (path, source) in sources {
+        // rustfmt guarantees top-level items begin at column 0, so a `static`
+        // item runs from its own line until the next unindented line.
+        let mut in_static_item = false;
+
+        for (index, line) in source.lines().enumerate() {
+            let starts_new_item = !line.is_empty() && !line.starts_with(char::is_whitespace);
+            if starts_new_item {
+                in_static_item = line.starts_with("static ") || line.starts_with("pub static ");
+            }
+
+            if !in_static_item && line.contains("Regex::new") {
+                offenders.push(format!("  {}:{}: {}", path, index + 1, line.trim()));
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "regexes must be compiled once, in a `static NAME: Lazy<Regex>`, not per call.\n\
+         Offending lines:\n{}",
+        offenders.join("\n")
+    );
+}
+
+/// Backstop for the lint: asserts parsing stays far below the latency that
+/// caused the shard-starvation incident.
+///
+/// Budgets are deliberately loose. Measured worst case across a 797-expression
+/// corpus is ~0.26ms, and the pre-fix worst case was ~18.8ms, so 5ms both
+/// leaves ~19x headroom against CI noise and still fails loudly on a real
+/// regression.
+#[test]
+fn test_parsing_stays_within_latency_budget() {
+    const BUDGET_MICROS: u128 = 5_000;
+
+    let cases = vec![
+        ("1d20", "minimal roll"),
+        ("4d6 k3", "common stat roll"),
+        ("10d10 e10 k5 +3", "several modifiers"),
+        ("10d6 ie6 k5 r1 t4 +5", "modifier-dense"),
+        ("1d6 + 1d6 t4f1ie6 + 1d6 e6k1", "worst case in corpus"),
+        ("4d6 k3 ; 4d6 k3 ; 4d6 k3", "semicolon-separated"),
+        ("6 4d6 k3", "roll set"),
+        ("4d6 k3 ! character generation", "with comment"),
+    ];
+
+    for (expression, description) in cases {
+        let elapsed = best_parse_micros(expression, 20);
+        assert!(
+            elapsed <= BUDGET_MICROS,
+            "parsing '{expression}' ({description}) took {elapsed}us, budget is {BUDGET_MICROS}us. \
+             This usually means a regex is being compiled per call rather than in a Lazy static."
         );
     }
 }
