@@ -51,7 +51,10 @@ Ruby bot's history/tooling — they are not part of the Rust build. Don't modify
   prefix of an existing one can silently break unrelated rolls. Check `roll_syntax.md` for
   every existing token before introducing new syntax.
 - Multi-character prefixes (`ie`, `irg`, `ir`, `km`, `kl`, `tl`) must be matched **before**
-  their single-character counterparts (`e`, `r`, `k`, `t`). Preserve this ordering.
+  their single-character counterparts (`e`, `r`, `k`, `t`). Preserve this ordering. The
+  ordered pattern lists live in the `COMBINED_MODIFIER_PATTERNS`, `SPLIT_MODIFIER_PATTERNS`,
+  and `MODIFIER_START_PATTERNS` statics in `parser.rs` — they are `Vec<Regex>` rather than
+  sets precisely because order is load-bearing. Never sort or dedupe them.
 - **Drop before explode** — dropped dice are never reconsidered for explosion. This is
   intentional and covered by tests. Do not change modifier ordering semantics.
 - Dice syntax is a public API. Never change the behavior of an existing expression without
@@ -98,6 +101,12 @@ Follow this sequence, no skipped or reordered steps:
 - Meaningful names (`dice_count` not `n`); delete replaced code; no versioned function
   names (`process_v2`, `handle_new`)
 - Randomness goes through `rng.rs` only — never instantiate ad-hoc RNGs elsewhere
+- **Never call `Regex::new` inside a function.** Hoist every pattern into a
+  `static NAME: Lazy<Regex>` (or `Lazy<Vec<Regex>>` for an ordered list). Compiling a regex
+  costs ~35µs against ~1µs to match with it, and the parser evaluates ~20 patterns per input
+  token — per-call compilation once made a single legal roll cost 165ms of CPU and starved
+  the gateway until every shard in the process dropped. `tests/performance_tests.rs` enforces
+  this; add any new regex-bearing source file to the list there.
 
 ## Operational Context
 
