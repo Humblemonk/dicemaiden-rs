@@ -5,7 +5,7 @@
 //! (private/ephemeral) flag and enforces Discord's 2 000-character message limit.
 //!
 //! The `bot-info` sub-command is restricted to guild administrators — see
-//! [`is_guild_administrator`].
+//! [`is_guild_administrator`] — and replies ephemerally, like `/help`.
 //!
 //! # Data flow
 //!
@@ -151,14 +151,15 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
         "bot-info" => {
             // Operator-only: generating this report scans /proc and walks the
             // full guild cache, so it is gated to server administrators rather
-            // than exposed on the public roll path.
+            // than exposed on the public roll path.  The report itself replies
+            // ephemerally so it never spams the channel.
             if !is_guild_administrator(command) {
                 return Ok(CommandResponse::private(
                     "❌ You need the 'Administrator' permission to use `bot-info`.".to_string(),
                 ));
             }
             let bot_info = generate_bot_info(ctx).await?;
-            return Ok(CommandResponse::public(bot_info));
+            return Ok(CommandResponse::private(bot_info));
         }
         _ => {} // Continue with normal dice parsing
     }
