@@ -182,7 +182,7 @@ New syntax or game systems need cases for **all** of the following:
 - Use `?` for error propagation — avoid deep `match`/`if let` nesting
 - Use `tracing::{info!, warn!, error!, debug!}` for all logging
 - All randomness goes through `src/dice/rng.rs` — never instantiate ad-hoc RNGs elsewhere
-- Hoist every regex into a `static NAME: Lazy<Regex>` (or `Lazy<Vec<Regex>>` for an ordered list) — see below
+- Hoist every regular expression into a `static NAME: Lazy<Regex>` (or `Lazy<Vec<Regex>>` for an ordered list) — see below
 
 ### Forbidden
 
@@ -199,7 +199,7 @@ New syntax or game systems need cases for **all** of the following:
 
 ### Why regexes must be hoisted
 
-Compiling a regex costs roughly 35µs; matching with an already-compiled one costs about 1µs.
+Compiling a regular expression costs roughly 35µs; matching with an already-compiled one costs about 1µs.
 The parser evaluates ~20 patterns per input token, so compiling per call made a single legal
 966-character roll cost 165ms of CPU. Because `parse_and_roll` runs synchronously on the
 gateway runtime, that time held tokio worker threads and left Serenity's shard runners
