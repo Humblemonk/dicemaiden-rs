@@ -410,7 +410,7 @@ fn test_common_rpg_scenarios() {
                 // For panic situations (if stress dice roll 1s), verify panic mechanics
                 if let Some(panic_roll) = roll.alien_panic_roll {
                     assert!(
-                        panic_roll >= 4 && panic_roll <= 16,
+                        (4..=16).contains(&panic_roll),
                         "Alien RPG panic roll should be in valid range for '{}'",
                         expression
                     );
@@ -1256,8 +1256,7 @@ fn test_discord_formatting_edge_cases() {
 
     for (expression, description) in formatting_edge_cases {
         let result = parse_and_roll(expression);
-        if result.is_ok() {
-            let results = result.unwrap();
+        if let Ok(results) = result {
             let formatted = format_multiple_results_with_limit(&results);
 
             // Should not exceed Discord limits
@@ -1331,13 +1330,13 @@ fn test_modifier_position_behavior() {
     let success_count2 = roll2[0].successes.unwrap();
 
     assert!(
-        success_count1 >= 0 && success_count1 <= 25,
+        (0..=25).contains(&success_count1),
         "Pre-target modifier should give reasonable success count, got {}",
         success_count1
     );
 
     assert!(
-        success_count2 >= 0 && success_count2 <= 25,
+        (0..=25).contains(&success_count2),
         "Post-target modifier should give reasonable success count, got {}",
         success_count2
     );
@@ -1700,12 +1699,10 @@ fn test_alien_rpg_full_integration() {
             }
 
             // Verify panic mechanics if triggered
-            if roll.alien_panic_roll.is_some() {
-                let panic_roll = roll.alien_panic_roll.unwrap();
-
+            if let Some(panic_roll) = roll.alien_panic_roll {
                 // Panic roll should be in valid range
                 assert!(
-                    panic_roll >= 4 && panic_roll <= 16,
+                    (4..=16).contains(&panic_roll),
                     "Alien workflow '{}' panic roll {} should be in valid range",
                     expression,
                     panic_roll
@@ -1792,8 +1789,7 @@ fn test_alien_rpg_cross_system_compatibility() {
 fn test_daggerheart_with_roll_sets() {
     // Test daggerheart works with roll sets if applicable
     let result = parse_and_roll("3 dheart");
-    if result.is_ok() {
-        let results = result.unwrap();
+    if let Ok(results) = result {
         assert_eq!(results.len(), 3);
         for roll in &results {
             assert!(roll.label.as_ref().unwrap().starts_with("Set "));

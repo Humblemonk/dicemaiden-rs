@@ -45,6 +45,7 @@ pub mod rng;
 pub mod roller;
 
 use anyhow::Result;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::fmt;
 
@@ -585,10 +586,12 @@ fn format_standard_multiple_results(results: &[RollResult]) -> String {
 }
 
 /// Extract the dice expression without the comment portion
+static COMMENT_SUFFIX_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\s*!\s*.*$").expect("Failed to compile COMMENT_SUFFIX_REGEX"));
+
 fn strip_comment_from_expression(expr: &str) -> String {
     // Use regex to remove comment (everything after ! including the !)
-    let comment_regex = Regex::new(r"\s*!\s*.*$").unwrap();
-    comment_regex.replace(expr, "").trim().to_string()
+    COMMENT_SUFFIX_REGEX.replace(expr, "").trim().to_string()
 }
 
 const DISCORD_MESSAGE_LIMIT: usize = 2000;

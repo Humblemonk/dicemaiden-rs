@@ -1453,7 +1453,7 @@ fn test_missing_game_systems() {
         assert!(
             results[0].total >= 0
                 || results[0].successes.is_some()
-                || results[0].individual_rolls.len() > 0,
+                || !results[0].individual_rolls.is_empty(),
             "Should have meaningful results for '{}': {}",
             expression,
             description
@@ -1559,8 +1559,7 @@ fn test_system_edge_cases_and_boundaries() {
     for (expression, description) in boundary_tests {
         let result = parse_and_roll(expression);
         // Some of these might be invalid, but they shouldn't crash
-        if result.is_ok() {
-            let results = result.unwrap();
+        if let Ok(results) = result {
             assert!(
                 !results.is_empty(),
                 "Should have results for '{}': {}",
@@ -1636,7 +1635,7 @@ fn test_storypath_system_comprehensive() {
         // Should be using d10s (all rolls 1-10)
         for &die_roll in &roll.individual_rolls {
             assert!(
-                die_roll >= 1 && die_roll <= 10,
+                (1..=10).contains(&die_roll),
                 "Storypath should use d10s, got {} for '{}'",
                 die_roll,
                 alias
@@ -1727,7 +1726,7 @@ fn test_double_digit_dice_comprehensive() {
         );
 
         // Calculate expected range
-        let min_total = 1 * 10 + 1; // Minimum: 1 on tens die * 10 + 1 on ones die
+        let min_total = 10 + 1; // Minimum: 1 on tens die * 10 + 1 on ones die
         let max_total = tens_sides * 10 + ones_sides; // Maximum possible
 
         assert!(
@@ -1745,7 +1744,7 @@ fn test_double_digit_dice_comprehensive() {
         // but we can verify they're all in reasonable ranges
         for &die_roll in &roll.individual_rolls {
             assert!(
-                die_roll >= 1 && die_roll <= 8, // Max of our test cases
+                (1..=8).contains(&die_roll), // Max of our test cases
                 "Double digit die roll {} should be reasonable for '{}'",
                 die_roll,
                 alias
@@ -1841,7 +1840,7 @@ fn test_sunsails_new_millennium_comprehensive() {
         // Should be using d6s (all rolls 1-6)
         for &die_roll in &roll.individual_rolls {
             assert!(
-                die_roll >= 1 && die_roll <= 6,
+                (1..=6).contains(&die_roll),
                 "SNM should use d6s, got {} for '{}'",
                 die_roll,
                 alias
@@ -1849,7 +1848,7 @@ fn test_sunsails_new_millennium_comprehensive() {
         }
 
         // Should have notes about explosions if any 6s were rolled
-        let has_sixes = roll.individual_rolls.iter().any(|&r| r == 6);
+        let has_sixes = roll.individual_rolls.contains(&6);
         if has_sixes && roll.individual_rolls.len() > expected_dice {
             let has_explosion_note = roll
                 .notes
@@ -1944,7 +1943,7 @@ fn test_year_zero_engine_comprehensive() {
         // Should be using d6s (all rolls 1-6)
         for &die_roll in &roll.individual_rolls {
             assert!(
-                die_roll >= 1 && die_roll <= 6,
+                (1..=6).contains(&die_roll),
                 "Year Zero should use d6s, got {} for '{}'",
                 die_roll,
                 alias
@@ -2041,7 +2040,7 @@ fn test_warhammer_40k_aos_comprehensive() {
         let actual_successes = roll
             .individual_rolls
             .iter()
-            .filter(|&&r| r >= target as i32)
+            .filter(|&&r| r >= target)
             .count();
         assert_eq!(
             success_count, actual_successes as i32,
@@ -2052,7 +2051,7 @@ fn test_warhammer_40k_aos_comprehensive() {
         // Should be using d6s (all rolls 1-6)
         for &die_roll in &roll.individual_rolls {
             assert!(
-                die_roll >= 1 && die_roll <= 6,
+                (1..=6).contains(&die_roll),
                 "Warhammer should use d6s, got {} for '{}'",
                 die_roll,
                 alias
@@ -2093,7 +2092,7 @@ fn test_warhammer_40k_aos_comprehensive() {
         let actual_successes = roll
             .individual_rolls
             .iter()
-            .filter(|&&r| r >= target as i32)
+            .filter(|&&r| r >= target)
             .count();
 
         assert_eq!(
@@ -2105,7 +2104,7 @@ fn test_warhammer_40k_aos_comprehensive() {
         // Special case: 1+ target should always succeed on d6
         if target == 1 {
             assert_eq!(
-                success_count, expected_dice as i32,
+                success_count, expected_dice,
                 "1+ target should always succeed all dice for '{}'",
                 alias
             );
@@ -2290,7 +2289,7 @@ fn test_exalted_system_comprehensive() {
         // Should be using d10s (all rolls 1-10)
         for &die_roll in &roll.individual_rolls {
             assert!(
-                die_roll >= 1 && die_roll <= 10,
+                (1..=10).contains(&die_roll),
                 "Exalted should use d10s, got {} for '{}'",
                 die_roll,
                 alias
@@ -2303,7 +2302,7 @@ fn test_exalted_system_comprehensive() {
             .individual_rolls
             .iter()
             .map(|&r| {
-                if r >= expected_target as i32 && r < 10 {
+                if r >= expected_target && r < 10 {
                     1 // Single success for target+ but less than 10
                 } else if r == 10 {
                     2 // Double success for 10s
@@ -2369,12 +2368,12 @@ fn test_exalted_system_comprehensive() {
         );
 
         // Verify double 10s rule still applies
-        if roll.individual_rolls.iter().any(|&r| r == 10) {
+        if roll.individual_rolls.contains(&10) {
             let tens_count = roll.individual_rolls.iter().filter(|&&r| r == 10).count();
             let other_successes = roll
                 .individual_rolls
                 .iter()
-                .filter(|&&r| r >= expected_target as i32 && r < 10)
+                .filter(|&&r| r >= expected_target && r < 10)
                 .count();
             let expected_successes = (tens_count * 2) + other_successes;
 
@@ -2656,8 +2655,8 @@ fn test_wrath_glory_complications_and_glory() {
 
         // If we have wrath dice results, check for appropriate mechanics
         if let Some(ref wrath_dice) = roll.wng_wrath_dice {
-            let has_ones = wrath_dice.iter().any(|&d| d == 1);
-            let has_sixes = wrath_dice.iter().any(|&d| d == 6);
+            let has_ones = wrath_dice.contains(&1);
+            let has_sixes = wrath_dice.contains(&6);
 
             if has_ones && !has_complication {
                 println!("Note: Complication (1) detected but no complication note found");
@@ -2814,7 +2813,7 @@ fn test_wrath_glory_edge_case_wrath_dice_counts() {
                 expected_wrath_count,
                 expression
             );
-        } else if let Some(_) = roll.wng_wrath_die {
+        } else if roll.wng_wrath_die.is_some() {
             // Legacy single wrath die tracking
             if expected_wrath_count == 1 {
                 // This is fine for single wrath die
@@ -2876,7 +2875,7 @@ fn test_advanced_percentile_edge_cases() {
         // For percentile dice, all individual rolls should be in range 1-10 or 1-100 depending on implementation
         for &die_roll in &roll.individual_rolls {
             assert!(
-                (die_roll >= 1 && die_roll <= 10) || (die_roll >= 1 && die_roll <= 100),
+                (1..=10).contains(&die_roll) || (1..=100).contains(&die_roll),
                 "Percentile die roll should be 1-10 or 1-100, got {} for '{}'",
                 die_roll,
                 expression
@@ -2927,7 +2926,7 @@ fn test_percentile_advantage_mechanics_detailed() {
     // All results should be in valid percentile range
     for &total in &advantage_totals {
         assert!(
-            total >= 1 && total <= 100,
+            (1..=100).contains(&total),
             "Advantage total {} should be 1-100",
             total
         );
@@ -2935,7 +2934,7 @@ fn test_percentile_advantage_mechanics_detailed() {
 
     for &total in &disadvantage_totals {
         assert!(
-            total >= 1 && total <= 100,
+            (1..=100).contains(&total),
             "Disadvantage total {} should be 1-100",
             total
         );
@@ -2943,7 +2942,7 @@ fn test_percentile_advantage_mechanics_detailed() {
 
     for &total in &regular_totals {
         assert!(
-            total >= 1 && total <= 100,
+            (1..=100).contains(&total),
             "Regular total {} should be 1-100",
             total
         );
@@ -3304,8 +3303,7 @@ fn test_cancel_mechanics_validation() {
 
     for _ in 0..20 {
         let result = parse_and_roll("4wod8c");
-        if result.is_ok() {
-            let results = result.unwrap();
+        if let Ok(results) = result {
             let roll = &results[0];
 
             // Basic validation that the mechanics are working
@@ -3314,8 +3312,8 @@ fn test_cancel_mechanics_validation() {
 
             // Check for cancel notes when appropriate
             let has_cancel_note = roll.notes.iter().any(|note| note.contains("CANCELLED"));
-            let has_tens = roll.kept_rolls.iter().any(|&r| r == 10);
-            let has_ones = roll.kept_rolls.iter().any(|&r| r == 1);
+            let has_tens = roll.kept_rolls.contains(&10);
+            let has_ones = roll.kept_rolls.contains(&1);
 
             // If we have both 10s and 1s, we might see a cancel note
             if has_tens && has_ones {
@@ -3376,7 +3374,7 @@ fn test_vtm5_system_comprehensive() {
         // Success count should be reasonable (0 to pool size * 2 max for crits)
         let success_count = roll.successes.unwrap();
         assert!(
-            success_count >= 0 && success_count <= (expected_pool as i32 * 2),
+            success_count >= 0 && success_count <= (expected_pool * 2),
             "Success count {} should be 0-{} for '{}': {}",
             success_count,
             expected_pool * 2,
@@ -3585,14 +3583,14 @@ fn test_vtm5_mechanics_simulation() {
     // All dice should be d10s (1-10 range)
     for &die_roll in &roll.individual_rolls {
         assert!(
-            die_roll >= 1 && die_roll <= 10,
+            (1..=10).contains(&die_roll),
             "VTM5 should use d10s, got {}",
             die_roll
         );
     }
 
     // Should have appropriate dice groups
-    assert!(roll.dice_groups.len() >= 1 && roll.dice_groups.len() <= 2);
+    assert!(!roll.dice_groups.is_empty() && roll.dice_groups.len() <= 2);
 
     // Total successes should equal success count
     assert_eq!(roll.total, roll.successes.unwrap());
@@ -3667,7 +3665,7 @@ fn test_lasers_feelings_mechanics() {
         );
 
         // Should use d6s only
-        let all_d6 = roll.individual_rolls.iter().all(|&r| r >= 1 && r <= 6);
+        let all_d6 = roll.individual_rolls.iter().all(|&r| (1..=6).contains(&r));
         assert!(
             all_d6,
             "Lasers & Feelings should only use d6s for '{}'",
@@ -3784,7 +3782,7 @@ fn test_lasers_feelings_success_counting() {
 
         // Success count should be reasonable (0-2 for 2 dice)
         assert!(
-            successes >= 0 && successes <= 2,
+            (0..=2).contains(&successes),
             "Lasers success count should be 0-2, got {}",
             successes
         );
@@ -3794,7 +3792,7 @@ fn test_lasers_feelings_success_counting() {
 
         // Success count should be reasonable (0-2 for 2 dice)
         assert!(
-            successes >= 0 && successes <= 2,
+            (0..=2).contains(&successes),
             "Feelings success count should be 0-2, got {}",
             successes
         );
@@ -4066,7 +4064,7 @@ fn test_alien_rpg_panic_mechanics() {
         // If panic roll exists, it should be reasonable
         if let Some(panic_roll) = result[0].alien_panic_roll {
             assert!(
-                panic_roll >= 4 && panic_roll <= 9, // 1d6(1-6) + 3 stress = 4-9
+                (4..=9).contains(&panic_roll), // 1d6(1-6) + 3 stress = 4-9
                 "Panic roll should be in range 4-9 for stress level 3, got {}",
                 panic_roll
             );
@@ -4291,7 +4289,7 @@ fn test_fitd_basic_mechanics() {
 
         let highest_die = roll.fitd_highest_die.unwrap();
         assert!(
-            highest_die >= 1 && highest_die <= 6,
+            (1..=6).contains(&highest_die),
             "Highest die should be 1-6, got {} for '{}'",
             highest_die,
             test
@@ -4390,34 +4388,34 @@ fn test_fitd_critical_success_detection() {
         let result = parse_and_roll("fitd6"); // 6 dice gives good chance for multiple 6s
         if let Ok(results) = result {
             let roll = &results[0];
-            if let Some(outcome) = &roll.fitd_outcome {
-                if outcome == "CRITICAL SUCCESS" {
-                    found_critical = true;
+            if let Some(outcome) = &roll.fitd_outcome
+                && outcome == "CRITICAL SUCCESS"
+            {
+                found_critical = true;
 
-                    // Verify that we actually have multiple 6s
-                    let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
-                    assert!(
-                        six_count >= 2,
-                        "Critical success should have multiple 6s, found {} sixes",
-                        six_count
-                    );
+                // Verify that we actually have multiple 6s
+                let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
+                assert!(
+                    six_count >= 2,
+                    "Critical success should have multiple 6s, found {} sixes",
+                    six_count
+                );
 
-                    // UPDATED: Should have exactly one note (critical note)
-                    assert_eq!(
-                        roll.notes.len(),
-                        1,
-                        "Critical success should have exactly one note"
-                    );
+                // UPDATED: Should have exactly one note (critical note)
+                assert_eq!(
+                    roll.notes.len(),
+                    1,
+                    "Critical success should have exactly one note"
+                );
 
-                    // Should have critical note
-                    let has_critical_note = roll.notes.iter().any(|note| note.contains("CRITICAL"));
-                    assert!(
-                        has_critical_note,
-                        "Critical success should have critical note"
-                    );
+                // Should have critical note
+                let has_critical_note = roll.notes.iter().any(|note| note.contains("CRITICAL"));
+                assert!(
+                    has_critical_note,
+                    "Critical success should have critical note"
+                );
 
-                    break;
-                }
+                break;
             }
         }
     }
@@ -5153,7 +5151,7 @@ fn test_wod_cancel_bug_fix() {
     // Test that the final success count is reasonable
     let success_count = roll.successes.unwrap();
     assert!(
-        success_count >= -4 && success_count <= 4,
+        (-4..=4).contains(&success_count),
         "Success count should be reasonable: got {}",
         success_count
     );
@@ -5177,12 +5175,12 @@ fn test_wod_cancel_bug_fix() {
     let failure_count2 = roll2.failures.unwrap();
 
     assert!(
-        success_count2 >= -5 && success_count2 <= 5,
+        (-5..=5).contains(&success_count2),
         "WoD6 success count should be reasonable: got {}",
         success_count2
     );
     assert!(
-        failure_count2 >= 0 && failure_count2 <= 5,
+        (0..=5).contains(&failure_count2),
         "WoD6 failure count should be reasonable: got {}",
         failure_count2
     );

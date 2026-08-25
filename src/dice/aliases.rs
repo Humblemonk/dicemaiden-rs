@@ -245,9 +245,11 @@ static ALIEN_PUSH_REGEX: Lazy<Regex> = Lazy::new(|| {
 static FITD_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(?i)fitd(\d+)$").expect("Failed to compile FITD_REGEX"));
 
-static WILD_WORLDS_BASIC_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^ww(\d+)$").unwrap());
+static WILD_WORLDS_BASIC_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^ww(\d+)$").expect("Failed to compile WILD_WORLDS_BASIC_REGEX"));
 
-static WILD_WORLDS_CUT_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^ww(\d+)c(\d+)$").unwrap());
+static WILD_WORLDS_CUT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^ww(\d+)c(\d+)$").expect("Failed to compile WILD_WORLDS_CUT_REGEX"));
 
 static MNM_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^mnm(?:\s*([+-]\s*\d+))?$").expect("Failed to compile MNM_REGEX"));
