@@ -102,7 +102,7 @@ Follow this sequence, no skipped or reordered steps:
   names (`process_v2`, `handle_new`)
 - Randomness goes through `rng.rs` only — never instantiate ad-hoc RNGs elsewhere
 - **Never call `Regex::new` inside a function.** Hoist every pattern into a
-  `static NAME: Lazy<Regex>` (or `Lazy<Vec<Regex>>` for an ordered list). Compiling a regex
+  `static NAME: Lazy<Regex>` (or `Lazy<Vec<Regex>>` for an ordered list). Compiling a regular expression
   costs ~35µs against ~1µs to match with it, and the parser evaluates ~20 patterns per input
   token — per-call compilation once made a single legal roll cost 165ms of CPU and starved
   the gateway until every shard in the process dropped. `tests/performance_tests.rs` enforces
