@@ -51,7 +51,7 @@ To restrict the bot to specific channels, go to **Server Settings → Integratio
 
 ## Self-Hosting
 
-Requires Rust 1.90+ and a Discord bot token. SQLite is created automatically.
+Requires Rust 1.95+ and a Discord bot token. SQLite is created automatically.
 
 ```bash
 git clone https://github.com/Humblemonk/dicemaiden-rs.git

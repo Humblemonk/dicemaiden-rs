@@ -196,7 +196,7 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
     use tracing_subscriber::EnvFilter;
 
     tracing_subscriber::fmt()

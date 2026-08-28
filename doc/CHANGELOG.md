@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.2] -2026-08-28
+
+## Fixed
+
+- Replaced the unmaintained `dotenv` crate with `dotenvy` (RUSTSEC-2021-0141); no change to `.env` handling
+- Upgraded `sqlx` to 0.9 and `sysinfo` to 0.39; minimum supported Rust version is now 1.95
+
 ## [1.6.1] - 2026-08-25
 
 ## Fixed

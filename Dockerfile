@@ -1,5 +1,5 @@
 # Build arguments for version pinning
-ARG RUST_VERSION=1.90.0
+ARG RUST_VERSION=1.95.0
 ARG UBI_VERSION=latest
 
 # ---------- Build stage ----------
