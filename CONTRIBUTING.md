@@ -32,7 +32,7 @@ Thanks for your interest in contributing! Dice Maiden is an open-source Discord 
 
 ### Requirements
 
-- Rust 1.90+ (see `rust-version` in `Cargo.toml`)
+- Rust 1.95+ (see `rust-version` in `Cargo.toml`)
 - A Discord bot token (for manual testing; not needed to run the test suite)
 - SQLite (the bot creates the database automatically)
 
