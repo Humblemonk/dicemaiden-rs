@@ -47,7 +47,8 @@ RUN microdnf update -y && \
         ca-certificates \
         tzdata \
         sqlite \
-        jq && \
+        jq \
+        vim-minimal && \
     microdnf clean all && \
     rm -rf /var/cache/dnf && \
     sqlite3 --version && jq --version
