@@ -115,11 +115,13 @@ cargo clippy -- -D warnings && cargo fmt --check && cargo test
 
 ### Copypaste check (JSCPD)
 
-CI runs super-linter, whose JSCPD copypaste detector has a threshold of **0**: any clone of 5 or more lines (50+ tokens) fails the build. Run the same check locally before opening a PR:
+CI runs super-linter, whose JSCPD copypaste detector has a threshold of **0**: any clone of 5 or more lines (50+ tokens) fails the build, in every language it scans — Markdown included. Approximate it locally before opening a PR:
 
 ```bash
-npx jscpd@3 --config .github/linters/.jscpd.json src tests
+npx jscpd@3 --threshold 0 --min-lines 5 --min-tokens 50 --max-lines 20000 --max-size 10mb src tests
 ```
+
+The `--max-*` flags matter — without them JSCPD skips `roller.rs` (too large) and `parser.rs` (too many lines), reporting a clean run that CI will contradict.
 
 The fix is never to reword the copy — extract the shared part. See [Shared helpers](#shared-helpers) below.
 
@@ -284,7 +286,7 @@ builds regexes, add it to the list in that test.
 ## Submitting a Pull Request
 
 1. Ensure `cargo clippy -- -D warnings && cargo fmt --check && cargo test` all pass
-2. Ensure `npx jscpd@3 --config .github/linters/.jscpd.json src tests` reports 0 clones
+2. Ensure `npx jscpd@3 --threshold 0 --min-lines 5 --min-tokens 50 --max-lines 20000 --max-size 10mb src tests` reports 0 clones
 3. If you added a game system, confirm `roll_syntax.md` is updated
 4. Keep your PR focused — one feature or fix per PR
 5. Write a clear description of what you changed and why

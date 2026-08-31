@@ -19,12 +19,15 @@ Tests run without a Discord token. For manual testing against a live guild, set 
 in `.env` so slash commands register instantly instead of waiting for global propagation.
 
 CI additionally runs super-linter, whose JSCPD copypaste check has a threshold of **0** —
-any clone of 5+ lines / 50+ tokens fails the build. Run the same check locally before
-pushing (same config CI uses):
+any clone of 5+ lines / 50+ tokens fails the build, in any language it scans — Markdown
+included. Approximate it locally before pushing:
 
 ```
-npx jscpd@3 --config .github/linters/.jscpd.json src tests
+npx jscpd@3 --threshold 0 --min-lines 5 --min-tokens 50 --max-lines 20000 --max-size 10mb src tests
 ```
+
+The `--max-*` flags matter: without them JSCPD skips `roller.rs` (too large) and `parser.rs`
+(too many lines) and reports a clean run that CI will contradict.
 
 ## Architecture
 
@@ -86,25 +89,23 @@ that is actually specific to the new system.
 
 ## Shared Helpers (use these instead of copypasting)
 
-Every one of these exists because the same block had been pasted 2–10 times. If you are
-about to write something that resembles a row on the left, the right-hand column already
-does it.
+Each exists because the same block had been pasted 2–10 times. Reach for one of these
+before writing new roll logic:
 
-| Instead of writing | Call |
-| --- | --- |
-| The 30-field `RollResult { .. }` literal | `RollResult::from_dice(&dice)` — or `RollResult { field: x, ..RollResult::from_dice(&dice) }` when a field differs |
-| A loop applying `+ - * /` to `result.total` | `apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)` |
-| `matches!(m, Modifier::Add(_) \| Modifier::Subtract(_) \| ...)` | `is_arithmetic_modifier(m)`, or `ArithmeticOp::from_modifier(m)?` when the operand is needed |
-| Rolling `+2d6`-style operands into an expression | `apply_dice_operand(..)` / `apply_modifier_expression(..)` |
-| A roll-and-explode-while-max loop | `roll_exploding_die(rng, sides)` |
-| Keep/drop index bookkeeping | `indexed_rolls(result)` + `partition_kept_dice(result, &kept)` |
-| A d10 crit/fumble explosion tail (CPR, Witcher) | `finalize_d10_explosion(..)` |
-| Building `Set 1..N` copies, or set parsing in `parser.rs` | `build_roll_set(..)` / `try_parse_roll_set(..)` |
+- `RollResult::from_dice(&dice)` — never hand-write the 30-field literal
+- `apply_arithmetic_modifiers`, `is_arithmetic_modifier`, `ArithmeticOp::from_modifier` —
+  anything that applies `+ - * /`
+- `apply_dice_operand`, `apply_modifier_expression` — `+2d6`-style dice operands
+- `roll_exploding_die` — roll, then keep rolling while the die shows its maximum
+- `indexed_rolls` with `partition_kept_dice` — keep/drop index bookkeeping
+- `finalize_d10_explosion` — d10 crit/fumble tails (Cyberpunk Red, Witcher)
+- `build_roll_set`, `try_parse_roll_set` — roll sets, including their parsing
 
-Behavioral variants belong in a parameter, not a second copy of the function — see
-`RerollDirection` (`r` vs `rg`) and `MathModifierRules` (standard vs post-division), each
-of which replaced a near-identical twin function. When you do add a parameter like this,
-document *why* the two paths differ; that difference is usually load-bearing.
+`CONTRIBUTING.md` § Shared helpers carries the same list keyed by the code you would
+otherwise have written, and is the copy to update if a helper changes.
+
+Behavioral variants belong in a parameter, never a twin function — see `RerollDirection`
+(`r` vs `rg`) and `MathModifierRules`. Say *why* the paths differ; it is load-bearing.
 
 ## Testing
 
