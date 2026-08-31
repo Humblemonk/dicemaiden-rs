@@ -114,6 +114,38 @@ document *why* the two paths differ; that difference is usually load-bearing.
 | `tests/game_systems_tests.rs` | All game system behavior (consolidated) |
 | `tests/integration_tests.rs` | End-to-end functionality |
 | `tests/performance_tests.rs` | Performance and roll-limit testing |
+| `tests/snapshot_tests.rs` | Golden snapshots pinning observable behavior |
+
+### Snapshot tests — the regression net
+
+`tests/snapshot_tests.rs` pins what users can observe for every expression in
+`tests/corpus/expressions.txt`, so that a refactor which silently changes a roll fails
+`cargo test` instead of shipping:
+
+- **`parse.txt`** — parsing is deterministic, so the parsed form and every parse error are
+  pinned exactly, for the whole corpus.
+- **`deterministic_rolls.txt`** — expressions whose dice cannot vary (`d1` pools) have their
+  full result *and* their formatted Discord output pinned exactly.
+- **`outcomes.txt`** — for randomly-rolling expressions, only what cannot vary with the dice:
+  result count, success/failure of the call, and exact error text.
+
+**When you add or change syntax, add expressions to `tests/corpus/expressions.txt`** — a
+happy-path case, the boundary values of every numeric parameter, and a `d1` form so the roll
+lands in the deterministic snapshot. Coverage here is only as good as the corpus: a keep-count
+bug at `k1` slipped through when the corpus had `k2` but not `k1`.
+
+Regenerate after an intentional change, then **read the diff** — every changed line is a
+change a user will see:
+
+```
+UPDATE_SNAPSHOTS=1 cargo test --test snapshot_tests
+```
+
+Never regenerate to make a red test go green without reading what moved.
+
+What snapshots cannot cover: results of randomly-rolling systems. `roll_dice` builds its own
+RNG internally (`rng.rs`), so those cannot be reproduced exactly. Cover them with the
+targeted assertions in `game_systems_tests.rs`.
 
 - Use **table-driven tests** — `vec![(input, expected), ...]` loops are the established
   pattern; follow it rather than writing one function per case

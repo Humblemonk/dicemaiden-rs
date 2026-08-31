@@ -1,0 +1,2242 @@
+  2d6  +  3  
+( Stealth Check ) 1d20
+() 2d6
+(Action Roll) fitd3 ! Rolling for stealth
+(Action Roll) fitd3 ! Sneaking past guards
+(Attack) +d20 + 8 ! Rogue sneak attack
+(Attack) 1d20 + 5
+(Attack) 1d20 + 5 ! Comment; with; many; semicolons
+(Attack) 1d20 + 5 ! With magic sword
+(Attack) 1d20 + 5 ! With sword
+(Attack) 1d20 ie20 + 2d6 ie6 adv1
+(Attack) fitd4
+(Complex) 1d20 * / 2
+(Damage) 2d6
+(Damage) 2d6 ! Fire
+(Damage) 3d6 + 2d6 ! Sneak attack damage
+(Damage) 4d6 i1
+(Fire Damage) 8d6
+(Fireball) 8d6 ! 3rd level spell
+(Initiative) 1d20
+(Initiative) 1d20 + 3; (Attack) 1d20 + 5; (Damage) 1d8 + 3
+(Label) 4d1
+(Label) 4d1 ! comment text
+(Label) 4d1 + 2
+(Label) 4d1 + 2 ! comment text
+(Label) 4d1 adv1
+(Label) 4d1 adv1 ! comment text
+(Label) 4d1 e1
+(Label) 4d1 e1 ! comment text
+(Label) 4d1 f1
+(Label) 4d1 f1 ! comment text
+(Label) 4d1 i1
+(Label) 4d1 i1 ! comment text
+(Label) 4d1 k1
+(Label) 4d1 k1 ! comment text
+(Label) 4d1 t1
+(Label) 4d1 t1 ! comment text
+(Label) 4d1 t2 ! note
+(Label) p s 2d6 ! Comment
+(Math) 2d6 + + 5
+(Melee Attack) 6wod7c ! Using claws
+(Resistance) fitd0 ! Taking stress damage
+(Save) 1d20 !
+(Stealth Check) 1d20 - 2
+(Strength) 4d6 k3 ! Primary stat
+(Test 'Apostrophe') -d%
+(Test) 4cod99
+(Unclosed 1d20 + 5 ! Should fail
+(WoD Attack) 4wod8c + 1 ! Supernatural strength
+(attack) 1d20+5 ! with sword
+(roll to hit) 1d20+2
+(⚔️ Attack) +d%
+(🎯 Skill) -d% ! 🎲 Roll
++2d6
++a5e +5 ex1
++a5e +5 ex2
++a5e +7 ex2
++d%
++d% ! 🔥 Fire damage
++d% * 0
++d% * 1
++d% * 2
++d% + +d%
++d% + 0
++d% + 100
++d% + 1d6
++d% + 25
++d% + 3df
++d% + 4cod
++d% + cpr
++d20
++d20 * 2
++d20 + 5
++d20 + d10
++d20 + d10 + 5
++d20 + something
++d20+5
++d20+5 ! comment
++d20-1
++ess1d8
++ess2d8 + 1
++ess3d6s
++ess3d6s + 2
++ms
+-1d4
+-1d6
+-a5e +5 ex1
+-a5e +5 ex3
+-d%
+-d% + -d%
+-d% + 200
+-d% + gb
+-d% + sw8
+-d% + wit
+-d% - 0
+-d% - 10
+-d% - 15
+-d% - 2d4
+-d% - 50
+-d% / 1
+-d% / 2
+-d20
+-d20 - 2
+-d20-3
+-ess1d10s
+-ess1d8
+-ms
+/roll (Attack) 1d20 + 5
+/roll 2d6
+/roll 2d6 ! Fire damage
+/roll 2d6 ; 3d8 ; 1d20; 4d10
+/roll 3d6 + 5
+/roll 4d6 k3
+/roll 6 4d6
+/roll d%
+/roll d100
+0 + +d%
+0 d6
+0d1
+0d6
+0d6l
+1 +d20
+1 1d6
+1 4d1
+1 d20+3
+1 d6
+10 / 1d1
+10 / 2d1
+10 1d12+6 t8
+100 - -d%
+100 / 2d1
+100 1d6
+100/2d1
+100/2d1 +5
+100/2d1+5
+100/2d4
+100/d%
+100d1
+100d100
+100d6 e6 ie k50 r1 t4 +10
+100d6 e6 k50
+100d6 ie6 k50
+100d6 k50
+10d1
+10d1 ! comment
+10d1 * 2d1
+10d1 *2
+10d1 + 2d1
+10d1 +5
+10d1 - 2d1
+10d1 -3
+10d1 / 2 / 5
+10d1 / 2d1
+10d1 /2
+10d1 adv1
+10d1 adv2 dis1
+10d1 b1t4
+10d1 c
+10d1 d1
+10d1 dis1
+10d1 e1
+10d1 f1t4
+10d1 i1
+10d1 ie1
+10d1 ir1
+10d1 irg1
+10d1 k2
+10d1 kl2
+10d1 km2
+10d1 nr
+10d1 p
+10d1 r1
+10d1 rg1
+10d1 s
+10d1 t4
+10d1 t4 * 2
+10d1 t4 + 2
+10d1 t4f1
+10d1 t4f1b1
+10d1 tl3
+10d1 ul
+10d10 e10 k5 +3
+10d10 f1 t8 c
+10d10 t7 ie10 + 5d6 e6 - 2d4
+10d10 t7 t10
+10d10 vtm5p10h0
+10d10 vtm5p10h3
+10d100
+10d6
+10d6 alien
+10d6 combat
+10d6 cpd
+10d6 e6 k8 +4
+10d6 fitd
+10d6 ie6 k5 r1 t4 +5
+10d6 plot
+10d6 target 4+
+10d6 ww
+10yz
+11d6 t4 + 1d6 t4f1ie6
+12d6l
+12yz
+15yz
+1d0
+1d1
+1d1 * 2 * 3
+1d1 * 2d1
+1d1 *0
+1d1 *1
+1d1 *2
+1d1 *3
+1d1 *5
+1d1 + 10 * 2
+1d1 + 15 - 6 / 3
+1d1 + 2 * 3
+1d1 + 2 * 3 - 4
+1d1 + 2 * 3 / 6
+1d1 + 2 + 3 + 4
+1d1 + 2d1
+1d1 + 4d1 k2
+1d1 + 6 / 2
+1d1 +0
+1d1 +1
+1d1 +2
+1d1 +3
+1d1 +5
+1d1 - 2d1
+1d1 -0
+1d1 -1
+1d1 -2
+1d1 -3
+1d1 -5
+1d1 / 2d1
+1d1 /0
+1d1 /1
+1d1 /2
+1d1 /3
+1d1 /5
+1d1 adv0
+1d1 adv1
+1d1 adv1 dis1
+1d1 adv2
+1d1 adv2 k1
+1d1 adv3
+1d1 adv5
+1d1 b0
+1d1 b1
+1d1 b1t1
+1d1 b2
+1d1 b3
+1d1 b5
+1d1 c
+1d1 c f1
+1d1 d0
+1d1 d1
+1d1 d1 * 2
+1d1 d2
+1d1 d3
+1d1 d5
+1d1 d6s5
+1d1 dis0
+1d1 dis1
+1d1 dis1 t1
+1d1 dis2
+1d1 dis3
+1d1 dis5
+1d1 e
+1d1 e0
+1d1 e1
+1d1 e1 k1
+1d1 e2
+1d1 e3
+1d1 e5
+1d1 f0
+1d1 f1
+1d1 f1t1
+1d1 f2
+1d1 f3
+1d1 f5
+1d1 i
+1d1 i0
+1d1 i1
+1d1 i1 + 5
+1d1 i2
+1d1 i3
+1d1 i5
+1d1 ie
+1d1 ie0
+1d1 ie1
+1d1 ie1 d1
+1d1 ie2
+1d1 ie3
+1d1 ie5
+1d1 ir
+1d1 ir0
+1d1 ir1
+1d1 ir2
+1d1 ir3
+1d1 ir5
+1d1 irg0
+1d1 irg1
+1d1 irg2
+1d1 irg3
+1d1 irg5
+1d1 k
+1d1 k0
+1d1 k1
+1d1 k1 + 3
+1d1 k2
+1d1 k3
+1d1 k5
+1d1 kl
+1d1 kl0
+1d1 kl1
+1d1 kl1 - 1
+1d1 kl2
+1d1 kl3
+1d1 kl5
+1d1 km0
+1d1 km1
+1d1 km1 + 1
+1d1 km2
+1d1 km3
+1d1 km5
+1d1 r
+1d1 r0
+1d1 r1
+1d1 r1 t1
+1d1 r2
+1d1 r3
+1d1 r5
+1d1 rg0
+1d1 rg1
+1d1 rg2
+1d1 rg3
+1d1 rg5
+1d1 t0
+1d1 t1
+1d1 t1 * 2
+1d1 t1 + 2
+1d1 t1 - 1
+1d1 t1b1
+1d1 t1f1
+1d1 t1f1b1
+1d1 t2
+1d1 t3
+1d1 t5
+1d1 tl0
+1d1 tl1
+1d1 tl1 f1
+1d1 tl2
+1d1 tl3
+1d1 tl5
+1d1+2d1
+1d1+3d1 k10
+1d1+3d1 k2
+1d1+5 f1t6
+1d1+5 t6
+1d1+5 t6 should always have exactly 1 success (1+5=6 >= 6)
+1d1+5 t6f1
+1d10
+1d10 c
+1d10 cpr
+1d10 cpr + 5
+1d10 dh
+1d10 e10 i1
+1d10 f1 t8 c
+1d10 i1 e10
+1d10 i10
+1d10 ie
+1d10 ie + 1d8 ie
+1d10 vtm5p1h1
+1d10 wit
+1d10+1d6 r1+2d4 k1
+1d10+3d6 k2d1
+1d10+3d8 k2
+1d100
+1d100 ms
+1d100 ms45
+1d100 wfrp0
+1d100 wfrp1
+1d100 wfrp100
+1d100 wfrp110
+1d100 wfrp201
+1d100 wfrp37
+1d100 wfrp67
+1d100 wfrp87
+1d1000
+1d1001
+1d12
+1d12 ie
+1d12 ie + 1d10 ie
+1d12 ie + 1d10 ie + 1d8 ie
+1d12 ie + 1d8 ie + 1d6 ie
+1d12 ie + 2d6 ie
+1d12 ie + 2d8 ie
+1d12+2 t8
+1d12+2d8 e8
+1d2*10 + 1d6
+1d20
+1d20 ! Attack; 1d8 ! Damage
+1d20 * 2
+1d20 + 10
+1d20 + 1d4
+1d20 + 1d6 t4f1ie6
+1d20 + 2
+1d20 + 3
+1d20 + 5
+1d20 + 5 ! Attack roll with sword
+1d20 + 8
+1d20 - 1
+1d20 - 2
+1d20 - 4
+1d20 - 5
+1d20 adv1
+1d20 cs5
+1d20 d1
+1d20 ess0
+1d20 ess1
+1d20 ess2
+1d20 ess3
+1d20 ess4
+1d20 ess4 +3
+1d20 ess5
+1d20 ess6
+1d20 ess7
+1d20 ess8
+1d20 ess9
+1d20 esss0
+1d20 esss1
+1d20 esss4
+1d20 esss4 -2
+1d20 esss7
+1d20 esss8
+1d20 esss9
+1d20 gb
+1d20 gbs
+1d20 ie + 1d10 ie + 1d6 ie
+1d20 ie + 1d10 ie + 1d8 ie
+1d20 ie + 1d10 ie + 2d8 ie + 1d6 ie
+1d20 ie + 1d12 ie + 1d10 ie
+1d20 ie + 1d12 ie + 1d10 ie + 1d8 ie
+1d20 ie + 1d12 ie + 1d8 ie + 1d4 ie
+1d20 ie + 1d12 ie + 1d8 ie + 1d6 ie
+1d20 ie + 1d12 ie + 2d10 ie + 1d8 ie
+1d20 ie + 1d12 ie + 2d6 ie
+1d20 ie + 1d12 ie + 2d8 ie
+1d20 ie + 1d8 ie + 1d6 ie
+1d20 ie + 2d10 ie
+1d20 ie + 2d10 ie + 1d8 ie
+1d20 ie + 2d10 ie + 1d8 ie + 1d6 ie
+1d20 ie + 2d10 ie + 2d8 ie
+1d20 ie + 2d12 ie
+1d20 ie + 2d6 ie
+1d20 ie + 2d8 ie
+1d20 ie + 3d10 ie + 1d8 ie
+1d20 ie20
+1d20 ie20 + 1d10 ie10
+1d20 ie20 + 1d4 ie4
+1d20 ie20 + 1d6 ie6
+1d20 ie20 + 1d8 ie8
+1d20 ie20 + 1d8 ie8 dis2
+1d20 ie20 + 2d10 ie10
+1d20 ie20 + 2d6 ie6
+1d20 ie20 + 2d6 ie6 adv1
+1d20 ie20 + 2d6 ie6 adv1 ; 1d20 ie20 + 1d8 ie8 dis1
+1d20 ie20 + 2d6 ie6 adv2
+1d20 ie20 + 2d6 ie6 dis1
+1d20 ie20 + 2d8 ie8
+1d20 ie20 + 3d10 ie10
+1d20 ie20 + 3d8 ie8
+1d20 ie20 + 4d8 ie8
+1d20 ie20 + 4d8 ie8 adv3
+1d20 ie20 adv1
+1d20 ie20 dis1
+1d20 mnm
+1d20 t10 +5
+1d20 t5 + 5
+1d20+0 + 1d6
+1d20+1 + 1d10
+1d20+1 + 1d100
+1d20+1 + 1d12
+1d20+1 + 1d20
+1d20+15 + 1d8
+1d20+2
+1d20+2d6 k1
+1d20+2d6 k1 +5
+1d20+2d6 k1+3d8 e8
+1d20+2d6 k1e6
+1d20+2d6 km1
+1d20+3 + 1d4
+1d20+3 + 1d6
+1d20+3 + 1d8
+1d20+3 f1t8
+1d20+3 t8f1
+1d20+3d6 k2
+1d20+5
+1d20+5 + 1d4
+1d20+5 + 1d6
+1d20+5 + 1d8
+1d20+5 ex1
+1d20+5 mnm
+1d20+5 t6
+1d20+7 + 1d6
+1d20-1d6 r1
+1d20-2 + 1d4
+1d20-3 mnm
+1d20; 1d8 + 3
+1d20; 2d6
+1d20; 2d6; 1d4
+1d3 * 10 + 1d4
+1d3*10 + 1d4 (d66-style)
+1d4
+1d4 ie
+1d4 ie - 1
+1d4 ie - 2
+1d4*10 + 1d6
+1d4e4
+1d6
+1d6 !
+1d6 * 2
+1d6 + 
+1d6 + + 5
+1d6 + 1d3 killing (fractional notation)
+1d6 + 1d6 + 1d6 + 1d6
+1d6 + 1d6 t4f1ie6 + 1d6 e6k1
+1d6 + 4 - 2
+1d6 + 5
+1d6 adv1 + 4 - 2
+1d6 c
+1d6 cd
+1d6 cpd
+1d6 dis1 + 4 - 2
+1d6 e0
+1d6 e6
+1d6 fitd
+1d6 hsk
+1d6 hsn
+1d6 ie
+1d6 ie1
+1d6 ie6
+1d6 k0
+1d6 k1 d0
+1d6 km0
+1d6 l
+1d6 lf5
+1d6 plot
+1d6 rg0
+1d6 sil1
+1d6 t4f1ie6
+1d6 target 2+
+1d6 wng
+1d6 ww
+1d6*2
+1d6+
+1d6++5
+1d6+2d6
+1d6+3d10 t7
+1d6+5
+1d6/0
+1d6;1d6
+1d6;1d6;1d6;1d6
+1d6;1d6;1d6;1d6;1d6
+1d6l
+1d8
+1d8 ie
+1d8 ie + 1d6 ie
+1dd6
+1yz
+1½d6 normal damage
+2 -d%
+2 -d% + 50
+2 -d20 + 3
+2 1d6
+2 1d6l
+2 4d1
+2 4d1 + 2
+2 4d1 adv1
+2 4d1 e1
+2 4d1 f1
+2 4d1 i1
+2 4d1 k1
+2 4d1 t1
+2 d20+3
+2 d6
+2 dd34
+2 ess1d8s ! Stealth
+2 wng w2 5d6 !dmg
+20 / 2d1
+20 10d10
+20 1d1
+20 1d6
+20 25d6
+20 4d1
+20 4d1 + 2
+20 4d1 adv1
+20 4d1 e1
+20 4d1 f1
+20 4d1 i1
+20 4d1 k1
+20 4d1 t1
+20 4wod8c
+20 50d6
+20 d20+3
+20 d6
+20/2d1
+20/d6
+200 / 2d4
+200 / 4d1
+200/1d1
+200/2d4
+200/d%
+20d10 t1 f10 b1
+20d6 e6 k10 + 10
+21 +d20
+21 1d6
+21 4d1
+21 d20+3
+21 d6
+22 d6
+2d1
+2d1 ! comment
+2d1 * 2d1
+2d1 *0
+2d1 *1
+2d1 *2
+2d1 *3
+2d1 *5
+2d1 + 2d1
+2d1 + 3d1 k2
+2d1 +0
+2d1 +1
+2d1 +2
+2d1 +3
+2d1 +5
+2d1 - 2d1
+2d1 -0
+2d1 -1
+2d1 -2
+2d1 -3
+2d1 -5
+2d1 / 2d1
+2d1 /0
+2d1 /1
+2d1 /2
+2d1 /3
+2d1 /5
+2d1 adv0
+2d1 adv1
+2d1 adv1 dis1
+2d1 adv2
+2d1 adv2 dis1
+2d1 adv2 k1
+2d1 adv3
+2d1 adv5
+2d1 b0
+2d1 b1
+2d1 b1t1
+2d1 b1t4
+2d1 b2
+2d1 b3
+2d1 b5
+2d1 c
+2d1 c f1
+2d1 d0
+2d1 d1
+2d1 d1 * 2
+2d1 d2
+2d1 d3
+2d1 d5
+2d1 dis0
+2d1 dis1
+2d1 dis1 t1
+2d1 dis2
+2d1 dis3
+2d1 dis5
+2d1 e
+2d1 e0
+2d1 e1
+2d1 e1 k1
+2d1 e2
+2d1 e3
+2d1 e5
+2d1 f0
+2d1 f1
+2d1 f1t1
+2d1 f1t4
+2d1 f2
+2d1 f3
+2d1 f5
+2d1 i
+2d1 i0
+2d1 i1
+2d1 i1 + 5
+2d1 i2
+2d1 i3
+2d1 i5
+2d1 ie
+2d1 ie0
+2d1 ie1
+2d1 ie1 d1
+2d1 ie2
+2d1 ie3
+2d1 ie5
+2d1 ir
+2d1 ir0
+2d1 ir1
+2d1 ir2
+2d1 ir3
+2d1 ir5
+2d1 irg0
+2d1 irg1
+2d1 irg2
+2d1 irg3
+2d1 irg5
+2d1 k
+2d1 k0
+2d1 k1
+2d1 k1 + 3
+2d1 k2
+2d1 k3
+2d1 k5
+2d1 kl
+2d1 kl0
+2d1 kl1
+2d1 kl1 - 1
+2d1 kl2
+2d1 kl3
+2d1 kl5
+2d1 km0
+2d1 km1
+2d1 km1 + 1
+2d1 km2
+2d1 km3
+2d1 km5
+2d1 nr
+2d1 p
+2d1 r
+2d1 r0
+2d1 r1
+2d1 r1 t1
+2d1 r2
+2d1 r3
+2d1 r5
+2d1 rg0
+2d1 rg1
+2d1 rg2
+2d1 rg3
+2d1 rg5
+2d1 s
+2d1 sw8
+2d1 sw{sides}
+2d1 t0
+2d1 t1
+2d1 t1 * 2
+2d1 t1 + 2
+2d1 t1 - 1
+2d1 t1b1
+2d1 t1f1
+2d1 t1f1b1
+2d1 t2
+2d1 t3
+2d1 t4
+2d1 t4 * 2
+2d1 t4 + 2
+2d1 t4f1
+2d1 t4f1b1
+2d1 t5
+2d1 tl0
+2d1 tl1
+2d1 tl1 f1
+2d1 tl2
+2d1 tl3
+2d1 tl5
+2d1 ul
+2d1+3 b1f1t4
+2d1+3 t4f1b1
+2d1+5 f1t4
+2d1+5 t4f1
+2d10
+2d10 + 3d6 k2
+2d10 + 3d6 k2 Roll: [9, 8] + [6, 5] = 28
+2d10 + 3d6 k2 Roll: [9, 8] + [6, 5] ~~[3]~~ = 28
+2d10 dis4
+2d10 e10
+2d10 f1 t7 c
+2d10 ie
+2d10 k1 * 10 + 1d10 - 10
+2d10 kl1 * 10 + 1d10 - 10
+2d10*2 t6f2b1
+2d100 ms30d
+2d100 ms45a
+2d100 ms45d
+2d100 msa
+2d100 msd
+2d12 dheart
+2d12 ie
+2d20 + 3d6 k2
+2d20 conan
+2d20 ie + 1d10 ie + 1d8 ie
+2d20 ie + 1d10 ie + 1d8 ie + 1d4 ie
+2d20 ie + 1d10 ie + 1d8 ie + 1d6 ie
+2d20 ie + 1d10 ie + 1d8 ie + 2d6 ie
+2d20 ie + 1d10 ie + 2d8 ie
+2d20 ie + 1d10 ie + 2d8 ie + 1d6 ie
+2d20 ie + 1d12 ie + 1d10 ie
+2d20 ie + 1d12 ie + 1d10 ie + 1d8 ie
+2d20 ie + 1d12 ie + 1d8 ie + 1d6 ie
+2d20 ie + 1d12 ie + 2d10 ie + 1d8 ie
+2d20 ie + 1d12 ie + 2d6 ie
+2d20 ie + 1d12 ie + 2d8 ie
+2d20 ie + 1d8 ie + 1d6 ie
+2d20 ie + 2d10 ie
+2d20 ie + 2d10 ie + 1d8 ie
+2d20 ie + 2d10 ie + 1d8 ie + 1d6 ie
+2d20 ie + 2d10 ie + 2d8 ie + 1d4 ie
+2d20 ie + 2d10 ie + 2d8 ie + 1d6 ie
+2d20 ie + 2d10 ie + 3d8 ie
+2d20 ie + 2d12 ie
+2d20 ie + 2d6 ie
+2d20 ie + 2d8 ie
+2d20 ie + 3d10 ie + 1d8 ie
+2d20 ie + 3d10 ie + 2d8 ie
+2d20 k1
+2d20 k1 ess4
+2d20 k1 ess7 +1
+2d20 k1 esss8
+2d20 k1+5 + 1d4
+2d20 k1+5 + 1d6
+2d20 kl1
+2d20 kl1 ess4
+2d20 kl1 esss5
+2d20 kl1+5 + 1d4
+2d20 kl1+5 + 1d8
+2d20 skill + 4d6 combat
+2d6
+2d6 ! Fire damage
+2d6 ! fire damage
+2d6 * 3
+2d6 + 1d3 killing (fractional notation)
+2d6 + 1d6
+2d6 + 3
+2d6 + 3d10
+2d6 + 3d6
+2d6 + 3d8 + 5
+2d6 - 1
+2d6 - 3
+2d6 adv1
+2d6 adv1 - 2
+2d6 adv1 tdh + 4
+2d6 adv1 tdh + 5
+2d6 adv1 tdhc + 4
+2d6 dis1
+2d6 dis1 tdh + 4
+2d6 dis1 tdhc + 4
+2d6 e6
+2d6 e6 k1
+2d6 fitd
+2d6 fitd0
+2d6 ie
+2d6 ie6 adv1
+2d6 ie6 adv1 ! Open Legend attack
+2d6 ie6 adv1 + 5
+2d6 ie6 adv1 k1
+2d6 ie6 d1
+2d6 k2 + 1d6 t4f1ie6
+2d6 k2 d0
+2d6 k2 l
+2d6 lf4
+2d6 lf4f
+2d6 lf4l
+2d6 t4
+2d6 target 3+
+2d6 tdh
+2d6 tdh + 10
+2d6 tdh + 3
+2d6 tdh + 4
+2d6 tdh + 5
+2d6 tdh - 2
+2d6 tdhc + 4
+2d6 ww
+2d6+1d20 k1+1d8 d1
+2d6+1d4 d1
+2d6+3
+2d6+3d8+5
+2d6-3
+2d8 ie
+2d8+1d6 r1
+2d8-2d6 d1
+2hsk1
+2lf4
+2lf4 ; fitd0 ; gb
+2lf4f
+2lf4l
+2lf5 + 1d6
+2x (1d6 t4f1ie6)
+2½d6 killing damage
+3 (Stat Roll) 4d6 k3
+3 +d%
+3 +d20
+3 -d% - 5
+3 100/2d1
+3 10d1
+3 10d1 ! comment
+3 10d1 * 2d1
+3 10d1 *2
+3 10d1 + 2d1
+3 10d1 +5
+3 10d1 - 2d1
+3 10d1 -3
+3 10d1 / 2d1
+3 10d1 /2
+3 10d1 adv1
+3 10d1 adv2 dis1
+3 10d1 b1t4
+3 10d1 c
+3 10d1 d1
+3 10d1 dis1
+3 10d1 e1
+3 10d1 f1t4
+3 10d1 i1
+3 10d1 ie1
+3 10d1 ir1
+3 10d1 irg1
+3 10d1 k2
+3 10d1 kl2
+3 10d1 km2
+3 10d1 nr
+3 10d1 p
+3 10d1 r1
+3 10d1 rg1
+3 10d1 s
+3 10d1 t4
+3 10d1 t4 * 2
+3 10d1 t4 + 2
+3 10d1 t4f1
+3 10d1 t4f1b1
+3 10d1 tl3
+3 10d1 ul
+3 2d6
+3 2d6 ! Damage rolls
+3 4d1
+3 4d1 + 2
+3 4d1 adv1
+3 4d1 e1
+3 4d1 f1
+3 4d1 i1
+3 4d1 k1
+3 4d1 t1
+3 4d6 i1
+3 4d6 i1 ! imploding
+3 4d6 k3
+3 4wod8c
+3 5d6l
+3 a5e +5 ex1
+3 alien4s2
+3 cpd6
+3 cpr
+3 cs 5
+3 ess1d10
+3 ess1d8
+3 ess1d8 should produce three rolls
+3 ex5
+3 fitd0
+3 fitd4
+3 gb
+3 mm
+3 mnm +2
+3 ol5
+3 tdh4
+3 wfrp45
+3 wit
+3 wng 4d6 !soak
+3d1
+3d1 * 2d1
+3d1 k2
+3d1*2+1 f1t4
+3d1*2+1 t4f1
+3d1+0 b1t4
+3d1+0 f1t4
+3d1+0 t4b1
+3d1+0 t4f1
+3d1+2 f1t4
+3d1+2 t4f1
+3d1+2*2 f1b2t6
+3d1+2*2 t6f1b2
+3d1+5 b1t4
+3d1+5 t4b1
+3d10 c f1 t8
+3d10 cpd
+3d10 e10
+3d10 f1 t6 c + 1
+3d10 l t7
+3d10 t6 t10
+3d10 t7 ! Difficulty check
+3d10 t7 + 2d8 e6k2
+3d100
+3d20 ie + 1d10 ie + 1d8 ie
+3d20 ie + 1d12 ie + 1d10 ie
+3d20 ie + 1d12 ie + 1d10 ie + 1d8 ie
+3d20 ie + 1d12 ie + 1d8 ie + 1d6 ie
+3d20 ie + 1d12 ie + 2d6 ie
+3d20 ie + 1d12 ie + 2d8 ie
+3d20 ie + 1d8 ie + 1d6 ie
+3d20 ie + 2d10 ie
+3d20 ie + 2d12 ie
+3d20 ie + 2d6 ie
+3d20 ie + 2d8 ie
+3d20 k2 + 2d6
+3d20 skill
+3d20 skill + 5d6 combat
+3d20 t15ds
+3d3 fudge
+3d6
+3d6 !
+3d6 + 1d3 normal (if supported)
+3d6 Marvel Multiverse
+3d6 Marvel Multiverse result
+3d6 adv0
+3d6 adv1
+3d6 adv1 dis1
+3d6 adv1 dis3
+3d6 adv2 dis1
+3d6 adv3
+3d6 alien
+3d6 alien + 1d6 aliens1
+3d6 cpd
+3d6 dis0
+3d6 dis1
+3d6 fitd
+3d6 hsh
+3d6 ir6
+3d6 k2 + 1d4
+3d6 km1
+3d6 lf2
+3d6 mm
+3d6 plot
+3d6 r1 ir1
+3d6 t4
+3d6 target 4+
+3d6 ww
+3d6-1d4 k1
+3d6e
+3d6e6
+3d8 e6
+3df
+3wh4+
+3wod9 + 2
+3wod9c + 2
+3x (4d6 t4 + 1d6 t4f1ie6)
+3yz
+3½d6 killing damage
+4 + 4d10
+4 +d% + 10
+4 10d6l
+4 20/2d1
+4 wng dn2 4d6 !exempt
+499d6 adv1
+499d6 plus one advantage die is exactly at the limit
+4cod
+4cod ! Chronicles skill roll
+4cod + 3
+4cod ; fitd100
+4cod8
+4cod9
+4d1
+4d1 ! c ; 2d1 + 1
+4d1 ! comment
+4d1 ! comment text
+4d1 * 2d1
+4d1 *0
+4d1 *1
+4d1 *2
+4d1 *3
+4d1 *5
+4d1 + 2 ! comment text
+4d1 + 2 ; 2d1 + 1
+4d1 + 2d1
+4d1 +0
+4d1 +1
+4d1 +2
+4d1 +3
+4d1 +5
+4d1 - 2d1
+4d1 -0
+4d1 -1
+4d1 -2
+4d1 -3
+4d1 -5
+4d1 / 2d1
+4d1 /0
+4d1 /1
+4d1 /2
+4d1 /3
+4d1 /5
+4d1 ; 2d1 + 1
+4d1 ; 4d1 ; 4d1 ; 4d1
+4d1 ; 4d1 ; 4d1 ; 4d1 ; 4d1
+4d1 adv0
+4d1 adv1
+4d1 adv1 ! comment text
+4d1 adv1 ; 2d1 + 1
+4d1 adv1 dis1
+4d1 adv2
+4d1 adv2 dis1
+4d1 adv2 k1
+4d1 adv3
+4d1 adv5
+4d1 b0
+4d1 b1
+4d1 b1t1
+4d1 b1t4
+4d1 b2
+4d1 b3
+4d1 b5
+4d1 c
+4d1 c f1
+4d1 d0
+4d1 d1
+4d1 d1 * 2
+4d1 d2
+4d1 d3
+4d1 d5
+4d1 d99
+4d1 dis0
+4d1 dis1
+4d1 dis1 t1
+4d1 dis2
+4d1 dis3
+4d1 dis5
+4d1 e
+4d1 e0
+4d1 e1
+4d1 e1 ! comment text
+4d1 e1 ; 2d1 + 1
+4d1 e1 k1
+4d1 e2
+4d1 e3
+4d1 e5
+4d1 f0
+4d1 f1
+4d1 f1 ! comment text
+4d1 f1 ; 2d1 + 1
+4d1 f1t1
+4d1 f1t4
+4d1 f2
+4d1 f3
+4d1 f5
+4d1 i
+4d1 i0
+4d1 i1
+4d1 i1 ! comment text
+4d1 i1 + 5
+4d1 i1 ; 2d1 + 1
+4d1 i2
+4d1 i3
+4d1 i5
+4d1 ie
+4d1 ie0
+4d1 ie1
+4d1 ie1 d1
+4d1 ie2
+4d1 ie3
+4d1 ie5
+4d1 ir
+4d1 ir0
+4d1 ir1
+4d1 ir2
+4d1 ir3
+4d1 ir5
+4d1 irg0
+4d1 irg1
+4d1 irg2
+4d1 irg3
+4d1 irg5
+4d1 k
+4d1 k0
+4d1 k1
+4d1 k1 ! comment text
+4d1 k1 + 3
+4d1 k1 ; 2d1 + 1
+4d1 k2
+4d1 k3
+4d1 k5
+4d1 k99
+4d1 kl
+4d1 kl0
+4d1 kl1
+4d1 kl1 - 1
+4d1 kl2
+4d1 kl3
+4d1 kl5
+4d1 km0
+4d1 km1
+4d1 km1 + 1
+4d1 km2
+4d1 km3
+4d1 km5
+4d1 nr
+4d1 p
+4d1 r
+4d1 r0
+4d1 r1
+4d1 r1 t1
+4d1 r2
+4d1 r3
+4d1 r5
+4d1 rg0
+4d1 rg1
+4d1 rg2
+4d1 rg3
+4d1 rg5
+4d1 s
+4d1 t0
+4d1 t1
+4d1 t1 ! comment text
+4d1 t1 * 2
+4d1 t1 + 2
+4d1 t1 - 1
+4d1 t1 ; 2d1 + 1
+4d1 t1b1
+4d1 t1f1
+4d1 t1f1b1
+4d1 t2
+4d1 t3
+4d1 t4
+4d1 t4 * 2
+4d1 t4 + 2
+4d1 t4f1
+4d1 t4f1b1
+4d1 t5
+4d1 tl0
+4d1 tl1
+4d1 tl1 f1
+4d1 tl2
+4d1 tl3
+4d1 tl5
+4d1 ul
+4d1+1 f1t4+1
+4d1+1 t4f1+1
+4d1+1*3 f2t5
+4d1+1*3 t5f2
+4d10 c f1 t8
+4d10 f1 c
+4d10 f1 c t8 + 2
+4d10 f1 t8
+4d10 f1 t8 + 2
+4d10 f1 t8 c
+4d10 t6ds
+4d10 t6ds10
+4d10 t6ds6
+4d10 t8 + 1
+4d10 t8 c
+4d10 t8 f1 + 2
+4d10 t8 ie10
+4d10 t8 ie10 r7
+4d10 tl3ds1
+4d10ie
+4d10ie8
+4d20 ie + 1d10 ie + 1d8 ie
+4d20 ie + 1d12 ie + 1d10 ie
+4d20 ie + 1d12 ie + 1d10 ie + 1d8 ie
+4d20 ie + 1d12 ie + 1d8 ie + 1d6 ie
+4d20 ie + 1d12 ie + 2d6 ie
+4d20 ie + 1d12 ie + 2d8 ie
+4d20 ie + 1d8 ie + 1d6 ie
+4d20 ie + 2d10 ie
+4d20 ie + 2d12 ie
+4d20 ie + 2d6 ie
+4d20 ie + 2d8 ie
+4d20 k2d1
+4d20 skill
+4d20 skill + 6d6 combat
+4d20k2d1
+4d3 fudge
+4d3 k2
+4d6
+4d6 + 3
+4d6 / 2
+4d6 adv
+4d6 adv501
+4d6 advx
+4d6 alien
+4d6 alien + 2d6 aliens2
+4d6 combat
+4d6 cpd + 2
+4d6 cpd +2
+4d6 d1
+4d6 dis
+4d6 dis-1
+4d6 dis2 * 2
+4d6 e
+4d6 e6
+4d6 e6 + 1d6 t4f1ie6
+4d6 e6 ie6
+4d6 f1 b1
+4d6 fitd
+4d6 i
+4d6 i0
+4d6 i1
+4d6 i1 ! imploding test
+4d6 i1 * 2
+4d6 i1 + 2d8
+4d6 i1 + 5
+4d6 i1 - 2
+4d6 i1 d1
+4d6 i1 e6
+4d6 i1 k2
+4d6 i1 k3
+4d6 ie
+4d6 ie6
+4d6 ir1
+4d6 irg5
+4d6 k3
+4d6 k3 ! Character creation
+4d6 k3 ! Character stats
+4d6 k3 ! character generation
+4d6 k3 + 2
+4d6 k3 + 2d6 * 3 - 1d4
+4d6 k3 ; 4d6 k3 ; 4d6 k3
+4d6 k3d1r1
+4d6 km3d1r1
+4d6 l e6
+4d6 r2
+4d6 rg2
+4d6 t0ds
+4d6 t0ds6
+4d6 t1ds
+4d6 t4
+4d6 t4f1
+4d6 t6ds
+4d6 t6ds4
+4d6 t7ds10
+4d6 target 2+
+4d6 tl0ds
+4d6 tl3
+4d6 tl3ds
+4d6 tl3ds0
+4d6 tl3ds5
+4d6 tl4ds
+4d6 tl4ds1
+4d6 tl4ds4
+4d6 ww
+4d6 wwc1
+4d6 wwc2
+4d6+3
+4d6/2
+4d6;3d8;2d10;1d20
+4d6d1
+4d6e6i1
+4d6e6k3
+4d6e6k3+2
+4d6f1
+4d6i
+4d6i0
+4d6i1e6
+4d6i1ie6
+4d6i1k2
+4d6i1k3
+4d6i2
+4d6ie6
+4d6ir1
+4d6ir1i1
+4d6irg5
+4d6k3
+4d6kl2
+4d6km2
+4d6r1
+4d6rg5
+4d8 t5ds
+4df
+4df + 2
+4wod8
+4wod8c
+4wod8c + 2
+4wod8c ; 3d6 + 2
+4x (9d6 t4 + 1d6 t4f1ie6)
+4yz
+4yz - 1
+5 - 2d1
+5 cpd6
+5 gb
+500 / d%
+500/d%
+500d1
+500d1000
+500d1000 i500
+500d6
+500d6 adv1
+501d1
+501d6
+50d6 e6
+50d6 k25 d10
+5d1+4 f1t4
+5d1+4 t4f1
+5d10 / 0
+5d10 f1 c t6
+5d10 f1 t6 c
+5d10 f1 t6 c ie10 + 2
+5d10 f1 t8 c
+5d10 f1 t8 c ie10 + 3
+5d10 i1
+5d10 i10
+5d10 t7 t10
+5d10 t7ds
+5d10 t7ds10
+5d10 t7ds9
+5d10 t8 f1 c
+5d10 t8 t10
+5d10 t8ds10
+5d10 vtm5p5h2
+5d20 ie + 1d10 ie + 1d8 ie
+5d20 ie + 1d12 ie + 1d10 ie
+5d20 ie + 1d12 ie + 1d10 ie + 1d8 ie
+5d20 ie + 1d12 ie + 1d8 ie + 1d6 ie
+5d20 ie + 1d12 ie + 2d6 ie
+5d20 ie + 1d12 ie + 2d8 ie
+5d20 ie + 1d8 ie + 1d6 ie
+5d20 ie + 2d10 ie
+5d20 ie + 2d12 ie
+5d20 ie + 2d6 ie
+5d20 ie + 2d8 ie
+5d20 skill
+5d6 + 1d6ie
+5d6 alien + 3d6 aliens3
+5d6 cpd - 1
+5d6 e6 k4
+5d6 fitd
+5d6 ie ir1 k3 + 2d6 e6 - 1d4
+5d6 ie6 t4
+5d6 k3
+5d6 k3 t5
+5d6 rg6 irg6
+5d6 t4
+5d6 target 5+
+5d6 ww
+5d6 wwc1
+5d6 wwc2
+5d6l
+5d8 e8
+5d8 tl6ds
+5wod6
+5wod6c
+5wod6c + 2
+5yz
+5yz * 2
+6 (Stat) 4d6 k3 ! Character generation
+6 4d6
+6 4d6 k3
+6cod
+6d1
+6d1 ! comment
+6d1 * 2d1
+6d1 *0
+6d1 *1
+6d1 *2
+6d1 *3
+6d1 *5
+6d1 + 2d1
+6d1 +0
+6d1 +1
+6d1 +2
+6d1 +3
+6d1 +5
+6d1 - 2d1
+6d1 -0
+6d1 -1
+6d1 -2
+6d1 -3
+6d1 -5
+6d1 / 2d1
+6d1 /0
+6d1 /1
+6d1 /2
+6d1 /3
+6d1 /5
+6d1 adv0
+6d1 adv1
+6d1 adv1 dis1
+6d1 adv2
+6d1 adv2 dis1
+6d1 adv2 k1
+6d1 adv3
+6d1 adv5
+6d1 b0
+6d1 b1
+6d1 b1t1
+6d1 b1t4
+6d1 b2
+6d1 b3
+6d1 b5
+6d1 c
+6d1 c f1
+6d1 d0
+6d1 d1
+6d1 d1 * 2
+6d1 d2
+6d1 d3
+6d1 d5
+6d1 dis0
+6d1 dis1
+6d1 dis1 t1
+6d1 dis2
+6d1 dis3
+6d1 dis5
+6d1 e
+6d1 e0
+6d1 e1
+6d1 e1 k1
+6d1 e2
+6d1 e3
+6d1 e5
+6d1 f0
+6d1 f1
+6d1 f1t1
+6d1 f1t4
+6d1 f2
+6d1 f3
+6d1 f5
+6d1 i
+6d1 i0
+6d1 i1
+6d1 i1 + 5
+6d1 i2
+6d1 i3
+6d1 i5
+6d1 ie
+6d1 ie0
+6d1 ie1
+6d1 ie1 d1
+6d1 ie2
+6d1 ie3
+6d1 ie5
+6d1 ir
+6d1 ir0
+6d1 ir1
+6d1 ir2
+6d1 ir3
+6d1 ir5
+6d1 irg0
+6d1 irg1
+6d1 irg2
+6d1 irg3
+6d1 irg5
+6d1 k
+6d1 k0
+6d1 k1
+6d1 k1 + 3
+6d1 k2
+6d1 k3
+6d1 k5
+6d1 kl
+6d1 kl0
+6d1 kl1
+6d1 kl1 - 1
+6d1 kl2
+6d1 kl3
+6d1 kl5
+6d1 km0
+6d1 km1
+6d1 km1 + 1
+6d1 km2
+6d1 km3
+6d1 km5
+6d1 nr
+6d1 p
+6d1 r
+6d1 r0
+6d1 r1
+6d1 r1 t1
+6d1 r2
+6d1 r3
+6d1 r5
+6d1 rg0
+6d1 rg1
+6d1 rg2
+6d1 rg3
+6d1 rg5
+6d1 s
+6d1 t0
+6d1 t1
+6d1 t1 * 2
+6d1 t1 + 2
+6d1 t1 - 1
+6d1 t1b1
+6d1 t1f1
+6d1 t1f1b1
+6d1 t2
+6d1 t3
+6d1 t4
+6d1 t4 * 2
+6d1 t4 + 2
+6d1 t4f1
+6d1 t4f1b1
+6d1 t5
+6d1 tl0
+6d1 tl1
+6d1 tl1 f1
+6d1 tl2
+6d1 tl3
+6d1 tl5
+6d1 ul
+6d10 d2
+6d10 d2 t4ds6
+6d10 e6k4d1
+6d10 e6km4d1
+6d10 f1 t7
+6d10 f1 t7 c
+6d10 f1 t7 c + 3
+6d10 i1 t7
+6d10 i3
+6d10 km3
+6d10 t5 tl5
+6d10 t7 f1
+6d10 t7 f1 b1 ie10 + 5d6 e6 - 2d4
+6d10 t7 f1 c
+6d10 t7 ie10
+6d10b
+6d10b1
+6d10c
+6d10km3
+6d10t7
+6d10tl7
+6d20 ie + 1d10 ie + 1d8 ie
+6d20 ie + 1d12 ie + 1d10 ie
+6d20 ie + 1d12 ie + 1d10 ie + 1d8 ie
+6d20 ie + 1d12 ie + 1d8 ie + 1d6 ie
+6d20 ie + 1d12 ie + 2d6 ie
+6d20 ie + 1d12 ie + 2d8 ie
+6d20 ie + 1d8 ie + 1d6 ie
+6d20 ie + 2d10 ie
+6d20 ie + 2d12 ie
+6d20 ie + 2d6 ie
+6d20 ie + 2d8 ie
+6d6 alien
+6d6 alien + 5d6 aliens5
+6d6 fitd
+6d6 i2
+6d6 should produce a Critical Injury within 60 rolls
+6d6 t4ds
+6d6 t5 shadowrun6
+6d6 t6
+6d6 target 6+
+6d6 tl4ds
+6d6 tl4ds1
+6d6 ww
+6d6 wwc1
+6d6 wwc2
+6d6 wwc3
+6wod7c
+6wod7c + 2
+6wod7c + 3
+6yz
+6yz + 2
+7d10 vtm5p7h2
+7d20 ie + 1d10 ie + 1d8 ie
+7d20 ie + 1d12 ie + 1d10 ie
+7d20 ie + 1d12 ie + 1d10 ie + 1d8 ie
+7d20 ie + 1d12 ie + 1d8 ie + 1d6 ie
+7d20 ie + 1d12 ie + 2d6 ie
+7d20 ie + 1d12 ie + 2d8 ie
+7d20 ie + 1d8 ie + 1d6 ie
+7d20 ie + 2d10 ie
+7d20 ie + 2d12 ie
+7d20 ie + 2d6 ie
+7d20 ie + 2d8 ie
+7d6 fitd
+7d6 t4 + 1d6 t4f1ie6
+7d6 ww
+8d1 / 2d1
+8d10 e10
+8d10 vtm5p8h0
+8d10 vtm5p8h3
+8d20 ie + 1d10 ie + 1d8 ie
+8d20 ie + 1d8 ie + 1d6 ie
+8d20 ie + 2d10 ie
+8d20 ie + 2d6 ie
+8d20 ie + 2d8 ie
+8d6
+8d6 ! Fireball spell
+8d6 fitd
+8d6 target 3+
+8d6 ww
+8d6km3d2
+8d6l
+8yz
+8yz + 1d6
+8yz - 2
+9d6 ww
+A5E ed2 should parse
+A5E ed3 should parse
+Added dice should be 2d6
+CRITICAL BUG: '1 d20+3' must fail - single roll sets not allowed
+CRITICAL BUG: '21 d20+3' must fail - too many roll sets not allowed
+Conan 2d20 skill
+Cyberpunk Red damage only works with d6 dice
+Cyberpunk Red mechanics only work with 1d10
+Daggerheart GM d20 roll
+Daggerheart GM roll (d20)
+Dark Heresy 4d10 righteous fury
+Dark Heresy 6d10 righteous fury
+Default 1d6 combat
+Default 2d20 skill
+Dice expression (e.g., 2d6+3, 4d6 k3, 3d10 t7)
+Double digit d2*10 + d6
+Double digit d3*10 + d4
+Double digit d4*10 + d6
+Double digit d6*10 + d6
+Edge drops the lower d20
+Edge keeps the higher d20
+Essence20 rolls add a skill dice group after the d20
+Exalted 10d10
+Exalted 10d10 t6ds8
+Exalted 10d10 t7 t10
+Exalted 12d10 t5 t10
+Exalted 3d10 t6 t10
+Exalted 5d10 t7 t10
+Exalted 5d10 t8 t10
+Exalted 5d10 t8ds9
+Exalted 6d10 t9 t10
+Exalted 7d10 t7ds8
+Exalted 8d10 t7 t10
+Explicit d100
+Godbound 3d8 with penalty
+Godbound straight 2d10 with bonus
+Hero System to-hit roll (3d6 roll-under)
+Invalid keep value in 'k2d1'
+Lasers & Feelings requires d6 dice
+Maximum rolled on d4
+Multiple d100
+Plain d6 unchanged
+Roll 4d6, cut 1 highest
+Roll 5d6, cut 2 highest
+Roll 6d6, cut 3 highest
+Savage Worlds d10 trait
+Savage Worlds d12 trait
+Savage Worlds d4 trait
+Savage Worlds d6 trait
+Savage Worlds d8 trait
+Savage Worlds trait die must be d4, d6, d8, d10, or d12
+Second roll should be regular d20 (no Mothership mechanics)
+Second roll should be regular d20 (no success/failure counting)
+Should have 4 dice for 4wod8c
+Should keep 1 die from the added 2d6
+Snag drops the higher d20
+Snag keeps the lower d20
+Storypath 4d10 t8 ie10
+Storypath 6d10 t8 ie10
+Storypath 8d10 t8 ie10
+Sunsails 3d6 ie6 t4
+Sunsails 5d6 ie6 t4
+Sunsails 8d6 ie6 t4
+Test with drops '4d1 k2': {}
+Testing explosion bug fix for 8d10e10...
+Warhammer 2d6 3+
+Warhammer 2d6 t5
+Warhammer 3d6 4+
+Warhammer 3d6 t4
+Warhammer 5d6 5+
+Warhammer 5d6 t3
+Witcher mechanics only work with 1d10
+Wound Rating = 1d6 + attack Rating − defense Rating
+Year Zero 4d6 t6
+Year Zero 6d6 t6
+Year Zero 8d6 t6
+Zero dice should roll exactly 2d6
+^fitd0$
+a5e
+a5e +0 ex2
+a5e +1 ex10
+a5e +1 ex100
+a5e +1 ex12
+a5e +1 ex20
+a5e +15 ex3
+a5e +3 ex3
+a5e +3 ex4
+a5e +3 ex6
+a5e +3 ex8
+a5e +5
+a5e +5 ex0
+a5e +5 ex1
+a5e +5 ex1; a5e +7 ex2; a5e +3 ex3
+a5e +5 ex2
+a5e +5 ex3
+a5e +5 ex5
+a5e +7 ex2
+a5e -2 ex1
+a5e ex1
+a5e ex2
+adv1
+adv2 dis1
+age
+alien
+alien3s2 + 2d10
+alien3s2p
+alien4
+alien4 + 1d6
+alien4; 1d20 + 5
+alien4s3 - 2d4
+alien5s1
+alien5s2
+alien6s3p
+alien6s4 + 1d6
+attack
+attack +10
+attack +5
+attack -2
+bnw
+bnw3
+bnw4 + 2
+cd0
+cd10
+cd4
+cd4 + 3
+cod
+conan
+conan + 2
+conan2cd4
+conan2cd4 + 5
+conan3cd4
+conan3cd5
+conan4
+conan4cd6
+cpd
+cpd is a damage total, not a pool
+cpd must reject non-d6 dice
+cpd total must be the plain sum of the d6s
+cpd0
+cpd1
+cpd10
+cpd2 * 3
+cpd2 * 4
+cpd3
+cpd3 * 2
+cpd3 + 5
+cpd3 - 2
+cpd4 + 2
+cpd4 / 2
+cpd4+2
+cpd5 ! heavy pistol
+cpd5 - 1
+cpd500
+cpd501
+cpd6
+cpr
+cpr * 3
+cpr + 10
+cpr + 5
+cpr - 4
+cpr / 2
+cs
+cs 0
+cs 1
+cs 1 + 5
+cs 10
+cs 10 - 3
+cs 11
+cs 3
+cs 3 + 2
+cs 5
+cs 6
+d%
+d% * 2
+d% + 10
+d% - 5
+d% / 2
+d% e100
+d% k1
+d1
+d1 should still drop exactly one die
+d10
+d100
+d2 tens + d3 ones
+d2 tens + d6 ones
+d20
+d20 advantage alias unchanged
+d20 disadvantage alias unchanged
+d3
+d3 tens + d4 ones
+d3 tens + d6 ones
+d4 tens + d4 ones
+d4 tens + d6 ones
+d6
+d6 can only roll 1-6
+d6 tens + d6 ones (d66)
+d6l
+d6s
+d6s4
+d6s5
+d8 lower double success
+d8 tens + d8 ones
+dd
+dd23
+dd26
+dd26 * 2
+dd34
+dd34 + 5
+dd36
+dd44
+dd46
+dd46 / 2
+dd66
+dd66 - 10
+dd66 / 10
+dd88
+df
+dh
+dh 2d10
+dh 4d10
+dh 6d10
+dis1
+ed
+ed1
+ed15
+ed4e1
+ed4e100
+ed4e15
+ed4e20
+ed4e50
+ed50
+ess1d10
+ess1d12
+ess1d12s
+ess1d2
+ess1d20
+ess1d2s
+ess1d3
+ess1d4
+ess1d4s
+ess1d4s should roll
+ess1d6
+ess1d8
+ess1d8 ! Athletics
+ess1d8 + 3
+ess1d8 should roll
+ess1d8+3
+ess1d8s
+ess1d8s ! Swimming
+ess1d8s-2
+ess1d8x
+ess2d10
+ess2d6
+ess2d8
+ess2d8s
+ess3d6
+ess3d6s
+ess3d8
+essd12
+essd8
+ex
+ex-5
+ex1
+ex10
+ex100
+ex10d8t6
+ex12
+ex12t6
+ex2
+ex20
+ex3
+ex3t6
+ex4
+ex4 + 1d6
+ex5
+ex5t6
+ex5t8
+ex5t8d9
+ex6
+ex7d8
+ex8
+ex8t6
+fitd
+fitd0
+fitd0 ! Desperate situation
+fitd1
+fitd10
+fitd100
+fitd100 ; 4cod
+fitd11
+fitd2
+fitd2 k1
+fitd3
+fitd3 ! Action; fitd4 ! Resistance; fitd0 ! Desperate
+fitd3 ! Sneaking past guards
+fitd3 + 2
+fitd3 ; 4cod ; sw8
+fitd3 d1
+fitd4
+fitd4 ! Desperate leap across rooftops
+fitd4 * 2
+fitd5
+fitd6
+fitd7
+fitd8
+gb
+gb 
+gb + 1d4
+gb + 5
+gb 1d8
+gb 3d8
+gb 3d8 - 2
+gbs 1d20 * 2
+gbs 2d10
+gbs 2d10 + 5
+gbs 2d10 +5
+hs
+ie6
+ir2
+irg2
+kl2
+km2
+lf
+mm
+mm 
+mm + 5
+mm 2e
+mm 2e 3t
+mm 3t
+mm 5e
+mm 5e - 3
+mm 5t
+mm e
+mm e t
+mm t
+mnm
+mnm +5
+mnm -2
+mnm -3
+mnm ; 1d20+5 ; mnm -2
+ms
+ms30
+ms45
+ms45 ; 1d20+5 ; +ms50
+nr (Behind Screen) 3d6 ! GM planning roll
+nr (Concentration) 1d20 + 5 ! Maintaining spell
+nr 2d6
+nr 3d10 e10
+nr 3d10 t7
+nr 4d1
+nr 4d1 + 2
+nr 4d1 adv1
+nr 4d1 e1
+nr 4d1 f1
+nr 4d1 i1
+nr 4d1 k1
+nr 4d1 t1
+nr 4d6 k3
+nr 6 2d6
+nr fitd2
+nr p 1d20
+nr s 2d6
+nr ul 2d6
+ol
+ol0
+ol0a1
+ol0a3
+ol0d1
+ol0d9
+ol3d2
+ol5
+ol5a1
+ol5a1 ! Attack the ogre
+ol5a2
+ol5d1
+ol7d2
+ol7d2 should drop exactly two dice
+ol7d2 should roll
+p (Secret Roll) 1d20 + 5 ! GM only
+p 1 d20
+p 1 d6
+p 1d6
+p 21 d6
+p 2d6
+p 2d6 dis1
+p 3 2d6
+p 3 d20
+p 3 d6
+p 4d1
+p 4d1 + 2
+p 4d1 adv1
+p 4d1 e1
+p 4d1 f1
+p 4d1 i1
+p 4d1 k1
+p 4d1 t1
+p 5wod6c
+p ess1d8
+p fitd3
+p nr (Attack) 1d20 + 5
+p nr 2d6
+p nr ul 2d6
+p s (Secret) 2d20 kl1 ! Stealth disadvantage
+p s 2d6
+p s 5 4d6 k3
+p s 5 4d6 k3 ! Character stats
+p s fitd3
+p s nr 2d6
+p s nr ul 2d6
+p s nr ul invalid 2d6
+p s ul 2d6
+p ul 2d6
+p2d6
+pp 2d6
+px 2d6
+rg2
+s 1d6
+s 2 1d20
+s 21 d6
+s 2d6
+s 2d6 adv1
+s 4d1
+s 4d1 + 2
+s 4d1 adv1
+s 4d1 e1
+s 4d1 f1
+s 4d1 i1
+s 4d1 k1
+s 4d1 t1
+s 4wod8c
+s 5 d6
+s ess2d8s
+s fitd4
+s nr 2d6
+s nr ul 2d6
+s s 2d6
+s ul 2d6
+s ul 8d6 e6
+save
+save +2
+save +8
+save -1
+sil
+sil + 3
+sil10
+sil3
+sil5
+skill
+skill +3
+skill -4
+skill -5
+snm
+snm5
+snm6 + 1d4
+sp
+sp3 + 1d6
+sp4
+sp4 + 2d6
+sp4t6
+sr6
+sw
+sw10
+sw12
+sw4
+sw6
+sw8
+tdh4
+tdh4 ! Pick the lock
+tdh4 +1
+tdh4b
+tdh4bc
+tdh4c
+tdh4n
+tdh4nc
+the natural 20 note must track the kept d20
+tl6
+tl6ds5
+ul (Chaos) 10d6 e6 ! Wild magic surge
+ul 10d10 e10
+ul 1d6 ie6 adv1
+ul 1d6 ie6 dis1
+ul 2d6 adv1
+ul 3 4d6
+ul 4d1
+ul 4d1 + 2
+ul 4d1 adv1
+ul 4d1 e1
+ul 4d1 f1
+ul 4d1 i1
+ul 4d1 k1
+ul 4d1 t1
+ul 4d6 k3
+ul 5d6
+ul fitd5
+ul nr fitd4
+ul p 3d8
+ul s 2d6
+vtm
+vtm5h0
+vtm5h2 ; fitd4 ; age
+vtm7h2
+vtm8h3 + 1d6
+wfrp
+wfrp must not disturb the Witcher alias
+wfrp67
+wfrp67 + 20
+wfrp67 - 30
+wh
+wit
+wit * 2
+wit + 5
+wit - 3
+wit / 2
+wng
+wng 4d6
+wng 4d6 !
+wng 4d6 ! soak
+wng 4d6 !SOAK
+wng 4d6 !invalid
+wng 4d6 !soak
+wng 4d6 !soak + 2
+wng 4d6 !soak invalid
+wng 5d6 !dmg
+wng 5d6 !dmg - 1
+wng 6d6 !exempt
+wng 6d6 + 2
+wng dn2 4d6
+wng dn2 4d6 !exempt
+wng dn3 4d6
+wng dn3 4d6 !soak
+wng dn3 5d6
+wng dn3 6d6 !soak / 2
+wng dn4 6d6 !exempt
+wng w0 4d6
+wng w1 1d6
+wng w1 4d6
+wng w1 4d6 !soak
+wng w1 dn6 4d6 !soak
+wng w2 4d6
+wng w2 4d6 !exempt * 2
+wng w2 5d6 !soak
+wng w2 6d6
+wng w2 6d6 !dmg
+wng w3 dn1 5d6 !exempt
+wng w5 4d6
+wng w5 5d6
+wng w5 6d6 !dmg
+wng w6 4d6
+wod
+ww3
+ww4c2
+yz
+🎯 **Natural 20** on the d20
