@@ -1705,10 +1705,17 @@ fn apply_mathematical_modifiers_to_successes_from_slice(
     Ok(())
 }
 
+/// One die rolled with explosions: every face rolled, and the values callers
+/// derive from them. Bundled together so a caller needs one line, not four.
+struct ExplodingDie {
+    rolls: Vec<i32>,
+    total: i32,
+    explosions: usize,
+}
+
 /// Roll one die of `sides` sides, rolling again each time it comes up at its
-/// maximum, and return every die rolled in order. Capped at 100 explosions so a
-/// pathological RNG cannot spin forever.
-fn roll_exploding_die(rng: &mut impl Rng, sides: u32) -> Vec<i32> {
+/// maximum. Capped at 100 explosions so a pathological RNG cannot spin forever.
+fn roll_exploding_die(rng: &mut impl Rng, sides: u32) -> ExplodingDie {
     let max = sides as i32;
     let mut rolls = vec![rng.random_range(1..=max)];
     let mut explosions = 0;
@@ -1716,7 +1723,27 @@ fn roll_exploding_die(rng: &mut impl Rng, sides: u32) -> Vec<i32> {
         rolls.push(rng.random_range(1..=max));
         explosions += 1;
     }
-    rolls
+    ExplodingDie {
+        total: rolls.iter().sum(),
+        explosions,
+        rolls,
+    }
+}
+
+/// Append a dice group for display. The `DiceGroup` literal is otherwise
+/// repeated verbatim in every system handler that shows more than one pool.
+fn push_dice_group(
+    result: &mut RollResult,
+    description: String,
+    rolls: Vec<i32>,
+    modifier_type: &str,
+) {
+    result.dice_groups.push(DiceGroup {
+        _description: description,
+        rolls,
+        dropped_rolls: Vec::new(),
+        modifier_type: modifier_type.to_string(),
+    });
 }
 
 fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
@@ -1735,34 +1762,29 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
         })
         .ok_or_else(|| anyhow!("Expected Savage Worlds modifier"))?;
 
-    // Roll trait die (exploding on max)
-    let trait_rolls = roll_exploding_die(rng, trait_sides);
-    let trait_total: i32 = trait_rolls.iter().sum();
-    let trait_explosions = trait_rolls.len() - 1;
-
-    // Roll wild die (d6, exploding on 6)
-    let wild_rolls = roll_exploding_die(rng, 6);
-    let wild_total: i32 = wild_rolls.iter().sum();
-    let wild_explosions = wild_rolls.len() - 1;
+    // Trait die explodes on its own maximum, wild die is always a d6
+    let trait_die = roll_exploding_die(rng, trait_sides);
+    let wild_die = roll_exploding_die(rng, 6);
+    let (trait_total, wild_total) = (trait_die.total, wild_die.total);
+    let (trait_explosions, wild_explosions) = (trait_die.explosions, wild_die.explosions);
 
     // Create dice groups for display
-    result.dice_groups.push(DiceGroup {
-        _description: format!("1d{trait_sides} ie{trait_sides}"),
-        rolls: trait_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "trait".to_string(),
-    });
-
-    result.dice_groups.push(DiceGroup {
-        _description: "1d6 ie6".to_string(),
-        rolls: wild_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "wild".to_string(),
-    });
+    push_dice_group(
+        &mut result,
+        format!("1d{trait_sides} ie{trait_sides}"),
+        trait_die.rolls.clone(),
+        "trait",
+    );
+    push_dice_group(
+        &mut result,
+        "1d6 ie6".to_string(),
+        wild_die.rolls.clone(),
+        "wild",
+    );
 
     // Add all rolls to individual_rolls for display
-    result.individual_rolls.extend(trait_rolls);
-    result.individual_rolls.extend(wild_rolls);
+    result.individual_rolls.extend(trait_die.rolls);
+    result.individual_rolls.extend(wild_die.rolls);
 
     // Keep the highest total (trait vs wild)
     let base_result = if trait_total >= wild_total {
@@ -1870,28 +1892,26 @@ fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResul
     let base_total: i32 = base_rolls.iter().sum();
 
     // Roll wild die (exploding on 6)
-    let wild_rolls = roll_exploding_die(rng, 6);
-    let wild_total: i32 = wild_rolls.iter().sum();
-    let wild_explosions = wild_rolls.len() - 1;
+    let wild_die = roll_exploding_die(rng, 6);
+    let (wild_total, wild_explosions) = (wild_die.total, wild_die.explosions);
 
     // Create dice groups for display
-    result.dice_groups.push(DiceGroup {
-        _description: format!("{count}d6"),
-        rolls: base_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "base".to_string(),
-    });
-
-    result.dice_groups.push(DiceGroup {
-        _description: "1d6 ie6".to_string(),
-        rolls: wild_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "add".to_string(),
-    });
+    push_dice_group(
+        &mut result,
+        format!("{count}d6"),
+        base_rolls.clone(),
+        "base",
+    );
+    push_dice_group(
+        &mut result,
+        "1d6 ie6".to_string(),
+        wild_die.rolls.clone(),
+        "add",
+    );
 
     // Add all rolls to individual_rolls and kept_rolls
     result.individual_rolls.extend(base_rolls);
-    result.individual_rolls.extend(wild_rolls);
+    result.individual_rolls.extend(wild_die.rolls);
     result.kept_rolls = result.individual_rolls.clone();
 
     // Calculate total
