@@ -113,9 +113,9 @@ Run this before every commit and before opening a PR. All three must pass — no
 cargo clippy -- -D warnings && cargo fmt --check && cargo test
 ```
 
-### Copy-paste check (JSCPD)
+### Copypaste check (JSCPD)
 
-CI runs super-linter, whose JSCPD copy-paste detector has a threshold of **0**: any clone of 5 or more lines (50+ tokens) fails the build. Run the same check locally before opening a PR:
+CI runs super-linter, whose JSCPD copypaste detector has a threshold of **0**: any clone of 5 or more lines (50+ tokens) fails the build. Run the same check locally before opening a PR:
 
 ```bash
 npx jscpd@3 --config .github/linters/.jscpd.json src tests
@@ -137,7 +137,7 @@ Follow this sequence exactly — do not skip or reorder steps:
 6. **`tests/game_systems_tests.rs`** — add tests following existing patterns
 7. **`roll_syntax.md`** — document the new syntax
 
-**Do not start by copy-pasting the nearest existing handler.** That is how this codebase accumulated 60 JSCPD clones. Start from the shared helpers below and write only what is genuinely specific to the new system.
+**Do not start by copypasting the nearest existing handler.** That is how this codebase accumulated 60 JSCPD clones. Start from the shared helpers below and write only what is genuinely specific to the new system.
 
 ### Shared helpers
 
@@ -178,13 +178,13 @@ Tests live in `tests/`:
 
 ### Snapshot tests
 
-Dice syntax is a public API, and a silently changed roll result is the worst bug this project can ship. `snapshot_tests.rs` guards against that by pinning what users can observe for every expression in `tests/corpus/expressions.txt`:
+Dice syntax is a public API, and a silently changed roll result is the worst bug this project can ship. `snapshot_tests.rs` guards against that by pinning what users can observe for every expression in `tests/corpus/expressions.dice`:
 
-- `snapshots/parse.txt` — the parsed form of every expression and every parse error, pinned exactly (parsing is deterministic)
-- `snapshots/deterministic_rolls.txt` — for expressions whose dice cannot vary (`d1` pools), the full result *and* the formatted Discord output, pinned exactly
-- `snapshots/outcomes.txt` — for randomly-rolling expressions, only what cannot vary with the dice: result count, success/failure, and exact error text
+- `snapshots/parse.snap` — the parsed form of every expression and every parse error, pinned exactly (parsing is deterministic)
+- `snapshots/deterministic_rolls.snap` — for expressions whose dice cannot vary (`d1` pools), the full result *and* the formatted Discord output, pinned exactly
+- `snapshots/outcomes.snap` — for randomly-rolling expressions, only what cannot vary with the dice: result count, success/failure, and exact error text
 
-**If you add or change syntax, add cases to `tests/corpus/expressions.txt`**: a happy-path expression, the boundary values of every numeric parameter, and a `d1` form (for example `4d1 k1`) so the roll is deterministic and lands in the exact-value snapshot. These tests only cover what the corpus contains — a keep-count bug at `k1` once slipped through because the corpus had `k2` but no `k1`.
+**If you add or change syntax, add cases to `tests/corpus/expressions.dice`**: a happy-path expression, the boundary values of every numeric parameter, and a `d1` form (for example `4d1 k1`) so the roll is deterministic and lands in the exact-value snapshot. These tests only cover what the corpus contains — a keep-count bug at `k1` once slipped through because the corpus had `k2` but no `k1`.
 
 If a snapshot fails, **read the diff before doing anything else**. Every changed line is a change your users will see. Once you have confirmed the change is intended:
 
@@ -224,7 +224,7 @@ New syntax or game systems need cases for **all** of the following:
 
 ### Keep test loops out of the clone detector
 
-The table changes between tests; the loop body usually does not. A pasted assertion loop is the most common source of JSCPD clones in this repo.
+The table changes between tests; the loop body usually does not. A pasted assertion loop is the most common source of JSCPD clones in this repository.
 
 - `tests/game_systems_tests.rs` has a `HELPER FUNCTIONS` section at the top. Use it, and add to it rather than pasting a loop: `roll_one`, `assert_labelled_roll_sets`, `assert_alias_matches_expansion`, `assert_success_alias`, `assert_no_prefix_conflicts`, `assert_kept_and_dropped`, `assert_valid`, `assert_invalid`.
 - Keep each test file to its own purpose. A game system's mechanics are tested in `game_systems_tests.rs` **only** — re-testing the same scenarios in `integration_tests.rs` creates a cross-file clone, and cross-file clones cannot be fixed with a local helper because each test file compiles as its own crate.
@@ -253,7 +253,7 @@ The table changes between tests; the loop body usually does not. A pasted assert
 | Ad-hoc RNGs (`rand::rng()`, etc.) | `src/dice/rng.rs` |
 | Unnecessary `.clone()` | Prefer borrowing |
 | `Regex::new` inside a function | A `static NAME: Lazy<Regex>` |
-| A copy-pasted block of 5+ lines | A shared helper (JSCPD fails the build at threshold 0) |
+| A copypasted block of 5+ lines | A shared helper (JSCPD fails the build at threshold 0) |
 
 ### Why regexes must be hoisted
 

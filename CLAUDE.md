@@ -18,7 +18,7 @@ cargo clippy -- -D warnings && cargo fmt --check && cargo test
 Tests run without a Discord token. For manual testing against a live guild, set `GUILD_ID`
 in `.env` so slash commands register instantly instead of waiting for global propagation.
 
-CI additionally runs super-linter, whose JSCPD copy-paste check has a threshold of **0** —
+CI additionally runs super-linter, whose JSCPD copypaste check has a threshold of **0** —
 any clone of 5+ lines / 50+ tokens fails the build. Run the same check locally before
 pushing (same config CI uses):
 
@@ -80,11 +80,11 @@ Follow this sequence, no skipped or reordered steps:
 6. `tests/game_systems_tests.rs` — tests following existing patterns
 7. `roll_syntax.md` — document the new syntax
 
-**Do not start by copy-pasting the nearest existing handler.** That is how this codebase
+**Do not start by copypasting the nearest existing handler.** That is how this codebase
 accumulated 60 JSCPD clones. Start from the shared helpers below and write only the part
 that is actually specific to the new system.
 
-## Shared Helpers (use these instead of copy-pasting)
+## Shared Helpers (use these instead of copypasting)
 
 Every one of these exists because the same block had been pasted 2–10 times. If you are
 about to write something that resembles a row on the left, the right-hand column already
@@ -119,17 +119,17 @@ document *why* the two paths differ; that difference is usually load-bearing.
 ### Snapshot tests — the regression net
 
 `tests/snapshot_tests.rs` pins what users can observe for every expression in
-`tests/corpus/expressions.txt`, so that a refactor which silently changes a roll fails
+`tests/corpus/expressions.dice`, so that a refactor which silently changes a roll fails
 `cargo test` instead of shipping:
 
-- **`parse.txt`** — parsing is deterministic, so the parsed form and every parse error are
+- **`parse.snap`** — parsing is deterministic, so the parsed form and every parse error are
   pinned exactly, for the whole corpus.
-- **`deterministic_rolls.txt`** — expressions whose dice cannot vary (`d1` pools) have their
+- **`deterministic_rolls.snap`** — expressions whose dice cannot vary (`d1` pools) have their
   full result *and* their formatted Discord output pinned exactly.
-- **`outcomes.txt`** — for randomly-rolling expressions, only what cannot vary with the dice:
+- **`outcomes.snap`** — for randomly-rolling expressions, only what cannot vary with the dice:
   result count, success/failure of the call, and exact error text.
 
-**When you add or change syntax, add expressions to `tests/corpus/expressions.txt`** — a
+**When you add or change syntax, add expressions to `tests/corpus/expressions.dice`** — a
 happy-path case, the boundary values of every numeric parameter, and a `d1` form so the roll
 lands in the deterministic snapshot. Coverage here is only as good as the corpus: a keep-count
 bug at `k1` slipped through when the corpus had `k2` but not `k1`.

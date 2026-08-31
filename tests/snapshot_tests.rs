@@ -2,7 +2,7 @@
 //
 // Dice syntax is a public API and a silently changed roll result is the worst
 // possible bug this project can ship. These tests pin the observable behavior of
-// every expression in `tests/corpus/expressions.txt` so that a refactor which
+// every expression in `tests/corpus/expressions.dice` so that a refactor which
 // changes a result fails here instead of on 500,000 Discord servers.
 //
 // Three layers, cheapest and strictest first:
@@ -45,7 +45,7 @@ fn repo_path(relative: &str) -> PathBuf {
 }
 
 fn corpus() -> Vec<String> {
-    let path = repo_path("tests/corpus/expressions.txt");
+    let path = repo_path("tests/corpus/expressions.dice");
     let raw = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
     raw.lines()
@@ -202,7 +202,7 @@ fn stable_roll_output(expression: &str) -> Option<String> {
 #[test]
 fn parse_snapshot_is_unchanged() {
     let lines: Vec<String> = corpus().iter().map(|e| parse_projection(e)).collect();
-    assert_snapshot("parse.txt", &format!("{}\n", lines.join("\n")));
+    assert_snapshot("parse.snap", &format!("{}\n", lines.join("\n")));
 }
 
 #[test]
@@ -220,7 +220,7 @@ fn deterministic_roll_snapshot_is_unchanged() {
         lines.len()
     );
     assert_snapshot(
-        "deterministic_rolls.txt",
+        "deterministic_rolls.snap",
         &format!("{}\n", lines.join("\n")),
     );
 }
@@ -265,5 +265,5 @@ fn outcome_snapshot_is_unchanged() {
         lines.push(format!("{expression}\t{outcome}"));
     }
 
-    assert_snapshot("outcomes.txt", &format!("{}\n", lines.join("\n")));
+    assert_snapshot("outcomes.snap", &format!("{}\n", lines.join("\n")));
 }
