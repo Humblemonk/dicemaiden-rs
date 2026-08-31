@@ -1,0 +1,9 @@
+{
+  "threshold": 0,
+  "reporters": ["consoleFull"],
+  "minLines": 5,
+  "minTokens": 50,
+  "maxLines": 20000,
+  "maxSize": "1mb",
+  "ignore": ["**/target/**", "**/.git/**", "**/*.md"]
+}

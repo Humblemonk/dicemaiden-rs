@@ -189,7 +189,7 @@ pub struct DiceGroup {
     pub modifier_type: String,   // "base", "add", "subtract"
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RollResult {
     pub individual_rolls: Vec<i32>,
     pub kept_rolls: Vec<i32>,
@@ -228,6 +228,23 @@ pub struct RollResult {
 }
 
 impl RollResult {
+    /// Empty result carrying the display metadata of the roll that produced it.
+    ///
+    /// Every game-system handler starts from this, so a field added to
+    /// `RollResult` gets its per-roll default in exactly one place instead of
+    /// being forgotten in one handler out of a dozen.
+    pub fn from_dice(dice: &DiceRoll) -> Self {
+        Self {
+            comment: dice.comment.clone(),
+            label: dice.label.clone(),
+            original_expression: dice.original_expression.clone(),
+            simple: dice.simple,
+            no_results: dice.no_results,
+            private: dice.private,
+            ..Self::default()
+        }
+    }
+
     /// Format the dice roll display based on whether we have dice groups or kept rolls
     fn format_dice_display(&self) -> String {
         // Special handling for Fudge dice

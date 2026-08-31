@@ -113,6 +113,16 @@ Run this before every commit and before opening a PR. All three must pass — no
 cargo clippy -- -D warnings && cargo fmt --check && cargo test
 ```
 
+### Copy-paste check (JSCPD)
+
+CI runs super-linter, whose JSCPD copy-paste detector has a threshold of **0**: any clone of 5 or more lines (50+ tokens) fails the build. Run the same check locally before opening a PR:
+
+```bash
+npx jscpd@3 --config .github/linters/.jscpd.json src tests
+```
+
+The fix is never to reword the copy — extract the shared part. See [Shared helpers](#shared-helpers) below.
+
 ---
 
 ## Adding a New Game System
@@ -126,6 +136,25 @@ Follow this sequence exactly — do not skip or reorder steps:
 5. **`src/commands/roll.rs`** — add display/formatting logic
 6. **`tests/game_systems_tests.rs`** — add tests following existing patterns
 7. **`roll_syntax.md`** — document the new syntax
+
+**Do not start by copy-pasting the nearest existing handler.** That is how this codebase accumulated 60 JSCPD clones. Start from the shared helpers below and write only what is genuinely specific to the new system.
+
+### Shared helpers
+
+Each of these exists because the same block had been pasted between 2 and 10 times. If you are about to write something resembling the left column, the right column already does it:
+
+| Instead of writing | Call |
+|---|---|
+| The 30-field `RollResult { .. }` literal | `RollResult::from_dice(&dice)` — or `RollResult { field: x, ..RollResult::from_dice(&dice) }` when a field differs |
+| A loop applying `+ - * /` to `result.total` | `apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)` |
+| `matches!(m, Modifier::Add(_) \| Modifier::Subtract(_) \| ...)` | `is_arithmetic_modifier(m)`, or `ArithmeticOp::from_modifier(m)?` when the operand is needed |
+| Rolling `+2d6`-style operands into an expression | `apply_dice_operand(..)` / `apply_modifier_expression(..)` |
+| A roll-and-explode-while-max loop | `roll_exploding_die(rng, sides)` |
+| Keep/drop index bookkeeping | `indexed_rolls(result)` + `partition_kept_dice(result, &kept)` |
+| A d10 crit/fumble explosion tail (Cyberpunk Red, Witcher) | `finalize_d10_explosion(..)` |
+| Building `Set 1..N` copies, or roll-set parsing | `build_roll_set(..)` / `try_parse_roll_set(..)` |
+
+If a new system needs *almost* the same behavior as an existing helper, add a parameter rather than a second copy of the function — see `RerollDirection` (`r` vs `rg`) and `MathModifierRules` (standard vs post-division), each of which replaced a near-identical twin function. Document why the two paths differ; that difference is usually load-bearing.
 
 ### Modifier ordering rules
 
@@ -172,6 +201,13 @@ New syntax or game systems need cases for **all** of the following:
 
 **Bugfixes must include a regression test** reproducing the original bug, added alongside the fix.
 
+### Keep test loops out of the clone detector
+
+The table changes between tests; the loop body usually does not. A pasted assertion loop is the most common source of JSCPD clones in this repo.
+
+- `tests/game_systems_tests.rs` has a `HELPER FUNCTIONS` section at the top. Use it, and add to it rather than pasting a loop: `roll_one`, `assert_labelled_roll_sets`, `assert_alias_matches_expansion`, `assert_success_alias`, `assert_no_prefix_conflicts`, `assert_kept_and_dropped`, `assert_valid`, `assert_invalid`.
+- Keep each test file to its own purpose. A game system's mechanics are tested in `game_systems_tests.rs` **only** — re-testing the same scenarios in `integration_tests.rs` creates a cross-file clone, and cross-file clones cannot be fixed with a local helper because each test file compiles as its own crate.
+
 ---
 
 ## Code Standards
@@ -196,6 +232,7 @@ New syntax or game systems need cases for **all** of the following:
 | Ad-hoc RNGs (`rand::rng()`, etc.) | `src/dice/rng.rs` |
 | Unnecessary `.clone()` | Prefer borrowing |
 | `Regex::new` inside a function | A `static NAME: Lazy<Regex>` |
+| A copy-pasted block of 5+ lines | A shared helper (JSCPD fails the build at threshold 0) |
 
 ### Why regexes must be hoisted
 
@@ -226,10 +263,11 @@ builds regexes, add it to the list in that test.
 ## Submitting a Pull Request
 
 1. Ensure `cargo clippy -- -D warnings && cargo fmt --check && cargo test` all pass
-2. If you added a game system, confirm `roll_syntax.md` is updated
-3. Keep your PR focused — one feature or fix per PR
-4. Write a clear description of what you changed and why
-5. Reference any related issues (e.g., `Closes #123`)
+2. Ensure `npx jscpd@3 --config .github/linters/.jscpd.json src tests` reports 0 clones
+3. If you added a game system, confirm `roll_syntax.md` is updated
+4. Keep your PR focused — one feature or fix per PR
+5. Write a clear description of what you changed and why
+6. Reference any related issues (e.g., `Closes #123`)
 
 PRs that fail the quality check or lack tests for new functionality will be asked to revise before review.
 

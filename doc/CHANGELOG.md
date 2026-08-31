@@ -1,12 +1,23 @@
 # Changelog
 
-## [1.6.2] -2026-08-28
+## [1.6.3] - 2026-08-31
+
+## Changed
+
+- Internal code cleanup only — **no change to dice syntax, roll results, or output**. Every
+  expression rolls exactly as it did in 1.6.2.
+- Consolidated roughly a thousand lines of duplicated roll-handling logic that had built up
+  as game systems were added one at a time. Each behavior now lives in one place, so a fix
+  applies everywhere at once instead of only in the copies someone remembers to update.
+- Adding a new game system now takes considerably less boilerplate, which should shorten the
+  turnaround on new system requests.
+
+## [1.6.2] - 2026-08-28
 
 ## Fixed
 
 - Replaced the unmaintained `dotenv` crate with `dotenvy` (RUSTSEC-2021-0141); no change to `.env` handling
 - Upgraded `sqlx` to 0.9 and `sysinfo` to 0.39; minimum supported Rust version is now 1.95
-- Refactor Exalted dice validation helper
 
 ## [1.6.1] - 2026-08-25
 

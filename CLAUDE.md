@@ -18,6 +18,14 @@ cargo clippy -- -D warnings && cargo fmt --check && cargo test
 Tests run without a Discord token. For manual testing against a live guild, set `GUILD_ID`
 in `.env` so slash commands register instantly instead of waiting for global propagation.
 
+CI additionally runs super-linter, whose JSCPD copy-paste check has a threshold of **0** —
+any clone of 5+ lines / 50+ tokens fails the build. Run the same check locally before
+pushing (same config CI uses):
+
+```
+npx jscpd@3 --config .github/linters/.jscpd.json src tests
+```
+
 ## Architecture
 
 ```
@@ -72,6 +80,32 @@ Follow this sequence, no skipped or reordered steps:
 6. `tests/game_systems_tests.rs` — tests following existing patterns
 7. `roll_syntax.md` — document the new syntax
 
+**Do not start by copy-pasting the nearest existing handler.** That is how this codebase
+accumulated 60 JSCPD clones. Start from the shared helpers below and write only the part
+that is actually specific to the new system.
+
+## Shared Helpers (use these instead of copy-pasting)
+
+Every one of these exists because the same block had been pasted 2–10 times. If you are
+about to write something that resembles a row on the left, the right-hand column already
+does it.
+
+| Instead of writing | Call |
+| --- | --- |
+| The 30-field `RollResult { .. }` literal | `RollResult::from_dice(&dice)` — or `RollResult { field: x, ..RollResult::from_dice(&dice) }` when a field differs |
+| A loop applying `+ - * /` to `result.total` | `apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)` |
+| `matches!(m, Modifier::Add(_) \| Modifier::Subtract(_) \| ...)` | `is_arithmetic_modifier(m)`, or `ArithmeticOp::from_modifier(m)?` when the operand is needed |
+| Rolling `+2d6`-style operands into an expression | `apply_dice_operand(..)` / `apply_modifier_expression(..)` |
+| A roll-and-explode-while-max loop | `roll_exploding_die(rng, sides)` |
+| Keep/drop index bookkeeping | `indexed_rolls(result)` + `partition_kept_dice(result, &kept)` |
+| A d10 crit/fumble explosion tail (CPR, Witcher) | `finalize_d10_explosion(..)` |
+| Building `Set 1..N` copies, or set parsing in `parser.rs` | `build_roll_set(..)` / `try_parse_roll_set(..)` |
+
+Behavioral variants belong in a parameter, not a second copy of the function — see
+`RerollDirection` (`r` vs `rg`) and `MathModifierRules` (standard vs post-division), each
+of which replaced a near-identical twin function. When you do add a parameter like this,
+document *why* the two paths differ; that difference is usually load-bearing.
+
 ## Testing
 
 | File | Purpose |
@@ -86,6 +120,16 @@ Follow this sequence, no skipped or reordered steps:
 - Write tests before or alongside the implementation, not after
 - New syntax needs cases for: the happy path, combination with common modifiers, comments
   (`! text`), roll sets, and boundary/limit values
+- **The table changes; the loop body does not.** A pasted assertion loop is the most common
+  source of JSCPD clones here. `tests/game_systems_tests.rs` has a HELPER FUNCTIONS section
+  at the top — use it, and add to it rather than pasting:
+  `roll_one`, `assert_labelled_roll_sets`, `assert_alias_matches_expansion`,
+  `assert_success_alias`, `assert_no_prefix_conflicts`, `assert_kept_and_dropped`,
+  `assert_valid`, `assert_invalid`
+- Keep each file to its own purpose. A game system's mechanics are tested in
+  `game_systems_tests.rs` **only** — re-testing the same scenarios in `integration_tests.rs`
+  is a cross-file clone, and cross-file clones cannot be fixed with a local helper
+  (each test file is its own crate)
 
 ## Rust Rules
 

@@ -774,10 +774,12 @@ fn test_target_system_modifiers() {
             expression
         );
 
-        // Both should produce reasonable success counts
+        // Both should produce reasonable success counts. `f`/`b` subtract from
+        // the count, so an expression like "2d10*2 t6f2b1" can legitimately go
+        // negative when every die fails.
         let success_count = results[0].successes.unwrap();
         assert!(
-            (0..=25).contains(&success_count),
+            (-25..=25).contains(&success_count),
             "Success count {} should be reasonable for '{}': {}",
             success_count,
             expression,
@@ -2516,20 +2518,7 @@ fn test_target_failure_order_consistency() {
     ];
 
     for (expr1, expr2, description) in test_cases {
-        let result1 = parse_and_roll(expr1).unwrap();
-        let result2 = parse_and_roll(expr2).unwrap();
-
-        assert_eq!(
-            result1[0].successes, result2[0].successes,
-            "Success counts must be identical for {} vs {} ({})",
-            expr1, expr2, description
-        );
-
-        assert_eq!(
-            result1[0].failures, result2[0].failures,
-            "Failure counts must be identical for {} vs {} ({})",
-            expr1, expr2, description
-        );
+        assert_modifier_order_equivalent(expr1, expr2, description);
     }
 }
 
@@ -2555,6 +2544,27 @@ fn test_pre_target_applied_once() {
     assert!(result2[0].kept_rolls.iter().all(|&v| v == 6));
 }
 
+/// Assert two orderings of the same target-related modifiers produce identical
+/// counts. Modifier order is user-visible syntax, so `t6f1` and `f1t6` must not
+/// diverge.
+fn assert_modifier_order_equivalent(expr1: &str, expr2: &str, description: &str) {
+    let result1 = parse_and_roll(expr1).unwrap();
+    let result2 = parse_and_roll(expr2).unwrap();
+
+    assert_eq!(
+        result1[0].successes, result2[0].successes,
+        "Order should not affect successes: {expr1} vs {expr2} ({description})"
+    );
+    assert_eq!(
+        result1[0].failures, result2[0].failures,
+        "Order should not affect failures: {expr1} vs {expr2} ({description})"
+    );
+    assert_eq!(
+        result1[0].botches, result2[0].botches,
+        "Order should not affect botches: {expr1} vs {expr2} ({description})"
+    );
+}
+
 #[test]
 fn test_botch_modifier_order_consistency() {
     // Test that botch modifiers also work consistently with the fix
@@ -2564,19 +2574,7 @@ fn test_botch_modifier_order_consistency() {
     ];
 
     for (expr1, expr2, description) in test_cases {
-        let result1 = parse_and_roll(expr1).unwrap();
-        let result2 = parse_and_roll(expr2).unwrap();
-
-        assert_eq!(
-            result1[0].successes, result2[0].successes,
-            "Botch order should not affect successes: {} vs {} ({})",
-            expr1, expr2, description
-        );
-        assert_eq!(
-            result1[0].botches, result2[0].botches,
-            "Botch order should not affect botch count: {} vs {} ({})",
-            expr1, expr2, description
-        );
+        assert_modifier_order_equivalent(expr1, expr2, description);
     }
 }
 
@@ -2602,25 +2600,7 @@ fn test_complex_modifier_orders() {
     ];
 
     for (expr1, expr2, description) in complex_cases {
-        let result1 = parse_and_roll(expr1).unwrap();
-        let result2 = parse_and_roll(expr2).unwrap();
-
-        // Basic consistency checks
-        assert_eq!(
-            result1[0].successes, result2[0].successes,
-            "Complex order test successes: {} vs {} ({})",
-            expr1, expr2, description
-        );
-        assert_eq!(
-            result1[0].failures, result2[0].failures,
-            "Complex order test failures: {} vs {} ({})",
-            expr1, expr2, description
-        );
-        assert_eq!(
-            result1[0].botches, result2[0].botches,
-            "Complex order test botches: {} vs {} ({})",
-            expr1, expr2, description
-        );
+        assert_modifier_order_equivalent(expr1, expr2, description);
     }
 }
 
