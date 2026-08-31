@@ -132,6 +132,108 @@ static DICE_WITH_MODIFIERS_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     .collect()
 });
 
+/// Parse the optional threshold on an explode modifier: `e`/`ie` explode on the
+/// die's maximum, `e6`/`ie6` on the given value. `part` is only used to quote
+/// the original token back in the error.
+fn parse_explode_threshold(stripped: &str, part: &str) -> Result<Option<u32>> {
+    if stripped.is_empty() {
+        return Ok(None);
+    }
+
+    let threshold: u32 = stripped
+        .parse()
+        .map_err(|_| anyhow!("Invalid explode value in '{}'", part))?;
+    if threshold == 0 {
+        return Err(anyhow!("Cannot explode on 0"));
+    }
+    Ok(Some(threshold))
+}
+
+/// Parse and range-check a Mothership stat value (`ms45`, `ms45a`, `ms45d`).
+fn parse_mothership_stat(stat_str: &str, part: &str) -> Result<u32> {
+    let stat: u32 = stat_str
+        .parse()
+        .map_err(|_| anyhow!("Invalid Mothership stat value in '{}'", part))?;
+    if !(1..=99).contains(&stat) {
+        return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
+    }
+    Ok(stat)
+}
+
+/// Expand the advantage/disadvantage alias in a roll-set expression, keeping any
+/// trailing simple numeric modifier (`+d20-1`, `+d20 * 2`). Returns `expression`
+/// unchanged when it is neither an alias nor an advantage pattern.
+fn expand_roll_set_expression(expression: &str) -> String {
+    if let Some(expanded) = super::aliases::expand_alias(expression) {
+        // Direct alias match (like "+d20" -> "2d20 k1")
+        return expanded;
+    }
+
+    // Advantage/disadvantage with modifiers (like "+d20-1" or "+d20 * 2")
+    let Some(captures) = ADV_WITH_SIMPLE_MOD_REGEX.captures(expression) else {
+        return expression.to_string();
+    };
+
+    let advantage_sign = &captures[1];
+    let sides = &captures[2];
+    let operator = &captures[3];
+    let number = &captures[4];
+
+    // Expand the advantage/disadvantage part, then recombine with the modifier
+    let adv_alias = format!("{advantage_sign}d{sides}");
+    match super::aliases::expand_alias(&adv_alias) {
+        Some(expanded_adv) => format!("{expanded_adv} {operator} {number}"),
+        None => expression.to_string(),
+    }
+}
+
+/// Clone `dice` into the `count` labelled copies that make up a roll set.
+fn build_roll_set(dice: &DiceRoll, count: u32) -> Vec<DiceRoll> {
+    (0..count)
+        .map(|i| {
+            let mut set_dice = dice.clone();
+            set_dice.label = Some(format!("Set {}", i + 1));
+            set_dice
+        })
+        .collect()
+}
+
+/// Parse `input` as a roll set (`4 4d6`), transferring `metadata` (flags, label,
+/// comment) onto each set when given.
+///
+/// `Ok(None)` means "not a roll set", and the caller falls through to
+/// single-expression parsing — that fall-through is what lets an input like
+/// `6 6` still parse as plain arithmetic. An out-of-range set count is an
+/// error rather than a fall-through, so the user is told why it was rejected.
+fn try_parse_roll_set(input: &str, metadata: Option<&DiceRoll>) -> Result<Option<Vec<DiceRoll>>> {
+    let Some(captures) = SET_REGEX.captures(input) else {
+        return Ok(None);
+    };
+
+    let expression = &captures[2];
+    if !is_valid_roll_set_expression(expression) {
+        return Ok(None);
+    }
+
+    let Ok(count) = captures[1].parse::<u32>() else {
+        return Ok(None);
+    };
+    if !(2..=20).contains(&count) {
+        return Err(anyhow!("Set count must be between 2 and 20"));
+    }
+
+    match parse_single_dice_expression(&expand_roll_set_expression(expression)) {
+        Ok(mut dice) => {
+            if let Some(meta) = metadata {
+                transfer_dice_metadata(meta, &mut dice);
+            }
+            Ok(Some(build_roll_set(&dice, count)))
+        }
+        // Not parseable as a set member; fall through to single-expression parsing
+        Err(_) => Ok(None),
+    }
+}
+
 pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     let input = input.trim();
 
@@ -165,57 +267,8 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     }
 
     // PRIORITY 1: Check for roll sets FIRST, but validate expression first
-    if let Some(captures) = SET_REGEX.captures(input) {
-        let count_str = &captures[1];
-        let expression = &captures[2];
-
-        // Only proceed with roll set logic if expression is valid
-        if is_valid_roll_set_expression(expression)
-            && let Ok(count) = count_str.parse::<u32>()
-        {
-            // Add validation check for count range
-            if !(2..=20).contains(&count) {
-                return Err(anyhow!("Set count must be between 2 and 20"));
-            }
-
-            // Handle advantage/disadvantage patterns with modifiers in roll sets
-            let final_expression = if let Some(expanded) = super::aliases::expand_alias(expression)
-            {
-                expanded
-            } else if let Some(captures) = ADV_WITH_SIMPLE_MOD_REGEX.captures(expression) {
-                let advantage_sign = &captures[1];
-                let sides = &captures[2];
-                let operator = &captures[3];
-                let number = &captures[4];
-
-                // Expand the advantage/disadvantage part
-                let adv_alias = format!("{advantage_sign}d{sides}");
-                if let Some(expanded_adv) = super::aliases::expand_alias(&adv_alias) {
-                    format!("{expanded_adv} {operator} {number}")
-                } else {
-                    expression.to_string()
-                }
-            } else {
-                expression.to_string()
-            };
-
-            // Now try to parse the (possibly expanded) expression
-            match parse_single_dice_expression(&final_expression) {
-                Ok(dice) => {
-                    let mut results = Vec::with_capacity(count as usize);
-                    for i in 0..count {
-                        let mut set_dice = dice.clone();
-                        set_dice.label = Some(format!("Set {}", i + 1));
-                        results.push(set_dice);
-                    }
-                    return Ok(results);
-                }
-                Err(_e) => {
-                    // Fall through to other parsing methods
-                }
-            }
-        }
-        // If not a valid roll set expression, fall through to single expression parsing
+    if let Some(results) = try_parse_roll_set(input, None)? {
+        return Ok(results);
     }
 
     // Parse flags, labels, and comments
@@ -226,59 +279,8 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     let remaining_input = after_comment.trim();
 
     // PRIORITY 2: Check for roll sets AGAIN after processing flags, with same validation
-    if let Some(captures) = SET_REGEX.captures(remaining_input) {
-        let count_str = &captures[1];
-        let expression = &captures[2];
-
-        // Only proceed with roll set logic if expression is valid
-        if is_valid_roll_set_expression(expression)
-            && let Ok(count) = count_str.parse::<u32>()
-        {
-            // Add validation check for count range
-            if !(2..=20).contains(&count) {
-                return Err(anyhow!("Set count must be between 2 and 20"));
-            }
-
-            // Handle advantage/disadvantage patterns with modifiers in roll sets
-            let final_expression = if let Some(expanded) = super::aliases::expand_alias(expression)
-            {
-                // Direct alias match (like "+d20" -> "2d20 k1")
-                expanded
-            } else if let Some(captures) = ADV_WITH_SIMPLE_MOD_REGEX.captures(expression) {
-                // Advantage/disadvantage with modifiers (like "+d20-1" or "+d20 * 2")
-                let advantage_sign = &captures[1];
-                let sides = &captures[2];
-                let operator = &captures[3];
-                let number = &captures[4];
-
-                // Expand the advantage/disadvantage part
-                let adv_alias = format!("{advantage_sign}d{sides}");
-                if let Some(expanded_adv) = super::aliases::expand_alias(&adv_alias) {
-                    // Combine with the numeric modifier part
-                    format!("{expanded_adv} {operator} {number}")
-                } else {
-                    expression.to_string()
-                }
-            } else {
-                expression.to_string()
-            };
-
-            // Now try to parse the (possibly expanded) expression
-            if let Ok(mut dice) = parse_single_dice_expression(&final_expression) {
-                // Transfer the parsed flags to each set
-                transfer_dice_metadata(&temp_dice, &mut dice);
-
-                // Successfully parsed - create the roll set
-                let mut results = Vec::with_capacity(count as usize);
-                for i in 0..count {
-                    let mut set_dice = dice.clone();
-                    set_dice.label = Some(format!("Set {}", i + 1));
-                    results.push(set_dice);
-                }
-                return Ok(results);
-            }
-        }
-        // If not a valid roll set expression, fall through to single expression parsing
+    if let Some(results) = try_parse_roll_set(remaining_input, Some(&temp_dice))? {
+        return Ok(results);
     }
 
     // PRIORITY 3: Handle advantage/disadvantage with simple modifiers
@@ -1781,39 +1783,13 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
 
     // Handle exploding dice
     if let Some(stripped) = part.strip_prefix("ie") {
-        let num = if stripped.is_empty() {
-            None
-        } else {
-            Some(
-                stripped
-                    .parse()
-                    .map_err(|_| anyhow!("Invalid explode value in '{}'", part))?,
-            )
-        };
-        if let Some(val) = num
-            && val == 0
-        {
-            return Err(anyhow!("Cannot explode on 0"));
-        }
-        return Ok(Modifier::ExplodeIndefinite(num));
+        return Ok(Modifier::ExplodeIndefinite(parse_explode_threshold(
+            stripped, part,
+        )?));
     }
 
     if let Some(stripped) = part.strip_prefix('e') {
-        let num = if stripped.is_empty() {
-            None
-        } else {
-            Some(
-                stripped
-                    .parse()
-                    .map_err(|_| anyhow!("Invalid explode value in '{}'", part))?,
-            )
-        };
-        if let Some(val) = num
-            && val == 0
-        {
-            return Err(anyhow!("Cannot explode on 0"));
-        }
-        return Ok(Modifier::Explode(num));
+        return Ok(Modifier::Explode(parse_explode_threshold(stripped, part)?));
     }
 
     // Handle D6 System BEFORE drop modifier to avoid conflicts
@@ -2269,31 +2245,22 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
     if let Some(stripped) = part.strip_prefix("ms") {
         if let Some(stat_str) = stripped.strip_suffix('a') {
             // Changed from '+'
-            let stat: u32 = stat_str
-                .parse()
-                .map_err(|_| anyhow!("Invalid Mothership stat value in '{}'", part))?;
-            if !(1..=99).contains(&stat) {
-                return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
-            }
-            return Ok(Modifier::Mothership(Some(stat), true));
+            return Ok(Modifier::Mothership(
+                Some(parse_mothership_stat(stat_str, part)?),
+                true,
+            ));
         } else if let Some(stat_str) = stripped.strip_suffix('d') {
             // Changed from '-'
-            let stat: u32 = stat_str
-                .parse()
-                .map_err(|_| anyhow!("Invalid Mothership stat value in '{}'", part))?;
-            if !(1..=99).contains(&stat) {
-                return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
-            }
-            return Ok(Modifier::Mothership(Some(stat), false));
+            return Ok(Modifier::Mothership(
+                Some(parse_mothership_stat(stat_str, part)?),
+                false,
+            ));
         } else if !stripped.is_empty() {
             // Just a stat value
-            let stat: u32 = stripped
-                .parse()
-                .map_err(|_| anyhow!("Invalid Mothership stat value in '{}'", part))?;
-            if !(1..=99).contains(&stat) {
-                return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
-            }
-            return Ok(Modifier::Mothership(Some(stat), false));
+            return Ok(Modifier::Mothership(
+                Some(parse_mothership_stat(stripped, part)?),
+                false,
+            ));
         }
     }
 
@@ -2556,42 +2523,13 @@ fn create_roll_set_with_metadata(
         return Err(anyhow!("Set count must be between 2 and 20"));
     }
 
-    let expression = &captures[2];
-
-    // Handle advantage/disadvantage patterns with modifiers in roll sets
-    let final_expression = if let Some(expanded) = super::aliases::expand_alias(expression) {
-        expanded
-    } else if let Some(adv_captures) = ADV_WITH_SIMPLE_MOD_REGEX.captures(expression) {
-        let advantage_sign = &adv_captures[1];
-        let sides = &adv_captures[2];
-        let operator = &adv_captures[3];
-        let number = &adv_captures[4];
-
-        // Expand the advantage/disadvantage part
-        let adv_alias = format!("{advantage_sign}d{sides}");
-        if let Some(expanded_adv) = super::aliases::expand_alias(&adv_alias) {
-            format!("{expanded_adv} {operator} {number}")
-        } else {
-            expression.to_string()
-        }
-    } else {
-        expression.to_string()
-    };
-
     // Parse the dice expression
-    let mut dice = parse_single_dice_expression(&final_expression)?;
+    let mut dice = parse_single_dice_expression(&expand_roll_set_expression(&captures[2]))?;
 
     // Transfer metadata if provided (for flag support)
     if let Some(meta) = metadata {
         transfer_dice_metadata(meta, &mut dice);
     }
 
-    // Create the roll set
-    let mut results = Vec::with_capacity(count as usize);
-    for i in 0..count {
-        let mut set_dice = dice.clone();
-        set_dice.label = Some(format!("Set {}", i + 1));
-        results.push(set_dice);
-    }
-    Ok(results)
+    Ok(build_roll_set(&dice, count))
 }

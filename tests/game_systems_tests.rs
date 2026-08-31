@@ -6,7 +6,7 @@
 // - Cross-system compatibility
 // - Game system modifiers and edge cases
 
-use dicemaiden_rs::{dice::aliases, dice::roller::wfrp_test_outcome, parse_and_roll};
+use dicemaiden_rs::{RollResult, dice::aliases, dice::roller::wfrp_test_outcome, parse_and_roll};
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -20,6 +20,133 @@ fn assert_valid(input: &str) {
 fn assert_invalid(input: &str) {
     let result = parse_and_roll(input);
     assert!(result.is_err(), "Expected error for: '{}'", input);
+}
+
+/// Roll `input` and return its single result, asserting it parsed and produced
+/// exactly one roll.
+fn roll_one(input: &str, description: &str) -> RollResult {
+    let mut results = parse_and_roll(input)
+        .unwrap_or_else(|e| panic!("'{input}' should parse: {description} - {e}"));
+    assert_eq!(results.len(), 1, "Should have one result for '{input}'");
+    results.remove(0)
+}
+
+/// Roll a `N <expression>` roll set, asserting it produced the N sets its
+/// leading digit asks for, each labelled `Set 1`..`Set N`. Returns the sets so
+/// callers can add their own system-specific assertions.
+fn assert_labelled_roll_sets(expression: &str, description: &str) -> Vec<RollResult> {
+    let results = parse_and_roll(expression)
+        .unwrap_or_else(|e| panic!("Roll set '{expression}' should work: {description} - {e}"));
+
+    let expected_sets = expression
+        .chars()
+        .next()
+        .and_then(|c| c.to_digit(10))
+        .unwrap_or_else(|| panic!("Roll set '{expression}' must start with a set count"))
+        as usize;
+    assert_eq!(
+        results.len(),
+        expected_sets,
+        "Should have {expected_sets} sets for '{expression}'"
+    );
+
+    for (i, roll) in results.iter().enumerate() {
+        assert_eq!(
+            roll.label,
+            Some(format!("Set {}", i + 1)),
+            "Each set should have correct label for '{expression}'"
+        );
+    }
+
+    results
+}
+
+/// Assert an alias expands to `expected_expansion` and that rolling the alias
+/// behaves the same as rolling the expansion written out by hand.
+fn assert_alias_matches_expansion(alias: &str, expected_expansion: &str) {
+    assert_eq!(
+        aliases::expand_alias(alias),
+        Some(expected_expansion.to_string()),
+        "Alias '{alias}' should expand to '{expected_expansion}'"
+    );
+
+    let alias_roll =
+        parse_and_roll(alias).unwrap_or_else(|e| panic!("Alias '{alias}' should roll: {e}"));
+    let expansion_roll = parse_and_roll(expected_expansion)
+        .unwrap_or_else(|e| panic!("Expansion '{expected_expansion}' should roll: {e}"));
+
+    assert_eq!(
+        alias_roll.len(),
+        expansion_roll.len(),
+        "Alias and expansion should have same result count for '{alias}'"
+    );
+    assert_eq!(
+        alias_roll[0].successes.is_some(),
+        expansion_roll[0].successes.is_some(),
+        "Alias and expansion should have same success counting behavior for '{alias}'"
+    );
+}
+
+/// Assert an alias expands to `expected_expansion`, rolls, and counts successes.
+fn assert_success_alias(alias: &str, expected_expansion: &str, description: &str) -> RollResult {
+    assert_eq!(
+        aliases::expand_alias(alias),
+        Some(expected_expansion.to_string()),
+        "Alias '{alias}' should expand to '{expected_expansion}': {description}"
+    );
+
+    let roll = roll_one(alias, description);
+    assert!(
+        roll.successes.is_some(),
+        "Roll '{alias}' should have success counting"
+    );
+    roll
+}
+
+/// Assert an advantage/disadvantage expression keeps and drops the expected
+/// number of dice.
+fn assert_kept_and_dropped(
+    expression: &str,
+    expected_kept: usize,
+    expected_dropped: usize,
+) -> RollResult {
+    let mut results = parse_and_roll(expression).expect("expression should roll");
+    let result = results.remove(0);
+
+    assert_eq!(
+        result.individual_rolls.len(),
+        expected_kept,
+        "'{expression}' should keep {expected_kept} dice"
+    );
+    assert_eq!(
+        result.dropped_rolls.len(),
+        expected_dropped,
+        "'{expression}' should drop {expected_dropped} dice"
+    );
+    result
+}
+
+/// Aliases already claimed by other game systems, checked against whenever a
+/// system's own tokens are verified to be collision-free.
+const EXISTING_ALIAS_PATTERNS: &[&str] = &[
+    "mm", "mnm", "sw", "cod", "wod", "ex", "alien", "vtm", "lf", "cs", "sp", "dd", "yz", "wh",
+    "ed", "snm", "gb", "gbs", "hs", "dh", "cpr", "cpd", "wit", "wfrp", "df", "age", "attack",
+    "skill", "save",
+];
+
+/// Assert a system's tokens share no prefix with any other system's, in either
+/// direction. The parser matches modifiers by prefix, so an overlap silently
+/// reroutes an unrelated roll.
+fn assert_no_prefix_conflicts(system: &str, patterns: &[&str], existing_patterns: &[&str]) {
+    for pattern in patterns {
+        let bare = pattern.trim_start_matches(['+', '-']);
+        for existing in existing_patterns {
+            assert!(
+                !pattern.starts_with(existing) && !existing.starts_with(bare),
+                "{system} pattern '{pattern}' conflicts with existing pattern '{existing}'"
+            );
+        }
+    }
 }
 
 // ============================================================================
@@ -1593,18 +1720,7 @@ fn test_storypath_system_comprehensive() {
     ];
 
     for (alias, expected_dice, description) in storypath_tests {
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Storypath '{}' should parse: {}",
-            alias,
-            description
-        );
-
-        let results = result.unwrap();
-        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
-
-        let roll = &results[0];
+        let roll = roll_one(alias, description);
 
         // Should have success counting (target system)
         assert!(
@@ -2125,32 +2241,7 @@ fn test_missing_systems_with_roll_sets() {
     ];
 
     for (expression, description) in roll_set_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Roll set '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        let expected_sets = expression.chars().next().unwrap().to_digit(10).unwrap() as usize;
-        assert_eq!(
-            results.len(),
-            expected_sets,
-            "Should have {} sets for '{}'",
-            expected_sets,
-            expression
-        );
-
-        for (i, roll) in results.iter().enumerate() {
-            assert_eq!(
-                roll.label,
-                Some(format!("Set {}", i + 1)),
-                "Each set should have correct label for '{}'",
-                expression
-            );
-        }
+        assert_labelled_roll_sets(expression, description);
     }
 }
 
@@ -2200,45 +2291,7 @@ fn test_missing_systems_alias_expansion() {
     ];
 
     for (alias, expected_expansion) in alias_expansion_tests {
-        // Test that the alias expands correctly
-        let expanded = aliases::expand_alias(alias);
-        assert_eq!(
-            expanded,
-            Some(expected_expansion.to_string()),
-            "Alias '{}' should expand to '{}'",
-            alias,
-            expected_expansion
-        );
-
-        // Test that both the alias and expansion produce equivalent results
-        let alias_result = parse_and_roll(alias);
-        let expansion_result = parse_and_roll(expected_expansion);
-
-        assert!(
-            alias_result.is_ok() && expansion_result.is_ok(),
-            "Both alias '{}' and expansion '{}' should work",
-            alias,
-            expected_expansion
-        );
-
-        let alias_roll = alias_result.unwrap();
-        let expansion_roll = expansion_result.unwrap();
-
-        // Should have same number of results
-        assert_eq!(
-            alias_roll.len(),
-            expansion_roll.len(),
-            "Alias and expansion should have same result count for '{}'",
-            alias
-        );
-
-        // Should have similar characteristics (both success-based or both total-based)
-        assert_eq!(
-            alias_roll[0].successes.is_some(),
-            expansion_roll[0].successes.is_some(),
-            "Alias and expansion should have same success counting behavior for '{}'",
-            alias
-        );
+        assert_alias_matches_expansion(alias, expected_expansion);
     }
 }
 
@@ -2257,18 +2310,7 @@ fn test_exalted_system_comprehensive() {
     ];
 
     for (alias, expected_dice, expected_target, description) in exalted_tests {
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Exalted '{}' should parse: {}",
-            alias,
-            description
-        );
-
-        let results = result.unwrap();
-        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
-
-        let roll = &results[0];
+        let roll = roll_one(alias, description);
 
         // Should have success counting (target system)
         assert!(
@@ -2401,45 +2443,7 @@ fn test_exalted_alias_expansion() {
     ];
 
     for (alias, expected_expansion) in exalted_alias_tests {
-        // Test that the alias expands correctly
-        let expanded = aliases::expand_alias(alias);
-        assert_eq!(
-            expanded,
-            Some(expected_expansion.to_string()),
-            "Exalted alias '{}' should expand to '{}'",
-            alias,
-            expected_expansion
-        );
-
-        // Test that both the alias and expansion produce equivalent results
-        let alias_result = parse_and_roll(alias);
-        let expansion_result = parse_and_roll(expected_expansion);
-
-        assert!(
-            alias_result.is_ok() && expansion_result.is_ok(),
-            "Both alias '{}' and expansion '{}' should work",
-            alias,
-            expected_expansion
-        );
-
-        let alias_roll = alias_result.unwrap();
-        let expansion_roll = expansion_result.unwrap();
-
-        // Should have same number of results
-        assert_eq!(
-            alias_roll.len(),
-            expansion_roll.len(),
-            "Alias and expansion should have same result count for '{}'",
-            alias
-        );
-
-        // Should both have success counting
-        assert_eq!(
-            alias_roll[0].successes.is_some(),
-            expansion_roll[0].successes.is_some(),
-            "Alias and expansion should both have success counting for '{}'",
-            alias
-        );
+        assert_alias_matches_expansion(alias, expected_expansion);
     }
 }
 
@@ -2453,31 +2457,7 @@ fn test_exalted_with_roll_sets() {
     ];
 
     for (expression, description) in exalted_roll_set_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Exalted roll set '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        let expected_sets = expression.chars().next().unwrap().to_digit(10).unwrap() as usize;
-        assert_eq!(
-            results.len(),
-            expected_sets,
-            "Should have {} sets for '{}'",
-            expected_sets,
-            expression
-        );
-
-        for (i, roll) in results.iter().enumerate() {
-            assert_eq!(
-                roll.label,
-                Some(format!("Set {}", i + 1)),
-                "Each set should have correct label for '{}'",
-                expression
-            );
+        for roll in assert_labelled_roll_sets(expression, description) {
             assert!(
                 roll.successes.is_some(),
                 "Each Exalted set should have success counting"
@@ -2512,8 +2492,12 @@ fn test_wrath_glory_special_modes_comprehensive() {
     // Test Wrath & Glory special modes: !soak, !exempt, !dmg
     let wng_special_modes = vec![
         ("wng 4d6 !soak", true, "Basic soak test"),
+        ("wng w2 5d6 !soak", true, "Soak with multiple wrath dice"),
+        ("wng dn3 4d6 !soak", true, "Soak with difficulty"),
         ("wng 6d6 !exempt", true, "Basic exempt test"),
+        ("wng dn2 4d6 !exempt", true, "Exempt with difficulty"),
         ("wng 5d6 !dmg", true, "Basic damage test"),
+        ("wng w2 6d6 !dmg", true, "Damage with multiple wrath dice"),
     ];
 
     for (expression, should_use_total, description) in wng_special_modes {
@@ -2707,32 +2691,7 @@ fn test_wrath_glory_special_modes_with_roll_sets() {
     ];
 
     for (expression, description) in wng_roll_set_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "W&G roll set '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        let expected_sets = expression.chars().next().unwrap().to_digit(10).unwrap() as usize;
-        assert_eq!(
-            results.len(),
-            expected_sets,
-            "Should have {} sets for '{}'",
-            expected_sets,
-            expression
-        );
-
-        for (i, roll) in results.iter().enumerate() {
-            assert_eq!(
-                roll.label,
-                Some(format!("Set {}", i + 1)),
-                "Each set should have correct label for '{}'",
-                expression
-            );
-        }
+        assert_labelled_roll_sets(expression, description);
     }
 }
 
@@ -3079,35 +3038,10 @@ fn test_percentile_with_roll_sets() {
     ];
 
     for (expression, description) in percentile_roll_sets {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Percentile roll set '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        let expected_sets = expression.chars().next().unwrap().to_digit(10).unwrap() as usize;
-        assert_eq!(
-            results.len(),
-            expected_sets,
-            "Should have {} sets for '{}'",
-            expected_sets,
-            expression
-        );
-
-        for (i, roll) in results.iter().enumerate() {
-            assert_eq!(
-                roll.label,
-                Some(format!("Set {}", i + 1)),
-                "Each set should have correct label for '{}'",
-                expression
-            );
-
+        for roll in assert_labelled_roll_sets(expression, description) {
             // Each roll should have percentile-like results
             assert!(
-                roll.total >= 1 && roll.total <= 200, // Allowing for modifiers
+                (1..=200).contains(&roll.total), // Allowing for modifiers
                 "Percentile set total {} should be reasonable for '{}'",
                 roll.total,
                 expression
@@ -3428,45 +3362,7 @@ fn test_vtm5_alias_expansion() {
     ];
 
     for (alias, expected_expansion) in vtm5_alias_tests {
-        // Test that the alias expands correctly
-        let expanded = aliases::expand_alias(alias);
-        assert_eq!(
-            expanded,
-            Some(expected_expansion.to_string()),
-            "VTM5 alias '{}' should expand to '{}'",
-            alias,
-            expected_expansion
-        );
-
-        // Test that both the alias and expansion produce equivalent results
-        let alias_result = parse_and_roll(alias);
-        let expansion_result = parse_and_roll(expected_expansion);
-
-        assert!(
-            alias_result.is_ok() && expansion_result.is_ok(),
-            "Both alias '{}' and expansion '{}' should work",
-            alias,
-            expected_expansion
-        );
-
-        let alias_roll = alias_result.unwrap();
-        let expansion_roll = expansion_result.unwrap();
-
-        // Should have same number of results
-        assert_eq!(
-            alias_roll.len(),
-            expansion_roll.len(),
-            "Alias and expansion should have same result count for '{}'",
-            alias
-        );
-
-        // Should both have success counting
-        assert_eq!(
-            alias_roll[0].successes.is_some(),
-            expansion_roll[0].successes.is_some(),
-            "Alias and expansion should both have success counting for '{}'",
-            alias
-        );
+        assert_alias_matches_expansion(alias, expected_expansion);
     }
 }
 
@@ -3508,31 +3404,7 @@ fn test_vtm5_with_roll_sets() {
     ];
 
     for (expression, description) in vtm5_roll_set_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "VTM5 roll set '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        let expected_sets = expression.chars().next().unwrap().to_digit(10).unwrap() as usize;
-        assert_eq!(
-            results.len(),
-            expected_sets,
-            "Should have {} sets for '{}'",
-            expected_sets,
-            expression
-        );
-
-        for (i, roll) in results.iter().enumerate() {
-            assert_eq!(
-                roll.label,
-                Some(format!("Set {}", i + 1)),
-                "Each set should have correct label for '{}'",
-                expression
-            );
+        for roll in assert_labelled_roll_sets(expression, description) {
             assert!(
                 roll.successes.is_some(),
                 "Each VTM5 set should have success counting"
@@ -3731,31 +3603,7 @@ fn test_lasers_feelings_with_roll_sets() {
     ];
 
     for (expression, description) in lf_roll_set_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Lasers & Feelings roll set '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        let expected_sets = expression.chars().next().unwrap().to_digit(10).unwrap() as usize;
-        assert_eq!(
-            results.len(),
-            expected_sets,
-            "Should have {} sets for '{}'",
-            expected_sets,
-            expression
-        );
-
-        for (i, roll) in results.iter().enumerate() {
-            assert_eq!(
-                roll.label,
-                Some(format!("Set {}", i + 1)),
-                "Each set should have correct label for '{}'",
-                expression
-            );
+        for roll in assert_labelled_roll_sets(expression, description) {
             assert!(
                 roll.successes.is_some(),
                 "Each Lasers & Feelings set should have success counting"
@@ -3900,36 +3748,7 @@ fn test_alien_rpg_basic_rolls() {
     ];
 
     for (alias, expected_expansion, description) in alien_basic_tests {
-        // Test alias expansion
-        let expanded = aliases::expand_alias(alias);
-        assert_eq!(
-            expanded,
-            Some(expected_expansion.to_string()),
-            "Alien alias '{}' should expand to '{}': {}",
-            alias,
-            expected_expansion,
-            description
-        );
-
-        // Test that the roll works
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Alien roll '{}' should work: {} - Error: {:?}",
-            alias,
-            description,
-            result.err()
-        );
-
-        let results = result.unwrap();
-        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
-
-        // Should have success counting
-        assert!(
-            results[0].successes.is_some(),
-            "Alien roll '{}' should have success counting",
-            alias
-        );
+        assert_success_alias(alias, expected_expansion, description);
     }
 }
 
@@ -3944,46 +3763,14 @@ fn test_alien_rpg_stress_rolls() {
     ];
 
     for (alias, expected_expansion, description) in alien_stress_tests {
-        // Test alias expansion
-        let expanded = aliases::expand_alias(alias);
-        assert_eq!(
-            expanded,
-            Some(expected_expansion.to_string()),
-            "Alien stress alias '{}' should expand to '{}': {}",
-            alias,
-            expected_expansion,
-            description
-        );
-
-        // Test that the roll works
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Alien stress roll '{}' should work: {} - Error: {:?}",
-            alias,
-            description,
-            result.err()
-        );
-
-        let results = result.unwrap();
-        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
-
-        // Should have success counting
-        assert!(
-            results[0].successes.is_some(),
-            "Alien stress roll '{}' should have success counting",
-            alias
-        );
+        let roll = assert_success_alias(alias, expected_expansion, description);
 
         // Note: We can't reliably test stress level tracking here because
         // it depends on the specific dice rolled and modifiers applied.
         // The stress level tracking will be tested in integration tests.
 
         // Should have stress system notes
-        let has_stress_note = results[0]
-            .notes
-            .iter()
-            .any(|note| note.contains("STRESS DICE"));
+        let has_stress_note = roll.notes.iter().any(|note| note.contains("STRESS DICE"));
         assert!(
             has_stress_note,
             "Should have stress dice note for '{}'",
@@ -4431,19 +4218,7 @@ fn test_fitd_critical_success_detection() {
 
 #[test]
 fn test_fitd_with_roll_sets() {
-    let result = parse_and_roll("3 fitd4");
-    assert!(result.is_ok(), "FitD roll sets should work");
-
-    let results = result.unwrap();
-    assert_eq!(results.len(), 3, "Should have 3 roll sets");
-
-    for (i, roll) in results.iter().enumerate() {
-        assert_eq!(
-            roll.label,
-            Some(format!("Set {}", i + 1)),
-            "Each set should have correct label"
-        );
-
+    for roll in assert_labelled_roll_sets("3 fitd4", "FitD roll sets") {
         assert!(
             roll.fitd_outcome.is_some(),
             "Each set should have FitD outcome"
@@ -4818,24 +4593,7 @@ fn test_fitd_unique_namespace() {
         "fitd", "fitd0", "fitd1", "fitd2", "fitd3", "fitd4", "fitd5", "fitd6", "fitd7", "fitd8",
     ];
 
-    // Get all existing non-FitD aliases for comparison
-    let existing_patterns = vec![
-        "sw", "cod", "wod", "ex", "alien", "vtm", "lf", "cs", "sp", "dd", "yz", "wh", "ed", "snm",
-        "gb", "gbs", "hs", "dh", "cpr", "cpd", "wit", "wfrp", "df", "age", "attack", "skill",
-        "save",
-    ];
-
-    for fitd_pattern in &fitd_patterns {
-        for existing_pattern in &existing_patterns {
-            assert!(
-                !fitd_pattern.starts_with(existing_pattern)
-                    && !existing_pattern.starts_with(fitd_pattern),
-                "FitD pattern '{}' conflicts with existing pattern '{}'",
-                fitd_pattern,
-                existing_pattern
-            );
-        }
-    }
+    assert_no_prefix_conflicts("FitD", &fitd_patterns, EXISTING_ALIAS_PATTERNS);
 }
 
 #[test]
@@ -5538,19 +5296,7 @@ fn test_mutants_masterminds_degrees() {
 #[test]
 fn test_mutants_masterminds_with_roll_sets() {
     // Test MnM with roll sets
-    let result = parse_and_roll("3 mnm +2");
-    assert!(result.is_ok(), "MnM roll sets should work");
-
-    let results = result.unwrap();
-    assert_eq!(results.len(), 3, "Should have 3 roll sets");
-
-    for (i, roll) in results.iter().enumerate() {
-        assert_eq!(
-            roll.label,
-            Some(format!("Set {}", i + 1)),
-            "Each set should have proper label"
-        );
-
+    for roll in assert_labelled_roll_sets("3 mnm +2", "MnM roll sets") {
         assert!(
             roll.successes.is_some() || roll.failures.is_some(),
             "Each MnM set should have success/failure counting"
@@ -5763,19 +5509,7 @@ fn test_mothership_stat_validation() {
 #[test]
 fn test_mothership_with_roll_sets() {
     // Test Mothership with roll sets
-    let result = parse_and_roll("3 +ms45");
-    assert!(result.is_ok(), "Mothership roll sets should work");
-
-    let results = result.unwrap();
-    assert_eq!(results.len(), 3, "Should have 3 roll sets");
-
-    for (i, roll) in results.iter().enumerate() {
-        assert_eq!(
-            roll.label,
-            Some(format!("Set {}", i + 1)),
-            "Each set should have proper label"
-        );
-
+    for roll in assert_labelled_roll_sets("3 +ms45", "Mothership roll sets") {
         assert!(
             roll.successes.is_some() || roll.failures.is_some(),
             "Each Mothership set should have success/failure"
@@ -5884,24 +5618,7 @@ fn test_mothership_unique_namespace() {
     // Verify Mothership uses unique namespace and doesn't conflict
     let ms_patterns = vec!["ms", "ms45", "+ms", "-ms", "+ms45", "-ms45"];
 
-    // Get all existing non-Mothership aliases for comparison
-    let existing_patterns = vec![
-        "mm", "mnm", "sw", "cod", "wod", "ex", "alien", "vtm", "lf", "cs", "sp", "dd", "yz", "wh",
-        "ed", "snm", "gb", "gbs", "hs", "dh", "cpr", "cpd", "wit", "wfrp", "df", "age", "attack",
-        "skill", "save",
-    ];
-
-    for ms_pattern in &ms_patterns {
-        for existing_pattern in &existing_patterns {
-            assert!(
-                !ms_pattern.starts_with(existing_pattern)
-                    && !existing_pattern.starts_with(ms_pattern.trim_start_matches(['+', '-'])),
-                "Mothership pattern '{}' conflicts with existing pattern '{}'",
-                ms_pattern,
-                existing_pattern
-            );
-        }
-    }
+    assert_no_prefix_conflicts("Mothership", &ms_patterns, EXISTING_ALIAS_PATTERNS);
 }
 
 #[test]
@@ -6323,19 +6040,7 @@ fn test_advantage_disadvantage_pool_size() {
     ];
 
     for (expression, expected_kept, expected_dropped) in pool_cases {
-        let results = parse_and_roll(expression).expect("expression should roll");
-        let result = &results[0];
-
-        assert_eq!(
-            result.individual_rolls.len(),
-            expected_kept,
-            "'{expression}' should keep {expected_kept} dice"
-        );
-        assert_eq!(
-            result.dropped_rolls.len(),
-            expected_dropped,
-            "'{expression}' should drop {expected_dropped} dice"
-        );
+        let result = assert_kept_and_dropped(expression, expected_kept, expected_dropped);
         assert_eq!(
             result.total,
             result.individual_rolls.iter().sum::<i32>(),
@@ -6356,19 +6061,7 @@ fn test_advantage_disadvantage_cancel_out() {
     ];
 
     for (expression, expected_kept, expected_dropped) in netting_cases {
-        let results = parse_and_roll(expression).expect("expression should roll");
-        let result = &results[0];
-
-        assert_eq!(
-            result.individual_rolls.len(),
-            expected_kept,
-            "'{expression}' should keep {expected_kept} dice"
-        );
-        assert_eq!(
-            result.dropped_rolls.len(),
-            expected_dropped,
-            "'{expression}' should drop {expected_dropped} dice"
-        );
+        assert_kept_and_dropped(expression, expected_kept, expected_dropped);
     }
 }
 

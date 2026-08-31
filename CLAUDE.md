@@ -18,6 +18,17 @@ cargo clippy -- -D warnings && cargo fmt --check && cargo test
 Tests run without a Discord token. For manual testing against a live guild, set `GUILD_ID`
 in `.env` so slash commands register instantly instead of waiting for global propagation.
 
+CI additionally runs super-linter, whose JSCPD copypaste check has a threshold of **0** —
+any clone of 5+ lines / 50+ tokens fails the build, in any language it scans — Markdown
+included. Approximate it locally before pushing:
+
+```
+npx jscpd@3 --threshold 0 --min-lines 5 --min-tokens 50 --max-lines 20000 --max-size 10mb src tests
+```
+
+The `--max-*` flags matter: without them JSCPD skips `roller.rs` (too large) and `parser.rs`
+(too many lines) and reports a clean run that CI will contradict.
+
 ## Architecture
 
 ```
@@ -72,6 +83,30 @@ Follow this sequence, no skipped or reordered steps:
 6. `tests/game_systems_tests.rs` — tests following existing patterns
 7. `roll_syntax.md` — document the new syntax
 
+**Do not start by copypasting the nearest existing handler.** That is how this codebase
+accumulated 60 JSCPD clones. Start from the shared helpers below and write only the part
+that is actually specific to the new system.
+
+## Shared Helpers (use these instead of copypasting)
+
+Each exists because the same block had been pasted 2–10 times. Reach for one of these
+before writing new roll logic:
+
+- `RollResult::from_dice(&dice)` — never hand-write the 30-field literal
+- `apply_arithmetic_modifiers`, `is_arithmetic_modifier`, `ArithmeticOp::from_modifier` —
+  anything that applies `+ - * /`
+- `apply_dice_operand`, `apply_modifier_expression` — `+2d6`-style dice operands
+- `roll_exploding_die` — roll, then keep rolling while the die shows its maximum
+- `indexed_rolls` with `partition_kept_dice` — keep/drop index bookkeeping
+- `finalize_d10_explosion` — d10 crit/fumble tails (Cyberpunk Red, Witcher)
+- `build_roll_set`, `try_parse_roll_set` — roll sets, including their parsing
+
+`CONTRIBUTING.md` § Shared helpers carries the same list keyed by the code you would
+otherwise have written, and is the copy to update if a helper changes.
+
+Behavioral variants belong in a parameter, never a twin function — see `RerollDirection`
+(`r` vs `rg`) and `MathModifierRules`. Say *why* the paths differ; it is load-bearing.
+
 ## Testing
 
 | File | Purpose |
@@ -80,12 +115,54 @@ Follow this sequence, no skipped or reordered steps:
 | `tests/game_systems_tests.rs` | All game system behavior (consolidated) |
 | `tests/integration_tests.rs` | End-to-end functionality |
 | `tests/performance_tests.rs` | Performance and roll-limit testing |
+| `tests/snapshot_tests.rs` | Golden snapshots pinning observable behavior |
+
+### Snapshot tests — the regression net
+
+`tests/snapshot_tests.rs` pins what users can observe for every expression in
+`tests/corpus/expressions.dice`, so that a refactor which silently changes a roll fails
+`cargo test` instead of shipping:
+
+- **`parse.snap`** — parsing is deterministic, so the parsed form and every parse error are
+  pinned exactly, for the whole corpus.
+- **`deterministic_rolls.snap`** — expressions whose dice cannot vary (`d1` pools) have their
+  full result *and* their formatted Discord output pinned exactly.
+- **`outcomes.snap`** — for randomly-rolling expressions, only what cannot vary with the dice:
+  result count, success/failure of the call, and exact error text.
+
+**When you add or change syntax, add expressions to `tests/corpus/expressions.dice`** — a
+happy-path case, the boundary values of every numeric parameter, and a `d1` form so the roll
+lands in the deterministic snapshot. Coverage here is only as good as the corpus: a keep-count
+bug at `k1` slipped through when the corpus had `k2` but not `k1`.
+
+Regenerate after an intentional change, then **read the diff** — every changed line is a
+change a user will see:
+
+```
+UPDATE_SNAPSHOTS=1 cargo test --test snapshot_tests
+```
+
+Never regenerate to make a red test go green without reading what moved.
+
+What snapshots cannot cover: results of randomly-rolling systems. `roll_dice` builds its own
+RNG internally (`rng.rs`), so those cannot be reproduced exactly. Cover them with the
+targeted assertions in `game_systems_tests.rs`.
 
 - Use **table-driven tests** — `vec![(input, expected), ...]` loops are the established
   pattern; follow it rather than writing one function per case
 - Write tests before or alongside the implementation, not after
 - New syntax needs cases for: the happy path, combination with common modifiers, comments
   (`! text`), roll sets, and boundary/limit values
+- **The table changes; the loop body does not.** A pasted assertion loop is the most common
+  source of JSCPD clones here. `tests/game_systems_tests.rs` has a HELPER FUNCTIONS section
+  at the top — use it, and add to it rather than pasting:
+  `roll_one`, `assert_labelled_roll_sets`, `assert_alias_matches_expansion`,
+  `assert_success_alias`, `assert_no_prefix_conflicts`, `assert_kept_and_dropped`,
+  `assert_valid`, `assert_invalid`
+- Keep each file to its own purpose. A game system's mechanics are tested in
+  `game_systems_tests.rs` **only** — re-testing the same scenarios in `integration_tests.rs`
+  is a cross-file clone, and cross-file clones cannot be fixed with a local helper
+  (each test file is its own crate)
 
 ## Rust Rules
 

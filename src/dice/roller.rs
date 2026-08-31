@@ -178,38 +178,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         return handle_mothership_roll(dice, &mut rng);
     }
 
-    let mut result = RollResult {
-        individual_rolls: Vec::new(),
-        kept_rolls: Vec::new(),
-        dropped_rolls: Vec::new(),
-        total: 0,
-        successes: None,
-        failures: None,
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
-        notes: Vec::new(),
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-        alien_stress_level: None,
-        alien_panic_roll: None,
-        alien_stress_ones: None,
-        fitd_outcome: None,
-        fitd_result: None,
-        fitd_highest_die: None,
-        plot_symbols: None,
-        implosion_rolls: Vec::new(),
-    };
+    let mut result = RollResult::from_dice(&dice);
 
     // Advantage/disadvantage rolls extra dice into the initial pool; the surplus
     // is discarded below, before any explosion runs.
@@ -306,19 +275,47 @@ fn apply_dice_modifying_modifiers(
                 implode_dice(result, rng, *threshold, dice.sides, original_dice_count)?;
             }
             Modifier::Reroll(threshold) => {
-                reroll_dice(result, rng, *threshold, dice.sides, false)?;
+                reroll_dice(
+                    result,
+                    rng,
+                    *threshold,
+                    dice.sides,
+                    false,
+                    RerollDirection::AtOrBelow,
+                )?;
                 update_base_group(result);
             }
             Modifier::RerollIndefinite(threshold) => {
-                reroll_dice(result, rng, *threshold, dice.sides, true)?;
+                reroll_dice(
+                    result,
+                    rng,
+                    *threshold,
+                    dice.sides,
+                    true,
+                    RerollDirection::AtOrBelow,
+                )?;
                 update_base_group(result);
             }
             Modifier::RerollGreater(threshold) => {
-                reroll_dice_greater(result, rng, *threshold, dice.sides, false)?;
+                reroll_dice(
+                    result,
+                    rng,
+                    *threshold,
+                    dice.sides,
+                    false,
+                    RerollDirection::AtOrAbove,
+                )?;
                 update_base_group(result);
             }
             Modifier::RerollGreaterIndefinite(threshold) => {
-                reroll_dice_greater(result, rng, *threshold, dice.sides, true)?;
+                reroll_dice(
+                    result,
+                    rng,
+                    *threshold,
+                    dice.sides,
+                    true,
+                    RerollDirection::AtOrAbove,
+                )?;
                 update_base_group(result);
             }
             _ => {} // Handle other modifiers later
@@ -362,6 +359,86 @@ fn apply_keep_drop_modifiers(result: &mut RollResult, dice: &DiceRoll) -> Result
     Ok(())
 }
 
+/// The arithmetic modifiers (`+n`, `-n`, `*n`, `/n`), lifted out of `Modifier`
+/// so they can be folded into any running value (a total, a success count).
+#[derive(Debug, Clone, Copy)]
+enum ArithmeticOp {
+    Add(i32),
+    Subtract(i32),
+    Multiply(i32),
+    Divide(i32),
+}
+
+impl ArithmeticOp {
+    /// `Ok(None)` for a modifier that is not arithmetic. Division by zero is
+    /// rejected here rather than at `apply` time, so a caller that has nothing
+    /// to apply the operation to still reports the same error.
+    fn from_modifier(modifier: &Modifier) -> Result<Option<Self>> {
+        let op = match modifier {
+            Modifier::Add(value) => Self::Add(*value),
+            Modifier::Subtract(value) => Self::Subtract(*value),
+            Modifier::Multiply(value) => Self::Multiply(*value),
+            Modifier::Divide(value) => {
+                if *value == 0 {
+                    return Err(anyhow!("Cannot divide by zero"));
+                }
+                Self::Divide(*value)
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(op))
+    }
+
+    /// Operator symbol, for rebuilding the operation as text.
+    fn symbol(self) -> &'static str {
+        match self {
+            Self::Add(_) => "+",
+            Self::Subtract(_) => "-",
+            Self::Multiply(_) => "*",
+            Self::Divide(_) => "/",
+        }
+    }
+
+    /// The right-hand side of the operation, for rebuilding it as text.
+    fn operand(self) -> i32 {
+        match self {
+            Self::Add(operand)
+            | Self::Subtract(operand)
+            | Self::Multiply(operand)
+            | Self::Divide(operand) => operand,
+        }
+    }
+
+    fn apply(self, value: &mut i32) {
+        match self {
+            Self::Add(operand) => *value += operand,
+            Self::Subtract(operand) => *value -= operand,
+            Self::Multiply(operand) => *value *= operand,
+            Self::Divide(operand) => *value /= operand,
+        }
+    }
+}
+
+/// True for the arithmetic modifiers (`+n`, `-n`, `*n`, `/n`).
+fn is_arithmetic_modifier(modifier: &Modifier) -> bool {
+    matches!(
+        modifier,
+        Modifier::Add(_) | Modifier::Subtract(_) | Modifier::Multiply(_) | Modifier::Divide(_)
+    )
+}
+
+/// Fold every arithmetic modifier into `total`, in the order the user wrote
+/// them. Non-arithmetic modifiers belong to the caller's own game system and
+/// are skipped here.
+fn apply_arithmetic_modifiers(modifiers: &[Modifier], total: &mut i32) -> Result<()> {
+    for modifier in modifiers {
+        if let Some(op) = ArithmeticOp::from_modifier(modifier)? {
+            op.apply(total);
+        }
+    }
+    Ok(())
+}
+
 // Update apply_mathematical_modifiers to handle the special division case AND continue with remaining modifiers
 fn apply_mathematical_modifiers(
     result: &mut RollResult,
@@ -382,253 +459,157 @@ fn apply_mathematical_modifiers(
         // IMPORTANT: Continue processing remaining modifiers starting from index 2
         let remaining_modifiers = &dice.modifiers[2..];
         if !remaining_modifiers.is_empty() {
-            apply_remaining_mathematical_modifiers(result, remaining_modifiers, dice)?;
+            apply_modifier_expression(result, remaining_modifiers, POST_DIVISION_MATH_RULES)?;
         }
         return Ok(());
     }
 
     // Standard mathematical modifier processing
-    apply_all_mathematical_modifiers(result, dice)?;
+    apply_modifier_expression(result, &dice.modifiers, STANDARD_MATH_RULES)?;
     Ok(())
 }
 
-// New function to apply remaining modifiers after special division
-fn apply_remaining_mathematical_modifiers(
-    result: &mut RollResult,
-    modifiers: &[Modifier],
-    _dice: &DiceRoll,
-) -> Result<()> {
-    // Build an expression from the remaining modifiers
-    let mut expression_parts = Vec::new();
+/// Operator for a dice-operand modifier (`+2d6`, `-1d4`, `*1d2`, `/1d3`).
+#[derive(Debug, Clone, Copy)]
+enum DiceOperator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+}
 
-    // Start with current total
-    expression_parts.push(format!("{}", result.total));
-
-    // Add each remaining mathematical operation
-    for modifier in modifiers {
-        match modifier {
-            Modifier::AddDice(dice_to_add) => {
-                let additional_result = roll_dice(dice_to_add.clone())?;
-                expression_parts.push("+".to_string());
-                expression_parts.push(format!("{}", additional_result.total));
-
-                // Add dice to individual_rolls for display
-                result
-                    .individual_rolls
-                    .extend(additional_result.individual_rolls.clone());
-                result
-                    .kept_rolls
-                    .extend(additional_result.kept_rolls.clone());
-
-                // Add a new dice group for display
-                add_dice_group(result, dice_to_add, &additional_result, "add");
-            }
-            Modifier::SubtractDice(dice_to_subtract) => {
-                let additional_result = roll_dice(dice_to_subtract.clone())?;
-                expression_parts.push("-".to_string());
-                expression_parts.push(format!("{}", additional_result.total));
-
-                // Add dice to individual_rolls for display
-                result
-                    .individual_rolls
-                    .extend(additional_result.individual_rolls.clone());
-                result
-                    .kept_rolls
-                    .extend(additional_result.kept_rolls.clone());
-
-                // Add a new dice group for display
-                add_dice_group(result, dice_to_subtract, &additional_result, "subtract");
-            }
-            Modifier::MultiplyDice(dice_to_multiply) => {
-                // Handle dice multiplication in remaining modifiers
-                let additional_result = roll_dice(dice_to_multiply.clone())?;
-                expression_parts.push("*".to_string());
-                expression_parts.push(format!("{}", additional_result.total));
-
-                result
-                    .individual_rolls
-                    .extend(additional_result.individual_rolls.clone());
-                result
-                    .kept_rolls
-                    .extend(additional_result.kept_rolls.clone());
-
-                add_dice_group(result, dice_to_multiply, &additional_result, "multiply");
-            }
-            Modifier::DivideDice(dice_to_divide) => {
-                // Handle dice division in remaining modifiers
-                let additional_result = roll_dice(dice_to_divide.clone())?;
-
-                if additional_result.total == 0 {
-                    return Err(anyhow!("Cannot divide by zero (dice result was 0)"));
-                }
-
-                expression_parts.push("/".to_string());
-                expression_parts.push(format!("{}", additional_result.total));
-
-                result
-                    .individual_rolls
-                    .extend(additional_result.individual_rolls.clone());
-                result
-                    .kept_rolls
-                    .extend(additional_result.kept_rolls.clone());
-
-                add_dice_group(result, dice_to_divide, &additional_result, "divide");
-            }
-            Modifier::Add(value) => {
-                expression_parts.push("+".to_string());
-                expression_parts.push(format!("{value}"));
-            }
-            Modifier::Subtract(value) => {
-                expression_parts.push("-".to_string());
-                expression_parts.push(format!("{value}"));
-            }
-            Modifier::Multiply(value) => {
-                expression_parts.push("*".to_string());
-                expression_parts.push(format!("{value}"));
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                expression_parts.push("/".to_string());
-                expression_parts.push(format!("{value}"));
-            }
-            _ => {} // Skip non-mathematical modifiers
+impl DiceOperator {
+    /// Symbol pushed into the expression that is evaluated with precedence.
+    fn symbol(self) -> &'static str {
+        match self {
+            Self::Add => "+",
+            Self::Subtract => "-",
+            Self::Multiply => "*",
+            Self::Divide => "/",
         }
     }
 
-    // Evaluate the expression if we have additional operations
-    if expression_parts.len() > 1 {
-        result.total = evaluate_expression(&expression_parts)?;
+    /// Label stored on the `DiceGroup`, which decides how the group renders.
+    fn group_label(self) -> &'static str {
+        match self {
+            Self::Add => "add",
+            Self::Subtract => "subtract",
+            Self::Multiply => "multiply",
+            Self::Divide => "divide",
+        }
+    }
+}
+
+/// Roll the dice operand of a `+2d6`-style modifier, append it to
+/// `expression_parts`, and fold its dice into `result` so they show up in the
+/// output. `merge_notes` carries the operand's notes (Hero System, for
+/// instance) up into the parent roll.
+fn apply_dice_operand(
+    result: &mut RollResult,
+    expression_parts: &mut Vec<String>,
+    dice_spec: &DiceRoll,
+    operator: DiceOperator,
+    merge_notes: bool,
+) -> Result<()> {
+    let operand_result = roll_dice(dice_spec.clone())?;
+
+    if matches!(operator, DiceOperator::Divide) && operand_result.total == 0 {
+        return Err(anyhow!("Cannot divide by zero (dice result was 0)"));
     }
 
+    expression_parts.push(operator.symbol().to_string());
+    expression_parts.push(format!("{}", operand_result.total));
+
+    if merge_notes {
+        result.notes.extend(operand_result.notes.clone());
+    }
+
+    // Both pools get the operand dice: `individual_rolls` for display, and
+    // `kept_rolls` so every total is computed from the same set of dice.
+    result
+        .individual_rolls
+        .extend(operand_result.individual_rolls.clone());
+    result.kept_rolls.extend(operand_result.kept_rolls.clone());
+
+    add_dice_group(result, dice_spec, &operand_result, operator.group_label());
     Ok(())
 }
 
-// Function to apply all mathematical modifiers (for standard case)
-fn apply_all_mathematical_modifiers(result: &mut RollResult, dice: &DiceRoll) -> Result<()> {
-    // Build an expression from the modifiers and evaluate it properly
-    let mut expression_parts = Vec::new();
+/// How a modifier expression is built. The standard path and the path that
+/// resumes after the `number / dice` special case differ only here, and the
+/// difference is load-bearing: the standard path merges an added roll's notes
+/// and drops the `*0` marker the parser uses to encode `number / dice`, while
+/// the resumed path does neither, because that marker was already consumed.
+#[derive(Debug, Clone, Copy)]
+struct MathModifierRules {
+    merge_added_dice_notes: bool,
+    skip_zero_multiplier: bool,
+}
 
-    // Start with the dice total
-    expression_parts.push(format!("{}", result.total));
+const STANDARD_MATH_RULES: MathModifierRules = MathModifierRules {
+    merge_added_dice_notes: true,
+    skip_zero_multiplier: true,
+};
 
-    // Add each mathematical operation as it appears
-    for modifier in &dice.modifiers {
+const POST_DIVISION_MATH_RULES: MathModifierRules = MathModifierRules {
+    merge_added_dice_notes: false,
+    skip_zero_multiplier: false,
+};
+
+/// Build an expression from `modifiers` and evaluate it with proper precedence,
+/// starting from the total already in `result`.
+fn apply_modifier_expression(
+    result: &mut RollResult,
+    modifiers: &[Modifier],
+    rules: MathModifierRules,
+) -> Result<()> {
+    let mut expression_parts = vec![format!("{}", result.total)];
+
+    for modifier in modifiers {
         match modifier {
             Modifier::AddDice(dice_to_add) => {
-                // Roll the additional dice only once and use that result consistently
-                let additional_result = roll_dice(dice_to_add.clone())?;
-                expression_parts.push("+".to_string());
-                expression_parts.push(format!("{}", additional_result.total));
-
-                // IMPORTANT: Merge notes from AddDice into main result
-                // This ensures Hero System notes are preserved
-                result.notes.extend(additional_result.notes.clone());
-
-                // Add dice to individual_rolls for display
-                result
-                    .individual_rolls
-                    .extend(additional_result.individual_rolls.clone());
-
-                // Add dice to kept_rolls so all totals are consistent
-                result
-                    .kept_rolls
-                    .extend(additional_result.kept_rolls.clone());
-
-                // Add a new dice group for display using the SAME rolled dice
-                add_dice_group(
+                apply_dice_operand(
                     result,
+                    &mut expression_parts,
                     dice_to_add,
-                    &additional_result, // Pass full result instead of just rolls
-                    "add",
-                );
+                    DiceOperator::Add,
+                    rules.merge_added_dice_notes,
+                )?;
             }
             Modifier::SubtractDice(dice_to_subtract) => {
-                // Roll the additional dice only once and use that result consistently
-                let additional_result = roll_dice(dice_to_subtract.clone())?;
-                expression_parts.push("-".to_string());
-                expression_parts.push(format!("{}", additional_result.total));
-
-                // Add dice to individual_rolls for display
-                result
-                    .individual_rolls
-                    .extend(additional_result.individual_rolls.clone());
-
-                // For subtraction, we still add the dice to kept_rolls for display
-                // The subtraction is handled in the expression evaluation
-                result
-                    .kept_rolls
-                    .extend(additional_result.kept_rolls.clone());
-
-                // Add a new dice group for display using the SAME rolled dice
-                add_dice_group(result, dice_to_subtract, &additional_result, "subtract");
+                apply_dice_operand(
+                    result,
+                    &mut expression_parts,
+                    dice_to_subtract,
+                    DiceOperator::Subtract,
+                    false,
+                )?;
             }
             Modifier::MultiplyDice(dice_to_multiply) => {
-                // Handle dice multiplication
-                let additional_result = roll_dice(dice_to_multiply.clone())?;
-                expression_parts.push("*".to_string());
-                expression_parts.push(format!("{}", additional_result.total));
-
-                // Add dice to individual_rolls for display
-                result
-                    .individual_rolls
-                    .extend(additional_result.individual_rolls.clone());
-
-                // Add dice to kept_rolls for display
-                result
-                    .kept_rolls
-                    .extend(additional_result.kept_rolls.clone());
-
-                // Add a new dice group for display
-                add_dice_group(result, dice_to_multiply, &additional_result, "multiply");
+                apply_dice_operand(
+                    result,
+                    &mut expression_parts,
+                    dice_to_multiply,
+                    DiceOperator::Multiply,
+                    false,
+                )?;
             }
             Modifier::DivideDice(dice_to_divide) => {
-                //  Handle dice division
-                let additional_result = roll_dice(dice_to_divide.clone())?;
-
-                // Check for division by zero
-                if additional_result.total == 0 {
-                    return Err(anyhow!("Cannot divide by zero (dice result was 0)"));
+                apply_dice_operand(
+                    result,
+                    &mut expression_parts,
+                    dice_to_divide,
+                    DiceOperator::Divide,
+                    false,
+                )?;
+            }
+            Modifier::Multiply(0) if rules.skip_zero_multiplier => {}
+            _ => {
+                if let Some(op) = ArithmeticOp::from_modifier(modifier)? {
+                    expression_parts.push(op.symbol().to_string());
+                    expression_parts.push(format!("{}", op.operand()));
                 }
-
-                expression_parts.push("/".to_string());
-                expression_parts.push(format!("{}", additional_result.total));
-
-                // Add dice to individual_rolls for display
-                result
-                    .individual_rolls
-                    .extend(additional_result.individual_rolls.clone());
-
-                // Add dice to kept_rolls for display
-                result
-                    .kept_rolls
-                    .extend(additional_result.kept_rolls.clone());
-
-                // Add a new dice group for display
-                add_dice_group(result, dice_to_divide, &additional_result, "divide");
             }
-            Modifier::Add(value) => {
-                expression_parts.push("+".to_string());
-                expression_parts.push(format!("{value}"));
-            }
-            Modifier::Subtract(value) => {
-                expression_parts.push("-".to_string());
-                expression_parts.push(format!("{value}"));
-            }
-            Modifier::Multiply(value) if *value != 0 => {
-                // Skip the special marker (multiply by 0)
-                expression_parts.push("*".to_string());
-                expression_parts.push(format!("{value}"));
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                expression_parts.push("/".to_string());
-                expression_parts.push(format!("{value}"));
-            }
-            _ => {}
         }
     }
 
@@ -788,15 +769,7 @@ fn apply_special_system_modifiers(
         let first_target_position = target_positions[0];
         let pre_target_modifiers: Vec<Modifier> = dice.modifiers[..first_target_position]
             .iter()
-            .filter(|m| {
-                matches!(
-                    m,
-                    Modifier::Add(_)
-                        | Modifier::Subtract(_)
-                        | Modifier::Multiply(_)
-                        | Modifier::Divide(_)
-                )
-            })
+            .filter(|m| is_arithmetic_modifier(m))
             .cloned()
             .collect();
 
@@ -982,15 +955,7 @@ fn apply_special_system_modifiers(
         if let Some(&last_target_pos) = target_positions.last() {
             let post_target_modifiers: Vec<_> = dice.modifiers[(last_target_pos + 1)..]
                 .iter()
-                .filter(|m| {
-                    matches!(
-                        m,
-                        Modifier::Add(_)
-                            | Modifier::Subtract(_)
-                            | Modifier::Multiply(_)
-                            | Modifier::Divide(_)
-                    )
-                })
+                .filter(|m| is_arithmetic_modifier(m))
                 .collect();
 
             if !post_target_modifiers.is_empty() {
@@ -1122,19 +1087,15 @@ fn count_wrath_glory_successes(
             ));
         }
 
-        // Add notes for wrath dice effects (only complications for soak rolls)
-        if has_complication {
-            let complication_count = wrath_dice_values.iter().filter(|&&x| x == 1).count();
-            if complication_count == 1 {
-                result
-                    .notes
-                    .push("Wrath die rolled 1 - Complication!".to_string());
-            } else {
-                result.notes.push(format!(
-                    "{complication_count} Wrath dice rolled 1 - Complications!"
-                ));
-            }
-        }
+        // Only complications for soak rolls: Glory effects do not apply, so the
+        // critical flag is always false here.
+        add_wrath_die_notes(
+            result,
+            has_complication,
+            false,
+            &wrath_dice_values,
+            wrath_dice_count,
+        );
     } else {
         // Standard Wrath & Glory success counting
         let mut total_successes = 0;
@@ -1523,12 +1484,7 @@ fn keep_dice(result: &mut RollResult, count: usize, keep_low: bool) -> Result<()
         return Err(anyhow!("Cannot keep 0 dice"));
     }
 
-    let mut indexed_rolls: Vec<(usize, i32)> = result
-        .individual_rolls
-        .iter()
-        .enumerate()
-        .map(|(i, &roll)| (i, roll))
-        .collect();
+    let mut indexed_rolls = indexed_rolls(result);
 
     // Sort by value
     if keep_low {
@@ -1540,6 +1496,24 @@ fn keep_dice(result: &mut RollResult, count: usize, keep_low: bool) -> Result<()
     // Keep the specified number of dice, drop the rest
     let kept_indices: Vec<usize> = indexed_rolls.iter().take(count).map(|&(i, _)| i).collect();
 
+    partition_kept_dice(result, &kept_indices);
+    Ok(())
+}
+
+/// Pair each die with its position in the roll, so a keep/drop decision made on
+/// sorted values can be applied back in the order the dice were rolled.
+fn indexed_rolls(result: &RollResult) -> Vec<(usize, i32)> {
+    result
+        .individual_rolls
+        .iter()
+        .enumerate()
+        .map(|(i, &roll)| (i, roll))
+        .collect()
+}
+
+/// Keep the dice at `kept_indices` in roll order and move the rest to
+/// `dropped_rolls`, where they render struck through.
+fn partition_kept_dice(result: &mut RollResult, kept_indices: &[usize]) {
     let mut new_rolls = Vec::new();
     for (i, &roll) in result.individual_rolls.iter().enumerate() {
         if kept_indices.contains(&i) {
@@ -1550,7 +1524,23 @@ fn keep_dice(result: &mut RollResult, count: usize, keep_low: bool) -> Result<()
     }
 
     result.individual_rolls = new_rolls;
-    Ok(())
+}
+
+/// Which side of the threshold triggers a reroll: `r`/`ir` reroll a die that is
+/// at or below it, `rg`/`irg` a die that is at or above it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum RerollDirection {
+    AtOrBelow,
+    AtOrAbove,
+}
+
+impl RerollDirection {
+    fn triggers(self, roll: i32, threshold: u32) -> bool {
+        match self {
+            Self::AtOrBelow => roll <= threshold as i32,
+            Self::AtOrAbove => roll >= threshold as i32,
+        }
+    }
 }
 
 fn reroll_dice(
@@ -1559,6 +1549,7 @@ fn reroll_dice(
     threshold: u32,
     dice_sides: u32,
     indefinite: bool,
+    direction: RerollDirection,
 ) -> Result<()> {
     let mut total_rerolls = 0;
     let max_total_rerolls = 100;
@@ -1567,7 +1558,7 @@ fn reroll_dice(
         let mut rerolls_for_this_die = 0;
         let max_rerolls_per_die = if indefinite { 100 } else { 1 };
 
-        while result.individual_rolls[i] <= threshold as i32
+        while direction.triggers(result.individual_rolls[i], threshold)
             && rerolls_for_this_die < max_rerolls_per_die
             && total_rerolls < max_total_rerolls
         {
@@ -1703,69 +1694,60 @@ fn apply_mathematical_modifiers_to_successes_from_slice(
     modifiers: &[&Modifier],
 ) -> Result<()> {
     for modifier in modifiers {
-        match modifier {
-            Modifier::Add(value) => {
-                if let Some(ref mut successes) = result.successes {
-                    *successes += value;
-                }
-            }
-            Modifier::Subtract(value) => {
-                if let Some(ref mut successes) = result.successes {
-                    *successes -= value;
-                }
-            }
-            Modifier::Multiply(value) => {
-                if let Some(ref mut successes) = result.successes {
-                    *successes *= value;
-                }
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                if let Some(ref mut successes) = result.successes {
-                    *successes /= value;
-                }
-            }
-            _ => {} // Not a mathematical modifier
+        // `/0` is still rejected on a roll with no success count, so the error
+        // does not depend on what the dice happened to produce.
+        if let Some(op) = ArithmeticOp::from_modifier(modifier)?
+            && let Some(successes) = result.successes.as_mut()
+        {
+            op.apply(successes);
         }
     }
     Ok(())
 }
 
-fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
-    let mut result = RollResult {
-        individual_rolls: Vec::new(),
-        kept_rolls: Vec::new(),
+/// One die rolled with explosions: every face rolled, and the values callers
+/// derive from them. Bundled together so a caller needs one line, not four.
+struct ExplodingDie {
+    rolls: Vec<i32>,
+    total: i32,
+    explosions: usize,
+}
+
+/// Roll one die of `sides` sides, rolling again each time it comes up at its
+/// maximum. Capped at 100 explosions so a pathological RNG cannot spin forever.
+fn roll_exploding_die(rng: &mut impl Rng, sides: u32) -> ExplodingDie {
+    let max = sides as i32;
+    let mut rolls = vec![rng.random_range(1..=max)];
+    let mut explosions = 0;
+    while rolls.last().copied().unwrap_or(0) >= max && explosions < 100 {
+        rolls.push(rng.random_range(1..=max));
+        explosions += 1;
+    }
+    ExplodingDie {
+        total: rolls.iter().sum(),
+        explosions,
+        rolls,
+    }
+}
+
+/// Append a dice group for display. The `DiceGroup` literal is otherwise
+/// repeated verbatim in every system handler that shows more than one pool.
+fn push_dice_group(
+    result: &mut RollResult,
+    description: String,
+    rolls: Vec<i32>,
+    modifier_type: &str,
+) {
+    result.dice_groups.push(DiceGroup {
+        _description: description,
+        rolls,
         dropped_rolls: Vec::new(),
-        total: 0,
-        successes: None,
-        failures: None,
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
-        notes: Vec::new(),
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-        alien_stress_level: None,
-        alien_panic_roll: None,
-        alien_stress_ones: None,
-        fitd_outcome: None,
-        fitd_result: None,
-        fitd_highest_die: None,
-        plot_symbols: None,
-        implosion_rolls: Vec::new(),
-    };
+        modifier_type: modifier_type.to_string(),
+    });
+}
+
+fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
+    let mut result = RollResult::from_dice(&dice);
 
     // Find the Savage Worlds modifier
     let trait_sides = dice
@@ -1780,42 +1762,29 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
         })
         .ok_or_else(|| anyhow!("Expected Savage Worlds modifier"))?;
 
-    // Roll trait die (exploding on max)
-    let mut trait_rolls = vec![rng.random_range(1..=trait_sides as i32)];
-    let mut trait_explosions = 0;
-    while trait_rolls.last().copied().unwrap_or(0) >= trait_sides as i32 && trait_explosions < 100 {
-        trait_rolls.push(rng.random_range(1..=trait_sides as i32));
-        trait_explosions += 1;
-    }
-    let trait_total: i32 = trait_rolls.iter().sum();
-
-    // Roll wild die (d6, exploding on 6)
-    let mut wild_rolls = vec![rng.random_range(1..=6)];
-    let mut wild_explosions = 0;
-    while wild_rolls.last().copied().unwrap_or(0) >= 6 && wild_explosions < 100 {
-        wild_rolls.push(rng.random_range(1..=6));
-        wild_explosions += 1;
-    }
-    let wild_total: i32 = wild_rolls.iter().sum();
+    // Trait die explodes on its own maximum, wild die is always a d6
+    let trait_die = roll_exploding_die(rng, trait_sides);
+    let wild_die = roll_exploding_die(rng, 6);
+    let (trait_total, wild_total) = (trait_die.total, wild_die.total);
+    let (trait_explosions, wild_explosions) = (trait_die.explosions, wild_die.explosions);
 
     // Create dice groups for display
-    result.dice_groups.push(DiceGroup {
-        _description: format!("1d{trait_sides} ie{trait_sides}"),
-        rolls: trait_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "trait".to_string(),
-    });
-
-    result.dice_groups.push(DiceGroup {
-        _description: "1d6 ie6".to_string(),
-        rolls: wild_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "wild".to_string(),
-    });
+    push_dice_group(
+        &mut result,
+        format!("1d{trait_sides} ie{trait_sides}"),
+        trait_die.rolls.clone(),
+        "trait",
+    );
+    push_dice_group(
+        &mut result,
+        "1d6 ie6".to_string(),
+        wild_die.rolls.clone(),
+        "wild",
+    );
 
     // Add all rolls to individual_rolls for display
-    result.individual_rolls.extend(trait_rolls);
-    result.individual_rolls.extend(wild_rolls);
+    result.individual_rolls.extend(trait_die.rolls);
+    result.individual_rolls.extend(wild_die.rolls);
 
     // Keep the highest total (trait vs wild)
     let base_result = if trait_total >= wild_total {
@@ -1829,32 +1798,7 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
     result.total = base_result;
 
     // NOW apply mathematical modifiers to the Savage Worlds result
-    for modifier in &dice.modifiers {
-        match modifier {
-            Modifier::Add(value) => {
-                result.total += value;
-            }
-            Modifier::Subtract(value) => {
-                result.total -= value;
-            }
-            Modifier::Multiply(value) => {
-                result.total *= value;
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                result.total /= value;
-            }
-            Modifier::SavageWorlds(_) => {
-                // Already handled above
-            }
-            _ => {
-                // For now, ignore other modifiers in Savage Worlds
-                // (we could add support for AddDice, etc. later if needed)
-            }
-        }
-    }
+    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
 
     // Check for Snake Eyes (both dice show natural 1)
     let trait_natural = result.dice_groups[0].rolls.first().copied().unwrap_or(0);
@@ -1925,38 +1869,7 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
 
 // 5. ADD handle_d6_system_roll function to roller.rs:
 fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
-    let mut result = RollResult {
-        individual_rolls: Vec::new(),
-        kept_rolls: Vec::new(),
-        dropped_rolls: Vec::new(),
-        total: 0,
-        successes: None,
-        failures: None,
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
-        notes: Vec::new(),
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-        alien_stress_level: None,
-        alien_panic_roll: None,
-        alien_stress_ones: None,
-        fitd_outcome: None,
-        fitd_result: None,
-        fitd_highest_die: None,
-        plot_symbols: None,
-        implosion_rolls: Vec::new(),
-    };
+    let mut result = RollResult::from_dice(&dice);
 
     // Find the D6 System modifier
     let (count, pips_str) = dice
@@ -1979,32 +1892,26 @@ fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResul
     let base_total: i32 = base_rolls.iter().sum();
 
     // Roll wild die (exploding on 6)
-    let mut wild_rolls = vec![rng.random_range(1..=6)];
-    let mut wild_explosions = 0;
-    while wild_rolls.last().copied().unwrap_or(0) >= 6 && wild_explosions < 100 {
-        wild_rolls.push(rng.random_range(1..=6));
-        wild_explosions += 1;
-    }
-    let wild_total: i32 = wild_rolls.iter().sum();
+    let wild_die = roll_exploding_die(rng, 6);
+    let (wild_total, wild_explosions) = (wild_die.total, wild_die.explosions);
 
     // Create dice groups for display
-    result.dice_groups.push(DiceGroup {
-        _description: format!("{count}d6"),
-        rolls: base_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "base".to_string(),
-    });
-
-    result.dice_groups.push(DiceGroup {
-        _description: "1d6 ie6".to_string(),
-        rolls: wild_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "add".to_string(),
-    });
+    push_dice_group(
+        &mut result,
+        format!("{count}d6"),
+        base_rolls.clone(),
+        "base",
+    );
+    push_dice_group(
+        &mut result,
+        "1d6 ie6".to_string(),
+        wild_die.rolls.clone(),
+        "add",
+    );
 
     // Add all rolls to individual_rolls and kept_rolls
     result.individual_rolls.extend(base_rolls);
-    result.individual_rolls.extend(wild_rolls);
+    result.individual_rolls.extend(wild_die.rolls);
     result.kept_rolls = result.individual_rolls.clone();
 
     // Calculate total
@@ -2020,31 +1927,7 @@ fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResul
     result.total = dice_total + pips_modifier;
 
     // Apply other mathematical modifiers
-    for modifier in &dice.modifiers {
-        match modifier {
-            Modifier::Add(value) => {
-                result.total += value;
-            }
-            Modifier::Subtract(value) => {
-                result.total -= value;
-            }
-            Modifier::Multiply(value) => {
-                result.total *= value;
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                result.total /= value;
-            }
-            Modifier::D6System(_, _) => {
-                // Already handled above
-            }
-            _ => {
-                // Ignore other modifiers for D6 System
-            }
-        }
-    }
+    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
 
     // Add notes
     if wild_explosions > 0 {
@@ -2093,39 +1976,28 @@ fn apply_shadowrun_critical_glitch_check(result: &mut RollResult, dice_count: u3
     Ok(())
 }
 
+/// Collapse a Marvel edge/trouble batch into one note, so a large pool does not
+/// bury the roll under one line per reroll.
+fn push_marvel_reroll_note(result: &mut RollResult, kind: &str, count: i32, details: &[String]) {
+    if count == 1 {
+        result
+            .notes
+            .push(format!("{kind} 1: Rerolled {}", details[0]));
+    } else {
+        result.notes.push(format!(
+            "{kind} rerolls: {}",
+            details
+                .iter()
+                .enumerate()
+                .map(|(i, detail)| format!("#{}: {}", i + 1, detail))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+}
+
 fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
-    let mut result = RollResult {
-        individual_rolls: Vec::new(),
-        kept_rolls: Vec::new(),
-        dropped_rolls: Vec::new(),
-        total: 0,
-        successes: None,
-        failures: None,
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
-        notes: Vec::new(),
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-        alien_stress_level: None,
-        alien_panic_roll: None,
-        alien_stress_ones: None,
-        fitd_outcome: None,
-        fitd_result: None,
-        fitd_highest_die: None,
-        plot_symbols: None,
-        implosion_rolls: Vec::new(),
-    };
+    let mut result = RollResult::from_dice(&dice);
 
     // Find the Marvel Multiverse modifier
     let (edges, troubles) = dice
@@ -2225,22 +2097,7 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
             }
         }
 
-        // Consolidate all edge rerolls into a single note
-        if edges == 1 {
-            result
-                .notes
-                .push(format!("Edge 1: Rerolled {}", edge_details[0]));
-        } else {
-            result.notes.push(format!(
-                "Edge rerolls: {}",
-                edge_details
-                    .iter()
-                    .enumerate()
-                    .map(|(i, detail)| format!("#{}: {}", i + 1, detail))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-        }
+        push_marvel_reroll_note(&mut result, "Edge", edges, &edge_details);
     }
 
     // Process troubles with consolidated reporting
@@ -2268,22 +2125,7 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
             }
         }
 
-        // Consolidate all trouble rerolls into a single note
-        if troubles == 1 {
-            result
-                .notes
-                .push(format!("Trouble 1: Rerolled {}", trouble_details[0]));
-        } else {
-            result.notes.push(format!(
-                "Trouble rerolls: {}",
-                trouble_details
-                    .iter()
-                    .enumerate()
-                    .map(|(i, detail)| format!("#{}: {}", i + 1, detail))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-        }
+        push_marvel_reroll_note(&mut result, "Trouble", troubles, &trouble_details);
     }
 
     // Create result dice group with proper Marvel symbol display
@@ -2310,26 +2152,7 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
     // Calculate total
     result.total = final_rolls.iter().sum::<i32>();
 
-    // Apply mathematical modifiers - INCLUDING DIVISION BY ZERO CHECK
-    for modifier in &dice.modifiers {
-        match modifier {
-            Modifier::Add(value) => result.total += value,
-            Modifier::Subtract(value) => result.total -= value,
-            Modifier::Multiply(value) => result.total *= value,
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                result.total /= value;
-            }
-            Modifier::MarvelMultiverse(_, _) => {
-                // Already handled above
-            }
-            _ => {
-                // Handle other modifier types as needed
-            }
-        }
-    }
+    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
 
     Ok(result)
 }
@@ -2489,9 +2312,28 @@ fn apply_cyberpunk_red_mechanics(result: &mut RollResult, rng: &mut impl Rng) ->
         }
     }
 
-    // Update the result
+    finalize_d10_explosion(
+        result,
+        original_roll,
+        &additional_rolls,
+        total_result,
+        explosion_notes,
+    );
+
+    Ok(())
+}
+
+/// Fold an exploded d10 (Cyberpunk Red, Witcher) back into `result`: the base
+/// die and the dice it exploded into render as two groups, and the running
+/// total becomes the single kept value.
+fn finalize_d10_explosion(
+    result: &mut RollResult,
+    original_roll: i32,
+    additional_rolls: &[i32],
+    total_result: i32,
+    explosion_notes: Vec<String>,
+) {
     if !additional_rolls.is_empty() {
-        // Create dice groups to show the explosion
         let base_group = DiceGroup {
             _description: "1d10".to_string(),
             rolls: vec![original_roll],
@@ -2499,37 +2341,28 @@ fn apply_cyberpunk_red_mechanics(result: &mut RollResult, rng: &mut impl Rng) ->
             modifier_type: "base".to_string(),
         };
 
+        let exploded_up = original_roll == 10;
         let explosion_group = DiceGroup {
-            _description: if original_roll == 10 {
+            _description: if exploded_up {
                 "Critical Success"
             } else {
                 "Critical Failure"
             }
             .to_string(),
-            rolls: additional_rolls.clone(),
+            rolls: additional_rolls.to_vec(),
             dropped_rolls: Vec::new(),
-            modifier_type: if original_roll == 10 {
-                "add"
-            } else {
-                "subtract"
-            }
-            .to_string(),
+            modifier_type: if exploded_up { "add" } else { "subtract" }.to_string(),
         };
 
         result.dice_groups = vec![base_group, explosion_group];
 
-        // Add the actual additional roll to individual_rolls for display
-        result.individual_rolls.push(additional_rolls[0]);
+        // Show the exploded dice alongside the original
+        result.individual_rolls.extend(additional_rolls.iter());
     }
 
-    // Update totals and kept rolls
     result.total = total_result;
     result.kept_rolls = vec![total_result];
-
-    // Add explosion notes only (no system note)
     result.notes.extend(explosion_notes);
-
-    Ok(())
 }
 
 // Cyberpunk Red damage (`cpd`): the dice total stays a plain sum, because the
@@ -2585,30 +2418,19 @@ fn apply_mathematical_modifiers_to_cpr_total(
     result: &mut RollResult,
     dice: &DiceRoll,
 ) -> Result<()> {
+    // `+`/`-` are accumulated and applied last so a CPR damage multiplier such
+    // as `cpd2 * 3` scales the dice total alone, not the flat bonus.
     let mut modifier_total = 0;
 
     for modifier in &dice.modifiers {
-        match modifier {
-            Modifier::Add(value) => {
-                modifier_total += value;
-            }
-            Modifier::Subtract(value) => {
-                modifier_total -= value;
-            }
-            Modifier::Multiply(value) => {
-                result.total *= value;
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                result.total /= value;
-            }
-            _ => {} // Skip non-mathematical modifiers
+        match ArithmeticOp::from_modifier(modifier)? {
+            Some(ArithmeticOp::Add(value)) => modifier_total += value,
+            Some(ArithmeticOp::Subtract(value)) => modifier_total -= value,
+            Some(op) => op.apply(&mut result.total),
+            None => {} // Skip non-mathematical modifiers
         }
     }
 
-    // Apply accumulated add/subtract modifiers
     if modifier_total != 0 {
         result.total += modifier_total;
     }
@@ -2696,47 +2518,13 @@ fn apply_witcher_mechanics(result: &mut RollResult, rng: &mut impl Rng) -> Resul
         }
     }
 
-    // Update the result if we had explosions
-    if !additional_rolls.is_empty() {
-        // Create dice groups to show the explosion
-        let base_group = DiceGroup {
-            _description: "1d10".to_string(),
-            rolls: vec![original_roll],
-            dropped_rolls: Vec::new(),
-            modifier_type: "base".to_string(),
-        };
-
-        let explosion_group = DiceGroup {
-            _description: if original_roll == 10 {
-                "Critical Success"
-            } else {
-                "Critical Failure"
-            }
-            .to_string(),
-            rolls: additional_rolls.clone(),
-            dropped_rolls: Vec::new(),
-            modifier_type: if original_roll == 10 {
-                "add"
-            } else {
-                "subtract"
-            }
-            .to_string(),
-        };
-
-        result.dice_groups = vec![base_group, explosion_group];
-
-        // Add the actual additional rolls to individual_rolls for display
-        result
-            .individual_rolls
-            .extend(additional_rolls.iter().copied());
-    }
-
-    // Update totals and kept rolls
-    result.total = total_result;
-    result.kept_rolls = vec![total_result];
-
-    // Add explosion notes
-    result.notes.extend(explosion_notes);
+    finalize_d10_explosion(
+        result,
+        original_roll,
+        &additional_rolls,
+        total_result,
+        explosion_notes,
+    );
 
     Ok(())
 }
@@ -2792,38 +2580,7 @@ fn apply_cypher_system_mechanics(result: &mut RollResult, level: u32) -> Result<
 }
 
 pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
-    let mut result = RollResult {
-        individual_rolls: Vec::new(),
-        kept_rolls: Vec::new(),
-        dropped_rolls: Vec::new(),
-        total: 0,
-        successes: None,
-        failures: None,
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
-        notes: Vec::new(),
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-        alien_stress_level: None,
-        alien_panic_roll: None,
-        alien_stress_ones: None,
-        fitd_outcome: None,
-        fitd_result: None,
-        fitd_highest_die: None,
-        plot_symbols: None,
-        implosion_rolls: Vec::new(),
-    };
+    let mut result = RollResult::from_dice(&dice);
 
     let pool_size = dice.count;
 
@@ -2898,68 +2655,13 @@ pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result
     ));
 
     // Apply any mathematical modifiers after the core BNW mechanics
-    for modifier in &dice.modifiers {
-        match modifier {
-            Modifier::Add(value) => {
-                result.total += value;
-            }
-            Modifier::Subtract(value) => {
-                result.total -= value;
-            }
-            Modifier::Multiply(value) => {
-                result.total *= value;
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                result.total /= value;
-            }
-            Modifier::BraveNewWorld(_) => {
-                // Already handled above
-            }
-            _ => {
-                // Ignore other modifiers for BNW
-            }
-        }
-    }
+    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
 
     Ok(result)
 }
 
 fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
-    let mut result = RollResult {
-        individual_rolls: Vec::new(),
-        kept_rolls: Vec::new(),
-        dropped_rolls: Vec::new(),
-        total: 0,
-        successes: None,
-        failures: None,
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
-        notes: Vec::new(),
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-        alien_stress_level: None,
-        alien_panic_roll: None,
-        alien_stress_ones: None,
-        fitd_outcome: None,
-        fitd_result: None,
-        fitd_highest_die: None,
-        plot_symbols: None,
-        implosion_rolls: Vec::new(),
-    };
+    let mut result = RollResult::from_dice(&dice);
 
     // Find the ConanSkill modifier to get dice count
     let dice_count = dice
@@ -3061,26 +2763,7 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
     }
 
     // 4. Apply regular mathematical modifiers (if any)
-    for modifier in &dice.modifiers {
-        match modifier {
-            Modifier::Add(value) => {
-                result.total += value;
-            }
-            Modifier::Subtract(value) => {
-                result.total -= value;
-            }
-            Modifier::Multiply(value) => {
-                result.total *= value;
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                result.total /= value;
-            }
-            _ => {} // Skip modifiers already handled
-        }
-    }
+    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
 
     // 5. Add notes for combat dice
     if has_combat_dice {
@@ -3121,38 +2804,7 @@ fn apply_conan_combat_interpretation(rolls: &[i32]) -> i32 {
 }
 
 fn handle_conan_combat_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
-    let mut result = RollResult {
-        individual_rolls: Vec::new(),
-        kept_rolls: Vec::new(),
-        dropped_rolls: Vec::new(),
-        total: 0,
-        successes: None,
-        failures: None,
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
-        notes: Vec::new(),
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-        alien_stress_level: None,
-        alien_panic_roll: None,
-        alien_stress_ones: None,
-        fitd_outcome: None,
-        fitd_result: None,
-        fitd_highest_die: None,
-        plot_symbols: None,
-        implosion_rolls: Vec::new(),
-    };
+    let mut result = RollResult::from_dice(&dice);
 
     // Find the ConanCombat modifier to get dice count
     let dice_count = dice
@@ -3202,26 +2854,7 @@ fn handle_conan_combat_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRe
     });
 
     // Apply mathematical modifiers to the final total
-    for modifier in &dice.modifiers {
-        match modifier {
-            Modifier::Add(value) => {
-                result.total += value;
-            }
-            Modifier::Subtract(value) => {
-                result.total -= value;
-            }
-            Modifier::Multiply(value) => {
-                result.total *= value;
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                result.total /= value;
-            }
-            _ => {}
-        }
-    }
+    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
 
     if specials > 0 {
         result.notes.push(format!("{specials} special effects"));
@@ -3247,38 +2880,7 @@ fn handle_silhouette_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
         .ok_or_else(|| anyhow!("Expected Silhouette modifier"))?;
 
     // Initialize complete RollResult structure
-    let mut result = RollResult {
-        individual_rolls: Vec::new(),
-        kept_rolls: Vec::new(),
-        dropped_rolls: Vec::new(),
-        total: 0,
-        successes: None,
-        failures: None,
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
-        notes: Vec::new(),
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-        alien_stress_level: None,
-        alien_panic_roll: None,
-        alien_stress_ones: None,
-        fitd_outcome: None,
-        fitd_result: None,
-        fitd_highest_die: None,
-        plot_symbols: None,
-        implosion_rolls: Vec::new(),
-    };
+    let mut result = RollResult::from_dice(&dice);
 
     // Roll the dice pool
     for _ in 0..dice_count {
@@ -3313,78 +2915,9 @@ fn handle_silhouette_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
     }
 
     // Apply mathematical modifiers to final result
-    apply_mathematical_modifiers_to_silhouette(&mut result, &dice)?;
+    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
 
     Ok(result)
-}
-
-fn apply_mathematical_modifiers_to_silhouette(
-    result: &mut RollResult,
-    dice: &DiceRoll,
-) -> Result<()> {
-    for modifier in &dice.modifiers {
-        match modifier {
-            Modifier::Add(value) => result.total += value,
-            Modifier::Subtract(value) => result.total -= value,
-            Modifier::Multiply(value) => result.total *= value,
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                result.total /= value;
-            }
-            _ => {} // Skip non-mathematical modifiers
-        }
-    }
-    Ok(())
-}
-
-fn reroll_dice_greater(
-    result: &mut RollResult,
-    rng: &mut impl Rng,
-    threshold: u32,
-    dice_sides: u32,
-    indefinite: bool,
-) -> Result<()> {
-    let mut total_rerolls = 0;
-    let max_total_rerolls = 100;
-
-    for i in 0..result.individual_rolls.len() {
-        let mut rerolls_for_this_die = 0;
-        let max_rerolls_per_die = if indefinite { 100 } else { 1 };
-
-        // MAIN DIFFERENCE: Changed condition from <= to >=
-        while result.individual_rolls[i] >= threshold as i32
-            && rerolls_for_this_die < max_rerolls_per_die
-            && total_rerolls < max_total_rerolls
-        {
-            result.individual_rolls[i] = rng.random_range(1..=dice_sides as i32);
-            rerolls_for_this_die += 1;
-            total_rerolls += 1;
-
-            if !indefinite {
-                break;
-            }
-        }
-    }
-
-    // Add single summary note if any rerolls happened
-    if total_rerolls > 0 {
-        if total_rerolls == 1 {
-            result.notes.push("1 die rerolled".to_string());
-        } else {
-            result.notes.push(format!("{total_rerolls} dice rerolled"));
-        }
-    }
-
-    // Safety check note
-    if total_rerolls >= max_total_rerolls {
-        result
-            .notes
-            .push("Maximum rerolls reached (100)".to_string());
-    }
-
-    Ok(())
 }
 
 fn keep_middle_dice(result: &mut RollResult, count: usize) -> Result<()> {
@@ -3396,12 +2929,7 @@ fn keep_middle_dice(result: &mut RollResult, count: usize) -> Result<()> {
     }
 
     // Create indexed rolls for tracking original positions
-    let mut indexed_rolls: Vec<(usize, i32)> = result
-        .individual_rolls
-        .iter()
-        .enumerate()
-        .map(|(i, &roll)| (i, roll))
-        .collect();
+    let mut indexed_rolls = indexed_rolls(result);
 
     // Sort by value to identify middle dice
     indexed_rolls.sort_by_key(|&(_, roll)| roll);
@@ -3420,17 +2948,7 @@ fn keep_middle_dice(result: &mut RollResult, count: usize) -> Result<()> {
         .map(|&(i, _)| i)
         .collect();
 
-    // Separate kept and dropped dice
-    let mut new_rolls = Vec::new();
-    for (i, &roll) in result.individual_rolls.iter().enumerate() {
-        if kept_indices.contains(&i) {
-            new_rolls.push(roll);
-        } else {
-            result.dropped_rolls.push(roll);
-        }
-    }
-
-    result.individual_rolls = new_rolls;
+    partition_kept_dice(result, &kept_indices);
     Ok(())
 }
 
@@ -3641,36 +3159,8 @@ fn handle_vtm5_roll(
 ) -> Result<RollResult> {
     // Initialize result structure
     let mut result = RollResult {
-        individual_rolls: Vec::new(),
-        kept_rolls: Vec::new(),
-        dropped_rolls: Vec::new(),
-        total: 0,
         successes: Some(0),
-        failures: None,
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
-        notes: Vec::new(),
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-        alien_stress_level: None,
-        alien_panic_roll: None,
-        alien_stress_ones: None,
-        fitd_outcome: None,
-        fitd_result: None,
-        fitd_highest_die: None,
-        plot_symbols: None,
-        implosion_rolls: Vec::new(),
+        ..RollResult::from_dice(&dice)
     };
 
     let regular_dice = pool_size - hunger_dice;
@@ -3767,35 +3257,14 @@ fn apply_mathematical_modifiers_to_vtm5_successes(
     dice: &DiceRoll,
 ) -> Result<()> {
     for modifier in &dice.modifiers {
-        match modifier {
-            Modifier::Add(value) => {
-                if let Some(ref mut successes) = result.successes {
-                    *successes += value;
-                    result.total += value;
-                }
-            }
-            Modifier::Subtract(value) => {
-                if let Some(ref mut successes) = result.successes {
-                    *successes -= value;
-                    result.total -= value;
-                }
-            }
-            Modifier::Multiply(value) => {
-                if let Some(ref mut successes) = result.successes {
-                    *successes *= value;
-                    result.total *= value;
-                }
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                if let Some(ref mut successes) = result.successes {
-                    *successes /= value;
-                    result.total /= value;
-                }
-            }
-            _ => {} // Skip VTM5 and other non-mathematical modifiers
+        // A VTM5 roll is read in successes, so the total tracks them; both move
+        // together, and only when there is a success count to move.
+        if let Some(op) = ArithmeticOp::from_modifier(modifier)?
+            && let Some(mut successes) = result.successes
+        {
+            op.apply(&mut successes);
+            result.successes = Some(successes);
+            op.apply(&mut result.total);
         }
     }
     Ok(())
@@ -4224,38 +3693,7 @@ fn has_matching_dice(dice: &[i32]) -> bool {
 
 pub fn handle_mutants_masterminds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
     // Initialize complete RollResult with all required fields
-    let mut result = RollResult {
-        individual_rolls: Vec::new(),
-        kept_rolls: Vec::new(),
-        dropped_rolls: Vec::new(),
-        total: 0,
-        successes: None,
-        failures: None,
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
-        notes: Vec::new(),
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-        alien_stress_level: None,
-        alien_panic_roll: None,
-        alien_stress_ones: None,
-        fitd_outcome: None,
-        fitd_result: None,
-        fitd_highest_die: None,
-        plot_symbols: None,
-        implosion_rolls: Vec::new(),
-    };
+    let mut result = RollResult::from_dice(&dice);
 
     // Roll the dice
     for _ in 0..dice.count {
@@ -4276,26 +3714,7 @@ pub fn handle_mutants_masterminds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Re
     result.total = result.kept_rolls.iter().sum();
 
     // Apply mathematical modifiers (add, subtract, multiply, divide)
-    for modifier in &dice.modifiers {
-        match modifier {
-            Modifier::Add(value) => {
-                result.total += value;
-            }
-            Modifier::Subtract(value) => {
-                result.total -= value;
-            }
-            Modifier::Multiply(value) => {
-                result.total *= value;
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                result.total /= value;
-            }
-            _ => {} // Only handle math modifiers, MutantsMasterminds handled separately
-        }
-    }
+    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
 
     // Calculate degrees of success/failure against DC 10
     let dc = 10;
@@ -4463,41 +3882,17 @@ fn handle_wfrp_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
     let outcome = wfrp_test_outcome(target, roll);
     let notes = outcome.notes(target);
 
+    // `successes` is left at its default of `None` so the value slot prints the
+    // SL. `successes` would print "N successes", which is a different quantity
+    // from a Success Level.
     Ok(RollResult {
         individual_rolls: vec![roll],
         kept_rolls: vec![roll],
-        dropped_rolls: Vec::new(),
         // The total is the SL, not the die: a WFRP test is read in Success
         // Levels, and the die itself is already shown in the roll display.
         total: outcome.success_levels,
-        // Left unset so the value slot prints the SL. `successes` would print
-        // "N successes", which is a different quantity from a Success Level.
-        successes: None,
-        failures: None,
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
         notes,
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-        alien_stress_level: None,
-        alien_panic_roll: None,
-        alien_stress_ones: None,
-        fitd_outcome: None,
-        fitd_result: None,
-        fitd_highest_die: None,
-        plot_symbols: None,
-        implosion_rolls: Vec::new(),
+        ..RollResult::from_dice(&dice)
     })
 }
 
@@ -4610,30 +4005,7 @@ fn handle_mothership_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
         total: selected_roll,
         successes: if is_success { Some(1) } else { None },
         failures: if !is_success { Some(1) } else { None },
-        botches: None,
-        comment: dice.comment.clone(),
-        label: dice.label.clone(),
-        notes: Vec::new(),
-        dice_groups: Vec::new(),
-        original_expression: dice.original_expression.clone(),
-        simple: dice.simple,
-        no_results: dice.no_results,
-        private: dice.private,
-        godbound_damage: None,
-        fudge_symbols: None,
-        wng_wrath_die: None,
-        wng_icons: None,
-        wng_exalted_icons: None,
-        wng_wrath_dice: None,
-        suppress_comment: false,
-        alien_stress_level: None,
-        alien_panic_roll: None,
-        alien_stress_ones: None,
-        fitd_outcome: None,
-        fitd_result: None,
-        fitd_highest_die: None,
-        plot_symbols: None,
-        implosion_rolls: Vec::new(),
+        ..RollResult::from_dice(&dice)
     };
 
     // Add descriptive notes

@@ -16,6 +16,31 @@ use dicemaiden_rs::{
 // ROLL SETS AND MULTIPLE ROLLS
 // ============================================================================
 
+/// Assert a roll-set expression formats as one line per labelled set followed by
+/// a combined total.
+fn assert_roll_set_formatting(expression: &str, expected_sets: usize) -> String {
+    let results =
+        parse_and_roll(expression).unwrap_or_else(|e| panic!("'{expression}' should roll: {e}"));
+    let formatted = format_multiple_results(&results);
+
+    for set in 1..=expected_sets {
+        assert!(
+            formatted.contains(&format!("Set {set}")),
+            "'{expression}' output should name Set {set}"
+        );
+    }
+
+    assert!(formatted.contains("**Total:"));
+
+    let expected_total: i32 = results.iter().map(|r| r.total).sum();
+    assert!(
+        formatted.contains(&format!("Total: {expected_total}**")),
+        "'{expression}' output should end on the combined total {expected_total}"
+    );
+
+    formatted
+}
+
 #[test]
 fn test_roll_sets_comprehensive() {
     // Test roll set creation and labeling
@@ -142,19 +167,7 @@ fn test_result_formatting() {
 #[test]
 fn test_roll_set_formatting() {
     // Test roll set formatting with totals
-    let result = parse_and_roll("3 2d6").unwrap();
-    let formatted = format_multiple_results(&result);
-
-    // Should show individual sets
-    assert!(formatted.contains("Set 1"));
-    assert!(formatted.contains("Set 2"));
-    assert!(formatted.contains("Set 3"));
-
-    // Should show combined total
-    assert!(formatted.contains("**Total:"));
-
-    let expected_total: i32 = result.iter().map(|r| r.total).sum();
-    assert!(formatted.contains(&format!("Total: {}**", expected_total)));
+    assert_roll_set_formatting("3 2d6", 3);
 }
 
 #[test]
@@ -961,92 +974,6 @@ fn test_special_flags_integration() {
 }
 
 #[test]
-fn test_wrath_glory_special_modes() {
-    // Test Wrath & Glory special modes mentioned in roll_syntax.md but not fully tested
-    let wng_special_modes = vec![
-        // Soak tests (use total instead of successes)
-        ("wng 4d6 !soak", "Basic soak test"),
-        ("wng w2 5d6 !soak", "Soak with multiple wrath dice"),
-        ("wng dn3 4d6 !soak", "Soak with difficulty"),
-        // Exempt tests (no wrath die)
-        ("wng 6d6 !exempt", "Basic exempt test"),
-        ("wng dn2 4d6 !exempt", "Exempt with difficulty"),
-        // Damage tests (similar to soak)
-        ("wng 5d6 !dmg", "Damage test"),
-        ("wng w2 6d6 !dmg", "Damage with multiple wrath dice"),
-    ];
-
-    for (expression, description) in wng_special_modes {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "W&G special mode '{}' should parse: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        assert!(
-            !results.is_empty(),
-            "Should have results for '{}': {}",
-            expression,
-            description
-        );
-
-        let roll = &results[0];
-
-        // Check that appropriate mechanics are applied
-        if expression.contains("!soak")
-            || expression.contains("!dmg")
-            || expression.contains("!exempt")
-        {
-            // For soak/damage/exempt tests, should use total instead of successes
-            // (Implementation details may vary, but should have some kind of appropriate result)
-            assert!(
-                roll.total > 0 || roll.successes.is_some(),
-                "Should have meaningful result for '{}': {}",
-                expression,
-                description
-            );
-
-            // Check for appropriate notes indicating the special mode
-            let _has_special_note = roll.notes.iter().any(|note| {
-                note.contains("soak")
-                    || note.contains("exempt")
-                    || note.contains("damage")
-                    || note.contains("total")
-                    || note.contains("Wrath")
-            });
-            // Note: This depends on implementation - the system should indicate special mode somehow
-        }
-
-        // Wrath dice should still be tracked for complications/glory
-        if expression.contains("w2") {
-            // Should have multiple wrath dice
-            assert!(
-                roll.wng_wrath_dice.is_some() || roll.wng_wrath_die.is_some(),
-                "Should have wrath dice information for '{}': {}",
-                expression,
-                description
-            );
-        }
-    }
-
-    // Test invalid W&G special modes
-    let invalid_wng_modes = vec!["wng 4d6 !invalid", "wng 4d6 !", "wng 4d6 !soak invalid"];
-
-    for invalid_test in invalid_wng_modes {
-        let result = parse_and_roll(invalid_test);
-        // These might parse but should either work or fail gracefully
-        if result.is_ok() {
-            println!("W&G mode '{}' parsed (behavior may vary)", invalid_test);
-        } else {
-            println!("W&G mode '{}' failed as expected", invalid_test);
-        }
-    }
-}
-
-#[test]
 fn test_comprehensive_user_scenarios() {
     // Test realistic user scenarios that combine multiple advanced features
     let user_scenarios = vec![
@@ -1565,22 +1492,8 @@ fn test_a5e_result_formatting() {
 
 #[test]
 fn test_a5e_roll_sets_formatting() {
-    use dicemaiden_rs::{format_multiple_results, parse_and_roll};
-
     // Test A5E roll sets formatting
-    let result = parse_and_roll("3 a5e +5 ex1").expect("A5E roll sets should work");
-    let formatted = format_multiple_results(&result);
-
-    // Should show individual sets
-    assert!(formatted.contains("Set 1"));
-    assert!(formatted.contains("Set 2"));
-    assert!(formatted.contains("Set 3"));
-
-    // Should show combined total
-    assert!(formatted.contains("**Total:"));
-
-    let expected_total: i32 = result.iter().map(|r| r.total).sum();
-    assert!(formatted.contains(&format!("{}**", expected_total)));
+    assert_roll_set_formatting("3 a5e +5 ex1", 3);
 }
 
 #[test]
