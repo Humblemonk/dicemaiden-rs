@@ -1,6 +1,6 @@
 //! Enhanced random-number generation for dice rolling.
 //!
-//! All dice in Dice Maiden use [`get_dice_rng`] (an alias for
+//! Every production roll uses [`get_dice_rng`] (an alias for
 //! [`create_enhanced_rng`]).  This returns a [`rand::rngs::StdRng`] (ChaCha20
 //! internally) seeded with multiple independent entropy sources so that rapid
 //! successive rolls — common in a busy Discord server — are highly unlikely to
@@ -19,6 +19,11 @@
 //!
 //! [`create_fast_rng`] returns a [`rand::rngs::SmallRng`] for benchmarks and
 //! scenarios where speed matters more than cryptographic quality.
+//!
+//! [`create_seeded_rng`] is for tests only.  It is reproducible by design, so
+//! the snapshot suite can pin the exact output of systems whose dice are fixed
+//! by the system rather than by notation.  Never reach for it in production: a
+//! predictable seed makes every roll on every server predictable.
 //!
 //! # Usage note
 //!

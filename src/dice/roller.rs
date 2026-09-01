@@ -43,8 +43,11 @@
 //! | `handle_mutants_masterminds_roll` | Mutants & Masterminds DC 10   |
 //! | `handle_mothership_roll`          | Mothership RPG (1d100 ≤ stat) |
 //!
-//! RNG is obtained fresh per call via `rng::get_dice_rng` (ChaCha20 / StdRng
-//! seeded with OS entropy + timestamp + thread/process/ASLR entropy).
+//! `roll_dice` obtains one RNG via `rng::get_dice_rng` (ChaCha20 / StdRng
+//! seeded with OS entropy + timestamp + thread/process/ASLR entropy) and
+//! threads it through nested dice operands, so one expression draws from one
+//! generator.  `roll_dice_with_rng` accepts the generator instead, which is
+//! what lets the test suite seed a roll and pin its exact result.
 
 use super::rng::get_dice_rng;
 use super::{
