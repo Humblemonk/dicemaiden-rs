@@ -1,0 +1,50 @@
+# cargo-audit configuration, read by `cargo audit` and by the rustsec/audit-check
+# action in .github/workflows/audit.yml.
+#
+# Entries here suppress an advisory WITHOUT fixing it. Add one only when the
+# vulnerable code path is unreachable from this bot, and always record why —
+# an undocumented ignore is indistinguishable from an unnoticed vulnerability.
+# Re-evaluate the whole list whenever the dependency that pulls in the crate moves.
+
+[advisories]
+ignore = [
+    # --- rustls-webpki 0.102.8 -------------------------------------------------
+    #
+    # Dependency path (the only one — `cargo tree -i rustls-webpki@0.102.8`):
+    #   serenity 0.12.5 -> tokio-tungstenite 0.21 -> tokio-rustls 0.25
+    #                   -> rustls 0.22.4 -> rustls-webpki 0.102.8
+    #
+    # This is the gateway websocket's TLS stack, and its only peer is Discord's
+    # gateway. The HTTP side is unaffected: reqwest resolves to rustls 0.23 ->
+    # rustls-webpki 0.103.15, which carries all four fixes.
+    #
+    # Why not simply upgrade: every fix landed in the 0.103 line (>=0.103.10),
+    # 0.102.8 is the final 0.102 release, and rustls/webpki keeps no 0.102
+    # maintenance branch. rustls 0.22.4 requires ^0.102, so neither `cargo update`
+    # nor a [patch.crates-io] entry can reach a patched version. serenity 0.12.5 is
+    # the newest release and pins tokio-tungstenite 0.21. Clearing these therefore
+    # means moving to serenity 0.13 (its `next` branch already uses
+    # tokio-tungstenite 0.28 -> rustls-webpki 0.103.15) — do that when 0.13 ships,
+    # and delete this whole block.
+
+    # CRLs not considered authoritative by Distribution Point. Unreachable: neither
+    # serenity nor tokio-tungstenite builds a verifier with certificate revocation
+    # lists, so no CRL is ever supplied to webpki.
+    "RUSTSEC-2026-0049",
+
+    # URI-name constraints were ignored rather than rejected. webpki exposes no API
+    # for asserting URI names, and exploiting this requires a trusted CA to
+    # misissue a name-constrained certificate for gateway.discord.gg.
+    "RUSTSEC-2026-0098",
+
+    # Name constraints accepted against a certificate asserting a wildcard name.
+    # Checked only after signature verification, so it likewise requires misissuance
+    # by a CA in the webpki-roots bundle.
+    "RUSTSEC-2026-0099",
+
+    # Panic parsing a malformed IssuingDistributionPoint in a CRL. Unreachable for
+    # the same reason as RUSTSEC-2026-0049 — the advisory states applications that
+    # do not use CRLs are unaffected, and the entry point
+    # (`*CertRevocationList::from_der`) is never called on this path.
+    "RUSTSEC-2026-0104",
+]
