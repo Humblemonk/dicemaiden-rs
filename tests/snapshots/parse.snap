@@ -197,7 +197,7 @@
 10d6 ie6 k5 r1 t4 +5	OK	[10d6 mods=[ExplodeIndefinite(Some(6)), KeepHigh(5), Reroll(1), Target(4), Add(5)] label=None comment=None flags=----]
 10d6 plot	OK	[10d6 mods=[PlotDie] label=None comment=None flags=----]
 10d6 target 4+	ERR	Invalid target value in 'target'
-10d6 ww	OK	[10d6 mods=[WildWorlds(None)] label=None comment=None flags=----]
+10d6 ww	OK	[10d6 mods=[WildWords(None)] label=None comment=None flags=----]
 10yz	OK	[10d6 mods=[Target(6)] label=None comment=None flags=----]
 11d6 t4 + 1d6 t4f1ie6	OK	[11d6 mods=[Target(4), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [Target(4), Failure(1), ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 12d6l	OK	[11d6 mods=[Target(4), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [Target(4), Failure(1), ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
@@ -552,7 +552,7 @@
 1d6 t4f1ie6	OK	[1d6 mods=[Target(4), Failure(1), ExplodeIndefinite(Some(6))] label=None comment=None flags=----]
 1d6 target 2+	ERR	Invalid target value in 'target'
 1d6 wng	OK	[1d6 mods=[WrathGlory(None, false, 1)] label=None comment=None flags=----]
-1d6 ww	OK	[1d6 mods=[WildWorlds(None)] label=None comment=None flags=----]
+1d6 ww	OK	[1d6 mods=[WildWords(None)] label=None comment=None flags=----]
 1d6*2	OK	[1d6 mods=[Multiply(2)] label=None comment=None flags=----]
 1d6+	ERR	Invalid modifier '+' - contains operator
 1d6++5	ERR	Invalid modifier '+' - contains operator
@@ -889,7 +889,7 @@
 2d6 tdh + 5	OK	[2d6 mods=[DarkestHouse(false), Add(5)] label=None comment=None flags=----]
 2d6 tdh - 2	OK	[2d6 mods=[DarkestHouse(false), Subtract(2)] label=None comment=None flags=----]
 2d6 tdhc + 4	OK	[2d6 mods=[DarkestHouse(true), Add(4)] label=None comment=None flags=----]
-2d6 ww	OK	[2d6 mods=[WildWorlds(None)] label=None comment=None flags=----]
+2d6 ww	OK	[2d6 mods=[WildWords(None)] label=None comment=None flags=----]
 2d6+1d20 k1+1d8 d1	OK	[2d6 mods=[AddDice(DiceRoll { count: 1, sides: 20, modifiers: [KeepHigh(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), AddDice(DiceRoll { count: 1, sides: 8, modifiers: [Drop(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 2d6+1d4 d1	OK	[2d6 mods=[AddDice(DiceRoll { count: 1, sides: 4, modifiers: [Drop(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 2d6+3	OK	[2d6 mods=[Add(3)] label=None comment=None flags=----]
@@ -1049,7 +1049,7 @@
 3d6 r1 ir1	OK	[3d6 mods=[Reroll(1), RerollIndefinite(1)] label=None comment=None flags=----]
 3d6 t4	OK	[3d6 mods=[Target(4)] label=None comment=None flags=----]
 3d6 target 4+	ERR	Invalid target value in 'target'
-3d6 ww	OK	[3d6 mods=[WildWorlds(None)] label=None comment=None flags=----]
+3d6 ww	OK	[3d6 mods=[WildWords(None)] label=None comment=None flags=----]
 3d6-1d4 k1	OK	[3d6 mods=[SubtractDice(DiceRoll { count: 1, sides: 4, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), KeepHigh(1)] label=None comment=None flags=----]
 3d6e	OK	[3d6 mods=[Explode(None)] label=None comment=None flags=----]
 3d6e6	OK	[3d6 mods=[Explode(Some(6))] label=None comment=None flags=----]
@@ -1350,9 +1350,9 @@
 4d6 tl4ds	OK	[4d6 mods=[TargetLowerWithDoubleSuccess(4, 4)] label=None comment=None flags=----]
 4d6 tl4ds1	OK	[4d6 mods=[TargetLowerWithDoubleSuccess(4, 1)] label=None comment=None flags=----]
 4d6 tl4ds4	OK	[4d6 mods=[TargetLowerWithDoubleSuccess(4, 4)] label=None comment=None flags=----]
-4d6 ww	OK	[4d6 mods=[WildWorlds(None)] label=None comment=None flags=----]
-4d6 wwc1	OK	[4d6 mods=[WildWorlds(Some(1))] label=None comment=None flags=----]
-4d6 wwc2	OK	[4d6 mods=[WildWorlds(Some(2))] label=None comment=None flags=----]
+4d6 ww	OK	[4d6 mods=[WildWords(None)] label=None comment=None flags=----]
+4d6 wwc1	OK	[4d6 mods=[WildWords(Some(1))] label=None comment=None flags=----]
+4d6 wwc2	OK	[4d6 mods=[WildWords(Some(2))] label=None comment=None flags=----]
 4d6+3	OK	[4d6 mods=[Add(3)] label=None comment=None flags=----]
 4d6/2	OK	[4d6 mods=[Divide(2)] label=None comment=None flags=----]
 4d6;3d8;2d10;1d20	OK	[4d6 mods=[] label=None comment=None flags=---- | 3d8 mods=[] label=None comment=None flags=---- | 2d10 mods=[] label=None comment=None flags=---- | 1d20 mods=[] label=None comment=None flags=----]
@@ -1443,9 +1443,9 @@
 5d6 rg6 irg6	OK	[5d6 mods=[RerollGreater(6), RerollGreaterIndefinite(6)] label=None comment=None flags=----]
 5d6 t4	OK	[5d6 mods=[Target(4)] label=None comment=None flags=----]
 5d6 target 5+	ERR	Invalid target value in 'target'
-5d6 ww	OK	[5d6 mods=[WildWorlds(None)] label=None comment=None flags=----]
-5d6 wwc1	OK	[5d6 mods=[WildWorlds(Some(1))] label=None comment=None flags=----]
-5d6 wwc2	OK	[5d6 mods=[WildWorlds(Some(2))] label=None comment=None flags=----]
+5d6 ww	OK	[5d6 mods=[WildWords(None)] label=None comment=None flags=----]
+5d6 wwc1	OK	[5d6 mods=[WildWords(Some(1))] label=None comment=None flags=----]
+5d6 wwc2	OK	[5d6 mods=[WildWords(Some(2))] label=None comment=None flags=----]
 5d6l	OK	[4d6 mods=[Target(4), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [Target(4), Failure(1), ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 5d8 e8	OK	[5d8 mods=[Explode(Some(8))] label=None comment=None flags=----]
 5d8 tl6ds	OK	[5d8 mods=[TargetLowerWithDoubleSuccess(6, 6)] label=None comment=None flags=----]
@@ -1652,10 +1652,10 @@
 6d6 target 6+	ERR	Invalid target value in 'target'
 6d6 tl4ds	OK	[6d6 mods=[TargetLowerWithDoubleSuccess(4, 4)] label=None comment=None flags=----]
 6d6 tl4ds1	OK	[6d6 mods=[TargetLowerWithDoubleSuccess(4, 1)] label=None comment=None flags=----]
-6d6 ww	OK	[6d6 mods=[WildWorlds(None)] label=None comment=None flags=----]
-6d6 wwc1	OK	[6d6 mods=[WildWorlds(Some(1))] label=None comment=None flags=----]
-6d6 wwc2	OK	[6d6 mods=[WildWorlds(Some(2))] label=None comment=None flags=----]
-6d6 wwc3	OK	[6d6 mods=[WildWorlds(Some(3))] label=None comment=None flags=----]
+6d6 ww	OK	[6d6 mods=[WildWords(None)] label=None comment=None flags=----]
+6d6 wwc1	OK	[6d6 mods=[WildWords(Some(1))] label=None comment=None flags=----]
+6d6 wwc2	OK	[6d6 mods=[WildWords(Some(2))] label=None comment=None flags=----]
+6d6 wwc3	OK	[6d6 mods=[WildWords(Some(3))] label=None comment=None flags=----]
 6wod7c	OK	[6d10 mods=[Failure(1), Target(7), Cancel] label=None comment=None flags=----]
 6wod7c + 2	OK	[6d10 mods=[Failure(1), Target(7), Cancel, Add(2)] label=None comment=None flags=----]
 6wod7c + 3	OK	[6d10 mods=[Failure(1), Target(7), Cancel, Add(3)] label=None comment=None flags=----]
@@ -1675,7 +1675,7 @@
 7d20 ie + 2d8 ie	OK	[7d20 mods=[ExplodeIndefinite(None), AddDice(DiceRoll { count: 2, sides: 8, modifiers: [ExplodeIndefinite(None)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 7d6 fitd	OK	[7d6 mods=[ForgedDark] label=None comment=None flags=----]
 7d6 t4 + 1d6 t4f1ie6	OK	[7d6 mods=[Target(4), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [Target(4), Failure(1), ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
-7d6 ww	OK	[7d6 mods=[WildWorlds(None)] label=None comment=None flags=----]
+7d6 ww	OK	[7d6 mods=[WildWords(None)] label=None comment=None flags=----]
 8d1 / 2d1	OK	[8d1 mods=[DivideDice(DiceRoll { count: 2, sides: 1, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 8d10 e10	OK	[8d10 mods=[Explode(Some(10))] label=None comment=None flags=----]
 8d10 vtm5p8h0	OK	[8d10 mods=[VampireMasquerade5(8, 0)] label=None comment=None flags=----]
@@ -1689,13 +1689,13 @@
 8d6 ! Fireball spell	OK	[8d6 mods=[] label=None comment=Some("Fireball spell") flags=----]
 8d6 fitd	OK	[8d6 mods=[ForgedDark] label=None comment=None flags=----]
 8d6 target 3+	ERR	Invalid target value in 'target'
-8d6 ww	OK	[8d6 mods=[WildWorlds(None)] label=None comment=None flags=----]
+8d6 ww	OK	[8d6 mods=[WildWords(None)] label=None comment=None flags=----]
 8d6km3d2	OK	[8d6 mods=[KeepMiddle(3), Drop(2)] label=None comment=None flags=----]
 8d6l	OK	[7d6 mods=[Target(4), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [Target(4), Failure(1), ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 8yz	OK	[8d6 mods=[Target(6)] label=None comment=None flags=----]
 8yz + 1d6	OK	[8d6 mods=[Target(6), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 8yz - 2	OK	[8d6 mods=[Target(6), Subtract(2)] label=None comment=None flags=----]
-9d6 ww	OK	[9d6 mods=[WildWorlds(None)] label=None comment=None flags=----]
+9d6 ww	OK	[9d6 mods=[WildWords(None)] label=None comment=None flags=----]
 A5E ed2 should parse	ERR	Invalid dice expression: A5E
 A5E ed3 should parse	ERR	Invalid dice expression: A5E
 CRITICAL BUG: '1 d20+3' must fail - single roll sets not allowed	ERR	Invalid dice expression: CRITICAL
@@ -2256,6 +2256,6 @@ wng w5 5d6	OK	[5d6 mods=[WrathGlory(None, false, 5)] label=None comment=None fla
 wng w5 6d6 !dmg	OK	[6d6 mods=[WrathGlory(None, false, 5)] label=None comment=None flags=----]
 wng w6 4d6	ERR	Wrath dice count must be 1-5, got 6
 wod	ERR	Invalid dice expression: wod
-ww3	OK	[3d6 mods=[WildWorlds(None)] label=None comment=None flags=----]
-ww4c2	OK	[4d6 mods=[WildWorlds(Some(2))] label=None comment=None flags=----]
+ww3	OK	[3d6 mods=[WildWords(None)] label=None comment=None flags=----]
+ww4c2	OK	[4d6 mods=[WildWords(Some(2))] label=None comment=None flags=----]
 yz	ERR	Invalid dice expression: yz

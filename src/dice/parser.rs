@@ -1757,7 +1757,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         "bnw" => return Ok(Modifier::BraveNewWorld(0)),
         "mnm" => return Ok(Modifier::MutantsMasterminds),
         "c" => return Ok(Modifier::Cancel),
-        "ww" => return Ok(Modifier::WildWorlds(None)),
+        "ww" => return Ok(Modifier::WildWords(None)),
         "plot" => return Ok(Modifier::PlotDie),
         "tdh" => return Ok(Modifier::DarkestHouse(false)),
         "tdhc" => return Ok(Modifier::DarkestHouse(true)),
@@ -2223,17 +2223,17 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::Shadowrun(dice_count));
     }
 
-    // Wild Worlds RPG cutting mechanics
+    // Wild Words RPG cutting mechanics
     if let Some(stripped) = part.strip_prefix("wwc") {
         let cut_count: u32 = stripped
             .parse()
-            .map_err(|_| anyhow!("Invalid cut count in Wild Worlds modifier '{}'", part))?;
+            .map_err(|_| anyhow!("Invalid cut count in Wild Words modifier '{}'", part))?;
 
         if cut_count == 0 {
-            return Err(anyhow!("Cannot cut 0 dice in Wild Worlds"));
+            return Err(anyhow!("Cannot cut 0 dice in Wild Words"));
         }
 
-        return Ok(Modifier::WildWorlds(Some(cut_count)));
+        return Ok(Modifier::WildWords(Some(cut_count)));
     }
 
     // Additional dice modifiers
@@ -2429,21 +2429,21 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::LaserFeelings(0, target, roll_type));
     }
 
-    // Wild Worlds RPG parsing
+    // Wild Words RPG parsing
     if part == "ww" {
-        return Ok(Modifier::WildWorlds(None));
+        return Ok(Modifier::WildWords(None));
     }
 
     if let Some(cut_match) = WWC_REGEX.captures(part) {
         let cut_count: u32 = cut_match[1]
             .parse()
-            .map_err(|_| anyhow!("Invalid cut count in Wild Worlds modifier"))?;
+            .map_err(|_| anyhow!("Invalid cut count in Wild Words modifier"))?;
 
         if cut_count == 0 {
-            return Err(anyhow!("Cannot cut 0 dice in Wild Worlds"));
+            return Err(anyhow!("Cannot cut 0 dice in Wild Words"));
         }
 
-        return Ok(Modifier::WildWorlds(Some(cut_count)));
+        return Ok(Modifier::WildWords(Some(cut_count)));
     }
 
     Err(anyhow!("Unknown modifier: {}", part))
