@@ -353,6 +353,7 @@
 1d1 tl2	OK	[1d1 mods=[TargetLower(2)] label=None comment=None flags=----]
 1d1 tl3	OK	[1d1 mods=[TargetLower(3)] label=None comment=None flags=----]
 1d1 tl5	OK	[1d1 mods=[TargetLower(5)] label=None comment=None flags=----]
+1d1 tn1	OK	[1d1 mods=[TwoD20Test { target: 1, focus: 0, complication: 20 }] label=None comment=None flags=----]
 1d1+2d1	OK	[1d1 mods=[AddDice(DiceRoll { count: 2, sides: 1, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 1d1+3d1 k10	OK	[1d1 mods=[AddDice(DiceRoll { count: 3, sides: 1, modifiers: [KeepHigh(10)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 1d1+3d1 k2	OK	[1d1 mods=[AddDice(DiceRoll { count: 3, sides: 1, modifiers: [KeepHigh(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
@@ -773,6 +774,13 @@
 2d1 tl2	OK	[2d1 mods=[TargetLower(2)] label=None comment=None flags=----]
 2d1 tl3	OK	[2d1 mods=[TargetLower(3)] label=None comment=None flags=----]
 2d1 tl5	OK	[2d1 mods=[TargetLower(5)] label=None comment=None flags=----]
+2d1 tn1	OK	[2d1 mods=[TwoD20Test { target: 1, focus: 0, complication: 20 }] label=None comment=None flags=----]
+2d1 tn1 ! deterministic comment	OK	[2d1 mods=[TwoD20Test { target: 1, focus: 0, complication: 20 }] label=None comment=Some("deterministic comment") flags=----]
+2d1 tn1c2	OK	[2d1 mods=[TwoD20Test { target: 1, focus: 0, complication: 2 }] label=None comment=None flags=----]
+2d1 tn1f1	OK	[2d1 mods=[TwoD20Test { target: 1, focus: 1, complication: 20 }] label=None comment=None flags=----]
+2d1 tn20	OK	[2d1 mods=[TwoD20Test { target: 20, focus: 0, complication: 20 }] label=None comment=None flags=----]
+4d1 tn1f1	OK	[4d1 mods=[TwoD20Test { target: 1, focus: 1, complication: 20 }] label=None comment=None flags=----]
+5d1 tn5f5	OK	[5d1 mods=[TwoD20Test { target: 5, focus: 5, complication: 20 }] label=None comment=None flags=----]
 2d1 ul	ERR	Unknown modifier: ul
 2d1+3 b1f1t4	OK	[2d1 mods=[Add(3), Botch(Some(1)), Failure(1), Target(4)] label=None comment=None flags=----]
 2d1+3 t4f1b1	OK	[2d1 mods=[Add(3), Target(4), Failure(1), Botch(Some(1))] label=None comment=None flags=----]
@@ -798,6 +806,8 @@
 2d12 ie	OK	[2d12 mods=[ExplodeIndefinite(None)] label=None comment=None flags=----]
 2d20 + 3d6 k2	OK	[2d20 mods=[AddDice(DiceRoll { count: 3, sides: 6, modifiers: [KeepHigh(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 2d20 conan	OK	[2d20 mods=[ConanSkill(2)] label=None comment=None flags=----]
+2d20 tn12	OK	[2d20 mods=[TwoD20Test { target: 12, focus: 0, complication: 20 }] label=None comment=None flags=----]
+2d20 tn12f3	OK	[2d20 mods=[TwoD20Test { target: 12, focus: 3, complication: 20 }] label=None comment=None flags=----]
 2d20 ie + 1d10 ie + 1d8 ie	OK	[2d20 mods=[ExplodeIndefinite(None), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [ExplodeIndefinite(None)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), AddDice(DiceRoll { count: 1, sides: 8, modifiers: [ExplodeIndefinite(None)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 2d20 ie + 1d10 ie + 1d8 ie + 1d4 ie	OK	[2d20 mods=[ExplodeIndefinite(None), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [ExplodeIndefinite(None)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), AddDice(DiceRoll { count: 1, sides: 8, modifiers: [ExplodeIndefinite(None)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), AddDice(DiceRoll { count: 1, sides: 4, modifiers: [ExplodeIndefinite(None)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 2d20 ie + 1d10 ie + 1d8 ie + 1d6 ie	OK	[2d20 mods=[ExplodeIndefinite(None), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [ExplodeIndefinite(None)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), AddDice(DiceRoll { count: 1, sides: 8, modifiers: [ExplodeIndefinite(None)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [ExplodeIndefinite(None)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
@@ -937,6 +947,7 @@
 3 10d1 t4f1	OK	[10d1 mods=[Target(4), Failure(1)] label=Some("Set 1") comment=None flags=---- | 10d1 mods=[Target(4), Failure(1)] label=Some("Set 2") comment=None flags=---- | 10d1 mods=[Target(4), Failure(1)] label=Some("Set 3") comment=None flags=----]
 3 10d1 t4f1b1	OK	[10d1 mods=[Target(4), Failure(1), Botch(Some(1))] label=Some("Set 1") comment=None flags=---- | 10d1 mods=[Target(4), Failure(1), Botch(Some(1))] label=Some("Set 2") comment=None flags=---- | 10d1 mods=[Target(4), Failure(1), Botch(Some(1))] label=Some("Set 3") comment=None flags=----]
 3 10d1 tl3	OK	[10d1 mods=[TargetLower(3)] label=Some("Set 1") comment=None flags=---- | 10d1 mods=[TargetLower(3)] label=Some("Set 2") comment=None flags=---- | 10d1 mods=[TargetLower(3)] label=Some("Set 3") comment=None flags=----]
+3 conan2tn12f3	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 3, complication: 20 }] label=Some("Set 1") comment=None flags=---- | 2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 3, complication: 20 }] label=Some("Set 2") comment=None flags=---- | 2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 3, complication: 20 }] label=Some("Set 3") comment=None flags=----]
 3 10d1 ul	ERR	Unknown modifier: ul
 3 2d6	OK	[2d6 mods=[] label=Some("Set 1") comment=None flags=---- | 2d6 mods=[] label=Some("Set 2") comment=None flags=---- | 2d6 mods=[] label=Some("Set 3") comment=None flags=----]
 3 2d6 ! Damage rolls	OK	[2d6 mods=[] label=Some("Set 1") comment=Some("Damage rolls") flags=---- | 2d6 mods=[] label=Some("Set 2") comment=Some("Damage rolls") flags=---- | 2d6 mods=[] label=Some("Set 3") comment=Some("Damage rolls") flags=----]
@@ -1808,6 +1819,33 @@ conan3cd4	OK	[3d20 mods=[ConanSkill(3), AddDice(DiceRoll { count: 4, sides: 6, m
 conan3cd5	OK	[3d20 mods=[ConanSkill(3), AddDice(DiceRoll { count: 5, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), ConanCombat(5)] label=None comment=None flags=----]
 conan4	OK	[4d20 mods=[ConanSkill(4)] label=None comment=None flags=----]
 conan4cd6	OK	[4d20 mods=[ConanSkill(4), AddDice(DiceRoll { count: 6, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), ConanCombat(6)] label=None comment=None flags=----]
+conan tn0	ERR	Target number must be 1-20, got 0
+conan tn1	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 1, focus: 0, complication: 20 }] label=None comment=None flags=----]
+conan tn12	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 0, complication: 20 }] label=None comment=None flags=----]
+conan tn12 + 2	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 0, complication: 20 }, Add(2)] label=None comment=None flags=----]
+conan tn12 ! Feat of strength	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 0, complication: 20 }] label=None comment=Some("Feat of strength") flags=----]
+conan tn12c1	ERR	Complication range must be 2-20, got 1
+conan tn12c2	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 0, complication: 2 }] label=None comment=None flags=----]
+conan tn12c19	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 0, complication: 19 }] label=None comment=None flags=----]
+conan tn12c20	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 0, complication: 20 }] label=None comment=None flags=----]
+conan tn12c21	ERR	Complication range must be 2-20, got 21
+conan tn12f0	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 0, complication: 20 }] label=None comment=None flags=----]
+conan tn12f3	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 3, complication: 20 }] label=None comment=None flags=----]
+conan tn12f3c19	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 3, complication: 19 }] label=None comment=None flags=----]
+conan tn12f5	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 5, complication: 20 }] label=None comment=None flags=----]
+conan tn12f6	ERR	Focus must be 0-5, got 6
+conan tn20	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 20, focus: 0, complication: 20 }] label=None comment=None flags=----]
+conan tn21	ERR	Target number must be 1-20, got 21
+conan tn3f5	ERR	Focus 5 cannot exceed target number 3
+conan1	OK	[1d20 mods=[ConanSkill(1)] label=None comment=None flags=----]
+conan10	ERR	Invalid dice expression: conan10
+conan2tn12f3	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 3, complication: 20 }] label=None comment=None flags=----]
+conan3cd5 tn12f3	OK	[3d20 mods=[ConanSkill(3), AddDice(DiceRoll { count: 5, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), ConanCombat(5), TwoD20Test { target: 12, focus: 3, complication: 20 }] label=None comment=None flags=----]
+conan4 tn14f5	OK	[4d20 mods=[ConanSkill(4), TwoD20Test { target: 14, focus: 5, complication: 20 }] label=None comment=None flags=----]
+conan5	OK	[5d20 mods=[ConanSkill(5)] label=None comment=None flags=----]
+conan5tn17f5c18	OK	[5d20 mods=[ConanSkill(5), TwoD20Test { target: 17, focus: 5, complication: 18 }] label=None comment=None flags=----]
+conan9	OK	[9d20 mods=[ConanSkill(9)] label=None comment=None flags=----]
+conantn12	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 0, complication: 20 }] label=None comment=None flags=----]
 cpd	ERR	Invalid dice expression: cpd
 cpd is a damage total, not a pool	ERR	Invalid dice expression: cpd
 cpd must reject non-d6 dice	ERR	Invalid dice expression: cpd

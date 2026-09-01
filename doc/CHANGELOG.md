@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.6.4] - 2026-09-01
+
+## Added
+
+- Conan skill tests against a Target Number: `conan tn12` counts each d20 at or under 12,
+  your Attribute + Expertise. `conan tn12f3` adds your Focus, so dice at or under 3 score
+  two successes. A 20 reports a Complication without cancelling a success, and `c19` widens
+  that to 19-20 for an untrained test.
+- Conan skill pools of 1 to 9 dice, up from 2 to 5.
+
+## Fixed
+
+- Conan reported the number of dice rolled as the success count, so `conan` always said
+  "2 successes" whatever the d20s showed.
+- Combat dice reported damage as "successes", and a combined attack added that damage into
+  the d20 count. The two are now separate, and `cd4 + 3` applies the `+3`.
+
+## Changed
+
+- `/roll conan` with no Target Number now shows just your 2d20 faces, to read against your
+  own sheet. No other game system changed.
+
 ## [1.6.3] - 2026-08-31
 
 ## Changed

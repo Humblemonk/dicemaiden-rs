@@ -147,7 +147,7 @@ pub fn generate_alias_help() -> String {
 • `cs 3` → Cypher System 1d20 cs3 (Level 3 task, target 9+)
 • `cpr` / `cpd3` → Cyberpunk Red (`/help cpr`)
 • `wfrp67` → WFRP 4e (`/help wfrp`)
-• `conan3` → 3d20 conan (3d20 skill roll)
+• `conan tn12f3` → Conan (target 12, Focus 3)
 • `sil3` → Silhouette (`/help system`)
 • `ol5` → Open Legend (`/help ol`)
 • `ess1d8` → Essence20 (`/help ess`)

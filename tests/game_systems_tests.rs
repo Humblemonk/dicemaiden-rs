@@ -6,7 +6,10 @@
 // - Cross-system compatibility
 // - Game system modifiers and edge cases
 
-use dicemaiden_rs::{RollResult, dice::aliases, dice::roller::wfrp_test_outcome, parse_and_roll};
+use dicemaiden_rs::{
+    RollResult, dice::aliases, dice::rng::create_seeded_rng, dice::roller::wfrp_test_outcome,
+    parse_and_roll, parse_and_roll_with_rng,
+};
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -228,7 +231,13 @@ fn test_game_systems_comprehensive() {
         ("d6s4", true, None, "D6 System"),
         ("bnw3", true, None, "Brave New World 3-die pool"),
         ("sil3", true, None, "Silhouette 3 dice"),
-        ("conan", true, Some("success"), "Conan 2d20 skill"),
+        (
+            "conan",
+            true,
+            None,
+            "Conan 2d20 skill without a target number",
+        ),
+        ("conan tn12", true, Some("success"), "Conan 2d20 skill test"),
         ("cd", true, None, "Conan combat dice"),
         // Wrath & Glory variations
         ("wng 4d6", true, Some("success"), "W&G basic test"),
@@ -1436,9 +1445,18 @@ fn test_conan_system_variants() {
     let conan_variants = vec![
         // Skill dice variants
         ("conan", "Default 2d20 skill"),
+        ("conan1", "1d20 skill"),
         ("conan3", "3d20 skill"),
         ("conan4", "4d20 skill"),
         ("conan5", "5d20 skill"),
+        ("conan9", "5d20 plus the +4d20 assistance dice allow"),
+        // Skill tests against a target number
+        ("conan tn12", "Target number only"),
+        ("conan tn12f3", "Target number and Focus"),
+        ("conan tn12f3c19", "Untrained: complications on 19-20"),
+        ("conan4 tn14f5", "Momentum-bought dice with a target number"),
+        ("conan2tn12f3", "Packed single-token form"),
+        ("conantn12", "Packed form defaulting to 2d20"),
         // Combat dice variants
         ("cd", "Default 1d6 combat"),
         ("cd4", "4d6 combat"),
@@ -1503,9 +1521,14 @@ fn test_conan_system_variants() {
 
     // Test invalid Conan variants
     let invalid_conan = vec![
-        "conan1", // Too few dice
-        "conan6", // Too many dice
-        "cd0",    // Zero combat dice
+        "conan10",       // More dice than 5d20 plus 4 assistance dice
+        "cd0",           // Zero combat dice
+        "conan tn0",     // Target number below the d20 range
+        "conan tn21",    // Target number above the d20 range
+        "conan tn12f6",  // Focus above the maximum rating of 5
+        "conan tn3f5",   // Focus cannot exceed the target number
+        "conan tn12c1",  // Every die would complicate
+        "conan tn12c21", // No die can ever complicate
     ];
 
     for invalid_test in invalid_conan {
@@ -1516,6 +1539,164 @@ fn test_conan_system_variants() {
             invalid_test
         );
     }
+}
+
+#[test]
+fn test_conan_skill_test_successes() {
+    // A d1 pool fixes every face at 1, so these counts cannot vary with the dice.
+    let success_cases = vec![
+        (
+            "2d1 tn1",
+            2,
+            "each die at or under the target scores one success",
+        ),
+        ("4d1 tn1", 4, "one success per die, across a larger pool"),
+        (
+            "2d1 tn20",
+            2,
+            "a high target number still scores one per die",
+        ),
+        (
+            "2d1 tn1f1",
+            4,
+            "a die at or under the Focus scores two instead",
+        ),
+        (
+            "5d1 tn5f5",
+            10,
+            "Focus at its maximum rating doubles every die",
+        ),
+    ];
+
+    for (expression, expected, description) in success_cases {
+        let result = roll_one(expression, description);
+        assert_eq!(
+            result.successes,
+            Some(expected),
+            "'{expression}' should score {expected} successes: {description}"
+        );
+    }
+
+    // Proves `tn12f3` is consumed as one token: were the `f3` split off as the
+    // failure modifier it would subtract from the successes instead of doubling.
+    let result = roll_one("2d1 tn1f1", "f inside tn is not the failure modifier");
+    assert_eq!(result.failures, None, "tn must not leave a failure count");
+}
+
+#[test]
+fn test_conan_complications() {
+    // Seed 99991 rolls [19, 19] and seed 1 rolls [17, 20], which fixes what does
+    // and does not complicate without fixing the dice notation.
+    let complication_cases = vec![
+        (
+            "conan tn12",
+            99991,
+            None,
+            "trained: a 19 is not a complication",
+        ),
+        (
+            "conan tn12c19",
+            99991,
+            Some("2 complications"),
+            "untrained: 19-20 complicates, once per die",
+        ),
+        (
+            "conan tn12",
+            1,
+            Some("1 complication"),
+            "a 20 complicates on an ordinary test",
+        ),
+    ];
+
+    for (expression, seed, expected_note, description) in complication_cases {
+        let mut results = parse_and_roll_with_rng(expression, &mut create_seeded_rng(seed))
+            .unwrap_or_else(|e| panic!("'{expression}' should roll: {description} - {e}"));
+        let result = results.remove(0);
+        let note = result
+            .notes
+            .iter()
+            .find(|note| note.contains("complication"))
+            .map(String::as_str);
+
+        assert_eq!(
+            note, expected_note,
+            "'{expression}' at seed {seed}: {description}"
+        );
+    }
+
+    // A Complication never turns a success into a failure: at seed 1 the 20 is
+    // at or under a target number of 20, so it scores and complicates at once.
+    let mut results = parse_and_roll_with_rng("conan tn20", &mut create_seeded_rng(1))
+        .expect("a maximum target number should roll");
+    let result = results.remove(0);
+    assert_eq!(
+        result.successes,
+        Some(2),
+        "both dice are at or under a target number of 20"
+    );
+    assert!(
+        result.notes.iter().any(|note| note == "1 complication"),
+        "the 20 should still complicate: {:?}",
+        result.notes
+    );
+}
+
+#[test]
+fn test_conan_without_target_number_counts_nothing() {
+    // Without a target number this is the rulebook's basic skill test and nothing
+    // more: the faces, with no success count and no sum of d20s invented for a
+    // system that has no use for one.
+    for expression in ["conan", "conan3", "conan9"] {
+        let result = roll_one(expression, "bare skill roll");
+        assert_eq!(
+            result.successes, None,
+            "'{expression}' must not report successes without a target number"
+        );
+        assert!(
+            result.no_results,
+            "'{expression}' must not show a total for a plain skill test"
+        );
+        assert!(
+            result.notes.is_empty(),
+            "'{expression}' should add no notes: {:?}",
+            result.notes
+        );
+    }
+
+    // Arithmetic the player typed is still honoured, and needs a total to show.
+    let result = roll_one("conan + 2", "arithmetic keeps the total visible");
+    assert!(
+        !result.no_results,
+        "'conan + 2' must not silently drop the arithmetic"
+    );
+}
+
+#[test]
+fn test_conan_combat_dice_are_damage_not_successes() {
+    // Combat dice deal damage. Damage must never be added to, or reported as,
+    // the success count of the d20s it accompanies.
+    let result = roll_one("conan2cd4 tn12", "combined attack");
+    let successes = result.successes.expect("a target number was given");
+    assert!(
+        (0..=4).contains(&successes),
+        "successes must come from 2d20 alone, got {successes}"
+    );
+    assert!(
+        result.notes.iter().any(|note| note.contains(" damage")),
+        "damage should be reported separately: {:?}",
+        result.notes
+    );
+
+    let standalone = roll_one("cd4", "combat dice alone");
+    assert_eq!(
+        standalone.successes, None,
+        "combat dice alone are damage, not successes"
+    );
+    assert!(
+        (0..=8).contains(&standalone.total),
+        "4 combat dice deal 0-8 damage, got {}",
+        standalone.total
+    );
 }
 
 #[test]

@@ -118,6 +118,15 @@ impl fmt::Display for LaserFeelingsType {
 /// succeeds anyway.
 pub const WFRP_MAX_TARGET: u32 = 200;
 
+/// Conan caps Expertise and Focus at 5, so a Focus above this is a typo rather
+/// than a legal rating.
+pub const CONAN_MAX_FOCUS: u32 = 5;
+
+/// A Conan test uses at most 5d20, but assistance dice explicitly do not count
+/// toward that limit and are capped at +4d20, so nine is the largest pool the
+/// rules can produce.
+pub const CONAN_MAX_POOL: u32 = 9;
+
 #[derive(Debug, Clone)]
 pub enum Modifier {
     Add(i32),
@@ -165,6 +174,18 @@ pub enum Modifier {
     BraveNewWorld(u32),
     ConanSkill(u32),  // conan, conan3, conan4, conan5 - d20 skill rolls
     ConanCombat(u32), // cd, cd4, cd5 - combat dice interpretation
+    /// `tn#`, `tn#f#`, `tn#f#c#` - Conan / 2d20 skill test. Each d20 at or under
+    /// `target` (Attribute + Expertise) scores one success, at or under `focus`
+    /// scores two, and at or over `complication` generates a Complication.
+    ///
+    /// `focus` is 0 when the user omits `f#`, which means no criticals. That is
+    /// correct for Conan: unlike Star Trek Adventures, a natural 1 carries no
+    /// special rule here and only ever crits by being at or under the Focus.
+    TwoD20Test {
+        target: u32,
+        focus: u32,
+        complication: u32,
+    },
     Silhouette(u32),
     VampireMasquerade5(u32, u32),
     LaserFeelings(u32, u32, LaserFeelingsType), // (dice_count, target, roll_type)
