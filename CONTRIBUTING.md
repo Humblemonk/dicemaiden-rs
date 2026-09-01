@@ -152,6 +152,7 @@ Each of these exists because the same block had been pasted between 2 and 10 tim
 | `matches!(m, Modifier::Add(_) \| Modifier::Subtract(_) \| ...)` | `is_arithmetic_modifier(m)`, or `ArithmeticOp::from_modifier(m)?` when the operand is needed |
 | Rolling `+2d6`-style operands into an expression | `apply_dice_operand(..)` / `apply_modifier_expression(..)` |
 | A roll-and-explode-while-max loop | `roll_exploding_die(rng, sides)` |
+| A `DiceGroup` literal | `push_dice_group(result, description, rolls, modifier_type)` |
 | Keep/drop index bookkeeping | `indexed_rolls(result)` + `partition_kept_dice(result, &kept)` |
 | A d10 crit/fumble explosion tail (Cyberpunk Red, Witcher) | `finalize_d10_explosion(..)` |
 | Building `Set 1..N` copies, or roll-set parsing | `build_roll_set(..)` / `try_parse_roll_set(..)` |
@@ -185,6 +186,7 @@ Dice syntax is a public API, and a silently changed roll result is the worst bug
 - `snapshots/parse.snap` — the parsed form of every expression and every parse error, pinned exactly (parsing is deterministic)
 - `snapshots/deterministic_rolls.snap` — for expressions whose dice cannot vary (`d1` pools), the full result *and* the formatted Discord output, pinned exactly
 - `snapshots/outcomes.snap` — for randomly-rolling expressions, only what cannot vary with the dice: result count, success/failure, and exact error text
+- `snapshots/seeded_rolls.snap` — every expression rolled at four fixed seeds, which pins the exact result for game systems whose dice are fixed by the rules rather than by what you type (Savage Worlds' trait die, Wrath & Glory's pool)
 
 **If you add or change syntax, add cases to `tests/corpus/expressions.txt`**: a happy-path expression, the boundary values of every numeric parameter, and a `d1` form (for example `4d1 k1`) so the roll is deterministic and lands in the exact-value snapshot. These tests only cover what the corpus contains — a keep-count bug at `k1` once slipped through because the corpus had `k2` but no `k1`.
 
@@ -196,7 +198,7 @@ UPDATE_SNAPSHOTS=1 cargo test --test snapshot_tests
 
 Never regenerate a snapshot just to turn a red test green.
 
-Snapshots cannot pin the *results* of randomly-rolling systems, because `roll_dice` builds its own RNG internally. Cover those with targeted assertions in `game_systems_tests.rs`.
+`seeded_rolls.snap` is sensitive to the order dice are drawn from the generator, so an internal change that draws them in a different order rewrites it without altering anything a user sees. `deterministic_rolls.snap` is not sensitive to that. If both move, behavior changed; if only the seeded one moves, it did not.
 
 Use **table-driven tests** — this is the established pattern in the project:
 
