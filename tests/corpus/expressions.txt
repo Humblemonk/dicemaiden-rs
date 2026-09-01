@@ -353,6 +353,7 @@
 1d1 tl2
 1d1 tl3
 1d1 tl5
+1d1 tn1
 1d1+2d1
 1d1+3d1 k10
 1d1+3d1 k2
@@ -773,6 +774,13 @@
 2d1 tl2
 2d1 tl3
 2d1 tl5
+2d1 tn1
+2d1 tn1 ! deterministic comment
+2d1 tn1c2
+2d1 tn1f1
+2d1 tn20
+4d1 tn1f1
+5d1 tn5f5
 2d1 ul
 2d1+3 b1f1t4
 2d1+3 t4f1b1
@@ -798,6 +806,8 @@
 2d12 ie
 2d20 + 3d6 k2
 2d20 conan
+2d20 tn12
+2d20 tn12f3
 2d20 ie + 1d10 ie + 1d8 ie
 2d20 ie + 1d10 ie + 1d8 ie + 1d4 ie
 2d20 ie + 1d10 ie + 1d8 ie + 1d6 ie
@@ -937,6 +947,7 @@
 3 10d1 t4f1
 3 10d1 t4f1b1
 3 10d1 tl3
+3 conan2tn12f3
 3 10d1 ul
 3 2d6
 3 2d6 ! Damage rolls
@@ -1808,6 +1819,33 @@ conan3cd4
 conan3cd5
 conan4
 conan4cd6
+conan tn0
+conan tn1
+conan tn12
+conan tn12 + 2
+conan tn12 ! Feat of strength
+conan tn12c1
+conan tn12c2
+conan tn12c19
+conan tn12c20
+conan tn12c21
+conan tn12f0
+conan tn12f3
+conan tn12f3c19
+conan tn12f5
+conan tn12f6
+conan tn20
+conan tn21
+conan tn3f5
+conan1
+conan10
+conan2tn12f3
+conan3cd5 tn12f3
+conan4 tn14f5
+conan5
+conan5tn17f5c18
+conan9
+conantn12
 cpd
 cpd is a damage total, not a pool
 cpd must reject non-d6 dice

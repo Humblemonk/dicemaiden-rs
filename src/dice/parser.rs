@@ -39,7 +39,8 @@
 //! All regex patterns are compiled once at startup via `once_cell::Lazy`.
 
 use super::{
-    DiceRoll, ESSENCE20_RANKS, HeroSystemType, LaserFeelingsType, Modifier, WFRP_MAX_TARGET,
+    CONAN_MAX_FOCUS, CONAN_MAX_POOL, DiceRoll, ESSENCE20_RANKS, HeroSystemType, LaserFeelingsType,
+    Modifier, WFRP_MAX_TARGET,
 };
 use anyhow::{Result, anyhow};
 use once_cell::sync::Lazy;
@@ -112,6 +113,14 @@ static TARGET_LOWER_DS_SIDES_REGEX: Lazy<Regex> = Lazy::new(|| {
 
 static TARGET_LOWER_DS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^tl(\d+)ds$").expect("Failed to compile TARGET_LOWER_DS_REGEX"));
+
+/// `tn12`, `tn12f3`, `tn12f3c19` - Conan / 2d20 target number, Focus and
+/// Complication range. Matched as one whole token, the way `tl6ds5` is, so the
+/// `f` and `c` inside it can never be mistaken for the `f#` failure or `c`
+/// cancel modifiers.
+static TWO_D20_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^tn(\d+)(?:f(\d+))?(?:c(\d+))?$").expect("Failed to compile TWO_D20_REGEX")
+});
 
 static WWC_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^wwc(\d+)$").expect("Failed to compile WWC_REGEX"));
@@ -1438,6 +1447,7 @@ static MODIFIER_START_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^km\d+",    // Keep middle: km3
         r"^kl\d+",    // Keep low: kl2
         r"^tl\d+",    // Target lower: tl5
+        r"^tn\d+",    // Conan 2d20 target number: tn12, tn12f3c19 (before t)
         r"^rg\d+",    // Reroll greater: rg5
         r"^k\d+",     // Keep high: k3
         r"^d\d+",     // Drop: d1
@@ -1622,6 +1632,57 @@ fn parse_essence20_rank(digits: &str, part: &str, specialization: bool) -> Resul
     Ok(Modifier::Essence20(rank, specialization))
 }
 
+/// Build a [`Modifier::TwoD20Test`] from a captured `tn#[f#][c#]` token.
+///
+/// Omitted `f#` gives a Focus of 0 (no criticals) and omitted `c#` gives a
+/// Complication range of 20 only, which is an ordinary trained Conan test. An
+/// untrained test widens the range to 19-20, written `c19`.
+fn parse_two_d20_test(captures: &regex::Captures<'_>) -> Result<Modifier> {
+    let number = |index: usize, default: u32| -> Result<u32> {
+        match captures.get(index) {
+            Some(matched) => matched
+                .as_str()
+                .parse::<u32>()
+                .map_err(|_| anyhow!("Invalid number in target number modifier")),
+            None => Ok(default),
+        }
+    };
+
+    let target = number(1, 0)?;
+    let focus = number(2, 0)?;
+    let complication = number(3, 20)?;
+
+    if !(1..=20).contains(&target) {
+        return Err(anyhow!("Target number must be 1-20, got {}", target));
+    }
+    if focus > CONAN_MAX_FOCUS {
+        return Err(anyhow!(
+            "Focus must be 0-{}, got {}",
+            CONAN_MAX_FOCUS,
+            focus
+        ));
+    }
+    if focus > target {
+        return Err(anyhow!(
+            "Focus {} cannot exceed target number {}",
+            focus,
+            target
+        ));
+    }
+    if !(2..=20).contains(&complication) {
+        return Err(anyhow!(
+            "Complication range must be 2-20, got {}",
+            complication
+        ));
+    }
+
+    Ok(Modifier::TwoD20Test {
+        target,
+        focus,
+        complication,
+    })
+}
+
 fn parse_single_modifier(part: &str) -> Result<Modifier> {
     // Reject standalone 'l' - it should only appear in d6l aliases
     if part == "l" {
@@ -1735,18 +1796,24 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::Wfrp(target));
     }
 
-    // Conan skill roll handling (conan, conan3, conan4, conan5)
+    // Conan / 2d20 target number: tn12, tn12f3, tn12f3c19
+    if let Some(captures) = TWO_D20_REGEX.captures(part) {
+        return parse_two_d20_test(&captures);
+    }
+
+    // Conan skill roll handling (conan, conan1 through conan9)
     if part == "conan" {
         return Ok(Modifier::ConanSkill(2)); // Default 2d20
     }
     if let Some(stripped) = part.strip_prefix("conan")
         && let Ok(dice_count) = stripped.parse::<u32>()
     {
-        if (2..=5).contains(&dice_count) {
+        if (1..=CONAN_MAX_POOL).contains(&dice_count) {
             return Ok(Modifier::ConanSkill(dice_count));
         } else {
             return Err(anyhow!(
-                "Conan skill rolls support 2-5 dice, got {}",
+                "Conan skill rolls support 1-{} dice, got {}",
+                CONAN_MAX_POOL,
                 dice_count
             ));
         }

@@ -919,6 +919,14 @@ fn apply_special_system_modifiers(
                 // Conan combat dice are handled in the main roll_dice function
                 // Don't process them here
             }
+            Modifier::TwoD20Test {
+                target,
+                focus,
+                complication,
+            } => {
+                apply_two_d20_test(result, *target, *focus, *complication)?;
+                has_special_system = true;
+            }
             Modifier::VampireMasquerade5(pool_size, hunger_dice) => {
                 *result = handle_vtm5_roll(dice.clone(), rng, *pool_size, *hunger_dice)?;
                 return Ok(());
@@ -2700,11 +2708,16 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
         result.individual_rolls.push(rng.random_range(1..=20));
     }
 
-    // Count successes for skill dice (simple approach: count = successes)
-    let skill_successes = result.individual_rolls.len() as i32;
-    result.successes = Some(skill_successes);
-    result.total = skill_successes;
     result.kept_rolls = result.individual_rolls.clone();
+    let skill_dice_total: i32 = result.individual_rolls.iter().sum();
+    result.total = skill_dice_total;
+
+    // A Conan test is only meaningful against a Target Number, so the successes
+    // are counted here and only here.
+    let scored_test = find_two_d20_test(&dice.modifiers);
+    if let Some((target, focus, complication)) = scored_test {
+        apply_two_d20_test(&mut result, target, focus, complication)?;
+    }
 
     // Create dice group for skill dice
     result.dice_groups.push(DiceGroup {
@@ -2727,17 +2740,11 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
             // Check if these are d6 dice that should use Conan combat interpretation
             if additional_dice.sides == 6 {
                 // Apply Conan combat dice interpretation to the d6 results
-                let combat_damage =
-                    apply_conan_combat_interpretation(&additional_result.individual_rolls);
+                let (combat_damage, effects) =
+                    conan_combat_totals(&additional_result.individual_rolls);
                 combat_dice_total += combat_damage;
+                combat_specials += effects;
                 has_combat_dice = true;
-
-                // Count special effects (5s and 6s) for notes
-                for &roll in &additional_result.individual_rolls {
-                    if roll == 5 || roll == 6 {
-                        combat_specials += 1;
-                    }
-                }
 
                 // Add combat dice to display
                 result
@@ -2774,11 +2781,29 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
         }
     }
 
-    // 3. Add combat damage to total
+    // 3. Damage is deliberately kept out of the success count: successes come
+    // from the d20s and damage from the d6s, and adding them together produces a
+    // number that is neither. On an attack the damage *is* the total, so the
+    // d20 faces come back out of it — they were only ever a success count.
     if has_combat_dice {
-        result.total += combat_dice_total;
-        let current_successes = result.successes.unwrap_or(0);
-        result.successes = Some(current_successes + combat_dice_total);
+        result.total = result.total - skill_dice_total + combat_dice_total;
+    }
+
+    // Without a Target Number this is the rulebook's basic skill test — "To make
+    // a skill test, roll 2d20" — and nothing more: the player reads the faces
+    // against their own Attribute and Expertise. A sum of d20s is not a quantity
+    // Conan uses, so none is shown.
+    //
+    // Two things earn a total back. Combat dice make it the damage, which is
+    // real. Arithmetic makes it whatever the player asked for, and silently
+    // dropping a `+ 2` they typed would be worse than printing a number the
+    // system has no use for.
+    let plain_skill_test = scored_test.is_none()
+        && !has_combat_dice
+        && !dice.modifiers.iter().any(is_arithmetic_modifier);
+
+    if plain_skill_test {
+        result.no_results = true;
     }
 
     // 4. Apply regular mathematical modifiers (if any)
@@ -2786,8 +2811,17 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
 
     // 5. Add notes for combat dice
     if has_combat_dice {
-        // Add special effects note if applicable
-        if combat_specials > 0 {
+        // Damage only needs stating when a `tn#` has taken the total slot for
+        // the success count; otherwise the total already is the damage. Effects
+        // ride along in the same note rather than costing a second line.
+        if result.successes.is_some() {
+            result.notes.push(if combat_specials > 0 {
+                let plural = if combat_specials == 1 { "" } else { "s" };
+                format!("{combat_dice_total} damage, {combat_specials} effect{plural}")
+            } else {
+                format!("{combat_dice_total} damage")
+            });
+        } else if combat_specials > 0 {
             result
                 .notes
                 .push(format!("{combat_specials} special effects"));
@@ -2802,9 +2836,14 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
     Ok(result)
 }
 
-// Helper function to apply Conan combat dice interpretation
-fn apply_conan_combat_interpretation(rolls: &[i32]) -> i32 {
+/// Conan Combat Dice, as `(damage, effects)`: a 1 deals 1 damage, a 2 deals 2,
+/// a 3 or 4 deals none, and a 5 or 6 deals 1 damage plus an Effect.
+///
+/// Both quantities come out of one pass so the damage and the Effect count can
+/// never disagree about what a die showed.
+fn conan_combat_totals(rolls: &[i32]) -> (i32, i32) {
     let mut damage = 0;
+    let mut effects = 0;
 
     for &roll in rolls {
         match roll {
@@ -2813,13 +2852,13 @@ fn apply_conan_combat_interpretation(rolls: &[i32]) -> i32 {
             3 | 4 => { /* no damage */ }
             5 | 6 => {
                 damage += 1;
-                // Note: 5-6 also grant special effects in actual play
+                effects += 1;
             }
             _ => {}
         }
     }
 
-    damage
+    (damage, effects)
 }
 
 fn handle_conan_combat_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
@@ -2843,25 +2882,11 @@ fn handle_conan_combat_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRe
         result.individual_rolls.push(rng.random_range(1..=6));
     }
 
-    // Apply Conan combat dice interpretation
-    let mut successes = 0;
-    let mut specials = 0;
+    // Combat dice deal damage; they are not a success count and must not be
+    // reported as one.
+    let (damage, specials) = conan_combat_totals(&result.individual_rolls);
 
-    for &roll in &result.individual_rolls {
-        match roll {
-            1 => successes += 1,
-            2 => successes += 2,
-            3 | 4 => { /* no effect */ }
-            5 | 6 => {
-                successes += 1;
-                specials += 1;
-            }
-            _ => {}
-        }
-    }
-
-    result.successes = Some(successes);
-    result.total = successes;
+    result.total = damage;
     result.kept_rolls = result.individual_rolls.clone();
 
     // Create dice group for display
@@ -2982,6 +3007,7 @@ fn find_target_modifier_positions(modifiers: &[Modifier]) -> Vec<usize> {
                     | Modifier::TargetLower(_)
                     | Modifier::TargetWithDoubleSuccess(_, _)
                     | Modifier::TargetLowerWithDoubleSuccess(_, _)
+                    | Modifier::TwoD20Test { .. }
                     | Modifier::Failure(_)
                     | Modifier::Botch(_)
             ) {
@@ -3165,6 +3191,61 @@ fn count_dice_with_target_lower_double_success(
         result.notes.push(format!(
             "≤{double_success_value} = 2 successes, ≤{target} = 1 success"
         ));
+    }
+
+    Ok(())
+}
+
+/// The `tn#` parameters of a roll, if it carries one.
+fn find_two_d20_test(modifiers: &[Modifier]) -> Option<(u32, u32, u32)> {
+    modifiers.iter().find_map(|modifier| match modifier {
+        Modifier::TwoD20Test {
+            target,
+            focus,
+            complication,
+        } => Some((*target, *focus, *complication)),
+        _ => None,
+    })
+}
+
+/// Count a Conan / 2d20 skill test over the kept dice.
+///
+/// Successes and Complications are counted independently rather than as
+/// branches of one decision: a 20 causes a Complication *and* can still be a
+/// success, because a Complication never turns a passed test into a failed one.
+///
+/// A Focus of 0 means the roll has no critical range at all, which is the
+/// correct reading for Conan — a natural 1 carries no special rule and only
+/// doubles by being at or under the Focus. The parser guarantees
+/// `focus <= target`, so any die that doubles is necessarily also a success.
+///
+/// The Focus is counted as a second pass over the same dice rather than as a
+/// doubling rule, which is what the rulebook describes: a die at or under the
+/// Focus "generates one additional success" on top of the one it already
+/// scored. It also keeps the output to a single line — the player chose these
+/// numbers, so restating them back at them is noise.
+fn apply_two_d20_test(
+    result: &mut RollResult,
+    target: u32,
+    focus: u32,
+    complication: u32,
+) -> Result<()> {
+    count_dice_matching(result, |roll| roll <= target as i32, "successes")?;
+    if focus > 0 {
+        count_dice_matching(result, |roll| roll <= focus as i32, "successes")?;
+    }
+
+    let complications = result
+        .kept_rolls
+        .iter()
+        .filter(|&&roll| roll >= complication as i32)
+        .count();
+
+    if complications > 0 {
+        let plural = if complications == 1 { "" } else { "s" };
+        result
+            .notes
+            .push(format!("{complications} complication{plural}"));
     }
 
     Ok(())

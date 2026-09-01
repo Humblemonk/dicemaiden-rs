@@ -187,14 +187,20 @@ static BNW_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^bnw(\d+)$").expect("Failed to compile BNW_REGEX"));
 
 static CONAN_SKILL_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^conan([345])$").expect("Failed to compile CONAN_SKILL_REGEX"));
+    Lazy::new(|| Regex::new(r"^conan([1-9])$").expect("Failed to compile CONAN_SKILL_REGEX"));
+
+// Packed skill test: conan tn12f3 written as one token (conan2tn12f3 = 2d20 tn12f3)
+static CONAN_TN_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^conan([1-9])?(tn\d+(?:f\d+)?(?:c\d+)?)$")
+        .expect("Failed to compile CONAN_TN_REGEX")
+});
 
 static CONAN_COMBAT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^cd(\d+)$").expect("Failed to compile CONAN_COMBAT_REGEX"));
 
 // Combined attack patterns (conan3cd4 = 3d20 skill + 4d6 combat)
 static CONAN_COMBINED_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^conan([2-5])cd(\d+)$").expect("Failed to compile CONAN_COMBINED_REGEX")
+    Regex::new(r"^conan([1-9])cd(\d+)$").expect("Failed to compile CONAN_COMBINED_REGEX")
 });
 
 static SIL_REGEX: Lazy<Regex> =
@@ -856,6 +862,13 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = BNW_REGEX.captures(input) {
         let pool_size = &captures[1];
         return Some(format!("{pool_size}d6 bnw"));
+    }
+
+    // Handle the packed skill test first: conan2tn12f3 -> 2d20 conan2 tn12f3
+    if let Some(captures) = CONAN_TN_REGEX.captures(input) {
+        let dice_count = captures.get(1).map_or("2", |m| m.as_str());
+        let test = &captures[2];
+        return Some(format!("{dice_count}d20 conan{dice_count} {test}"));
     }
 
     // Handle Conan combined patterns first (most specific)

@@ -123,13 +123,38 @@ Modifiers apply in stages, not in the order you type them:
 - Used in DC Universe RPG, Hercules & Xena, and other D6 Legend system games
 
 ### Conan
-- `conan` → 2d20 skill roll (default)
-- `conan4` → 4d20 skill roll (momentum spent for extra dice)
+- `conan` → the basic skill test: roll 2d20 and read the faces against your
+  Attribute + Expertise
+- `conan4` → 4d20 skill roll (Momentum or Doom spent for extra dice)
+- `conan tn12` → skill test against Target Number 12 (Attribute + Expertise)
+- `conan tn12f3` → Target Number 12 with Focus 3
+- `conan tn12f3c19` → untrained test: Complications on 19-20
+- `conan4 tn14f5` → 4d20 against Target Number 14 with Focus 5
+- `conan2tn12f3` → same test written as one token (needed inside roll sets)
 - `cd` → 1d6 combat dice (default)
 - `cd4` → 4d6 combat dice (massive damage)
 - `conan3cd5` → 3d20 skill + 5d6 combat (combined attack)
-- Skill Rolls: Roll d20s, count successes (target number varies by difficulty)
-- Combat Dice: Special interpretation - 1=1 damage, 2=2 damage, 3-4=0 damage, 5-6=1 damage + special effect
+- `conan3cd5 tn12f3` → combined attack scored against a Target Number
+
+**Skill Tests**
+- Each d20 at or under the Target Number scores 1 success
+- Each d20 at or under the Focus scores 2 successes instead. Conan has no
+  natural-1 rule, so without `f#` there are no criticals at all
+- Each d20 at or over the Complication range (20 by default) causes a
+  Complication. A Complication never turns a success into a failure, so a die
+  can score *and* complicate
+- Difficulty is the number of successes needed; successes beyond it are Momentum
+
+**Limits**
+- Dice: 1-9. A test uses at most 5d20, but assistance dice do not count toward
+  that limit and add up to 4 more
+- `tn`: 1-20 · `f`: 0-5 (the maximum Focus rating, and never above `tn`) ·
+  `c`: 2-20
+
+**Combat Dice**
+- Special interpretation - 1=1 damage, 2=2 damage, 3-4=0 damage, 5-6=1 damage + special effect
+- Damage is reported as damage, never as successes, so an attack shows the
+  successes from its d20s and the damage from its d6s separately
 
 ### Silhouette System (Dream Pod 9)
 - `sil` → 1d6 Silhouette (default)

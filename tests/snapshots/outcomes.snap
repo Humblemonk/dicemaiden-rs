@@ -353,6 +353,7 @@
 1d1 tl2	always-ok n=Some(1)
 1d1 tl3	always-ok n=Some(1)
 1d1 tl5	always-ok n=Some(1)
+1d1 tn1	always-ok n=Some(1)
 1d1+2d1	always-ok n=Some(1)
 1d1+3d1 k10	always-ok n=Some(1)
 1d1+3d1 k2	always-ok n=Some(1)
@@ -773,6 +774,13 @@
 2d1 tl2	always-ok n=Some(1)
 2d1 tl3	always-ok n=Some(1)
 2d1 tl5	always-ok n=Some(1)
+2d1 tn1	always-ok n=Some(1)
+2d1 tn1 ! deterministic comment	always-ok n=Some(1)
+2d1 tn1c2	always-ok n=Some(1)
+2d1 tn1f1	always-ok n=Some(1)
+2d1 tn20	always-ok n=Some(1)
+4d1 tn1f1	always-ok n=Some(1)
+5d1 tn5f5	always-ok n=Some(1)
 2d1 ul	always-err {"Unknown modifier: ul"}
 2d1+3 b1f1t4	always-ok n=Some(1)
 2d1+3 t4f1b1	always-ok n=Some(1)
@@ -798,6 +806,8 @@
 2d12 ie	always-ok n=Some(1)
 2d20 + 3d6 k2	always-ok n=Some(1)
 2d20 conan	always-ok n=Some(1)
+2d20 tn12	always-ok n=Some(1)
+2d20 tn12f3	always-ok n=Some(1)
 2d20 ie + 1d10 ie + 1d8 ie	always-ok n=Some(1)
 2d20 ie + 1d10 ie + 1d8 ie + 1d4 ie	always-ok n=Some(1)
 2d20 ie + 1d10 ie + 1d8 ie + 1d6 ie	always-ok n=Some(1)
@@ -937,6 +947,7 @@
 3 10d1 t4f1	always-ok n=Some(3)
 3 10d1 t4f1b1	always-ok n=Some(3)
 3 10d1 tl3	always-ok n=Some(3)
+3 conan2tn12f3	always-ok n=Some(3)
 3 10d1 ul	always-err {"Unknown modifier: ul"}
 3 2d6	always-ok n=Some(3)
 3 2d6 ! Damage rolls	always-ok n=Some(3)
@@ -1808,6 +1819,33 @@ conan3cd4	always-ok n=Some(1)
 conan3cd5	always-ok n=Some(1)
 conan4	always-ok n=Some(1)
 conan4cd6	always-ok n=Some(1)
+conan tn0	always-err {"Target number must be 1-20, got 0"}
+conan tn1	always-ok n=Some(1)
+conan tn12	always-ok n=Some(1)
+conan tn12 + 2	always-ok n=Some(1)
+conan tn12 ! Feat of strength	always-ok n=Some(1)
+conan tn12c1	always-err {"Complication range must be 2-20, got 1"}
+conan tn12c2	always-ok n=Some(1)
+conan tn12c19	always-ok n=Some(1)
+conan tn12c20	always-ok n=Some(1)
+conan tn12c21	always-err {"Complication range must be 2-20, got 21"}
+conan tn12f0	always-ok n=Some(1)
+conan tn12f3	always-ok n=Some(1)
+conan tn12f3c19	always-ok n=Some(1)
+conan tn12f5	always-ok n=Some(1)
+conan tn12f6	always-err {"Focus must be 0-5, got 6"}
+conan tn20	always-ok n=Some(1)
+conan tn21	always-err {"Target number must be 1-20, got 21"}
+conan tn3f5	always-err {"Focus 5 cannot exceed target number 3"}
+conan1	always-ok n=Some(1)
+conan10	always-err {"Invalid dice expression: conan10"}
+conan2tn12f3	always-ok n=Some(1)
+conan3cd5 tn12f3	always-ok n=Some(1)
+conan4 tn14f5	always-ok n=Some(1)
+conan5	always-ok n=Some(1)
+conan5tn17f5c18	always-ok n=Some(1)
+conan9	always-ok n=Some(1)
+conantn12	always-ok n=Some(1)
 cpd	always-err {"Invalid dice expression: cpd"}
 cpd is a damage total, not a pool	always-err {"Invalid dice expression: cpd"}
 cpd must reject non-d6 dice	always-err {"Invalid dice expression: cpd"}
