@@ -151,6 +151,17 @@ pub fn get_dice_rng() -> StdRng {
     create_enhanced_rng()
 }
 
+/// A reproducible RNG for tests: the same `seed` always yields the same rolls.
+///
+/// This exists so the test suite can pin the exact result of systems whose dice
+/// are fixed by the system itself (Savage Worlds' d8 trait die, Wrath & Glory's
+/// d6 pool) and therefore cannot be made deterministic through notation.
+/// Production code must use [`get_dice_rng`]; a predictable seed would make
+/// every roll on every server predictable.
+pub fn create_seeded_rng(seed: u64) -> StdRng {
+    StdRng::seed_from_u64(seed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

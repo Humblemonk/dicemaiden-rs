@@ -8,20 +8,28 @@
   it did in 1.6.2. This release is internal work, versioned on its own because of how much
   of it there is.
 - Consolidated 60 blocks of duplicated roll-handling code that had built up as game systems
-  were added one at a time, for a net reduction of about 670 lines. Each behavior now lives
+  were added one at a time, for a net reduction of about 640 lines. Each behavior now lives
   in one place, so a fix reaches every game system at once instead of only the copies
   someone remembers to update.
 - Adding a new game system now takes noticeably less repetitive setup, which should shorten
   the turnaround on requests for new systems.
+- An expression that adds dice together, such as `1d20 + 2d6 + 1d8`, now uses a single
+  random number generator instead of building a separate one for each part. Dice behave
+  identically — this was checked by rolling 100,000 of each and comparing the results — and
+  each roll costs the bot slightly less work.
 
 ## Added
 
-- A regression suite that pins what you can observe for more than 2,200 dice expressions:
-  how each one is interpreted, plus the exact result and the exact Discord output for the
-  730 whose dice cannot vary. A future change that would alter any of that now fails the
-  build instead of reaching your server.
+- A regression suite covering 2,223 dice expressions, which pins everything you can see:
+  how each expression is interpreted, and for every one that rolls, its exact result and
+  exact Discord output. The 358 that are invalid have their exact error message pinned
+  instead. A change that would alter any of it now fails the build rather than reaching
+  your server.
+- Every game system is included. Systems whose dice are fixed by the rules rather than by
+  what you type — Savage Worlds' trait die, Wrath & Glory's pool — are now pinned exactly
+  too, which previously was not possible.
 - Before release, the whole suite was run against both 1.6.2 and this version and the two
-  compared: identical interpretation and error messages for all 2,221 expressions, and
+  compared: identical interpretation and error messages for all 2,223 expressions, and
   identical results for the 1,088 whose dice cannot vary. The rest were checked by rolling
   each one thousands of times on both versions and confirming the outcomes matched.
 

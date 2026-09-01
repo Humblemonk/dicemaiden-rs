@@ -82,6 +82,7 @@
 +ess3d6s
 +ess3d6s + 2
 +ms
++ms45
 -1d4
 -1d6
 -a5e +5 ex1
@@ -105,6 +106,7 @@
 -ess1d10s
 -ess1d8
 -ms
+-ms45
 /roll (Attack) 1d20 + 5
 /roll 2d6
 /roll 2d6 ! Fire damage

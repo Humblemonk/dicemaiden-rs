@@ -19,6 +19,16 @@
 //                         many results come back, whether the expression
 //                         succeeds or fails, and the exact error text when it
 //                         always fails.
+// 4. `seeded_snapshot`  — every expression rolled from a fixed seed, pinning the
+//                         exact result of systems whose dice are fixed by the
+//                         system itself (Savage Worlds' d8 trait die, Wrath &
+//                         Glory's d6 pool) and so cannot be pinned by notation.
+//
+// Layer 4 is kept in its own file on purpose. It is sensitive to the *order and
+// number* of values drawn from the generator, so an internal change that draws
+// dice in a different order rewrites all of it while changing nothing a user
+// sees. Layer 2 is immune to that, which is why both exist: if layer 4 moves and
+// layer 2 does not, the behavior is intact and only the draw order shifted.
 //
 // Note what layer 3 deliberately does NOT assert: which optional fields a result
 // populates is *not* an invariant of the expression. `4d6 i1` only grows a
@@ -32,7 +42,10 @@
 //
 // Then read the diff. Every changed line is a change your users will see.
 
-use dicemaiden_rs::{RollResult, dice::parser, format_multiple_results, parse_and_roll};
+use dicemaiden_rs::{
+    RollResult, dice::parser, dice::rng::create_seeded_rng, format_multiple_results,
+    parse_and_roll, parse_and_roll_with_rng,
+};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -266,4 +279,43 @@ fn outcome_snapshot_is_unchanged() {
     }
 
     assert_snapshot("outcomes.snap", &format!("{}\n", lines.join("\n")));
+}
+
+/// Seeds chosen so each expression is exercised from several starting points;
+/// one seed could miss a branch (a critical, a botch) that another hits.
+const SNAPSHOT_SEEDS: [u64; 4] = [1, 42, 1337, 99_991];
+
+#[test]
+fn seeded_roll_snapshot_is_unchanged() {
+    let mut lines = Vec::new();
+
+    for expression in corpus() {
+        for seed in SNAPSHOT_SEEDS {
+            let rendered = match parse_and_roll_with_rng(&expression, &mut create_seeded_rng(seed))
+            {
+                Ok(results) => {
+                    // The same seed must always give the same roll, or the
+                    // snapshot would be pinning noise.
+                    let again = parse_and_roll_with_rng(&expression, &mut create_seeded_rng(seed))
+                        .expect("a seeded roll that succeeded must succeed again");
+                    let first: Vec<String> = results.iter().map(roll_projection).collect();
+                    let second: Vec<String> = again.iter().map(roll_projection).collect();
+                    assert_eq!(
+                        first, second,
+                        "'{expression}' is not reproducible at seed {seed} — something is \
+                         drawing randomness from outside the supplied generator"
+                    );
+                    format!(
+                        "{}\tFMT\t{}",
+                        first.join(" || "),
+                        format_multiple_results(&results).replace('\n', "\\n")
+                    )
+                }
+                Err(e) => format!("ERR\t{e}"),
+            };
+            lines.push(format!("{expression}\tseed={seed}\t{rendered}"));
+        }
+    }
+
+    assert_snapshot("seeded_rolls.snap", &format!("{}\n", lines.join("\n")));
 }
