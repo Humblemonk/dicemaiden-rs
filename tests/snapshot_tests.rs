@@ -53,6 +53,12 @@ use std::path::{Path, PathBuf};
 /// confirm a random expression's result shape never varies.
 const STABILITY_TRIALS: usize = 25;
 
+/// How many corpus expressions have dice that cannot vary, and so get their
+/// exact result pinned. Checked before the snapshot is written, so it holds
+/// even during `UPDATE_SNAPSHOTS=1` — a regeneration run cannot quietly shrink
+/// the set of expressions being pinned exactly.
+const DETERMINISTIC_EXPRESSIONS: usize = 730;
+
 fn repo_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
@@ -227,10 +233,14 @@ fn deterministic_roll_snapshot_is_unchanged() {
         .iter()
         .filter_map(|e| stable_roll_output(e))
         .collect();
-    assert!(
-        lines.len() > 200,
-        "expected the deterministic corpus to stay substantial, got {} entries",
-        lines.len()
+    assert_eq!(
+        lines.len(),
+        DETERMINISTIC_EXPRESSIONS,
+        "the number of expressions whose dice cannot vary changed.\n\
+         Fewer means something that used to be deterministic now draws randomness — \
+         a bug, not a snapshot to regenerate.\n\
+         More usually means new corpus entries; update DETERMINISTIC_EXPRESSIONS \
+         once you have confirmed that is the reason."
     );
     assert_snapshot(
         "deterministic_rolls.snap",
