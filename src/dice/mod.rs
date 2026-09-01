@@ -49,7 +49,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use std::fmt;
 
-pub use rng::{create_enhanced_rng, create_fast_rng, get_dice_rng};
+pub use rng::{create_enhanced_rng, create_fast_rng, create_seeded_rng, get_dice_rng};
 
 #[derive(Debug, Clone)]
 pub struct DiceRoll {
@@ -485,11 +485,20 @@ impl fmt::Display for RollResult {
 }
 
 pub fn parse_and_roll(input: &str) -> Result<Vec<RollResult>> {
+    parse_and_roll_with_rng(input, &mut rng::get_dice_rng())
+}
+
+/// Parse and roll `input` drawing every die from `rng`.
+///
+/// With a seeded generator this is fully reproducible, which is how the test
+/// suite pins the exact output of systems whose dice are fixed by the system
+/// itself and so cannot be made deterministic through notation.
+pub fn parse_and_roll_with_rng(input: &str, rng: &mut impl rand::Rng) -> Result<Vec<RollResult>> {
     let dice_expressions = crate::dice::parser::parse_dice_string(input)?;
     let mut results = Vec::new();
 
     for dice in dice_expressions {
-        let result = crate::dice::roller::roll_dice(dice)?;
+        let result = crate::dice::roller::roll_dice_with_rng(dice, rng)?;
         results.push(result);
     }
 

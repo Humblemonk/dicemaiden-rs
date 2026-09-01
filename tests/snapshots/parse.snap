@@ -82,6 +82,7 @@
 +ess3d6s	OK	[2d20 mods=[KeepHigh(1), Essence20(8, true)] label=None comment=None flags=----]
 +ess3d6s + 2	OK	[2d20 mods=[KeepHigh(1), Essence20(8, true), Add(2)] label=None comment=None flags=----]
 +ms	OK	[2d100 mods=[Mothership(None, true)] label=None comment=None flags=----]
++ms45	OK	[2d100 mods=[Mothership(Some(45), true)] label=None comment=None flags=----]
 -1d4	ERR	Invalid dice expression: -
 -1d6	ERR	Invalid dice expression: -
 -a5e +5 ex1	OK	[2d20 mods=[KeepLow(1), Add(5), AddDice(DiceRoll { count: 1, sides: 4, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
@@ -105,6 +106,7 @@
 -ess1d10s	OK	[2d20 mods=[KeepLow(1), Essence20(5, true)] label=None comment=None flags=----]
 -ess1d8	OK	[2d20 mods=[KeepLow(1), Essence20(4, false)] label=None comment=None flags=----]
 -ms	OK	[2d100 mods=[Mothership(None, false)] label=None comment=None flags=----]
+-ms45	OK	[2d100 mods=[Mothership(Some(45), false)] label=None comment=None flags=----]
 /roll (Attack) 1d20 + 5	ERR	Invalid dice expression: /
 /roll 2d6	ERR	Invalid dice expression: /
 /roll 2d6 ! Fire damage	ERR	Invalid dice expression: /

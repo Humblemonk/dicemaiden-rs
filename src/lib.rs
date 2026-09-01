@@ -55,7 +55,7 @@ impl TypeMapKey for DatabaseContainer {
 // Re-export commonly used items for easier testing
 pub use dice::{
     DiceGroup, DiceRoll, HeroSystemType, Modifier, RollResult, format_multiple_results,
-    format_multiple_results_with_limit, parse_and_roll,
+    format_multiple_results_with_limit, parse_and_roll, parse_and_roll_with_rng,
 };
 
 // Re-export dice submodules for testing

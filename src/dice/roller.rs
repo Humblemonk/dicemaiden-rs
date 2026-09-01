@@ -43,8 +43,11 @@
 //! | `handle_mutants_masterminds_roll` | Mutants & Masterminds DC 10   |
 //! | `handle_mothership_roll`          | Mothership RPG (1d100 ≤ stat) |
 //!
-//! RNG is obtained fresh per call via `rng::get_dice_rng` (ChaCha20 / StdRng
-//! seeded with OS entropy + timestamp + thread/process/ASLR entropy).
+//! `roll_dice` obtains one RNG via `rng::get_dice_rng` (ChaCha20 / StdRng
+//! seeded with OS entropy + timestamp + thread/process/ASLR entropy) and
+//! threads it through nested dice operands, so one expression draws from one
+//! generator.  `roll_dice_with_rng` accepts the generator instead, which is
+//! what lets the test suite seed a roll and pin its exact result.
 
 use super::rng::get_dice_rng;
 use super::{
@@ -71,6 +74,17 @@ fn net_advantage_level(modifiers: &[Modifier]) -> i64 {
 }
 
 pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
+    roll_dice_with_rng(dice, &mut get_dice_rng())
+}
+
+/// Roll `dice` drawing from `rng`.
+///
+/// Nested dice operands (`+2d6`) recurse through here with the *same* `rng`, so
+/// a caller that supplies a seeded generator gets a fully reproducible roll —
+/// which is what lets the test suite pin systems whose dice are fixed by the
+/// system rather than by notation. It also means one expression now builds one
+/// generator instead of one per operand.
+pub fn roll_dice_with_rng(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
     // Validation check
     if dice.sides < 1 {
         return Err(anyhow!("Cannot roll dice with {} sides", dice.sides));
@@ -79,8 +93,6 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         return Err(anyhow!("Cannot roll 0 dice"));
     }
 
-    let mut rng = get_dice_rng();
-
     // Check for Conan system handlers
     let has_conan_skill = dice
         .modifiers
@@ -88,7 +100,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         .any(|m| matches!(m, Modifier::ConanSkill(_)));
 
     if has_conan_skill {
-        return handle_conan_skill_roll(dice, &mut rng);
+        return handle_conan_skill_roll(dice, rng);
     }
 
     let has_conan_combat = dice
@@ -97,7 +109,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         .any(|m| matches!(m, Modifier::ConanCombat(_)));
 
     if has_conan_combat {
-        return handle_conan_combat_roll(dice, &mut rng);
+        return handle_conan_combat_roll(dice, rng);
     }
 
     let has_wfrp = dice
@@ -106,7 +118,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         .any(|m| matches!(m, Modifier::Wfrp(_)));
 
     if has_wfrp {
-        return handle_wfrp_roll(dice, &mut rng);
+        return handle_wfrp_roll(dice, rng);
     }
 
     // Check if this is a D6 System roll - handle it specially
@@ -116,7 +128,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         .any(|m| matches!(m, Modifier::D6System(_, _)));
 
     if has_d6_system {
-        return handle_d6_system_roll(dice, &mut rng);
+        return handle_d6_system_roll(dice, rng);
     }
 
     let has_marvel_multiverse = dice
@@ -125,7 +137,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         .any(|m| matches!(m, Modifier::MarvelMultiverse(_, _)));
 
     if has_marvel_multiverse {
-        return handle_marvel_multiverse_roll(dice, &mut rng);
+        return handle_marvel_multiverse_roll(dice, rng);
     }
 
     // Check if this is a Savage Worlds roll - handle it specially
@@ -136,7 +148,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
 
     if has_savage_worlds {
         // For Savage Worlds, handle it completely differently
-        return handle_savage_worlds_roll(dice, &mut rng);
+        return handle_savage_worlds_roll(dice, rng);
     }
 
     let has_brave_new_world = dice
@@ -145,7 +157,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         .any(|m| matches!(m, Modifier::BraveNewWorld(_)));
 
     if has_brave_new_world {
-        return handle_brave_new_world_roll(dice, &mut rng);
+        return handle_brave_new_world_roll(dice, rng);
     }
 
     // Check if this is a Silhouette roll - handle it specially
@@ -155,7 +167,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         .any(|m| matches!(m, Modifier::Silhouette(_)));
 
     if has_silhouette {
-        return handle_silhouette_roll(dice, &mut rng);
+        return handle_silhouette_roll(dice, rng);
     }
 
     // Check if this is a Mutants & Masterminds roll - handle it specially
@@ -165,7 +177,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         .any(|m| matches!(m, Modifier::MutantsMasterminds));
 
     if has_mutants_masterminds {
-        return handle_mutants_masterminds_roll(dice, &mut rng);
+        return handle_mutants_masterminds_roll(dice, rng);
     }
 
     // Check if this is a Mothership roll - handle it specially
@@ -175,7 +187,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
         .any(|m| matches!(m, Modifier::Mothership(_, _)));
 
     if has_mothership {
-        return handle_mothership_roll(dice, &mut rng);
+        return handle_mothership_roll(dice, rng);
     }
 
     let mut result = RollResult::from_dice(&dice);
@@ -222,7 +234,7 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
 
     // Apply modifiers in the correct order for mathematical precedence
     // 1. Apply dice-modifying modifiers first (exploding, rerolls, etc.)
-    apply_dice_modifying_modifiers(&mut result, &mut rng, &dice)?;
+    apply_dice_modifying_modifiers(&mut result, rng, &dice)?;
 
     // 2. Apply keep/drop modifiers
     apply_keep_drop_modifiers(&mut result, &dice)?;
@@ -237,10 +249,10 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
     result.total -= result.implosion_rolls.iter().sum::<i32>();
 
     // 4. Apply mathematical modifiers (add, subtract, multiply, divide)
-    apply_mathematical_modifiers(&mut result, &dice, &mut rng)?;
+    apply_mathematical_modifiers(&mut result, &dice, rng)?;
 
     // 5. Apply special system modifiers (after math modifiers for proper precedence)
-    apply_special_system_modifiers(&mut result, &dice, &mut rng)?;
+    apply_special_system_modifiers(&mut result, &dice, rng)?;
 
     // 6. Sort rolls unless unsorted flag is set
     if !dice.unsorted {
@@ -443,7 +455,7 @@ fn apply_arithmetic_modifiers(modifiers: &[Modifier], total: &mut i32) -> Result
 fn apply_mathematical_modifiers(
     result: &mut RollResult,
     dice: &DiceRoll,
-    _rng: &mut impl Rng,
+    rng: &mut impl Rng,
 ) -> Result<()> {
     // Check for special division pattern: Multiply(0) followed by Add(number)
     if dice.modifiers.len() >= 2
@@ -459,13 +471,13 @@ fn apply_mathematical_modifiers(
         // IMPORTANT: Continue processing remaining modifiers starting from index 2
         let remaining_modifiers = &dice.modifiers[2..];
         if !remaining_modifiers.is_empty() {
-            apply_modifier_expression(result, remaining_modifiers, POST_DIVISION_MATH_RULES)?;
+            apply_modifier_expression(result, remaining_modifiers, POST_DIVISION_MATH_RULES, rng)?;
         }
         return Ok(());
     }
 
     // Standard mathematical modifier processing
-    apply_modifier_expression(result, &dice.modifiers, STANDARD_MATH_RULES)?;
+    apply_modifier_expression(result, &dice.modifiers, STANDARD_MATH_RULES, rng)?;
     Ok(())
 }
 
@@ -510,8 +522,10 @@ fn apply_dice_operand(
     dice_spec: &DiceRoll,
     operator: DiceOperator,
     merge_notes: bool,
+    rng: &mut impl Rng,
 ) -> Result<()> {
-    let operand_result = roll_dice(dice_spec.clone())?;
+    // Same `rng` as the parent roll, so a seeded caller stays reproducible
+    let operand_result = roll_dice_with_rng(dice_spec.clone(), rng)?;
 
     if matches!(operator, DiceOperator::Divide) && operand_result.total == 0 {
         return Err(anyhow!("Cannot divide by zero (dice result was 0)"));
@@ -562,6 +576,7 @@ fn apply_modifier_expression(
     result: &mut RollResult,
     modifiers: &[Modifier],
     rules: MathModifierRules,
+    rng: &mut impl Rng,
 ) -> Result<()> {
     let mut expression_parts = vec![format!("{}", result.total)];
 
@@ -574,6 +589,7 @@ fn apply_modifier_expression(
                     dice_to_add,
                     DiceOperator::Add,
                     rules.merge_added_dice_notes,
+                    rng,
                 )?;
             }
             Modifier::SubtractDice(dice_to_subtract) => {
@@ -583,6 +599,7 @@ fn apply_modifier_expression(
                     dice_to_subtract,
                     DiceOperator::Subtract,
                     false,
+                    rng,
                 )?;
             }
             Modifier::MultiplyDice(dice_to_multiply) => {
@@ -592,6 +609,7 @@ fn apply_modifier_expression(
                     dice_to_multiply,
                     DiceOperator::Multiply,
                     false,
+                    rng,
                 )?;
             }
             Modifier::DivideDice(dice_to_divide) => {
@@ -601,6 +619,7 @@ fn apply_modifier_expression(
                     dice_to_divide,
                     DiceOperator::Divide,
                     false,
+                    rng,
                 )?;
             }
             Modifier::Multiply(0) if rules.skip_zero_multiplier => {}
@@ -2703,7 +2722,7 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
     for modifier in &dice.modifiers {
         if let Modifier::AddDice(additional_dice) = modifier {
             // Roll the additional dice
-            let additional_result = roll_dice(additional_dice.clone())?;
+            let additional_result = roll_dice_with_rng(additional_dice.clone(), rng)?;
 
             // Check if these are d6 dice that should use Conan combat interpretation
             if additional_dice.sides == 6 {

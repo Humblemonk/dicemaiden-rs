@@ -82,6 +82,7 @@
 +ess3d6s	always-ok n=Some(1)
 +ess3d6s + 2	always-ok n=Some(1)
 +ms	always-ok n=Some(1)
++ms45	always-ok n=Some(1)
 -1d4	always-err {"Invalid dice expression: -"}
 -1d6	always-err {"Invalid dice expression: -"}
 -a5e +5 ex1	always-ok n=Some(1)
@@ -105,6 +106,7 @@
 -ess1d10s	always-ok n=Some(1)
 -ess1d8	always-ok n=Some(1)
 -ms	always-ok n=Some(1)
+-ms45	always-ok n=Some(1)
 /roll (Attack) 1d20 + 5	always-err {"Invalid dice expression: /"}
 /roll 2d6	always-err {"Invalid dice expression: /"}
 /roll 2d6 ! Fire damage	always-err {"Invalid dice expression: /"}

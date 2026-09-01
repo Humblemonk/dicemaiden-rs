@@ -97,6 +97,7 @@ before writing new roll logic:
   anything that applies `+ - * /`
 - `apply_dice_operand`, `apply_modifier_expression` — `+2d6`-style dice operands
 - `roll_exploding_die` — roll, then keep rolling while the die shows its maximum
+- `push_dice_group` — never hand-write the `DiceGroup` literal
 - `indexed_rolls` with `partition_kept_dice` — keep/drop index bookkeeping
 - `finalize_d10_explosion` — d10 crit/fumble tails (Cyberpunk Red, Witcher)
 - `build_roll_set`, `try_parse_roll_set` — roll sets, including their parsing
@@ -120,7 +121,7 @@ Behavioral variants belong in a parameter, never a twin function — see `Reroll
 ### Snapshot tests — the regression net
 
 `tests/snapshot_tests.rs` pins what users can observe for every expression in
-`tests/corpus/expressions.dice`, so that a refactor which silently changes a roll fails
+`tests/corpus/expressions.txt`, so that a refactor which silently changes a roll fails
 `cargo test` instead of shipping:
 
 - **`parse.snap`** — parsing is deterministic, so the parsed form and every parse error are
@@ -129,8 +130,11 @@ Behavioral variants belong in a parameter, never a twin function — see `Reroll
   full result *and* their formatted Discord output pinned exactly.
 - **`outcomes.snap`** — for randomly-rolling expressions, only what cannot vary with the dice:
   result count, success/failure of the call, and exact error text.
+- **`seeded_rolls.snap`** — every expression rolled at four fixed seeds via
+  `parse_and_roll_with_rng`, pinning the exact result of systems whose dice are fixed by the
+  system rather than by notation (Savage Worlds, Wrath & Glory).
 
-**When you add or change syntax, add expressions to `tests/corpus/expressions.dice`** — a
+**When you add or change syntax, add expressions to `tests/corpus/expressions.txt`** — a
 happy-path case, the boundary values of every numeric parameter, and a `d1` form so the roll
 lands in the deterministic snapshot. Coverage here is only as good as the corpus: a keep-count
 bug at `k1` slipped through when the corpus had `k2` but not `k1`.
@@ -144,9 +148,9 @@ UPDATE_SNAPSHOTS=1 cargo test --test snapshot_tests
 
 Never regenerate to make a red test go green without reading what moved.
 
-What snapshots cannot cover: results of randomly-rolling systems. `roll_dice` builds its own
-RNG internally (`rng.rs`), so those cannot be reproduced exactly. Cover them with the
-targeted assertions in `game_systems_tests.rs`.
+`seeded_rolls.snap` pins the *order* of RNG draws, so a refactor that reorders draws rewrites
+it while `deterministic_rolls.snap` stays put. That combination is the signal: both moved means
+behavior changed; only the seeded one moved means it did not.
 
 - Use **table-driven tests** — `vec![(input, expected), ...]` loops are the established
   pattern; follow it rather than writing one function per case
