@@ -1662,9 +1662,11 @@ fn apply_hero_system_calculation(
             ));
         }
         HeroSystemType::Killing => {
-            // Killing damage: BODY = dice total, STUN = BODY × multiplier (1d3)
+            // Killing damage: BODY = dice total, STUN = BODY × STUN Multiplier.
+            // 5th Edition rolls 1d6-1 for the multiplier with a minimum of 1;
+            // the 1d3 multiplier belongs to 6th Edition, not this one.
             let body_damage = result.total;
-            let stun_multiplier = rng.random_range(1..=3);
+            let stun_multiplier = (rng.random_range(1..=6) - 1).max(1);
             let stun_damage = body_damage * stun_multiplier;
 
             result.notes.push(format!(
@@ -3470,10 +3472,11 @@ fn apply_alien_stress_modifier(
         let panic_roll = rng.random_range(1..=6) + stress_level as i32;
         result.alien_panic_roll = Some(panic_roll);
 
-        // Add panic roll note with interpretation
+        // Add panic roll note with interpretation. One Panic Roll is made no
+        // matter how many stress dice came up 1, so this is always 1d6.
         let panic_effect = interpret_panic_roll(panic_roll);
         result.notes.push(format!(
-            "💀 **PANIC ROLL**: {ones_count}d6 + {stress_level} stress = **{panic_roll}** → {panic_effect}"
+            "💀 **PANIC ROLL**: 1d6 + {stress_level} stress = **{panic_roll}** → {panic_effect}"
         ));
 
         // Add flavor note about push restriction
@@ -3490,19 +3493,26 @@ fn apply_alien_stress_modifier(
     Ok(())
 }
 
+/// The ALIEN RPG Panic Table, keyed by 1d6 + Stress Level.
+///
+/// The table runs from "Keeping it together" at 6 or less up to Catatonic at
+/// 15 or more; there is no result above Catatonic. Keep this in step with the
+/// core rulebook — every entry from 7 up shifts if a row is added or dropped.
 fn interpret_panic_roll(panic_total: i32) -> String {
     match panic_total {
-        1..=6 => "Keeping it together".to_string(),
-        7 => "Tremble - Shaky hands (-2 to next roll)".to_string(),
-        8 => "Drop Item - You drop a weapon or important item".to_string(),
-        9 => "Freeze - You lose your next turn".to_string(),
-        10 => "Seek Cover - You must move to safety immediately".to_string(),
-        11 => "Scream - Everyone who hears you must make a Panic Roll".to_string(),
-        12 => "Flee - You must move away from the threat".to_string(),
-        13 => "Berserk - You attack the nearest person or creature".to_string(),
-        14 => "Catatonic - You become unresponsive for one turn".to_string(),
-        15..=99 => "Heart Attack - You suffer a heart attack and become Broken".to_string(),
-        _ => "Catastrophic Panic".to_string(),
+        ..=6 => "Keeping it together".to_string(),
+        7 => "Nervous Twitch - Stress +1 for you and friendly PCs at SHORT range".to_string(),
+        8 => "Tremble - AGILITY rolls suffer -2 until your panic stops".to_string(),
+        9 => "Drop Item - You drop a weapon or important item, Stress +1".to_string(),
+        10 => {
+            "Freeze - You lose your next slow action, Stress +1 for you and nearby friends"
+                .to_string()
+        }
+        11 => "Seek Cover - You must use your next action to move to safety".to_string(),
+        12 => "Scream - You lose your next slow action, Stress -1, and everyone who hears you must make a Panic Roll".to_string(),
+        13 => "Flee - You must flee to a safe place and refuse to leave it, Stress -1, and everyone who sees you must make a Panic Roll".to_string(),
+        14 => "Berserk - You attack the nearest person or creature, and every witness must make a Panic Roll".to_string(),
+        _ => "Catatonic - You collapse and cannot talk or move".to_string(),
     }
 }
 
@@ -3735,9 +3745,10 @@ fn apply_plot_die_conversion(result: &mut RollResult) -> Result<()> {
 /// The Darkest House (Monte Cook Games) House Die.
 ///
 /// Every action roll — never a damage roll — is accompanied by an extra d6.
-/// The House Die does not affect success or failure; if it is higher than the
-/// dice used for the action, the house acts.  With a Boon or a Bane only the
-/// two dice actually used count, so the discarded die is ignored here.
+/// The House Die does not affect success or failure; if it is higher than
+/// either die used for the action — that is, if it is the highest die on the
+/// table — the house acts.  With a Boon or a Bane only the two dice actually
+/// used count, so the discarded die is ignored here.
 ///
 /// "Calling upon the house" (`tdhc`) adds the House Die to the result instead:
 /// the house then acts automatically and the character gains a Doom.
@@ -3837,7 +3848,9 @@ pub fn handle_mutants_masterminds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Re
             ));
         }
     } else {
-        // Failure: every 5 points below DC is one degree of failure
+        // Failure: the printed table anchors its failure bands at DC-5, not DC-1,
+        // so missing by 1-5 is one degree, 6-10 is two, 11-15 is three. Both
+        // sides use 5-wide bands; only the offset differs from the success case.
         let degrees = ((-total_vs_dc - 1) / 5) + 1;
         result.failures = Some(degrees);
 
@@ -4038,11 +4051,14 @@ fn handle_mothership_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
 
     // Categorize rolls
     #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+    // Ordered best to worst. A Critical Failure is an ordinary failure *plus* a
+    // Panic Check, so it ranks below a plain failure — Advantage must never
+    // select it over one.
     enum RollCategory {
         CritSuccess = 0, // Best
         Success = 1,
-        CritFailure = 2,
-        Failure = 3, // Worst
+        Failure = 2,
+        CritFailure = 3, // Worst
     }
 
     let categorize_roll = |roll: i32| -> RollCategory {

@@ -34,6 +34,50 @@ fn roll_one(input: &str, description: &str) -> RollResult {
     results.remove(0)
 }
 
+/// Roll `expression` against a fixed seed, returning its single result.
+fn roll_at_seed(expression: &str, seed: u64) -> RollResult {
+    let mut results = parse_and_roll_with_rng(expression, &mut create_seeded_rng(seed))
+        .unwrap_or_else(|e| panic!("'{expression}' should roll at seed {seed}: {e}"));
+    assert_eq!(
+        results.len(),
+        1,
+        "'{expression}' should produce one result at seed {seed}"
+    );
+    results.remove(0)
+}
+
+/// Roll `expression` once per seed in `0..seeds`. Systems whose dice the
+/// notation cannot pin down — an exploding multiplier, a d100 pair, a panic
+/// roll — are checked by sweeping seeds and asserting a property over every
+/// outcome that turns up.
+fn roll_across_seeds(expression: &str, seeds: u64) -> Vec<RollResult> {
+    (0..seeds)
+        .map(|seed| roll_at_seed(expression, seed))
+        .collect()
+}
+
+/// Find the first note containing `needle` and read the number it carries
+/// between `prefix` and `suffix` — the multiplier in `STUN (×3)`, the total in
+/// `= **9** →`. Several systems report a rolled value only in prose, so a test
+/// that wants to check it has to read it back out. Returns `None` when the note
+/// is absent, and panics when it is present but malformed.
+fn note_with_number<'a>(
+    result: &'a RollResult,
+    needle: &str,
+    prefix: &str,
+    suffix: &str,
+) -> Option<(&'a str, i32)> {
+    let note = result.notes.iter().find(|note| note.contains(needle))?;
+    let number = note
+        .split_once(prefix)
+        .and_then(|(_, rest)| rest.split_once(suffix))
+        .and_then(|(value, _)| value.parse().ok())
+        .unwrap_or_else(|| {
+            panic!("'{note}' should carry a number between '{prefix}' and '{suffix}'")
+        });
+    Some((note.as_str(), number))
+}
+
 /// Roll a `N <expression>` roll set, asserting it produced the N sets its
 /// leading digit asks for, each labelled `Set 1`..`Set N`. Returns the sets so
 /// callers can add their own system-specific assertions.
@@ -1281,6 +1325,28 @@ fn test_dnd_aliases_comprehensive() {
             );
         }
     }
+}
+
+#[test]
+fn test_hero_killing_stun_multiplier_is_fifth_edition() {
+    // 5th Edition rolls 1d6-1 for the STUN Multiplier with a minimum of 1, so
+    // the multiplier spans 1 through 5. The 1d3 multiplier capped at 3 belongs
+    // to 6th Edition and understates high-end killing damage badly.
+    let mut multipliers_seen = std::collections::BTreeSet::new();
+
+    for result in roll_across_seeds("3hsk", 300) {
+        // "Killing damage: 12 BODY, 36 STUN (×3)"
+        let (_, multiplier) = note_with_number(&result, "Killing damage", "(×", ")")
+            .unwrap_or_else(|| panic!("a killing roll should report its multiplier"));
+
+        multipliers_seen.insert(multiplier);
+    }
+
+    assert_eq!(
+        multipliers_seen,
+        [1, 2, 3, 4, 5].into_iter().collect(),
+        "the 5e STUN Multiplier is 1d6-1, minimum 1"
+    );
 }
 
 #[test]
@@ -4051,6 +4117,64 @@ fn test_alien_rpg_panic_mechanics() {
 }
 
 #[test]
+fn test_alien_panic_table_matches_the_rulebook() {
+    // The Panic Table is keyed by 1d6 + Stress Level and runs from "Keeping it
+    // together" at 6 or less to Catatonic at 15+. Every entry from 7 up shifts
+    // if a row is added or dropped, so pin each one by name.
+    let panic_table = |total: i32| -> &'static str {
+        match total {
+            ..=6 => "Keeping it together",
+            7 => "Nervous Twitch",
+            8 => "Tremble",
+            9 => "Drop Item",
+            10 => "Freeze",
+            11 => "Seek Cover",
+            12 => "Scream",
+            13 => "Flee",
+            14 => "Berserk",
+            _ => "Catatonic",
+        }
+    };
+
+    // Stress levels chosen so the reachable totals (1d6 + stress) cover the
+    // whole table between them, from 2 up to 16.
+    let mut totals_seen = std::collections::BTreeSet::new();
+
+    for stress in [1_u32, 5, 9, 10] {
+        for result in roll_across_seeds(&format!("alien4s{stress}"), 200) {
+            // "…= **9** → Drop Item - …"
+            let Some((note, panic_total)) = note_with_number(&result, "PANIC ROLL", "= **", "**")
+            else {
+                continue;
+            };
+            totals_seen.insert(panic_total);
+
+            assert!(
+                note.contains(panic_table(panic_total)),
+                "panic total {panic_total} should read '{}', got: {note}",
+                panic_table(panic_total)
+            );
+
+            // One Panic Roll is made however many stress dice came up 1
+            assert!(
+                note.contains(&format!("1d6 + {stress} stress")),
+                "the panic note should show a single d6: {note}"
+            );
+        }
+    }
+
+    // "Heart Attack" was never a result on this table; Catatonic is the top row
+    assert!(
+        totals_seen.iter().any(|&total| total >= 15),
+        "the sweep should reach the Catatonic band, saw: {totals_seen:?}"
+    );
+    assert!(
+        totals_seen.contains(&7),
+        "the sweep should reach Nervous Twitch, saw: {totals_seen:?}"
+    );
+}
+
+#[test]
 fn test_alien_rpg_with_roll_sets() {
     // Test Alien RPG with roll sets
     let result = parse_and_roll("3 alien4s2").unwrap();
@@ -5475,6 +5599,74 @@ fn test_mutants_masterminds_degrees() {
 }
 
 #[test]
+fn test_mutants_masterminds_degree_thresholds() {
+    // The printed table reads "check result equal or greater than": DC for one
+    // degree of success, DC-5 for one degree of failure.  Both sides use 5-wide
+    // bands, but the failure bands are anchored a point lower, so beating the DC
+    // by 0-4 is one degree while missing it by 1-5 is one degree.
+    let boundaries = vec![
+        (10, 1, "meeting the DC is one degree of success"),
+        (14, 1, "beating it by 4 is still one degree"),
+        (15, 2, "beating it by 5 is two degrees"),
+        (19, 2, "beating it by 9 is still two degrees"),
+        (20, 3, "beating it by 10 is three degrees"),
+        (9, -1, "missing by 1 is one degree of failure"),
+        (5, -1, "missing by 5 is still one degree"),
+        (4, -2, "missing by 6 is two degrees"),
+        (0, -2, "missing by 10 is still two degrees"),
+        (-1, -3, "missing by 11 is three degrees"),
+    ];
+
+    // A d20 alone cannot reach every total, so the flat modifier moves the
+    // whole range: `mnm +N` totals N+1 through N+20.
+    let degrees_for = |total: i32| -> i32 {
+        let against_dc = total - 10;
+        if against_dc >= 0 {
+            (against_dc / 5) + 1
+        } else {
+            -(((-against_dc - 1) / 5) + 1)
+        }
+    };
+
+    // Pin the d20 to a known face, then shift the total with a flat modifier
+    let seed = (0..200_u64)
+        .find(|&seed| roll_at_seed("mnm", seed).total == 10)
+        .expect("some seed should roll a natural 10");
+
+    for (total, expected_degrees, description) in boundaries {
+        let offset = total - 10;
+        let expression = if offset >= 0 {
+            format!("mnm +{offset}")
+        } else {
+            format!("mnm -{}", -offset)
+        };
+
+        let result = roll_at_seed(&expression, seed);
+
+        assert_eq!(
+            result.total, total,
+            "'{expression}' should total {total}: {description}"
+        );
+
+        let actual = match (result.successes, result.failures) {
+            (Some(degrees), None) => degrees,
+            (None, Some(degrees)) => -degrees,
+            other => panic!("'{expression}' should report exactly one of the two, got {other:?}"),
+        };
+
+        assert_eq!(
+            actual, expected_degrees,
+            "'{expression}' (total {total}): {description}"
+        );
+        assert_eq!(
+            actual,
+            degrees_for(total),
+            "'{expression}' should agree with the reference table"
+        );
+    }
+}
+
+#[test]
 fn test_mutants_masterminds_with_roll_sets() {
     // Test MnM with roll sets
     for roll in assert_labelled_roll_sets("3 mnm +2", "MnM roll sets") {
@@ -5653,6 +5845,59 @@ fn test_mothership_advantage_disadvantage_mechanics() {
         basic_result[0].individual_rolls.len(),
         1,
         "Basic roll should roll 1 die"
+    );
+}
+
+#[test]
+fn test_mothership_advantage_never_selects_the_worse_outcome() {
+    // Doubles make a roll critical: a critical success on a hit, a critical
+    // failure on a miss. A Critical Failure is an ordinary failure *plus* a
+    // Panic Check, so it is the worst outcome on the table — Advantage must
+    // never take it over a plain failure, and Disadvantage must prefer it.
+    const STAT: i32 = 45;
+
+    // Ranked best (0) to worst (3)
+    let rank = |roll: i32| -> u8 {
+        let is_double = roll == 100 || (roll / 10) == (roll % 10);
+        match (roll <= STAT, is_double) {
+            (true, true) => 0,  // crit success
+            (true, false) => 1, // success
+            (false, false) => 2,
+            (false, true) => 3, // crit failure
+        }
+    };
+
+    let mut saw_split_decision = false;
+
+    for (expression, wants_better) in [("+ms45", true), ("-ms45", false)] {
+        for result in roll_across_seeds(expression, 400) {
+            let pair = &result.individual_rolls;
+            assert_eq!(pair.len(), 2, "'{expression}' should roll two dice");
+
+            let selected = result.total;
+            let (best, worst) = (
+                rank(pair[0]).min(rank(pair[1])),
+                rank(pair[0]).max(rank(pair[1])),
+            );
+            let wanted = if wants_better { best } else { worst };
+
+            assert_eq!(
+                rank(selected),
+                wanted,
+                "'{expression}' picked {selected} from {pair:?} against Strength {STAT}"
+            );
+
+            // The interesting case: one die is a crit failure, the other a
+            // plain failure. Advantage must take the plain one.
+            if best != worst && (worst == 3 && best == 2) {
+                saw_split_decision = true;
+            }
+        }
+    }
+
+    assert!(
+        saw_split_decision,
+        "the sweep should include a crit-failure/plain-failure pair"
     );
 }
 
@@ -6793,8 +7038,9 @@ fn test_darkest_house_boon_and_bane() {
 
 #[test]
 fn test_darkest_house_acts_when_house_die_is_higher() {
-    // The house acts when the House Die is higher than the dice used for the
-    // action.  A tie is not "higher", so the house waits.
+    // The house acts when the House Die is higher than either die used for the
+    // action — that is, when it is the highest die on the table.  A tie is not
+    // "higher", so the house waits.
     let mut saw_acts = false;
     let mut saw_waits = false;
     let mut saw_tie = false;

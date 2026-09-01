@@ -899,6 +899,8 @@
 2d8+1d6 r1
 2d8-2d6 d1
 2hsk1
+2.5hsk
+3hsk
 2lf4
 2lf4 ; fitd0 ; gb
 2lf4f
@@ -2049,6 +2051,8 @@ mnm
 mnm +5
 mnm -2
 mnm -3
+mnm -5
+mnm +10
 mnm ; 1d20+5 ; mnm -2
 ms
 ms30
