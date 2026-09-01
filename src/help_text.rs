@@ -183,7 +183,7 @@ pub fn generate_system_help() -> String {
 
 **Hero System:**
 • `/roll 2hsn` - 2d6 normal damage
-• `/roll 3hsk` - 3d6 killing damage (BODY + STUN = BODY × 1d3)
+• `/roll 3hsk` - 3d6 killing damage (BODY, and STUN = BODY × 1d6-1)
 • `/roll 3hsh` - 3d6 to-hit (target: 11 + OCV - DCV)
 
 **Wrath & Glory:**
@@ -286,19 +286,18 @@ The Alien RPG uses the Year Zero Engine with **Base Dice** (safe) and **Stress D
 **Panic System:**
 When stress dice show **1s**, you must make a panic roll:
 • Panic Roll = `1d6 + Current Stress Level`
-• Higher stress = worse panic effects
 
 **Panic Table Results:**
 • 1-6: Keeping it together (no effect)
-• 7: Tremble - Shaky hands (-2 to next roll)
-• 8: Drop Item - You drop a weapon or important item
-• 9: Freeze - You lose your next turn
-• 10: Seek Cover - You must move to safety immediately
-• 11: Scream - Everyone who hears you must make a Panic Roll
-• 12: Flee - You must move away from the threat
-• 13: Berserk - You attack the nearest person or creature
-• 14: Catatonic - You become unresponsive for one turn
-• 15+: Heart Attack - You suffer a heart attack and become Broken
+• 7: Nervous Twitch - Stress +1 for you and nearby friends
+• 8: Tremble - AGILITY rolls suffer -2 while panicked
+• 9: Drop Item - Drop a weapon or key item, Stress +1
+• 10: Freeze - Lose next slow action, Stress +1 nearby
+• 11: Seek Cover - Next action must move you to safety
+• 12: Scream - Lose a slow action, Stress -1, others panic
+• 13: Flee - Flee to safety, Stress -1, witnesses panic
+• 14: Berserk - Attack the nearest character, witnesses panic
+• 15+: Catatonic - You collapse, unable to talk or move
 
 **Push Mechanics:**
 • Add 'p' to stress aliases to push: `alien4s2p` becomes `alien4s3`
@@ -523,14 +522,14 @@ Doubles (11, 22, 33, ..., 99, 00) are critical rolls:
 When rolling with advantage, the better roll is selected by priority:
 1. **Critical Success** (doubles ≤ stat) - BEST
 2. **Success** (non-doubles ≤ stat)
-3. **Critical Failure** (doubles > stat)
-4. **Failure** (non-doubles > stat) - WORST
+3. **Failure** (non-doubles > stat)
+4. **Critical Failure** (doubles > stat) - WORST
 - Within same category: prefer lower roll
 
 **Selection Logic for Disadvantage:**
 When rolling with disadvantage, the worse roll is selected by priority:
-1. **Failure** (non-doubles > stat) - WORST
-2. **Critical Failure** (doubles > stat)
+1. **Critical Failure** (doubles > stat) - WORST
+2. **Failure** (non-doubles > stat)
 3. **Success** (non-doubles ≤ stat)
 4. **Critical Success** (doubles ≤ stat) - BEST
 - Within same category: prefer higher roll

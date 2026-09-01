@@ -16,6 +16,15 @@
   "2 successes" whatever the d20s showed.
 - Combat dice reported damage as "successes", and a combined attack added that damage into
   the d20 count. The two are now separate, and `cd4 + 3` applies the `+3`.
+- Alien RPG's panic table was shifted a row from 7 upward: Nervous Twitch was missing, every
+  result read one step too severe, and it ended in a "Heart Attack" that is not in the game.
+  It now matches the rulebook, and the panic roll reads `1d6` however many stress dice
+  came up 1.
+- Hero System killing damage used the 6th Edition STUN multiplier of 1d3. 5th Edition rolls
+  1d6-1 with a minimum of 1, so `3hsk` reaches 90 STUN again instead of stopping at 54.
+- Mothership advantage could hand you the worse of two rolls by preferring a critical failure
+  to an ordinary one. Disadvantage had the mirrored problem and shielded you from critical
+  failures.
 
 ## Changed
 

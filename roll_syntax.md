@@ -90,15 +90,15 @@ Modifiers apply in stages, not in the order you type them:
 
 **Panic Table Results:**
 - 1-6: Keeping it together
-- 7: Tremble (-2 to next roll)
-- 8: Drop item
-- 9: Freeze (lose next turn)
-- 10: Seek cover
-- 11: Scream (others must panic roll)
-- 12: Flee from threat
-- 13: Berserk attack
-- 14: Catatonic
-- 15+: Heart attack (Broken)
+- 7: Nervous Twitch (stress +1 for you and friendly PCs at SHORT range)
+- 8: Tremble (AGILITY rolls suffer -2 until your panic stops)
+- 9: Drop item (stress +1)
+- 10: Freeze (lose next slow action, stress +1 for you and nearby friends)
+- 11: Seek cover (next action must move you to safety)
+- 12: Scream (lose next slow action, stress -1, others must panic roll)
+- 13: Flee (flee to safety and refuse to leave it, stress -1, witnesses panic)
+- 14: Berserk (attack the nearest person or creature, witnesses panic)
+- 15+: Catatonic (collapse, unable to talk or move)
 
 **Mechanics:**
 - Success on 6s (Year Zero Engine standard)
@@ -236,7 +236,7 @@ Modifiers apply in stages, not in the order you type them:
 
 ### Hero System 5th Edition
 - `2hsn` → 2d6 hsn (normal damage)
-- `3hsk` → 3d6 hsk (killing damage with STUN multiplier)
+- `3hsk` → 3d6 hsk (killing damage; STUN = BODY × 1d6-1, minimum 1)
 - `2.5hsk` → 2d6 + 1d3 hsk (fractional killing damage)
 - `2hsk1` → 2d6 + 1d3 hsk (alternative fractional notation)
 - `3hsh` → 3d6 hsh (to-hit roll, roll-under)
@@ -443,7 +443,7 @@ plain dice syntax — `1d6 + 4 - 2` — and `adv1` / `dis1` for a Boon or Bane o
 - `+ms45` → Roll twice, select better result using Mothership logic
 - `-ms45` → Roll twice, select worse result using Mothership logic
 - **Crit System**: Doubles (11, 22, 33, ..., 99, 00) are critical rolls
-- **Selection Logic**: Advantage prioritizes Crit Success > Success > Crit Failure > Failure
+- **Selection Logic**: Advantage prioritizes Crit Success > Success > Failure > Crit Failure — a Critical Failure is an ordinary failure plus a Panic Check, so it is the worst outcome. Disadvantage reverses the order
 
 ### Exalted (White Wolf)
 - `ex5` → 5d10 t7ds10 (5 dice, target 7+, 10s count double)
@@ -501,7 +501,7 @@ plain dice syntax — `1d6 + 4 - 2` — and `adv1` / `dis1` for a Boon or Bane o
 ### Hero System Damage
 ```text
 /roll 2hsn      # 2d6 normal damage
-/roll 3hsk      # 3d6 killing: shows BODY and STUN (BODY × 1d3)
+/roll 3hsk      # 3d6 killing: shows BODY and STUN (BODY × 1d6-1, min 1)
 /roll 2.5hsk    # 2d6 + 1d3 killing damage
 /roll 3hsh      # 3d6 to-hit (roll under 11 + OCV - DCV)
 ```
