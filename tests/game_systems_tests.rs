@@ -5208,14 +5208,14 @@ fn test_dh_dheart_no_conflict() {
 }
 
 #[test]
-fn test_wild_worlds_rpg_system() {
+fn test_wild_words_rpg_system() {
     use dicemaiden_rs::{dice::aliases, parse_and_roll};
 
-    // Test basic Wild Worlds rolls
+    // Test basic Wild Words rolls
     let basic_tests = vec![
-        ("ww3", "3d6 ww", "Basic 3 dice Wild Worlds roll"),
-        ("ww4", "4d6 ww", "Basic 4 dice Wild Worlds roll"),
-        ("ww6", "6d6 ww", "Basic 6 dice Wild Worlds roll"),
+        ("ww3", "3d6 ww", "Basic 3 dice Wild Words roll"),
+        ("ww4", "4d6 ww", "Basic 4 dice Wild Words roll"),
+        ("ww6", "6d6 ww", "Basic 6 dice Wild Words roll"),
     ];
 
     for (alias, expected_expansion, description) in basic_tests {
@@ -5224,7 +5224,7 @@ fn test_wild_worlds_rpg_system() {
         assert_eq!(
             expanded,
             Some(expected_expansion.to_string()),
-            "Wild Worlds alias '{}' should expand to '{}': {}",
+            "Wild Words alias '{}' should expand to '{}': {}",
             alias,
             expected_expansion,
             description
@@ -5234,7 +5234,7 @@ fn test_wild_worlds_rpg_system() {
         let result = parse_and_roll(alias);
         assert!(
             result.is_ok(),
-            "Wild Worlds '{}' should parse successfully: {}",
+            "Wild Words '{}' should parse successfully: {}",
             alias,
             description
         );
@@ -5244,23 +5244,23 @@ fn test_wild_worlds_rpg_system() {
 
         let roll_result = &results[0];
 
-        // Should have Wild Worlds interpretation
-        let has_wild_worlds_note = roll_result.notes.iter().any(|note| {
-            note.contains("Wild Worlds:")
+        // Should have Wild Words interpretation
+        let has_wild_words_note = roll_result.notes.iter().any(|note| {
+            note.contains("Wild Words:")
                 && (note.contains("Triumph")
                     || note.contains("Conflict")
                     || note.contains("Disaster"))
         });
         assert!(
-            has_wild_worlds_note,
-            "Should have Wild Worlds interpretation note for '{}'",
+            has_wild_words_note,
+            "Should have Wild Words interpretation note for '{}'",
             alias
         );
 
         // Total should be between 1-6 (highest die value)
         assert!(
             roll_result.total >= 1 && roll_result.total <= 6,
-            "Wild Worlds result should be 1-6 for '{}': got {}",
+            "Wild Words result should be 1-6 for '{}': got {}",
             alias,
             roll_result.total
         );
@@ -5279,7 +5279,7 @@ fn test_wild_worlds_rpg_system() {
         assert_eq!(
             expanded,
             Some(expected_expansion.to_string()),
-            "Wild Worlds cutting alias '{}' should expand to '{}': {}",
+            "Wild Words cutting alias '{}' should expand to '{}': {}",
             alias,
             expected_expansion,
             description
@@ -5289,7 +5289,7 @@ fn test_wild_worlds_rpg_system() {
         let result = parse_and_roll(alias);
         assert!(
             result.is_ok(),
-            "Wild Worlds cutting '{}' should parse successfully: {}",
+            "Wild Words cutting '{}' should parse successfully: {}",
             alias,
             description
         );
@@ -5304,21 +5304,21 @@ fn test_wild_worlds_rpg_system() {
             .any(|note| note.contains("Cut") && note.contains("highest"));
         assert!(has_cut_note, "Should have cutting note for '{}'", alias);
 
-        // Should have Wild Worlds interpretation
+        // Should have Wild Words interpretation
         let has_interpretation = roll_result
             .notes
             .iter()
-            .any(|note| note.contains("Wild Worlds:"));
+            .any(|note| note.contains("Wild Words:"));
         assert!(
             has_interpretation,
-            "Should have Wild Worlds interpretation for '{}'",
+            "Should have Wild Words interpretation for '{}'",
             alias
         );
 
         // Total should be between 1-6
         assert!(
             roll_result.total >= 1 && roll_result.total <= 6,
-            "Wild Worlds cutting result should be 1-6 for '{}': got {}",
+            "Wild Words cutting result should be 1-6 for '{}': got {}",
             alias,
             roll_result.total
         );
@@ -5337,7 +5337,7 @@ fn test_wild_worlds_rpg_system() {
         let result = parse_and_roll(expression);
         assert!(
             result.is_err(),
-            "Invalid Wild Worlds '{}' should fail: {}",
+            "Invalid Wild Words '{}' should fail: {}",
             expression,
             description
         );
@@ -5345,12 +5345,12 @@ fn test_wild_worlds_rpg_system() {
 }
 
 #[test]
-fn test_wild_worlds_roll_sets() {
+fn test_wild_words_roll_sets() {
     use dicemaiden_rs::parse_and_roll;
 
-    // Test Wild Worlds with roll sets
+    // Test Wild Words with roll sets
     let result = parse_and_roll("3 ww4");
-    assert!(result.is_ok(), "Wild Worlds roll sets should work");
+    assert!(result.is_ok(), "Wild Words roll sets should work");
 
     let results = result.unwrap();
     assert_eq!(results.len(), 3, "Should have 3 sets");
@@ -5362,18 +5362,18 @@ fn test_wild_worlds_roll_sets() {
             "Should have proper set labels"
         );
 
-        let has_wild_worlds_note = roll_result
+        let has_wild_words_note = roll_result
             .notes
             .iter()
-            .any(|note| note.contains("Wild Worlds:"));
+            .any(|note| note.contains("Wild Words:"));
         assert!(
-            has_wild_worlds_note,
-            "Each set should have Wild Worlds interpretation"
+            has_wild_words_note,
+            "Each set should have Wild Words interpretation"
         );
 
         assert!(
             roll_result.total >= 1 && roll_result.total <= 6,
-            "Each set should have valid Wild Worlds result"
+            "Each set should have valid Wild Words result"
         );
     }
 }

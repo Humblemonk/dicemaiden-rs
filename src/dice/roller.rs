@@ -937,8 +937,8 @@ fn apply_special_system_modifiers(
                 apply_laser_feelings_mechanics(result, *target, roll_type, dice_count)?;
                 has_special_system = true;
             }
-            Modifier::WildWorlds(cut_count) => {
-                apply_wild_worlds_mechanics(result, *cut_count)?;
+            Modifier::WildWords(cut_count) => {
+                apply_wild_words_mechanics(result, *cut_count)?;
                 has_special_system = true;
             }
             Modifier::MutantsMasterminds => {
@@ -3638,10 +3638,10 @@ fn apply_daggerheart_mechanics(result: &mut RollResult) -> Result<()> {
     Ok(())
 }
 
-/// Apply Wild Worlds RPG mechanics (The Wildsea RPG system)
-fn apply_wild_worlds_mechanics(result: &mut RollResult, cut_count: Option<u32>) -> Result<()> {
+/// Apply Wild Words RPG mechanics (The Wildsea RPG system)
+fn apply_wild_words_mechanics(result: &mut RollResult, cut_count: Option<u32>) -> Result<()> {
     if result.individual_rolls.is_empty() {
-        return Err(anyhow!("No dice to apply Wild Worlds mechanics to"));
+        return Err(anyhow!("No dice to apply Wild Words mechanics to"));
     }
 
     // Start with all rolled dice
@@ -3670,13 +3670,13 @@ fn apply_wild_worlds_mechanics(result: &mut RollResult, cut_count: Option<u32>) 
         return Err(anyhow!("No dice remaining after cutting"));
     }
 
-    // Find the highest die value (this determines the result in Wild Worlds)
+    // Find the highest die value (this determines the result in Wild Words)
     let highest_die = *working_dice.iter().max().unwrap();
 
     // Check for doubles/triples (any matching values = twist)
     let has_twist = has_matching_dice(&working_dice);
 
-    // Interpret the result based on highest die (Wild Worlds rules)
+    // Interpret the result based on highest die (Wild Words rules)
     let interpretation = match highest_die {
         6 => "Triumph",      // Complete success
         4 | 5 => "Conflict", // Success with drawback
@@ -3684,11 +3684,11 @@ fn apply_wild_worlds_mechanics(result: &mut RollResult, cut_count: Option<u32>) 
         _ => unreachable!("d6 can only roll 1-6"),
     };
 
-    // Set the result total to the highest die (Wild Worlds uses highest die, not sum)
+    // Set the result total to the highest die (Wild Words uses highest die, not sum)
     result.total = highest_die;
 
     // Add interpretation note with twist indication
-    let mut result_text = format!("Wild Worlds: {} ({})", interpretation, highest_die);
+    let mut result_text = format!("Wild Words: {} ({})", interpretation, highest_die);
     if has_twist {
         result_text.push_str(" + Twist");
     }

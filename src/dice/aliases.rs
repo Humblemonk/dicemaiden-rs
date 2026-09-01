@@ -451,9 +451,9 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some(a5e_result);
     }
 
-    // Handle Wild Worlds RPG aliases
-    if let Some(wild_worlds_result) = expand_wild_worlds_alias(input) {
-        return Some(wild_worlds_result);
+    // Handle Wild Words RPG aliases
+    if let Some(wild_words_result) = expand_wild_words_alias(input) {
+        return Some(wild_words_result);
     }
 
     // Handle Open Legend RPG aliases
@@ -1393,7 +1393,7 @@ fn expand_alien_alias(input: &str) -> Option<String> {
     None
 }
 
-fn expand_wild_worlds_alias(input: &str) -> Option<String> {
+fn expand_wild_words_alias(input: &str) -> Option<String> {
     // Check for cutting dice first (ww4c2 -> 4d6 wwc2)
     if let Some(captures) = WILD_WORLDS_CUT_REGEX.captures(input) {
         let dice_count = &captures[1];

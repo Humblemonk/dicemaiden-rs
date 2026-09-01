@@ -19,7 +19,7 @@
 | [Lasers & Feelings](#lasers--feelings) | [Level Up A5E](#level-up-advanced-5th-edition-a5e) | [Marvel Multiverse](#marvel-multiverse-rpg) |
 | [Mothership](#mothership-rpg) | [Mutants & Masterminds](#mutants-and-masterminds) | [Open Legend](#open-legend) |
 | [Savage Worlds](#savage-worlds) | [Silhouette](#silhouette-system-dream-pod-9) | [Vampire: The Masquerade 5e](#vampire-the-masquerade-5th-edition) |
-| [Warhammer 40k W&G](#warhammer-40k-wrath--glory) | [Warhammer Fantasy 4e](#warhammer-fantasy-roleplay-4e) | [Wild Worlds](#wild-worlds) |
+| [Warhammer 40k W&G](#warhammer-40k-wrath--glory) | [Warhammer Fantasy 4e](#warhammer-fantasy-roleplay-4e) | [Wild Words / Wildsea](#wild-words-the-wildsea) |
 | [Witcher d10](#witcher-d10-system) | [World of Darkness / CoD](#world-of-darkness--chronicles-of-darkness) |  |
 
 Systems without a dedicated alias are listed under [Other Popular Systems](#other-popular-systems).
@@ -112,7 +112,7 @@ Modifiers apply in stages, not in the order you type them:
 - `sw8` → 1d8 trait + 1d6 wild, keep highest, both explode
 - `sw10` → 1d10 trait + 1d6 wild, keep highest, both explode
 - `sw12` → 1d12 trait + 1d6 wild, keep highest, both explode
-- Snake Eyes: Critical failure when both dice roll natural
+- Snake Eyes: Critical failure when both the trait die and the wild die roll a natural 1
 
 ### D6 Legends (Success-based with Wild Die)
 - `1d6l` → 1d6 t4f1ie6 (wild die only)
@@ -317,15 +317,18 @@ Modifiers apply in stages, not in the order you type them:
 - `dheart` → Hope & Fear dice with display and summary
 - `dheartgm` → GM d20 roll (standard d20)
 
-### Wild Worlds
-- `ww3` → 3d6 ww (basic Wild Worlds roll)
+### Wild Words (The Wildsea)
+- `ww3` → 3d6 ww (basic Wild Words roll)
 - `ww4c2` → 4d6 wwc2 (roll 4d6, cut 2 highest before evaluation)
 - **Results based on highest remaining die:**
   - **6 = Triumph** (complete success)
-  - **4-5 = Conflict** (success with drawback)  
+  - **4-5 = Conflict** (success with drawback)
   - **1-3 = Disaster** (failure with complication)
-- **Twist**: Any doubles/triples add a beneficial twist to the outcome
+- **Twist**: doubles among the remaining dice add a twist — a narrative
+  complication that may be good or bad. Triples add nothing beyond doubles
 - **Cutting**: Remove highest dice before evaluation (simulates difficulty)
+- The Wild Words engine by Felix Isaacs, used by The Wildsea. The `ww` alias
+  keeps its name from an earlier release
 
 ### Mutants and Masterminds
 - `mnm` → 1d20 mnm (basic check vs DC 10)
