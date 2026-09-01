@@ -180,13 +180,13 @@ Tests live in `tests/`:
 
 ### Snapshot tests
 
-Dice syntax is a public API, and a silently changed roll result is the worst bug this project can ship. `snapshot_tests.rs` guards against that by pinning what users can observe for every expression in `tests/corpus/expressions.dice`:
+Dice syntax is a public API, and a silently changed roll result is the worst bug this project can ship. `snapshot_tests.rs` guards against that by pinning what users can observe for every expression in `tests/corpus/expressions.txt`:
 
 - `snapshots/parse.snap` — the parsed form of every expression and every parse error, pinned exactly (parsing is deterministic)
 - `snapshots/deterministic_rolls.snap` — for expressions whose dice cannot vary (`d1` pools), the full result *and* the formatted Discord output, pinned exactly
 - `snapshots/outcomes.snap` — for randomly-rolling expressions, only what cannot vary with the dice: result count, success/failure, and exact error text
 
-**If you add or change syntax, add cases to `tests/corpus/expressions.dice`**: a happy-path expression, the boundary values of every numeric parameter, and a `d1` form (for example `4d1 k1`) so the roll is deterministic and lands in the exact-value snapshot. These tests only cover what the corpus contains — a keep-count bug at `k1` once slipped through because the corpus had `k2` but no `k1`.
+**If you add or change syntax, add cases to `tests/corpus/expressions.txt`**: a happy-path expression, the boundary values of every numeric parameter, and a `d1` form (for example `4d1 k1`) so the roll is deterministic and lands in the exact-value snapshot. These tests only cover what the corpus contains — a keep-count bug at `k1` once slipped through because the corpus had `k2` but no `k1`.
 
 If a snapshot fails, **read the diff before doing anything else**. Every changed line is a change your users will see. Once you have confirmed the change is intended:
 

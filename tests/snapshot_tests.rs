@@ -2,7 +2,7 @@
 //
 // Dice syntax is a public API and a silently changed roll result is the worst
 // possible bug this project can ship. These tests pin the observable behavior of
-// every expression in `tests/corpus/expressions.dice` so that a refactor which
+// every expression in `tests/corpus/expressions.txt` so that a refactor which
 // changes a result fails here instead of on 500,000 Discord servers.
 //
 // Three layers, cheapest and strictest first:
@@ -58,7 +58,7 @@ fn repo_path(relative: &str) -> PathBuf {
 }
 
 fn corpus() -> Vec<String> {
-    let path = repo_path("tests/corpus/expressions.dice");
+    let path = repo_path("tests/corpus/expressions.txt");
     let raw = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
     raw.lines()

@@ -121,7 +121,7 @@ Behavioral variants belong in a parameter, never a twin function — see `Reroll
 ### Snapshot tests — the regression net
 
 `tests/snapshot_tests.rs` pins what users can observe for every expression in
-`tests/corpus/expressions.dice`, so that a refactor which silently changes a roll fails
+`tests/corpus/expressions.txt`, so that a refactor which silently changes a roll fails
 `cargo test` instead of shipping:
 
 - **`parse.snap`** — parsing is deterministic, so the parsed form and every parse error are
@@ -134,7 +134,7 @@ Behavioral variants belong in a parameter, never a twin function — see `Reroll
   `parse_and_roll_with_rng`, pinning the exact result of systems whose dice are fixed by the
   system rather than by notation (Savage Worlds, Wrath & Glory).
 
-**When you add or change syntax, add expressions to `tests/corpus/expressions.dice`** — a
+**When you add or change syntax, add expressions to `tests/corpus/expressions.txt`** — a
 happy-path case, the boundary values of every numeric parameter, and a `d1` form so the roll
 lands in the deterministic snapshot. Coverage here is only as good as the corpus: a keep-count
 bug at `k1` slipped through when the corpus had `k2` but not `k1`.
