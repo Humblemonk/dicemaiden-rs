@@ -3623,10 +3623,9 @@ fn apply_daggerheart_mechanics(result: &mut RollResult) -> Result<()> {
 
     let hope_die = dice_group.rolls[0];
     let fear_die = dice_group.rolls[1];
-    let total = hope_die + fear_die;
 
-    // Clear existing total since we'll set our own
-    result.total = total;
+    // Hope vs Fear reads the bare d12s; the total keeps its math modifiers
+    let total = result.total;
 
     // Determine the result based on Hope vs Fear
     let daggerheart_result = if hope_die == fear_die {

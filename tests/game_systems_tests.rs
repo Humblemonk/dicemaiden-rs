@@ -5287,6 +5287,47 @@ fn test_daggerheart_comprehensive() {
 }
 
 #[test]
+fn test_daggerheart_keeps_math_modifiers() {
+    // Hope vs Fear is decided by the bare d12s, but the total a player acts on
+    // is 2d12 + trait + experience. Regression test for issue #255, where the
+    // total was recomputed from the two dice alone and every modifier the
+    // player added was silently dropped.
+    let modifier_tests = vec![
+        ("dheart", 0..=0, "no modifier"),
+        ("dheart + 3", 3..=3, "flat trait modifier"),
+        ("dheart - 2", -2..=-2, "flat penalty"),
+        ("dheart + 1d6", 1..=6, "experience die"),
+        ("dheart + 3 + 1d4", 4..=7, "trait plus advantage die"),
+    ];
+
+    for (expression, delta, description) in modifier_tests {
+        for result in roll_across_seeds(expression, 8) {
+            let (note, hope) = note_with_number(&result, "Daggerheart Roll", "Hope: ", ",")
+                .unwrap_or_else(|| panic!("'{expression}' should report a Daggerheart note"));
+            let (_, fear) = note_with_number(&result, "Daggerheart Roll", "Fear: ", " \u{2192}")
+                .unwrap_or_else(|| panic!("'{expression}' should report a Fear die"));
+
+            assert!(
+                delta.contains(&(result.total - hope - fear)),
+                "'{expression}' ({description}) should add {delta:?} to Hope {hope} + Fear {fear}, got total {} in '{note}'",
+                result.total
+            );
+
+            // The total quoted back to the player has to be the one they act on
+            if hope != fear {
+                let (_, reported) = note_with_number(&result, "roll is ", "roll is ", " with")
+                    .unwrap_or_else(|| panic!("'{expression}' should quote its total"));
+                assert_eq!(
+                    reported, result.total,
+                    "'{expression}' ({description}) should quote total {} in '{note}'",
+                    result.total
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn test_dh_dheart_no_conflict() {
     // Test that Dark Heresy (dh) and Daggerheart (dheart) don't conflict
     let conflict_tests = vec![

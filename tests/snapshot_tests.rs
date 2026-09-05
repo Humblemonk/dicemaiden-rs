@@ -57,7 +57,7 @@ const STABILITY_TRIALS: usize = 25;
 /// exact result pinned. Checked before the snapshot is written, so it holds
 /// even during `UPDATE_SNAPSHOTS=1` — a regeneration run cannot quietly shrink
 /// the set of expressions being pinned exactly.
-const DETERMINISTIC_EXPRESSIONS: usize = 738;
+const DETERMINISTIC_EXPRESSIONS: usize = 741;
 
 fn repo_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
