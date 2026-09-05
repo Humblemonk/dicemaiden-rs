@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.6.5] - 2026-09-05
+
+## Fixed
+
+- Daggerheart discarded every modifier added to a duality roll: `dheart + 3` and
+  `dheart + 1d6` rolled the extra dice, showed them, then reported the two d12s on their
+  own. The total now carries the trait modifier and any added dice, while Hope vs Fear
+  stays decided by the two d12s alone.
+
 ## [1.6.4] - 2026-09-01
 
 ## Added

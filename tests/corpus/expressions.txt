@@ -670,6 +670,9 @@
 2d1 d2
 2d1 d3
 2d1 d5
+2d1 dheart
+2d1 dheart + 3
+2d1 dheart - 1
 2d1 dis0
 2d1 dis1
 2d1 dis1 t1
@@ -803,6 +806,9 @@
 2d100 msa
 2d100 msd
 2d12 dheart
+2d12 dheart + 1d6
+2d12 dheart + 3
+2d12 dheart - 2
 2d12 ie
 2d20 + 3d6 k2
 2d20 conan
@@ -1933,6 +1939,11 @@ dh
 dh 2d10
 dh 4d10
 dh 6d10
+dheart
+dheart + 1d6
+dheart + 3 ! trait plus experience
+dheart - 1d6
+dheart - 2
 dis1
 ed
 ed1

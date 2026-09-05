@@ -316,6 +316,7 @@ Modifiers apply in stages, not in the order you type them:
 ### Daggerheart
 - `dheart` → Hope & Fear dice with display and summary
 - `dheartgm` → GM d20 roll (standard d20)
+- Modifiers add to the total: `dheart + 3`, `dheart + 1d6` advantage, `dheart - 1d6` disadvantage
 
 ### Wild Words (The Wildsea)
 - `ww3` → 3d6 ww (basic Wild Words roll)
