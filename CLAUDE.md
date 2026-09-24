@@ -25,7 +25,7 @@ Data flow: `dice/aliases.rs` (expands shorthand to a standard expression) → `d
 (→ `Vec<DiceRoll>`) → `dice/roller.rs` (→ `Vec<RollResult>`) → `commands/roll.rs` (Discord
 formatting). Core types live in `dice/mod.rs`; all randomness in `dice/rng.rs`.
 
-The Ruby files in the repo root (`Gemfile`, `.rubocop*.yml`) are history, not part of the
+The Ruby files in the repository root (`Gemfile`, `.rubocop*.yml`) are history, not part of the
 build. Don't modify them.
 
 ## Parser Invariants (critical)
