@@ -31,6 +31,7 @@
 //! | `tdh`            | The Darkest House (Monte Cook Games) |
 //! | `cpr` / `cpd`    | Cyberpunk Red skill check / damage    |
 //! | `wfrp`           | Warhammer Fantasy Roleplay 4e         |
+//! | `tbe`            | The Broken Empires RPG                |
 //!
 //! See `roll_syntax.md` for the full syntax reference.  All regex patterns are
 //! compiled once at startup via `once_cell::Lazy`.
@@ -177,6 +178,13 @@ static WIT_REGEX: Lazy<Regex> =
 // folds into a target of 87 at expansion time rather than reaching the total.
 static WFRP_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^wfrp(\d+)(?:\s*([+-])\s*(\d+))?$").expect("Failed to compile WFRP_REGEX")
+});
+
+static TBE_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"^tbe(\d+)(?:\s*(?:(simple|easy|medium|challenging|hard|severe)|([+-])\s*(\d+)))?(?:\s+favor(\d+))?$",
+    )
+        .expect("Failed to compile TBE_REGEX")
 });
 
 static CS_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -845,6 +853,54 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let target = target.clamp(0, i64::from(crate::dice::WFRP_MAX_TARGET));
 
         return Some(format!("1d100 wfrp{target}"));
+    }
+
+    if let Some(captures) = TBE_REGEX.captures(input) {
+        let skill: u32 = captures[1].parse().ok()?;
+        if skill == 0 {
+            return None;
+        }
+
+        let favor = captures
+            .get(5)
+            .map(|points| points.as_str().parse::<u32>())
+            .transpose()
+            .ok()?;
+        if favor.is_some_and(|points| !(1..=3).contains(&points)) {
+            return None;
+        }
+
+        let modifier = if let Some(difficulty) = captures.get(2) {
+            match difficulty.as_str() {
+                "simple" => 20,
+                "easy" => 10,
+                "medium" => 0,
+                "challenging" => -10,
+                "hard" => -20,
+                "severe" => -30,
+                _ => return None,
+            }
+        } else if let (Some(sign), Some(amount)) = (captures.get(3), captures.get(4)) {
+            let amount: i32 = amount.as_str().parse().ok()?;
+            if sign.as_str() == "+" {
+                amount
+            } else {
+                -amount
+            }
+        } else {
+            0
+        };
+
+        let mut expansion = if modifier == 0 {
+            format!("1d100 tbe{skill}")
+        } else {
+            format!("1d100 tbe{skill} {modifier:+}")
+        };
+        if let Some(points) = favor {
+            expansion.push_str(&format!(" favor{points}"));
+        }
+
+        return Some(expansion);
     }
 
     if let Some(captures) = CS_REGEX.captures(input) {

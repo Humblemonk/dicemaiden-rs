@@ -7,7 +7,10 @@
 // - Game system modifiers and edge cases
 
 use dicemaiden_rs::{
-    RollResult, dice::aliases, dice::rng::create_seeded_rng, dice::roller::wfrp_test_outcome,
+    RollResult,
+    dice::aliases,
+    dice::rng::create_seeded_rng,
+    dice::roller::{broken_empires_test_outcome, wfrp_test_outcome},
     parse_and_roll, parse_and_roll_with_rng,
 };
 
@@ -1024,6 +1027,186 @@ fn test_wfrp_prefix_regression() {
         Some("1d10 wit".to_string()),
         "wfrp must not disturb the Witcher alias"
     );
+}
+
+#[test]
+fn test_broken_empires_outcomes() {
+    // (skill, roll, success, critical, success levels)
+    let cases = vec![
+        (1, 3, true, false, 1),
+        (50, 5, true, true, 4),
+        (50, 8, true, false, 1),
+        (50, 11, true, true, 4),
+        (50, 42, true, false, 4),
+        (65, 65, true, true, 9),
+        (80, 77, true, true, 10),
+        (50, 51, false, false, 0),
+        (50, 55, false, true, 0),
+        (80, 99, false, true, 0),
+        (99, 99, false, false, 0),
+        (99, 100, false, true, 0),
+        (100, 100, false, false, 0),
+        (110, 100, false, false, 0),
+        (i64::from(u32::MAX), 100, false, false, 0),
+    ];
+
+    for (skill, roll, success, critical, success_levels) in cases {
+        let outcome = broken_empires_test_outcome(skill, roll);
+        assert_eq!(
+            (outcome.success, outcome.critical, outcome.success_levels),
+            (success, critical, success_levels),
+            "skill {skill}, roll {roll}"
+        );
+    }
+}
+
+#[test]
+fn test_broken_empires_difficulty_modifiers() {
+    let aliases = [
+        ("tbe60 simple", "1d100 tbe60 +20"),
+        ("tbe60 easy", "1d100 tbe60 +10"),
+        ("tbe60 medium", "1d100 tbe60"),
+        ("tbe60 challenging", "1d100 tbe60 -10"),
+        ("tbe60 hard", "1d100 tbe60 -20"),
+        ("tbe60 severe", "1d100 tbe60 -30"),
+        ("tbe60-15", "1d100 tbe60 -15"),
+        ("tbe60 - 15", "1d100 tbe60 -15"),
+        ("tbe60+25", "1d100 tbe60 +25"),
+    ];
+
+    for (alias, expansion) in aliases {
+        assert_alias_matches_expansion(alias, expansion);
+    }
+
+    let medium = roll_at_seed("tbe20 medium", 42);
+    let challenging = roll_at_seed("tbe20 challenging", 42);
+    let manual = roll_at_seed("tbe20-10", 42);
+    assert_eq!(medium.individual_rolls, vec![14]);
+    assert_eq!(medium.total, 1, "14 succeeds against effective skill 20");
+    assert_eq!(challenging.total, 0, "14 fails against effective skill 10");
+    assert_eq!(manual.total, challenging.total);
+    assert!(challenging.notes[0].contains("Effective Skill 10"));
+
+    let commented = roll_one("tbe60 hard ! melee attack", "named difficulty comment");
+    assert_eq!(commented.comment.as_deref(), Some("melee attack"));
+    assert_labelled_roll_sets("3 tbe60 hard", "named TBE difficulty roll sets");
+
+    let exact = broken_empires_test_outcome(45, 45);
+    assert!(exact.success && exact.critical);
+    assert_eq!(exact.success_levels, 7);
+
+    assert_invalid("tbe60 impossible");
+}
+
+#[test]
+fn test_broken_empires_favor() {
+    for (alias, expansion) in [
+        ("tbe60 favor1", "1d100 tbe60 favor1"),
+        ("tbe60 favor2", "1d100 tbe60 favor2"),
+        ("tbe60 favor3", "1d100 tbe60 favor3"),
+        ("tbe60 hard favor2", "1d100 tbe60 -20 favor2"),
+        ("tbe60-15 favor1", "1d100 tbe60 -15 favor1"),
+    ] {
+        assert_alias_matches_expansion(alias, expansion);
+    }
+
+    let without_favor = roll_at_seed("tbe1", 42);
+    let with_favor = roll_at_seed("tbe1 favor2", 42);
+    assert_eq!(without_favor.individual_rolls, vec![14]);
+    assert_eq!(with_favor.individual_rolls, vec![14]);
+    assert_eq!(without_favor.total, 0, "14 fails against skill 1");
+    assert_eq!(
+        with_favor.total, 1,
+        "14 succeeds against effective skill 21"
+    );
+    assert!(with_favor.notes[0].contains("Favor 2 (+20)"));
+    assert!(with_favor.notes[0].contains("Effective Skill 21"));
+
+    let stacked = roll_at_seed("tbe20 hard favor2", 42);
+    assert_eq!(stacked.total, 1, "Favor offsets the Hard task modifier");
+    assert!(stacked.notes[0].contains("Modifier -20"));
+    assert!(stacked.notes[0].contains("Favor 2 (+20)"));
+    assert!(stacked.notes[0].contains("Effective Skill 20"));
+
+    let commented = roll_one("tbe60 favor1 ! aided research", "Favor comment");
+    assert_eq!(commented.comment.as_deref(), Some("aided research"));
+    assert_labelled_roll_sets("3 tbe60 favor3", "TBE Favor roll sets");
+
+    for invalid in [
+        "tbe60 favor0",
+        "tbe60 favor4",
+        "1d100 tbe60 favor0",
+        "1d100 tbe60 favor4",
+        "1d100 tbe60 favor1 favor2",
+        "1d100 favor2",
+        "1d100 wfrp60 favor2",
+        "1d100 ms60 favor2",
+        "1d100 wfrp60 tbe60 favor2",
+    ] {
+        assert_invalid(invalid);
+    }
+}
+
+#[test]
+fn test_broken_empires_alias_and_boundaries() {
+    for (alias, expansion) in [
+        ("tbe1", "1d100 tbe1"),
+        ("tbe50", "1d100 tbe50"),
+        ("TBE65", "1d100 tbe65"),
+        ("tbe100", "1d100 tbe100"),
+        ("tbe110", "1d100 tbe110"),
+        ("tbe4294967295", "1d100 tbe4294967295"),
+    ] {
+        assert_alias_matches_expansion(alias, expansion);
+    }
+
+    for invalid in ["tbe", "tbe0", "1d100 tbe0"] {
+        assert_invalid(invalid);
+    }
+
+    assert_valid("1d100 tbe110");
+
+    for wrong_dice in ["2d100 tbe65", "1d20 tbe65"] {
+        assert_invalid(wrong_dice);
+    }
+}
+
+#[test]
+fn test_broken_empires_roll_behavior() {
+    for result in roll_across_seeds("tbe65", 25) {
+        let die = result.individual_rolls[0];
+        let outcome = broken_empires_test_outcome(65, die);
+
+        assert_eq!(result.total, outcome.success_levels, "die {die}");
+        assert!(result.successes.is_none(), "SL is not a success count");
+        assert_eq!(
+            result.notes.iter().any(|note| note.contains("CRITICAL")),
+            outcome.critical,
+            "die {die}"
+        );
+        assert!(
+            result.notes[0].contains(if outcome.success {
+                "SUCCESS"
+            } else {
+                "FAILURE"
+            }),
+            "die {die}: {:?}",
+            result.notes
+        );
+    }
+}
+
+#[test]
+fn test_broken_empires_comments_sets_and_prefixes() {
+    let result = roll_one("tbe65 ! perception", "commented TBE test");
+    assert_eq!(result.comment.as_deref(), Some("perception"));
+
+    assert_labelled_roll_sets("3 tbe45", "TBE roll sets");
+    for expression in ["tbe65", "1d100 tbe65", "1d6 tl6", "tdh4", "1d6 t4"] {
+        assert_valid(expression);
+    }
+
+    assert_no_prefix_conflicts("The Broken Empires", &["tbe"], EXISTING_ALIAS_PATTERNS);
 }
 
 #[test]

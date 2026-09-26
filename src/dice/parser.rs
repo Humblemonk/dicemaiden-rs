@@ -1025,6 +1025,7 @@ static SPLIT_MODIFIER_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^(d\d+)",                       // drop — d1
         r"^(r\d+)",                       // reroll — r1
         r"^(t\d+)",                       // target — t4, t7
+        r"^(favor\d+)",                   // Broken Empires Favor (BEFORE failure)
         r"^(f\d+)",                       // failure — f1
         r"^(esss?\d+)",                   // essence20 — ess4, esss4 (BEFORE explode)
         r"^(e\d*)",                       // explode — e, e6 (AFTER indefinite explode)
@@ -1032,6 +1033,7 @@ static SPLIT_MODIFIER_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^(cpd)",                        // cyberpunk red damage — cpd (BEFORE cancel's bare `c`)
         r"^(c)",                          // cancel — c
         r"^(wfrp\d+)",                    // warhammer fantasy — wfrp67 (BEFORE wng/wit/ww)
+        r"^(tbe\d+)",                     // The Broken Empires — tbe65 (BEFORE t)
         r"^(wng\d*t?)",                   // wrath & glory — wng patterns
         r"^(gb|gbs)",                     // godbound — gb, gbs
         r"^(hs[nkh])",                    // hero system — hsn, hsk, hsh
@@ -1363,23 +1365,24 @@ fn parse_all_modifiers(dice: &mut DiceRoll, parts: &[String]) -> Result<()> {
 /// truncated into a shorter one. Do not reorder.
 static COMBINED_MODIFIER_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     [
-        r"^(ie\d*)",  // Indefinite explode first (longer pattern)
-        r"^(adv\d+)", // Advantage (before explode)
-        r"^(dis\d+)", // Disadvantage (before drop)
-        r"^(irg\d+)", // Indefinite reroll greater
-        r"^(ir\d+)",  // Indefinite reroll
-        r"^(i\d*)",   // Implode (AFTER ie/irg/ir)
-        r"^(km\d+)",  // Keep middle
-        r"^(kl\d+)",  // Keep low
-        r"^(tl\d+)",  // Target lower (must come before regular target)
-        r"^(rg\d+)",  // Reroll greater
-        r"^(e\d*)",   // Explode
-        r"^(k\d+)",   // Keep high
-        r"^(d\d+)",   // Drop
-        r"^(r\d+)",   // Reroll
-        r"^(t\d+)",   // Target - KEY FOR D6 LEGENDS
-        r"^(f\d+)",   // Failure - KEY FOR D6 LEGENDS
-        r"^(b\d*)",   // Botch
+        r"^(ie\d*)",    // Indefinite explode first (longer pattern)
+        r"^(adv\d+)",   // Advantage (before explode)
+        r"^(dis\d+)",   // Disadvantage (before drop)
+        r"^(irg\d+)",   // Indefinite reroll greater
+        r"^(ir\d+)",    // Indefinite reroll
+        r"^(i\d*)",     // Implode (AFTER ie/irg/ir)
+        r"^(km\d+)",    // Keep middle
+        r"^(kl\d+)",    // Keep low
+        r"^(tl\d+)",    // Target lower (must come before regular target)
+        r"^(rg\d+)",    // Reroll greater
+        r"^(e\d*)",     // Explode
+        r"^(k\d+)",     // Keep high
+        r"^(d\d+)",     // Drop
+        r"^(r\d+)",     // Reroll
+        r"^(t\d+)",     // Target - KEY FOR D6 LEGENDS
+        r"^(favor\d+)", // Broken Empires Favor (before failure)
+        r"^(f\d+)",     // Failure - KEY FOR D6 LEGENDS
+        r"^(b\d*)",     // Botch
     ]
     .iter()
     .map(|pattern| Regex::new(pattern).expect("Failed to compile COMBINED_MODIFIER_PATTERNS entry"))
@@ -1453,6 +1456,7 @@ static MODIFIER_START_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^d\d+",     // Drop: d1
         r"^r\d+",     // Reroll: r1
         r"^t\d+",     // Target: t4, t7 - CRITICAL FOR D6 LEGENDS
+        r"^favor\d+", // Broken Empires Favor (before failure)
         r"^f\d+",     // Failure: f1 - CRITICAL FOR D6 LEGENDS
         r"^esss?\d+", // Essence20 skill die: ess4, esss4 (before explode)
         r"^e\d*",     // Explode: e, e6
@@ -1460,6 +1464,7 @@ static MODIFIER_START_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^c$",       // Cancel: c (exact match)
         // System modifiers
         r"^wfrp\d+",   // Warhammer Fantasy 4e: wfrp67
+        r"^tbe\d+",    // The Broken Empires: tbe65 (before t)
         r"^wng",       // Wrath & Glory patterns
         r"^gb$",       // Godbound (exact)
         r"^gbs$",      // Godbound straight (exact)
@@ -1794,6 +1799,31 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             ));
         }
         return Ok(Modifier::Wfrp(target));
+    }
+
+    if let Some(stripped) = part.strip_prefix("tbe")
+        && !stripped.is_empty()
+        && stripped.chars().all(|c| c.is_ascii_digit())
+    {
+        let skill: u32 = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid Broken Empires skill in '{}'", part))?;
+        if skill == 0 {
+            return Err(anyhow!("Broken Empires skill must be greater than 0"));
+        }
+        return Ok(Modifier::BrokenEmpires(skill));
+    }
+
+    if let Some(stripped) = part.strip_prefix("favor") {
+        let points: u32 = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid Broken Empires Favor in '{}'", part))?;
+        if !(1..=3).contains(&points) {
+            return Err(anyhow!(
+                "Broken Empires Favor spent per roll must be 1-3, got {points}"
+            ));
+        }
+        return Ok(Modifier::BrokenEmpiresFavor(points));
     }
 
     // Conan / 2d20 target number: tn12, tn12f3, tn12f3c19

@@ -24,6 +24,7 @@ pub const HELP_TOPICS: &[&str] = &[
     "tdh",
     "cpr",
     "wfrp",
+    "tbe",
 ];
 
 /// Resolve a topic name to its help text, or `None` if the topic is unknown.
@@ -44,6 +45,7 @@ pub fn generate_topic_help(topic: &str) -> Option<String> {
         "tdh" => generate_darkest_house_help(),
         "cpr" => generate_cyberpunk_red_help(),
         "wfrp" => generate_wfrp_help(),
+        "tbe" => generate_broken_empires_help(),
         _ => return None,
     })
 }
@@ -145,8 +147,7 @@ pub fn generate_alias_help() -> String {
 • `dd34` → 1d3*10 + 1d4 (double-digit d66 style)
 • `ed15` → Earthdawn step 15
 • `cs 3` → Cypher System 1d20 cs3 (Level 3 task, target 9+)
-• `cpr` / `cpd3` → Cyberpunk Red (`/help cpr`)
-• `wfrp67` → WFRP 4e (`/help wfrp`)
+• `cpr`/`cpd3`, `wfrp67`, `tbe65` → `/help cpr`, `/help wfrp`, `/help tbe`
 • `conan tn12f3` → Conan (target 12, Focus 3)
 • `sil3` → Silhouette (`/help system`)
 • `ol5` → Open Legend (`/help ol`)
@@ -380,6 +381,45 @@ Roll d100 against a Characteristic or Skill and succeed on equal or lower.
 - 11, 22 ... 99, 00 are an Astounding Success or Astounding Failure
 - In combat that is a Critical Hit or a Fumble
 - Independent of SL: both apply to the same roll"#
+        .to_string()
+}
+
+pub fn generate_broken_empires_help() -> String {
+    r#"🎲 **The Broken Empires RPG** 🎲
+
+Roll d100 equal to or under a skill, aiming as high as possible.
+
+**Skill Tests:**
+- `tbe65` → test a skill of 65
+- `tbe110` → skills over 100 are valid; there is no game-rule ceiling
+- `3 tbe45` → make three separate tests
+- The result shown is the number of Success Levels (SL)
+
+**Difficulty:**
+- `simple` +20, `easy` +10, `medium` +0
+- `challenging` -10, `hard` -20, `severe` -30
+- `tbe60 hard` → effective skill 40
+- `tbe60-15` → custom -15 task modifier
+
+**Favor:**
+- `favor1`, `favor2`, or `favor3` spends that much Favor on the roll
+- Each Favor adds +10 to the effective skill; no more than 3 may be spent
+- `tbe60 favor2` → effective skill 80
+- `tbe60 hard favor2` → Hard -20 and Favor +20, for effective skill 60
+
+**Success Levels:**
+- A successful roll's tens digit is its SL: 42 scores 4 SL
+- Successful 01-09 scores a minimum of 1 SL
+- 01-05 always succeeds; 99-00 always fails
+
+**Criticals:**
+- A successful double, 05, or exact effective-skill match is a Critical Success
+- Critical Success adds +3 SL
+- A failed double is a Critical Failure
+- 99 is critical when the skill is below 99
+- 00 is critical when the skill is below 100
+- Against skill 99, a 99 is an ordinary automatic failure
+- Against skill 100, a 00 is an ordinary automatic failure"#
         .to_string()
 }
 

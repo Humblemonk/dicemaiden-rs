@@ -167,8 +167,10 @@ pub enum Modifier {
     Shadowrun(u32),
     MarvelMultiverse(i32, i32), // (edges, troubles) - already calculated net values
     CyberpunkRed,
-    CyberpunkRedDamage, // cpd - Nd6 damage, 2+ sixes = Critical Injury
-    Wfrp(u32),          // wfrp# - Warhammer Fantasy 4e roll-under with Success Levels
+    CyberpunkRedDamage,      // cpd - Nd6 damage, 2+ sixes = Critical Injury
+    Wfrp(u32),               // wfrp# - Warhammer Fantasy 4e roll-under with Success Levels
+    BrokenEmpires(u32),      // tbe# - The Broken Empires d100 blackjack skill test
+    BrokenEmpiresFavor(u32), // favor# - spend 1-3 Favor for +10 skill per point
     Witcher,
     CypherSystem(u32),
     BraveNewWorld(u32),
