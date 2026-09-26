@@ -379,6 +379,16 @@
 1d100	always-ok n=Some(1)
 1d100 ms	always-ok n=Some(1)
 1d100 ms45	always-ok n=Some(1)
+1d100 tbe0	always-err {"Broken Empires skill must be greater than 0"}
+1d100 tbe1	always-ok n=Some(1)
+1d100 tbe65	always-ok n=Some(1)
+1d100 tbe100	always-ok n=Some(1)
+1d100 tbe101	always-ok n=Some(1)
+1d100 tbe110	always-ok n=Some(1)
+1d100 tbe60 favor1	always-ok n=Some(1)
+1d100 tbe60 favor3	always-ok n=Some(1)
+1d100 wfrp60 favor2	always-err {"Favor can only be spent on a The Broken Empires skill test"}
+1d100 ms60 favor2	always-err {"Favor can only be spent on a The Broken Empires skill test"}
 1d100 wfrp0	always-ok n=Some(1)
 1d100 wfrp1	always-ok n=Some(1)
 1d100 wfrp100	always-ok n=Some(1)
@@ -987,6 +997,8 @@
 3 mnm +2	always-ok n=Some(3)
 3 ol5	always-ok n=Some(3)
 3 tdh4	always-ok n=Some(3)
+3 tbe45	always-ok n=Some(3)
+3 tbe60 hard	always-ok n=Some(3)
 3 wfrp45	always-ok n=Some(3)
 3 wit	always-ok n=Some(3)
 3 wng 4d6 !soak	always-ok n=Some(3)
@@ -2198,6 +2210,25 @@ tdh4bc	always-ok n=Some(1)
 tdh4c	always-ok n=Some(1)
 tdh4n	always-ok n=Some(1)
 tdh4nc	always-ok n=Some(1)
+tbe	always-err {"Invalid dice expression: tbe"}
+tbe1	always-ok n=Some(1)
+tbe65	always-ok n=Some(1)
+tbe100	always-ok n=Some(1)
+tbe110	always-ok n=Some(1)
+tbe60 simple	always-ok n=Some(1)
+tbe60 easy	always-ok n=Some(1)
+tbe60 medium	always-ok n=Some(1)
+tbe60 challenging	always-ok n=Some(1)
+tbe60 hard	always-ok n=Some(1)
+tbe60 hard ! melee attack	always-ok n=Some(1)
+tbe60 severe	always-ok n=Some(1)
+tbe60-15	always-ok n=Some(1)
+tbe60 + 25	always-ok n=Some(1)
+tbe60 favor1	always-ok n=Some(1)
+tbe60 hard favor3	always-ok n=Some(1)
+tbe60-15 favor2	always-ok n=Some(1)
+tbe60 favor0	always-err {"Broken Empires Favor spent per roll must be 1-3, got 0"}
+tbe60 favor4	always-err {"Broken Empires Favor spent per roll must be 1-3, got 4"}
 tl6	always-err {"Invalid dice expression: tl6"}
 tl6ds5	always-err {"Invalid dice expression: tl6ds5"}
 ul (Chaos) 10d6 e6 ! Wild magic surge	always-ok n=Some(1)

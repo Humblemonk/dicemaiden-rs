@@ -284,6 +284,42 @@ Modifiers apply in stages, not in the order you type them:
   Hit or Fumble in combat
 - The die is rolled 1-100, with 100 standing in for 00
 
+### The Broken Empires RPG
+- `tbe65` → 1d100 against a skill of 65
+- `tbe110` → skills over 100 are valid; there is no game-rule ceiling
+- `3 tbe45` → three separate skill tests
+- Roll equal to or under the skill, aiming as high as possible
+- A successful roll's tens digit is its Success Levels; 01-09 scores at least 1 SL
+- 01-05 always succeeds, while 99-00 always fails
+- A successful double, 05, or exact skill match is a Critical Success and adds +3 SL
+- A failed double is a Critical Failure
+- 99 is critical when the skill is below 99; 00 is critical when it is below 100
+- At skill 99 or 100, the matching automatic failure is not critical
+
+Task difficulty changes the effective skill before resolving the test:
+
+| Difficulty | Modifier |
+| --- | ---: |
+| Simple | +20 |
+| Easy | +10 |
+| Medium | +0 |
+| Challenging | -10 |
+| Hard | -20 |
+| Severe | -30 |
+
+- `tbe60 hard` → roll against an effective skill of 40
+- `tbe60-15` or `tbe60 - 15` → apply a custom -15 modifier
+- `tbe60+25` → apply a custom +25 modifier
+- An exact roll matching the effective skill is a Critical Success
+
+Favor spent on a roll adds +10 to the effective skill per point. A roll may
+spend 1-3 Favor, and Favor stacks with its task modifier:
+
+- `tbe60 favor1` → spend 1 Favor and roll against effective skill 70
+- `tbe60 favor3` → spend the maximum 3 Favor and roll against effective skill 90
+- `tbe60 hard favor2` → -20 for Hard and +20 for Favor, for effective skill 60
+- `tbe60-15 favor1` → -15 task modifier and +10 for Favor, for effective skill 55
+
 ### Marvel Multiverse RPG
 - `mm` → 3d6 Marvel Multiverse basic roll
 - `mm e` → 3d6 with 1 edge (reroll lowest die, keep higher)

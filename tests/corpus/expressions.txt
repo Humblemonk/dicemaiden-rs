@@ -379,6 +379,16 @@
 1d100
 1d100 ms
 1d100 ms45
+1d100 tbe0
+1d100 tbe1
+1d100 tbe65
+1d100 tbe100
+1d100 tbe101
+1d100 tbe110
+1d100 tbe60 favor1
+1d100 tbe60 favor3
+1d100 wfrp60 favor2
+1d100 ms60 favor2
 1d100 wfrp0
 1d100 wfrp1
 1d100 wfrp100
@@ -987,6 +997,8 @@
 3 mnm +2
 3 ol5
 3 tdh4
+3 tbe45
+3 tbe60 hard
 3 wfrp45
 3 wit
 3 wng 4d6 !soak
@@ -2198,6 +2210,25 @@ tdh4bc
 tdh4c
 tdh4n
 tdh4nc
+tbe
+tbe1
+tbe65
+tbe100
+tbe110
+tbe60 simple
+tbe60 easy
+tbe60 medium
+tbe60 challenging
+tbe60 hard
+tbe60 hard ! melee attack
+tbe60 severe
+tbe60-15
+tbe60 + 25
+tbe60 favor1
+tbe60 hard favor3
+tbe60-15 favor2
+tbe60 favor0
+tbe60 favor4
 tl6
 tl6ds5
 ul (Chaos) 10d6 e6 ! Wild magic surge
