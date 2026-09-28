@@ -1046,6 +1046,15 @@ fn test_broken_empires_outcomes() {
         (99, 99, false, false, 0),
         (99, 100, false, true, 0),
         (100, 100, false, false, 0),
+        // Effective skills over 100 add their excess Score (the tens digit of
+        // skill - 100, minimum 1) to every successful roll's SL.
+        (101, 42, true, false, 5),
+        (105, 83, true, false, 9),
+        (109, 11, true, true, 5),
+        (110, 83, true, false, 9),
+        (119, 83, true, false, 9),
+        (120, 83, true, false, 10),
+        (105, 99, false, false, 0),
         (110, 100, false, false, 0),
         (i64::from(u32::MAX), 100, false, false, 0),
     ];
@@ -1072,6 +1081,8 @@ fn test_broken_empires_difficulty_modifiers() {
         ("tbe60-15", "1d100 tbe60 -15"),
         ("tbe60 - 15", "1d100 tbe60 -15"),
         ("tbe60+25", "1d100 tbe60 +25"),
+        ("tbe60 hard +5", "1d100 tbe60 -20 +5"),
+        ("tbe60 +5 hard", "1d100 tbe60 -20 +5"),
     ];
 
     for (alias, expansion) in aliases {
@@ -1086,6 +1097,11 @@ fn test_broken_empires_difficulty_modifiers() {
     assert_eq!(challenging.total, 0, "14 fails against effective skill 10");
     assert_eq!(manual.total, challenging.total);
     assert!(challenging.notes[0].contains("Effective Skill 10"));
+
+    let combined = roll_at_seed("tbe60 hard +5", 42);
+    assert_eq!(combined.individual_rolls, vec![14]);
+    assert!(combined.notes[0].contains("Modifier -15"));
+    assert!(combined.notes[0].contains("Effective Skill 45"));
 
     let commented = roll_one("tbe60 hard ! melee attack", "named difficulty comment");
     assert_eq!(commented.comment.as_deref(), Some("melee attack"));
@@ -1106,6 +1122,13 @@ fn test_broken_empires_favor() {
         ("tbe60 favor3", "1d100 tbe60 favor3"),
         ("tbe60 hard favor2", "1d100 tbe60 -20 favor2"),
         ("tbe60-15 favor1", "1d100 tbe60 -15 favor1"),
+        ("tbe60 favor2 hard", "1d100 tbe60 -20 favor2"),
+        ("tbe60 hard +5 favor2", "1d100 tbe60 -20 +5 favor2"),
+        ("tbe60 hard favor2 +5", "1d100 tbe60 -20 +5 favor2"),
+        ("tbe60 +5 hard favor2", "1d100 tbe60 -20 +5 favor2"),
+        ("tbe60 +5 favor2 hard", "1d100 tbe60 -20 +5 favor2"),
+        ("tbe60 favor2 hard +5", "1d100 tbe60 -20 +5 favor2"),
+        ("tbe60 favor2 +5 hard", "1d100 tbe60 -20 +5 favor2"),
     ] {
         assert_alias_matches_expansion(alias, expansion);
     }
@@ -1131,6 +1154,15 @@ fn test_broken_empires_favor() {
     let commented = roll_one("tbe60 favor1 ! aided research", "Favor comment");
     assert_eq!(commented.comment.as_deref(), Some("aided research"));
     assert_labelled_roll_sets("3 tbe60 favor3", "TBE Favor roll sets");
+    let reordered = roll_one(
+        "tbe60 favor2 hard +5 ! defended strike",
+        "reordered TBE options with a comment",
+    );
+    assert_eq!(reordered.comment.as_deref(), Some("defended strike"));
+    assert_labelled_roll_sets(
+        "3 tbe60 +5 favor2 hard",
+        "reordered TBE options in roll sets",
+    );
 
     for invalid in [
         "tbe60 favor0",
@@ -1142,8 +1174,30 @@ fn test_broken_empires_favor() {
         "1d100 wfrp60 favor2",
         "1d100 ms60 favor2",
         "1d100 wfrp60 tbe60 favor2",
+        "tbe60 hard easy",
     ] {
         assert_invalid(invalid);
+    }
+}
+
+#[test]
+fn test_broken_empires_rejects_other_game_system_modifiers() {
+    for expression in [
+        // These handlers are dispatched before ordinary modifiers and must not
+        // silently win merely because their modifier appears alongside TBE.
+        "1d100 wfrp60 tbe60",
+        "1d100 tbe60 wfrp60",
+        "1d20 conan2 tbe60",
+        "1d6 cd1 tbe60",
+        // Systems handled after rolling must be rejected just as consistently.
+        "1d100 tbe60 ms60",
+        "1d100 tbe60 cpr",
+        "1d100 tbe60 wit",
+        "1d100 tbe60 mnm",
+        "1d100 tbe60 alien",
+        "1d100 tbe60 fitd",
+    ] {
+        assert_invalid(expression);
     }
 }
 

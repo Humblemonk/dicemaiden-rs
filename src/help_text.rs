@@ -399,6 +399,7 @@ Roll d100 equal to or under a skill, aiming as high as possible.
 - `simple` +20, `easy` +10, `medium` +0
 - `challenging` -10, `hard` -20, `severe` -30
 - `tbe60 hard` → effective skill 40
+- `tbe60 hard +5` → Hard and a custom +5, for effective skill 45
 - `tbe60-15` → custom -15 task modifier
 
 **Favor:**
@@ -406,20 +407,27 @@ Roll d100 equal to or under a skill, aiming as high as possible.
 - Each Favor adds +10 to the effective skill; no more than 3 may be spent
 - `tbe60 favor2` → effective skill 80
 - `tbe60 hard favor2` → Hard -20 and Favor +20, for effective skill 60
+- Difficulty, a custom modifier, and Favor may appear in any order
+- TBE cannot be combined with another game system's modifier
 
 **Success Levels:**
 - A successful roll's tens digit is its SL: 42 scores 4 SL
 - Successful 01-09 scores a minimum of 1 SL
+- Effective skills over 100 add the tens digit of the excess, minimum +1 SL
+- Skill 105 adds +1 SL; skill 120 adds +2 SL to every success
+- There are no negative SL; a failed test produces 0 SL
 - 01-05 always succeeds; 99-00 always fails
 
 **Criticals:**
 - A successful double, 05, or exact effective-skill match is a Critical Success
 - Critical Success adds +3 SL
 - A failed double is a Critical Failure
+- On a defensive combat roll, a Critical Failure gives the opponent +1 bonus SL
 - 99 is critical when the skill is below 99
 - 00 is critical when the skill is below 100
 - Against skill 99, a 99 is an ordinary automatic failure
-- Against skill 100, a 00 is an ordinary automatic failure"#
+- Against skill 100, a 00 is an ordinary automatic failure
+- Above skill 100, neither 99 nor 00 is a Critical Failure"#
         .to_string()
 }
 

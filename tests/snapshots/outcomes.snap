@@ -385,10 +385,13 @@
 1d100 tbe100	always-ok n=Some(1)
 1d100 tbe101	always-ok n=Some(1)
 1d100 tbe110	always-ok n=Some(1)
+1d100 tbe120	always-ok n=Some(1)
 1d100 tbe60 favor1	always-ok n=Some(1)
 1d100 tbe60 favor3	always-ok n=Some(1)
 1d100 wfrp60 favor2	always-err {"Favor can only be spent on a The Broken Empires skill test"}
 1d100 ms60 favor2	always-err {"Favor can only be spent on a The Broken Empires skill test"}
+1d100 wfrp60 tbe60	always-err {"The Broken Empires skill test only supports +N and -N task modifiers"}
+1d100 tbe60 wfrp60	always-err {"The Broken Empires skill test only supports +N and -N task modifiers"}
 1d100 wfrp0	always-ok n=Some(1)
 1d100 wfrp1	always-ok n=Some(1)
 1d100 wfrp100	always-ok n=Some(1)
@@ -2215,11 +2218,14 @@ tbe1	always-ok n=Some(1)
 tbe65	always-ok n=Some(1)
 tbe100	always-ok n=Some(1)
 tbe110	always-ok n=Some(1)
+tbe120	always-ok n=Some(1)
 tbe60 simple	always-ok n=Some(1)
 tbe60 easy	always-ok n=Some(1)
 tbe60 medium	always-ok n=Some(1)
 tbe60 challenging	always-ok n=Some(1)
 tbe60 hard	always-ok n=Some(1)
+tbe60 hard +5	always-ok n=Some(1)
+tbe60 favor2 hard +5	always-ok n=Some(1)
 tbe60 hard ! melee attack	always-ok n=Some(1)
 tbe60 severe	always-ok n=Some(1)
 tbe60-15	always-ok n=Some(1)

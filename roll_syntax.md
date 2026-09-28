@@ -290,11 +290,17 @@ Modifiers apply in stages, not in the order you type them:
 - `3 tbe45` → three separate skill tests
 - Roll equal to or under the skill, aiming as high as possible
 - A successful roll's tens digit is its Success Levels; 01-09 scores at least 1 SL
+- An effective skill over 100 adds the tens digit of the amount over 100 to
+  every success, with a minimum bonus of +1 SL
+- `tbe105` adds +1 SL, so a roll of 83 scores 9 SL; `tbe120` adds +2 SL
+- There are no negative Success Levels; a failed test produces 0 SL
 - 01-05 always succeeds, while 99-00 always fails
 - A successful double, 05, or exact skill match is a Critical Success and adds +3 SL
 - A failed double is a Critical Failure
+- On a defensive combat roll, a Critical Failure gives the opponent +1 bonus SL
 - 99 is critical when the skill is below 99; 00 is critical when it is below 100
 - At skill 99 or 100, the matching automatic failure is not critical
+- At skills over 100, neither 99 nor 00 is a Critical Failure
 
 Task difficulty changes the effective skill before resolving the test:
 
@@ -308,6 +314,7 @@ Task difficulty changes the effective skill before resolving the test:
 | Severe | -30 |
 
 - `tbe60 hard` → roll against an effective skill of 40
+- `tbe60 hard +5` → combine Hard (-20) with a custom +5, for effective skill 45
 - `tbe60-15` or `tbe60 - 15` → apply a custom -15 modifier
 - `tbe60+25` → apply a custom +25 modifier
 - An exact roll matching the effective skill is a Critical Success
@@ -319,6 +326,9 @@ spend 1-3 Favor, and Favor stacks with its task modifier:
 - `tbe60 favor3` → spend the maximum 3 Favor and roll against effective skill 90
 - `tbe60 hard favor2` → -20 for Hard and +20 for Favor, for effective skill 60
 - `tbe60-15 favor1` → -15 task modifier and +10 for Favor, for effective skill 55
+- Difficulty, a custom modifier, and Favor may appear in any order after the skill;
+  `tbe60 favor2 +5 hard` is equivalent to `tbe60 hard +5 favor2`
+- A TBE skill test cannot be combined with another game system's modifier
 
 ### Marvel Multiverse RPG
 - `mm` → 3d6 Marvel Multiverse basic roll

@@ -385,10 +385,13 @@
 1d100 tbe100
 1d100 tbe101
 1d100 tbe110
+1d100 tbe120
 1d100 tbe60 favor1
 1d100 tbe60 favor3
 1d100 wfrp60 favor2
 1d100 ms60 favor2
+1d100 wfrp60 tbe60
+1d100 tbe60 wfrp60
 1d100 wfrp0
 1d100 wfrp1
 1d100 wfrp100
@@ -2215,11 +2218,14 @@ tbe1
 tbe65
 tbe100
 tbe110
+tbe120
 tbe60 simple
 tbe60 easy
 tbe60 medium
 tbe60 challenging
 tbe60 hard
+tbe60 hard +5
+tbe60 favor2 hard +5
 tbe60 hard ! melee attack
 tbe60 severe
 tbe60-15

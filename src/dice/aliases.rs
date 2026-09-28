@@ -180,11 +180,14 @@ static WFRP_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^wfrp(\d+)(?:\s*([+-])\s*(\d+))?$").expect("Failed to compile WFRP_REGEX")
 });
 
-static TBE_REGEX: Lazy<Regex> = Lazy::new(|| {
+static TBE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^tbe(\d+)(.*)$").expect("Failed to compile TBE_REGEX"));
+
+static TBE_OPTION_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"^tbe(\d+)(?:\s*(?:(simple|easy|medium|challenging|hard|severe)|([+-])\s*(\d+)))?(?:\s+favor(\d+))?$",
+        r"^(?:\s*(simple|easy|medium|challenging|hard|severe)\b|\s*([+-])\s*(\d+)|\s+favor(\d+)\b)",
     )
-        .expect("Failed to compile TBE_REGEX")
+    .expect("Failed to compile TBE_OPTION_REGEX")
 });
 
 static CS_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -861,41 +864,59 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
             return None;
         }
 
-        let favor = captures
-            .get(5)
-            .map(|points| points.as_str().parse::<u32>())
-            .transpose()
-            .ok()?;
-        if favor.is_some_and(|points| !(1..=3).contains(&points)) {
-            return None;
+        let mut difficulty = None;
+        let mut custom_modifier = None;
+        let mut favor = None;
+        let mut remaining = captures.get(2)?.as_str();
+
+        while !remaining.trim().is_empty() {
+            let option = TBE_OPTION_REGEX.captures(remaining)?;
+            if let Some(name) = option.get(1) {
+                if difficulty.is_some() {
+                    return None;
+                }
+                difficulty = Some(match name.as_str() {
+                    "simple" => 20,
+                    "easy" => 10,
+                    "medium" => 0,
+                    "challenging" => -10,
+                    "hard" => -20,
+                    "severe" => -30,
+                    _ => return None,
+                });
+            } else if let (Some(sign), Some(amount)) = (option.get(2), option.get(3)) {
+                if custom_modifier.is_some() {
+                    return None;
+                }
+                let amount: i32 = amount.as_str().parse().ok()?;
+                custom_modifier = Some(if sign.as_str() == "+" {
+                    amount
+                } else {
+                    -amount
+                });
+            } else if let Some(points) = option.get(4) {
+                if favor.is_some() {
+                    return None;
+                }
+                let points: u32 = points.as_str().parse().ok()?;
+                if !(1..=3).contains(&points) {
+                    return None;
+                }
+                favor = Some(points);
+            } else {
+                return None;
+            }
+
+            remaining = &remaining[option.get(0)?.end()..];
         }
 
-        let modifier = if let Some(difficulty) = captures.get(2) {
-            match difficulty.as_str() {
-                "simple" => 20,
-                "easy" => 10,
-                "medium" => 0,
-                "challenging" => -10,
-                "hard" => -20,
-                "severe" => -30,
-                _ => return None,
-            }
-        } else if let (Some(sign), Some(amount)) = (captures.get(3), captures.get(4)) {
-            let amount: i32 = amount.as_str().parse().ok()?;
-            if sign.as_str() == "+" {
-                amount
-            } else {
-                -amount
-            }
-        } else {
-            0
-        };
-
-        let mut expansion = if modifier == 0 {
-            format!("1d100 tbe{skill}")
-        } else {
-            format!("1d100 tbe{skill} {modifier:+}")
-        };
+        let mut expansion = format!("1d100 tbe{skill}");
+        if let Some(modifier) = difficulty.filter(|modifier| *modifier != 0) {
+            expansion.push_str(&format!(" {modifier:+}"));
+        }
+        if let Some(modifier) = custom_modifier.filter(|modifier| *modifier != 0) {
+            expansion.push_str(&format!(" {modifier:+}"));
+        }
         if let Some(points) = favor {
             expansion.push_str(&format!(" favor{points}"));
         }

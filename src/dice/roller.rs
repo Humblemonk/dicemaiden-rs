@@ -103,12 +103,16 @@ pub fn roll_dice_with_rng(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
         .iter()
         .any(|modifier| matches!(modifier, Modifier::BrokenEmpiresFavor(_)));
 
-    if spends_favor {
-        if !has_broken_empires {
-            return Err(anyhow!(
-                "Favor can only be spent on a The Broken Empires skill test"
-            ));
-        }
+    if spends_favor && !has_broken_empires {
+        return Err(anyhow!(
+            "Favor can only be spent on a The Broken Empires skill test"
+        ));
+    }
+
+    // TBE validates its complete modifier list. Dispatch it before every other
+    // system so a competing handler cannot silently claim the roll and ignore
+    // the TBE modifier.
+    if has_broken_empires {
         return handle_broken_empires_roll(dice, rng);
     }
 
@@ -138,10 +142,6 @@ pub fn roll_dice_with_rng(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
 
     if has_wfrp {
         return handle_wfrp_roll(dice, rng);
-    }
-
-    if has_broken_empires {
-        return handle_broken_empires_roll(dice, rng);
     }
 
     // Check if this is a D6 System roll - handle it specially
@@ -4105,7 +4105,12 @@ pub fn broken_empires_test_outcome(effective_skill: i64, roll: i32) -> BrokenEmp
     };
 
     let success_levels = if success {
-        (roll / 10).max(1) + if critical { 3 } else { 0 }
+        let skill_bonus = if effective_skill > 100 {
+            ((effective_skill - 100) / 10).max(1) as i32
+        } else {
+            0
+        };
+        (roll / 10).max(1) + skill_bonus + if critical { 3 } else { 0 }
     } else {
         0
     };
