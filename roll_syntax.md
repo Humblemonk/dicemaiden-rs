@@ -330,6 +330,15 @@ spend 1-3 Favor, and Favor stacks with its task modifier:
   `tbe60 favor2 +5 hard` is equivalent to `tbe60 hard +5 favor2`
 - A TBE skill test cannot be combined with another game system's modifier
 
+Expertise sets a positive SL floor on a successful test:
+
+- `tbe65e4` → a success scores at least 4 SL
+- Expertise never turns a failed test into a success
+- Expertise and Critical Success SL do not add together; use whichever result is higher
+- With Expertise 4, a roll of 12 scores 4 SL; with Expertise 2, a critical 11
+  scores 4 SL
+- Append `e` and the Expertise value directly to the skill, before other options
+
 ### Marvel Multiverse RPG
 - `mm` → 3d6 Marvel Multiverse basic roll
 - `mm e` → 3d6 with 1 edge (reroll lowest die, keep higher)

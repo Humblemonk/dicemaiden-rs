@@ -185,7 +185,7 @@ static TBE_REGEX: Lazy<Regex> =
 
 static TBE_OPTION_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"^(?:\s*(simple|easy|medium|challenging|hard|severe)\b|\s*([+-])\s*(\d+)|\s+favor(\d+)\b)",
+        r"^(?:\s*(simple|easy|medium|challenging|hard|severe)\b|\s*([+-])\s*(\d+)|\s+favor(\d+)\b|\s*e(\d+)\b)",
     )
     .expect("Failed to compile TBE_OPTION_REGEX")
 });
@@ -867,6 +867,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let mut difficulty = None;
         let mut custom_modifier = None;
         let mut favor = None;
+        let mut expertise = None;
         let mut remaining = captures.get(2)?.as_str();
 
         while !remaining.trim().is_empty() {
@@ -903,6 +904,15 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
                     return None;
                 }
                 favor = Some(points);
+            } else if let Some(level) = option.get(5) {
+                if expertise.is_some() {
+                    return None;
+                }
+                let level: u32 = level.as_str().parse().ok()?;
+                if level == 0 || level > i32::MAX as u32 {
+                    return None;
+                }
+                expertise = Some(level);
             } else {
                 return None;
             }
@@ -911,6 +921,9 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         }
 
         let mut expansion = format!("1d100 tbe{skill}");
+        if let Some(level) = expertise {
+            expansion.push_str(&format!("e{level}"));
+        }
         if let Some(modifier) = difficulty.filter(|modifier| *modifier != 0) {
             expansion.push_str(&format!(" {modifier:+}"));
         }
@@ -920,7 +933,6 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         if let Some(points) = favor {
             expansion.push_str(&format!(" favor{points}"));
         }
-
         return Some(expansion);
     }
 

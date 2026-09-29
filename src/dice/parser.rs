@@ -1033,7 +1033,7 @@ static SPLIT_MODIFIER_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^(cpd)",                        // cyberpunk red damage — cpd (BEFORE cancel's bare `c`)
         r"^(c)",                          // cancel — c
         r"^(wfrp\d+)",                    // warhammer fantasy — wfrp67 (BEFORE wng/wit/ww)
-        r"^(tbe\d+)",                     // The Broken Empires — tbe65 (BEFORE t)
+        r"^(tbe\d+(?:e\d+)?)",            // The Broken Empires — tbe65e4 (BEFORE t/e)
         r"^(wng\d*t?)",                   // wrath & glory — wng patterns
         r"^(gb|gbs)",                     // godbound — gb, gbs
         r"^(hs[nkh])",                    // hero system — hsn, hsk, hsh
@@ -1463,25 +1463,25 @@ static MODIFIER_START_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^b\d*",     // Botch: b, b1
         r"^c$",       // Cancel: c (exact match)
         // System modifiers
-        r"^wfrp\d+",   // Warhammer Fantasy 4e: wfrp67
-        r"^tbe\d+",    // The Broken Empires: tbe65 (before t)
-        r"^wng",       // Wrath & Glory patterns
-        r"^gb$",       // Godbound (exact)
-        r"^gbs$",      // Godbound straight (exact)
-        r"^hs[nkh]",   // Hero System
-        r"^dh$",       // Dark Heresy (exact)
-        r"^fudge$",    // Fudge (exact)
-        r"^df$",       // Fudge dice (exact)
-        r"^d6s\d+",    // D6 System
-        r"^cpr$",      // Cyberpunk Red (exact)
-        r"^cpd$",      // Cyberpunk Red damage (exact)
-        r"^wit$",      // Witcher (exact)
-        r"^alien$",    // Alien base modifier (exact)
-        r"^aliens\d+", // Alien stress modifiers: aliens1, aliens2, etc.
-        r"^fitd$",     // Forged in the Dark (exact)
-        r"^fitd0$",    // FitD zero dice (exact)
-        r"^plot$",     // Plotweaver/Cosmere RPG plot die (exact)
-        r"^tdhc?$",    // The Darkest House die: tdh, tdhc (exact)
+        r"^wfrp\d+",         // Warhammer Fantasy 4e: wfrp67
+        r"^tbe\d+(?:e\d+)?", // The Broken Empires: tbe65e4 (before t/e)
+        r"^wng",             // Wrath & Glory patterns
+        r"^gb$",             // Godbound (exact)
+        r"^gbs$",            // Godbound straight (exact)
+        r"^hs[nkh]",         // Hero System
+        r"^dh$",             // Dark Heresy (exact)
+        r"^fudge$",          // Fudge (exact)
+        r"^df$",             // Fudge dice (exact)
+        r"^d6s\d+",          // D6 System
+        r"^cpr$",            // Cyberpunk Red (exact)
+        r"^cpd$",            // Cyberpunk Red damage (exact)
+        r"^wit$",            // Witcher (exact)
+        r"^alien$",          // Alien base modifier (exact)
+        r"^aliens\d+",       // Alien stress modifiers: aliens1, aliens2, etc.
+        r"^fitd$",           // Forged in the Dark (exact)
+        r"^fitd0$",          // FitD zero dice (exact)
+        r"^plot$",           // Plotweaver/Cosmere RPG plot die (exact)
+        r"^tdhc?$",          // The Darkest House die: tdh, tdhc (exact)
     ]
     .iter()
     .map(|pattern| Regex::new(pattern).expect("Failed to compile MODIFIER_START_PATTERNS entry"))
@@ -1803,15 +1803,40 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
 
     if let Some(stripped) = part.strip_prefix("tbe")
         && !stripped.is_empty()
-        && stripped.chars().all(|c| c.is_ascii_digit())
     {
-        let skill: u32 = stripped
+        let (skill_text, expertise_text) = stripped
+            .split_once('e')
+            .map_or((stripped, None), |(skill, expertise)| {
+                (skill, Some(expertise))
+            });
+        if !skill_text.chars().all(|c| c.is_ascii_digit())
+            || expertise_text
+                .is_some_and(|value| value.is_empty() || !value.chars().all(|c| c.is_ascii_digit()))
+        {
+            return Err(anyhow!("Invalid Broken Empires skill in '{}'", part));
+        }
+
+        let skill: u32 = skill_text
             .parse()
             .map_err(|_| anyhow!("Invalid Broken Empires skill in '{}'", part))?;
         if skill == 0 {
             return Err(anyhow!("Broken Empires skill must be greater than 0"));
         }
-        return Ok(Modifier::BrokenEmpires(skill));
+        let expertise: u32 = expertise_text
+            .unwrap_or("0")
+            .parse()
+            .map_err(|_| anyhow!("Invalid Broken Empires Expertise in '{}'", part))?;
+        if expertise_text.is_some() && expertise == 0 {
+            return Err(anyhow!("Broken Empires Expertise must be positive"));
+        }
+        if expertise > i32::MAX as u32 {
+            return Err(anyhow!("Broken Empires Expertise is too large"));
+        }
+        return if expertise == 0 {
+            Ok(Modifier::BrokenEmpires(skill))
+        } else {
+            Ok(Modifier::BrokenEmpiresWithExpertise(skill, expertise))
+        };
     }
 
     if let Some(stripped) = part.strip_prefix("favor") {

@@ -10,7 +10,9 @@ use dicemaiden_rs::{
     RollResult,
     dice::aliases,
     dice::rng::create_seeded_rng,
-    dice::roller::{broken_empires_test_outcome, wfrp_test_outcome},
+    dice::roller::{
+        broken_empires_test_outcome, broken_empires_test_outcome_with_expertise, wfrp_test_outcome,
+    },
     parse_and_roll, parse_and_roll_with_rng,
 };
 
@@ -1067,6 +1069,67 @@ fn test_broken_empires_outcomes() {
             "skill {skill}, roll {roll}"
         );
     }
+}
+
+#[test]
+fn test_broken_empires_expertise_outcomes() {
+    // Expertise is a floor for a successful roll's final SL, not an additive
+    // bonus. A critical's +3 SL can therefore beat the expertise floor.
+    let cases = vec![
+        // (skill, expertise, roll, success, critical, success levels)
+        (65, 4, 12, true, false, 4),
+        (45, 2, 11, true, true, 4),
+        (45, 4, 11, true, true, 4),
+        (65, 2, 42, true, false, 4),
+        (10, 4, 12, false, false, 0),
+    ];
+
+    for (skill, expertise, roll, success, critical, success_levels) in cases {
+        let outcome = broken_empires_test_outcome_with_expertise(skill, expertise, roll);
+        assert_eq!(
+            (outcome.success, outcome.critical, outcome.success_levels),
+            (success, critical, success_levels),
+            "skill {skill}, expertise {expertise}, roll {roll}"
+        );
+    }
+}
+
+#[test]
+fn test_broken_empires_expertise_syntax() {
+    for (alias, expansion) in [
+        ("tbe65e1", "1d100 tbe65e1"),
+        ("tbe65e4", "1d100 tbe65e4"),
+        ("tbe98e9", "1d100 tbe98e9"),
+        ("tbe98e10", "1d100 tbe98e10"),
+        ("tbe60e3 hard favor2 +5", "1d100 tbe60e3 -20 +5 favor2"),
+        ("tbe60e3 +5 favor2 hard", "1d100 tbe60e3 -20 +5 favor2"),
+    ] {
+        assert_alias_matches_expansion(alias, expansion);
+    }
+
+    let floor = roll_at_seed("tbe65e4", 42);
+    assert_eq!(floor.individual_rolls, vec![14]);
+    assert_eq!(floor.total, 4);
+    assert!(floor.notes[0].contains("Expertise 4"));
+
+    let high_expertise = roll_at_seed("tbe98e9", 42);
+    assert_eq!(high_expertise.individual_rolls, vec![14]);
+    assert_eq!(high_expertise.total, 9);
+    assert!(high_expertise.notes[0].contains("Expertise 9"));
+
+    let uncapped_expertise = roll_at_seed("tbe98e10", 42);
+    assert_eq!(uncapped_expertise.total, 10);
+
+    let commented = roll_one("tbe65e2 ! careful search", "TBE Expertise comment");
+    assert_eq!(commented.comment.as_deref(), Some("careful search"));
+    assert_labelled_roll_sets("3 tbe65e2", "TBE Expertise roll sets");
+
+    assert_valid("1d6 e6");
+    assert_valid("ex1");
+    assert_valid("tbe98e2147483647");
+    assert_invalid("tbe65e0");
+    assert_invalid("tbe98e2147483648");
+    assert_invalid("tbe65 expertise4");
 }
 
 #[test]

@@ -388,6 +388,13 @@
 1d100 tbe120	always-ok n=Some(1)
 1d100 tbe60 favor1	always-ok n=Some(1)
 1d100 tbe60 favor3	always-ok n=Some(1)
+1d100 tbe65e1	always-ok n=Some(1)
+1d100 tbe65e4	always-ok n=Some(1)
+1d100 tbe98e9	always-ok n=Some(1)
+1d100 tbe98e10	always-ok n=Some(1)
+1d100 tbe98e2147483647	always-ok n=Some(1)
+1d100 tbe98e2147483648	always-err {"Broken Empires Expertise is too large"}
+1d1 tbe65e4	always-err {"The Broken Empires skill test requires exactly 1d100"}
 1d100 wfrp60 favor2	always-err {"Favor can only be spent on a The Broken Empires skill test"}
 1d100 ms60 favor2	always-err {"Favor can only be spent on a The Broken Empires skill test"}
 1d100 wfrp60 tbe60	always-err {"The Broken Empires skill test only supports +N and -N task modifiers"}
@@ -1002,6 +1009,7 @@
 3 tdh4	always-ok n=Some(3)
 3 tbe45	always-ok n=Some(3)
 3 tbe60 hard	always-ok n=Some(3)
+3 tbe65e2	always-ok n=Some(3)
 3 wfrp45	always-ok n=Some(3)
 3 wit	always-ok n=Some(3)
 3 wng 4d6 !soak	always-ok n=Some(3)
@@ -2233,6 +2241,16 @@ tbe60 + 25	always-ok n=Some(1)
 tbe60 favor1	always-ok n=Some(1)
 tbe60 hard favor3	always-ok n=Some(1)
 tbe60-15 favor2	always-ok n=Some(1)
+tbe65e1	always-ok n=Some(1)
+tbe65e4	always-ok n=Some(1)
+tbe98e9	always-ok n=Some(1)
+tbe98e10	always-ok n=Some(1)
+tbe45e2 ! critical can beat expertise	always-ok n=Some(1)
+tbe60e3 +5 favor2 hard	always-ok n=Some(1)
+tbe60e3 hard favor2 +5	always-ok n=Some(1)
+tbe65e0	always-err {"Invalid dice expression: tbe65e0"}
+tbe98e2147483647	always-ok n=Some(1)
+tbe98e2147483648	always-err {"Invalid dice expression: tbe98e2147483648"}
 tbe60 favor0	always-err {"Broken Empires Favor spent per roll must be 1-3, got 0"}
 tbe60 favor4	always-err {"Broken Empires Favor spent per roll must be 1-3, got 4"}
 tl6	always-err {"Invalid dice expression: tl6"}

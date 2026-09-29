@@ -388,6 +388,13 @@
 1d100 tbe120
 1d100 tbe60 favor1
 1d100 tbe60 favor3
+1d100 tbe65e1
+1d100 tbe65e4
+1d100 tbe98e9
+1d100 tbe98e10
+1d100 tbe98e2147483647
+1d100 tbe98e2147483648
+1d1 tbe65e4
 1d100 wfrp60 favor2
 1d100 ms60 favor2
 1d100 wfrp60 tbe60
@@ -1002,6 +1009,7 @@
 3 tdh4
 3 tbe45
 3 tbe60 hard
+3 tbe65e2
 3 wfrp45
 3 wit
 3 wng 4d6 !soak
@@ -2233,6 +2241,16 @@ tbe60 + 25
 tbe60 favor1
 tbe60 hard favor3
 tbe60-15 favor2
+tbe65e1
+tbe65e4
+tbe98e9
+tbe98e10
+tbe45e2 ! critical can beat expertise
+tbe60e3 +5 favor2 hard
+tbe60e3 hard favor2 +5
+tbe65e0
+tbe98e2147483647
+tbe98e2147483648
 tbe60 favor0
 tbe60 favor4
 tl6

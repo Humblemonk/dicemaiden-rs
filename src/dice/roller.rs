@@ -94,10 +94,12 @@ pub fn roll_dice_with_rng(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
         return Err(anyhow!("Cannot roll 0 dice"));
     }
 
-    let has_broken_empires = dice
-        .modifiers
-        .iter()
-        .any(|modifier| matches!(modifier, Modifier::BrokenEmpires(_)));
+    let has_broken_empires = dice.modifiers.iter().any(|modifier| {
+        matches!(
+            modifier,
+            Modifier::BrokenEmpires(_) | Modifier::BrokenEmpiresWithExpertise(_, _)
+        )
+    });
     let spends_favor = dice
         .modifiers
         .iter()
@@ -975,7 +977,7 @@ fn apply_special_system_modifiers(
                 // WFRP is handled in the main roll_dice function
                 // Don't process it here
             }
-            Modifier::BrokenEmpires(_) => {
+            Modifier::BrokenEmpires(_) | Modifier::BrokenEmpiresWithExpertise(_, _) => {
                 // The Broken Empires is handled in the main roll_dice function
             }
             Modifier::BrokenEmpiresFavor(_) => {
@@ -4047,7 +4049,14 @@ pub struct BrokenEmpiresTest {
 }
 
 impl BrokenEmpiresTest {
-    fn notes(&self, skill: u32, modifier: i64, favor: u32, roll: i32) -> Vec<String> {
+    fn notes(
+        &self,
+        skill: u32,
+        modifier: i64,
+        favor: u32,
+        expertise: u32,
+        roll: i32,
+    ) -> Vec<String> {
         let verdict = match (self.success, self.critical, roll) {
             (true, true, _) => "**CRITICAL SUCCESS**",
             (true, false, 1..=5) => "**AUTOMATIC SUCCESS** (01-05)",
@@ -4059,7 +4068,7 @@ impl BrokenEmpiresTest {
 
         let favor_bonus = i64::from(favor) * 10;
         let effective_skill = i64::from(skill) + modifier + favor_bonus;
-        let test = if modifier == 0 && favor == 0 {
+        let test = if modifier == 0 && favor == 0 && expertise == 0 {
             format!("Skill {skill}")
         } else {
             let mut details = vec![format!("Skill {skill}")];
@@ -4068,6 +4077,9 @@ impl BrokenEmpiresTest {
             }
             if favor > 0 {
                 details.push(format!("Favor {favor} (+{favor_bonus})"));
+            }
+            if expertise > 0 {
+                details.push(format!("Expertise {expertise}"));
             }
             details.push(format!("Effective Skill {effective_skill}"));
             details.join(", ")
@@ -4091,6 +4103,15 @@ impl BrokenEmpiresTest {
 
 /// Resolve one The Broken Empires skill test without rolling it.
 pub fn broken_empires_test_outcome(effective_skill: i64, roll: i32) -> BrokenEmpiresTest {
+    broken_empires_test_outcome_with_expertise(effective_skill, 0, roll)
+}
+
+/// Resolve a The Broken Empires skill test with an Expertise SL floor.
+pub fn broken_empires_test_outcome_with_expertise(
+    effective_skill: i64,
+    expertise: u32,
+    roll: i32,
+) -> BrokenEmpiresTest {
     let automatic_success = roll <= 5;
     let automatic_failure = roll >= 99;
     let success = automatic_success || (!automatic_failure && i64::from(roll) <= effective_skill);
@@ -4110,7 +4131,8 @@ pub fn broken_empires_test_outcome(effective_skill: i64, roll: i32) -> BrokenEmp
         } else {
             0
         };
-        (roll / 10).max(1) + skill_bonus + if critical { 3 } else { 0 }
+        let expertise_floor = i32::try_from(expertise).unwrap_or(i32::MAX);
+        ((roll / 10).max(1) + skill_bonus + if critical { 3 } else { 0 }).max(expertise_floor)
     } else {
         0
     };
@@ -4129,11 +4151,12 @@ fn handle_broken_empires_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<Roll
         ));
     }
 
-    let skill = dice
+    let (skill, expertise) = dice
         .modifiers
         .iter()
         .find_map(|modifier| match modifier {
-            Modifier::BrokenEmpires(skill) => Some(*skill),
+            Modifier::BrokenEmpires(skill) => Some((*skill, 0)),
+            Modifier::BrokenEmpiresWithExpertise(skill, expertise) => Some((*skill, *expertise)),
             _ => None,
         })
         .ok_or_else(|| anyhow!("Expected Broken Empires modifier"))?;
@@ -4142,7 +4165,7 @@ fn handle_broken_empires_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<Roll
         .modifiers
         .iter()
         .try_fold(0i64, |total, modifier| match modifier {
-            Modifier::BrokenEmpires(_) => Ok(total),
+            Modifier::BrokenEmpires(_) | Modifier::BrokenEmpiresWithExpertise(_, _) => Ok(total),
             Modifier::BrokenEmpiresFavor(_) => Ok(total),
             Modifier::Add(value) => Ok(total + i64::from(*value)),
             Modifier::Subtract(value) => Ok(total - i64::from(*value)),
@@ -4163,8 +4186,8 @@ fn handle_broken_empires_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<Roll
     let effective_skill = i64::from(skill) + task_modifier + i64::from(favor) * 10;
 
     let roll = rng.random_range(1..=100);
-    let outcome = broken_empires_test_outcome(effective_skill, roll);
-    let notes = outcome.notes(skill, task_modifier, favor, roll);
+    let outcome = broken_empires_test_outcome_with_expertise(effective_skill, expertise, roll);
+    let notes = outcome.notes(skill, task_modifier, favor, expertise, roll);
 
     Ok(RollResult {
         individual_rolls: vec![roll],
