@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.6] - 2026-10-01
+
+## Security
+
+- Updated rustls to 0.23.45 for RUSTSEC-2026-0285, along with rand and other dependencies.
+
 ## [1.6.5] - 2026-09-05
 
 ## Fixed
