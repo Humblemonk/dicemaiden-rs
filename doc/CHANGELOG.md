@@ -9,6 +9,12 @@
   (`tbe60 hard`), a custom modifier (`tbe60 - 15`), Favor (`tbe60 favor2`), and Expertise
   (`tbe65e4`) in any order after the skill. `/help tbe` covers the rules.
 
+## Changed
+
+- The container image now checks that the bot can run on the image's own system libraries.
+  It is compiled on a newer Linux than it runs on, so a dependency update could produce an
+  image that built cleanly and then failed at startup. That now fails the build instead.
+
 ## [1.6.6] - 2026-10-01
 
 ## Security
