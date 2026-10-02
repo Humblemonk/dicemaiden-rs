@@ -399,6 +399,8 @@
 1d100 ms60 favor2
 1d100 wfrp60 tbe60
 1d100 tbe60 wfrp60
+1d100 tbe60 tbe70
+tbe65 e4
 1d100 wfrp0
 1d100 wfrp1
 1d100 wfrp100

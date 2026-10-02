@@ -297,7 +297,6 @@ Modifiers apply in stages, not in the order you type them:
 - 01-05 always succeeds, while 99-00 always fails
 - A successful double, 05, or exact skill match is a Critical Success and adds +3 SL
 - A failed double is a Critical Failure
-- On a defensive combat roll, a Critical Failure gives the opponent +1 bonus SL
 - 99 is critical when the skill is below 99; 00 is critical when it is below 100
 - At skill 99 or 100, the matching automatic failure is not critical
 - At skills over 100, neither 99 nor 00 is a Critical Failure

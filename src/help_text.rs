@@ -420,7 +420,7 @@ Roll d100 equal to or under a skill, aiming as high as possible.
 **Criticals:**
 - A successful double, 05, or exact effective-skill match is a Critical Success
 - Critical Success adds +3 SL
-- A failed double is Critical; on defense it gives the opponent +1 bonus SL
+- A failed double is a Critical Failure
 - 99 is critical below skill 99; 00 is critical below skill 100
 - Above skill 100, neither 99 nor 00 is critical"#
         .to_string()

@@ -1033,7 +1033,7 @@ static SPLIT_MODIFIER_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^(cpd)",                        // cyberpunk red damage — cpd (BEFORE cancel's bare `c`)
         r"^(c)",                          // cancel — c
         r"^(wfrp\d+)",                    // warhammer fantasy — wfrp67 (BEFORE wng/wit/ww)
-        r"^(tbe\d+(?:e\d+)?)",            // The Broken Empires — tbe65e4 (BEFORE t/e)
+        r"^(tbe\d+(?:e\d+)?)",            // The Broken Empires — tbe65e4 (keeps e# as Expertise)
         r"^(wng\d*t?)",                   // wrath & glory — wng patterns
         r"^(gb|gbs)",                     // godbound — gb, gbs
         r"^(hs[nkh])",                    // hero system — hsn, hsk, hsh
@@ -1464,7 +1464,7 @@ static MODIFIER_START_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^c$",       // Cancel: c (exact match)
         // System modifiers
         r"^wfrp\d+",         // Warhammer Fantasy 4e: wfrp67
-        r"^tbe\d+(?:e\d+)?", // The Broken Empires: tbe65e4 (before t/e)
+        r"^tbe\d+(?:e\d+)?", // The Broken Empires: tbe65e4 (e# is Expertise)
         r"^wng",             // Wrath & Glory patterns
         r"^gb$",             // Godbound (exact)
         r"^gbs$",            // Godbound straight (exact)
@@ -1832,11 +1832,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         if expertise > i32::MAX as u32 {
             return Err(anyhow!("Broken Empires Expertise is too large"));
         }
-        return if expertise == 0 {
-            Ok(Modifier::BrokenEmpires(skill))
-        } else {
-            Ok(Modifier::BrokenEmpiresWithExpertise(skill, expertise))
-        };
+        return Ok(Modifier::BrokenEmpires(skill, expertise));
     }
 
     if let Some(stripped) = part.strip_prefix("favor") {

@@ -181,11 +181,11 @@ static WFRP_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 static TBE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^tbe(\d+)(.*)$").expect("Failed to compile TBE_REGEX"));
+    Lazy::new(|| Regex::new(r"^tbe(\d+)(e\d+)?(.*)$").expect("Failed to compile TBE_REGEX"));
 
 static TBE_OPTION_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"^(?:\s*(simple|easy|medium|challenging|hard|severe)\b|\s*([+-])\s*(\d+)|\s+favor(\d+)\b|\s*e(\d+)\b)",
+        r"^(?:\s*(simple|easy|medium|challenging|hard|severe)\b|\s*([+-])\s*(\d+)|\s+favor(\d+)\b)",
     )
     .expect("Failed to compile TBE_OPTION_REGEX")
 });
@@ -867,8 +867,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let mut difficulty = None;
         let mut custom_modifier = None;
         let mut favor = None;
-        let mut expertise = None;
-        let mut remaining = captures.get(2)?.as_str();
+        let mut remaining = captures.get(3)?.as_str();
 
         while !remaining.trim().is_empty() {
             let option = TBE_OPTION_REGEX.captures(remaining)?;
@@ -895,35 +894,20 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
                 } else {
                     -amount
                 });
-            } else if let Some(points) = option.get(4) {
-                if favor.is_some() {
-                    return None;
-                }
-                let points: u32 = points.as_str().parse().ok()?;
-                if !(1..=3).contains(&points) {
+            } else {
+                let points: u32 = option.get(4)?.as_str().parse().ok()?;
+                if favor.is_some() || !(1..=3).contains(&points) {
                     return None;
                 }
                 favor = Some(points);
-            } else if let Some(level) = option.get(5) {
-                if expertise.is_some() {
-                    return None;
-                }
-                let level: u32 = level.as_str().parse().ok()?;
-                if level == 0 || level > i32::MAX as u32 {
-                    return None;
-                }
-                expertise = Some(level);
-            } else {
-                return None;
             }
 
             remaining = &remaining[option.get(0)?.end()..];
         }
 
-        let mut expansion = format!("1d100 tbe{skill}");
-        if let Some(level) = expertise {
-            expansion.push_str(&format!("e{level}"));
-        }
+        // Expertise (`e#`) is passed through for the parser to validate.
+        let expertise = captures.get(2).map_or("", |level| level.as_str());
+        let mut expansion = format!("1d100 tbe{skill}{expertise}");
         if let Some(modifier) = difficulty.filter(|modifier| *modifier != 0) {
             expansion.push_str(&format!(" {modifier:+}"));
         }

@@ -10,9 +10,7 @@ use dicemaiden_rs::{
     RollResult,
     dice::aliases,
     dice::rng::create_seeded_rng,
-    dice::roller::{
-        broken_empires_test_outcome, broken_empires_test_outcome_with_expertise, wfrp_test_outcome,
-    },
+    dice::roller::{broken_empires_test_outcome, wfrp_test_outcome},
     parse_and_roll, parse_and_roll_with_rng,
 };
 
@@ -1062,7 +1060,7 @@ fn test_broken_empires_outcomes() {
     ];
 
     for (skill, roll, success, critical, success_levels) in cases {
-        let outcome = broken_empires_test_outcome(skill, roll);
+        let outcome = broken_empires_test_outcome(skill, 0, roll);
         assert_eq!(
             (outcome.success, outcome.critical, outcome.success_levels),
             (success, critical, success_levels),
@@ -1085,7 +1083,7 @@ fn test_broken_empires_expertise_outcomes() {
     ];
 
     for (skill, expertise, roll, success, critical, success_levels) in cases {
-        let outcome = broken_empires_test_outcome_with_expertise(skill, expertise, roll);
+        let outcome = broken_empires_test_outcome(skill, expertise, roll);
         assert_eq!(
             (outcome.success, outcome.critical, outcome.success_levels),
             (success, critical, success_levels),
@@ -1111,6 +1109,11 @@ fn test_broken_empires_expertise_syntax() {
     assert_eq!(floor.individual_rolls, vec![14]);
     assert_eq!(floor.total, 4);
     assert!(floor.notes[0].contains("Expertise 4"));
+    assert!(
+        floor.notes[0].contains("Expertise minimum 4 SL"),
+        "{:?}",
+        floor.notes
+    );
 
     let high_expertise = roll_at_seed("tbe98e9", 42);
     assert_eq!(high_expertise.individual_rolls, vec![14]);
@@ -1130,6 +1133,9 @@ fn test_broken_empires_expertise_syntax() {
     assert_invalid("tbe65e0");
     assert_invalid("tbe98e2147483648");
     assert_invalid("tbe65 expertise4");
+    // Expertise is attached to the skill; a spaced `e4` would be explode.
+    assert_invalid("tbe65 e4");
+    assert_invalid("tbe65 hard e4");
 }
 
 #[test]
@@ -1170,7 +1176,7 @@ fn test_broken_empires_difficulty_modifiers() {
     assert_eq!(commented.comment.as_deref(), Some("melee attack"));
     assert_labelled_roll_sets("3 tbe60 hard", "named TBE difficulty roll sets");
 
-    let exact = broken_empires_test_outcome(45, 45);
+    let exact = broken_empires_test_outcome(45, 0, 45);
     assert!(exact.success && exact.critical);
     assert_eq!(exact.success_levels, 7);
 
@@ -1259,6 +1265,8 @@ fn test_broken_empires_rejects_other_game_system_modifiers() {
         "1d100 tbe60 mnm",
         "1d100 tbe60 alien",
         "1d100 tbe60 fitd",
+        // A second skill must not be silently ignored either.
+        "1d100 tbe60 tbe70",
     ] {
         assert_invalid(expression);
     }
@@ -1282,6 +1290,13 @@ fn test_broken_empires_alias_and_boundaries() {
     }
 
     assert_valid("1d100 tbe110");
+    let over_100 = roll_at_seed("tbe110", 42);
+    assert_eq!(over_100.total, 2);
+    assert!(
+        over_100.notes[0].contains("includes +1 SL for skill over 100"),
+        "{:?}",
+        over_100.notes
+    );
 
     for wrong_dice in ["2d100 tbe65", "1d20 tbe65"] {
         assert_invalid(wrong_dice);
@@ -1292,7 +1307,7 @@ fn test_broken_empires_alias_and_boundaries() {
 fn test_broken_empires_roll_behavior() {
     for result in roll_across_seeds("tbe65", 25) {
         let die = result.individual_rolls[0];
-        let outcome = broken_empires_test_outcome(65, die);
+        let outcome = broken_empires_test_outcome(65, 0, die);
 
         assert_eq!(result.total, outcome.success_levels, "die {die}");
         assert!(result.successes.is_none(), "SL is not a success count");

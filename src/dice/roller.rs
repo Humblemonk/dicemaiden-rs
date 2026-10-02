@@ -94,12 +94,10 @@ pub fn roll_dice_with_rng(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
         return Err(anyhow!("Cannot roll 0 dice"));
     }
 
-    let has_broken_empires = dice.modifiers.iter().any(|modifier| {
-        matches!(
-            modifier,
-            Modifier::BrokenEmpires(_) | Modifier::BrokenEmpiresWithExpertise(_, _)
-        )
-    });
+    let has_broken_empires = dice
+        .modifiers
+        .iter()
+        .any(|modifier| matches!(modifier, Modifier::BrokenEmpires(..)));
     let spends_favor = dice
         .modifiers
         .iter()
@@ -977,7 +975,7 @@ fn apply_special_system_modifiers(
                 // WFRP is handled in the main roll_dice function
                 // Don't process it here
             }
-            Modifier::BrokenEmpires(_) | Modifier::BrokenEmpiresWithExpertise(_, _) => {
+            Modifier::BrokenEmpires(..) => {
                 // The Broken Empires is handled in the main roll_dice function
             }
             Modifier::BrokenEmpiresFavor(_) => {
@@ -4046,6 +4044,10 @@ pub struct BrokenEmpiresTest {
     pub success: bool,
     pub critical: bool,
     pub success_levels: i32,
+    /// SL added for an effective skill over 100; included in `success_levels`.
+    pub skill_bonus: i32,
+    /// Expertise, not the roll, set `success_levels`.
+    pub expertise_floor: bool,
 }
 
 impl BrokenEmpiresTest {
@@ -4085,29 +4087,35 @@ impl BrokenEmpiresTest {
             details.join(", ")
         };
 
-        if self.success {
-            let critical_bonus = if self.critical {
-                "; includes +3 SL"
-            } else {
-                ""
-            };
-            vec![format!(
-                "{verdict} - {} SL ({test}{critical_bonus})",
-                self.success_levels
-            )]
-        } else {
-            vec![format!("{verdict} - 0 SL ({test})")]
+        if !self.success {
+            return vec![format!("{verdict} - 0 SL ({test})")];
         }
+
+        let mut bonuses = Vec::new();
+        if self.expertise_floor {
+            bonuses.push(format!("Expertise minimum {expertise} SL"));
+        } else {
+            if self.critical {
+                bonuses.push("includes +3 SL".to_string());
+            }
+            if self.skill_bonus > 0 {
+                bonuses.push(format!(
+                    "includes +{} SL for skill over 100",
+                    self.skill_bonus
+                ));
+            }
+        }
+        let bonuses: String = bonuses.iter().map(|bonus| format!("; {bonus}")).collect();
+        vec![format!(
+            "{verdict} - {} SL ({test}{bonuses})",
+            self.success_levels
+        )]
     }
 }
 
-/// Resolve one The Broken Empires skill test without rolling it.
-pub fn broken_empires_test_outcome(effective_skill: i64, roll: i32) -> BrokenEmpiresTest {
-    broken_empires_test_outcome_with_expertise(effective_skill, 0, roll)
-}
-
-/// Resolve a The Broken Empires skill test with an Expertise SL floor.
-pub fn broken_empires_test_outcome_with_expertise(
+/// Resolve one The Broken Empires skill test without rolling it. `expertise`
+/// is a floor for a successful test's SL (0 for none).
+pub fn broken_empires_test_outcome(
     effective_skill: i64,
     expertise: u32,
     roll: i32,
@@ -4125,14 +4133,19 @@ pub fn broken_empires_test_outcome_with_expertise(
             || (roll == 100 && effective_skill < 100)
     };
 
-    let success_levels = if success {
-        let skill_bonus = if effective_skill > 100 {
-            ((effective_skill - 100) / 10).max(1) as i32
-        } else {
-            0
-        };
-        let expertise_floor = i32::try_from(expertise).unwrap_or(i32::MAX);
-        ((roll / 10).max(1) + skill_bonus + if critical { 3 } else { 0 }).max(expertise_floor)
+    let skill_bonus = if success && effective_skill > 100 {
+        i32::try_from(((effective_skill - 100) / 10).max(1)).unwrap_or(i32::MAX)
+    } else {
+        0
+    };
+    let rolled = if success {
+        (roll / 10).max(1) + skill_bonus + if critical { 3 } else { 0 }
+    } else {
+        0
+    };
+    // Expertise only lifts a success; it never turns a failure into one.
+    let floor = if success {
+        i32::try_from(expertise).unwrap_or(i32::MAX)
     } else {
         0
     };
@@ -4140,7 +4153,9 @@ pub fn broken_empires_test_outcome_with_expertise(
     BrokenEmpiresTest {
         success,
         critical,
-        success_levels,
+        success_levels: rolled.max(floor),
+        skill_bonus,
+        expertise_floor: floor > rolled,
     }
 }
 
@@ -4151,42 +4166,35 @@ fn handle_broken_empires_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<Roll
         ));
     }
 
-    let (skill, expertise) = dice
-        .modifiers
-        .iter()
-        .find_map(|modifier| match modifier {
-            Modifier::BrokenEmpires(skill) => Some((*skill, 0)),
-            Modifier::BrokenEmpiresWithExpertise(skill, expertise) => Some((*skill, *expertise)),
-            _ => None,
-        })
-        .ok_or_else(|| anyhow!("Expected Broken Empires modifier"))?;
-
-    let task_modifier = dice
-        .modifiers
-        .iter()
-        .try_fold(0i64, |total, modifier| match modifier {
-            Modifier::BrokenEmpires(_) | Modifier::BrokenEmpiresWithExpertise(_, _) => Ok(total),
-            Modifier::BrokenEmpiresFavor(_) => Ok(total),
-            Modifier::Add(value) => Ok(total + i64::from(*value)),
-            Modifier::Subtract(value) => Ok(total - i64::from(*value)),
-            _ => Err(anyhow!(
-                "The Broken Empires skill test only supports +N and -N task modifiers"
-            )),
-        })?;
-    let favor = dice
-        .modifiers
-        .iter()
-        .try_fold(0u32, |spent, modifier| match modifier {
-            Modifier::BrokenEmpiresFavor(points) if spent == 0 => Ok(*points),
-            Modifier::BrokenEmpiresFavor(_) => {
-                Err(anyhow!("Favor can only be specified once per roll"))
+    let mut test = None;
+    let mut task_modifier = 0i64;
+    let mut favor = 0u32;
+    for modifier in &dice.modifiers {
+        match modifier {
+            Modifier::BrokenEmpires(..) if test.is_some() => {
+                return Err(anyhow!("Only one The Broken Empires skill per roll"));
             }
-            _ => Ok(spent),
-        })?;
+            Modifier::BrokenEmpires(skill, expertise) => test = Some((*skill, *expertise)),
+            Modifier::BrokenEmpiresFavor(_) if favor > 0 => {
+                return Err(anyhow!("Favor can only be specified once per roll"));
+            }
+            Modifier::BrokenEmpiresFavor(points) => favor = *points,
+            Modifier::Add(value) => task_modifier += i64::from(*value),
+            Modifier::Subtract(value) => task_modifier -= i64::from(*value),
+            // Any other modifier, including another game system's, fails the
+            // roll rather than being silently dropped from it.
+            _ => {
+                return Err(anyhow!(
+                    "The Broken Empires skill test only supports difficulty, +N/-N, Favor, and Expertise; it cannot be combined with other modifiers or game systems"
+                ));
+            }
+        }
+    }
+    let (skill, expertise) = test.ok_or_else(|| anyhow!("Expected Broken Empires modifier"))?;
     let effective_skill = i64::from(skill) + task_modifier + i64::from(favor) * 10;
 
     let roll = rng.random_range(1..=100);
-    let outcome = broken_empires_test_outcome_with_expertise(effective_skill, expertise, roll);
+    let outcome = broken_empires_test_outcome(effective_skill, expertise, roll);
     let notes = outcome.notes(skill, task_modifier, favor, expertise, roll);
 
     Ok(RollResult {
