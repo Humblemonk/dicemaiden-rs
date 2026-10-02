@@ -387,42 +387,46 @@ Roll d100 against a Characteristic or Skill and succeed on equal or lower.
 pub fn generate_broken_empires_help() -> String {
     r#"🎲 **The Broken Empires RPG** 🎲
 
-Roll d100 equal to or under a skill, aiming as high as possible.
+**Note:**
+- Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+- If you experience a bug, please report the issue on GitHub!
 
-**Skill Tests:**
+Roll d100 against a skill and succeed on equal or lower, aiming as high as possible.
+
+**Tests:**
 - `tbe65` → test a skill of 65
-- `tbe110` → skills over 100 are valid; `3 tbe45` → three tests
-- The result is the number of Success Levels (SL)
+- `tbe110` → skills over 100 are valid
+- `3 tbe45` → three separate tests
+- The result shown is the SL; the note carries the verdict
 
 **Difficulty:**
-- `simple` +20, `easy` +10, `medium` +0
-- `challenging` -10, `hard` -20, `severe` -30
-- `tbe60 hard +5` → effective skill 45; `tbe60-15` → custom -15
+- `tbe60 hard` → Hard test, effective skill 40
+- `tbe60 - 15` → custom modifier, effective skill 45
+- `tbe60 hard + 5` → difficulty and modifier combine, giving 45
+- `simple` +20, `easy` +10, `medium` +0, `challenging` -10, `hard` -20, `severe` -30
 
 **Favor:**
-- `favor1` to `favor3` adds +10 to the effective skill per Favor
-- `tbe60 hard favor2` → Hard -20 and Favor +20, for effective skill 60
+- `tbe60 favor2` → spend 2 Favor for +20, effective skill 80
+- Spend 1-3 Favor per roll; it stacks with difficulty
 
 **Expertise:**
-- Append `e` and a positive value to the skill to set a successful test's minimum SL
 - `tbe65e4` → every success scores at least 4 SL
-- Expertise cannot make a failed test succeed
-- Expertise and Critical Success SL do not add; use whichever is higher
-- Put Expertise on the skill; later options may still appear in any order
-- TBE cannot be combined with another game system's modifier
+- Attach `e#` to the skill; other options may follow in any order
+- Expertise never turns a failure into a success
 
 **Success Levels:**
-- A successful roll's tens digit is its SL: 42 scores 4 SL
-- Successful 01-09 scores at least 1 SL; failures produce 0 SL
-- Skills over 100 add the excess's tens digit, minimum +1 SL
+- SL is the tens digit of the roll: 42 → 4 SL, 01-09 → 1 SL
+- Effective skill over 100 adds the tens digit of the excess, minimum +1 SL
+- A failure scores 0 SL
+
+**Automatic Results:**
 - 01-05 always succeeds; 99-00 always fails
 
 **Criticals:**
-- A successful double, 05, or exact effective-skill match is a Critical Success
-- Critical Success adds +3 SL
+- A successful double, 05, or exact skill match is a Critical Success: +3 SL
+- Critical SL and Expertise do not add; the higher applies
 - A failed double is a Critical Failure
-- 99 is critical below skill 99; 00 is critical below skill 100
-- Above skill 100, neither 99 nor 00 is critical"#
+- 99 is critical below skill 99; 00 is critical below skill 100"#
         .to_string()
 }
 
