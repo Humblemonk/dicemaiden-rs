@@ -11,16 +11,16 @@
 
 | | | |
 | --- | --- | --- |
-| [Alien RPG](#alien-rpg-year-zero-engine) | [Brave New World](#brave-new-world-pool-system) | [Conan](#conan) |
-| [Cyberpunk Red](#cyberpunk-red) | [Cypher System](#cypher-system) | [D&D / Pathfinder](#ddpathfinder) |
-| [D6 Legends](#d6-legends-success-based-with-wild-die) | [Daggerheart](#daggerheart) | [The Darkest House](#the-darkest-house-monte-cook-games) |
-| [Dark Heresy 2e](#dark-heresy-2nd-edition) | [Essence20](#essence20-renegade-game-studios) | [Exalted](#exalted-white-wolf) |
-| [Forged in the Dark](#forged-in-the-dark) | [Godbound](#godbound) | [Hero System 5e](#hero-system-5th-edition) |
-| [Lasers & Feelings](#lasers--feelings) | [Level Up A5E](#level-up-advanced-5th-edition-a5e) | [Marvel Multiverse](#marvel-multiverse-rpg) |
-| [Mothership](#mothership-rpg) | [Mutants & Masterminds](#mutants-and-masterminds) | [Open Legend](#open-legend) |
-| [Savage Worlds](#savage-worlds) | [Silhouette](#silhouette-system-dream-pod-9) | [Vampire: The Masquerade 5e](#vampire-the-masquerade-5th-edition) |
-| [Warhammer 40k W&G](#warhammer-40k-wrath--glory) | [Warhammer Fantasy 4e](#warhammer-fantasy-roleplay-4e) | [Wild Words / Wildsea](#wild-words-the-wildsea) |
-| [Witcher d10](#witcher-d10-system) | [World of Darkness / CoD](#world-of-darkness--chronicles-of-darkness) |  |
+| [Alien RPG](#alien-rpg-year-zero-engine) | [Brave New World](#brave-new-world-pool-system) | [The Broken Empires](#the-broken-empires-rpg) |
+| [Conan](#conan) | [Cyberpunk Red](#cyberpunk-red) | [Cypher System](#cypher-system) |
+| [D&D / Pathfinder](#ddpathfinder) | [D6 Legends](#d6-legends-success-based-with-wild-die) | [Daggerheart](#daggerheart) |
+| [The Darkest House](#the-darkest-house-monte-cook-games) | [Dark Heresy 2e](#dark-heresy-2nd-edition) | [Essence20](#essence20-renegade-game-studios) |
+| [Exalted](#exalted-white-wolf) | [Forged in the Dark](#forged-in-the-dark) | [Godbound](#godbound) |
+| [Hero System 5e](#hero-system-5th-edition) | [Lasers & Feelings](#lasers--feelings) | [Level Up A5E](#level-up-advanced-5th-edition-a5e) |
+| [Marvel Multiverse](#marvel-multiverse-rpg) | [Mothership](#mothership-rpg) | [Mutants & Masterminds](#mutants-and-masterminds) |
+| [Open Legend](#open-legend) | [Savage Worlds](#savage-worlds) | [Silhouette](#silhouette-system-dream-pod-9) |
+| [Vampire: The Masquerade 5e](#vampire-the-masquerade-5th-edition) | [Warhammer 40k W&G](#warhammer-40k-wrath--glory) | [Warhammer Fantasy 4e](#warhammer-fantasy-roleplay-4e) |
+| [Wild Words / Wildsea](#wild-words-the-wildsea) | [Witcher d10](#witcher-d10-system) | [World of Darkness / CoD](#world-of-darkness--chronicles-of-darkness) |
 
 Systems without a dedicated alias are listed under [Other Popular Systems](#other-popular-systems).
 
@@ -288,20 +288,11 @@ Modifiers apply in stages, not in the order you type them:
 - `tbe65` → 1d100 against a skill of 65
 - `tbe110` → skills over 100 are valid; there is no game-rule ceiling
 - `3 tbe45` → three separate skill tests
-- Roll equal to or under the skill, aiming as high as possible
-- A successful roll's tens digit is its Success Levels; 01-09 scores at least 1 SL
-- An effective skill over 100 adds the tens digit of the amount over 100 to
-  every success, with a minimum bonus of +1 SL
-- `tbe105` adds +1 SL, so a roll of 83 scores 9 SL; `tbe120` adds +2 SL
-- There are no negative Success Levels; a failed test produces 0 SL
-- 01-05 always succeeds, while 99-00 always fails
-- A successful double, 05, or exact skill match is a Critical Success and adds +3 SL
-- A failed double is a Critical Failure
-- 99 is critical when the skill is below 99; 00 is critical when it is below 100
-- At skill 99 or 100, the matching automatic failure is not critical
-- At skills over 100, neither 99 nor 00 is a Critical Failure
+- Success if the roll is equal to or lower than the effective skill
+- The result shown is the SL, and the note carries the verdict
+- A TBE test cannot be combined with another game system's modifier
 
-Task difficulty changes the effective skill before resolving the test:
+**Difficulty:**
 
 | Difficulty | Modifier |
 | --- | ---: |
@@ -312,31 +303,36 @@ Task difficulty changes the effective skill before resolving the test:
 | Hard | -20 |
 | Severe | -30 |
 
-- `tbe60 hard` → roll against an effective skill of 40
-- `tbe60 hard +5` → combine Hard (-20) with a custom +5, for effective skill 45
-- `tbe60-15` or `tbe60 - 15` → apply a custom -15 modifier
-- `tbe60+25` → apply a custom +25 modifier
-- An exact roll matching the effective skill is a Critical Success
+- `tbe60 hard` → Hard test, effective skill 40
+- `tbe60 - 15` → custom modifier, effective skill 45
+- `tbe60 hard + 5` → Hard (-20) and a custom +5 combine, effective skill 45
 
-Favor spent on a roll adds +10 to the effective skill per point. A roll may
-spend 1-3 Favor, and Favor stacks with its task modifier:
+**Favor (`favor#`):**
+- `tbe60 favor2` → spend 2 Favor for +20, effective skill 80
+- `tbe60 hard favor2` → Hard (-20) and Favor (+20), effective skill 60
+- Spend 1-3 Favor per roll, at +10 effective skill each
+- Difficulty, custom modifiers, and Favor may follow the skill in any order:
+  `tbe60 favor2 + 5 hard` is the same as `tbe60 hard + 5 favor2`
 
-- `tbe60 favor1` → spend 1 Favor and roll against effective skill 70
-- `tbe60 favor3` → spend the maximum 3 Favor and roll against effective skill 90
-- `tbe60 hard favor2` → -20 for Hard and +20 for Favor, for effective skill 60
-- `tbe60-15 favor1` → -15 task modifier and +10 for Favor, for effective skill 55
-- Difficulty, a custom modifier, and Favor may appear in any order after the skill;
-  `tbe60 favor2 +5 hard` is equivalent to `tbe60 hard +5 favor2`
-- A TBE skill test cannot be combined with another game system's modifier
-
-Expertise sets a positive SL floor on a successful test:
-
+**Expertise (`e#`):**
 - `tbe65e4` → a success scores at least 4 SL
+- Attach `e#` directly to the skill, before any other options
 - Expertise never turns a failed test into a success
-- Expertise and Critical Success SL do not add together; use whichever result is higher
-- With Expertise 4, a roll of 12 scores 4 SL; with Expertise 2, a critical 11
-  scores 4 SL
-- Append `e` and the Expertise value directly to the skill, before other options
+- Expertise and Critical Success SL do not add; the higher result applies. With
+  Expertise 4 a roll of 12 scores 4 SL; with Expertise 2 a critical 11 scores 4 SL
+
+**Success Levels:**
+- A successful roll's tens digit is its SL; 01-09 scores at least 1 SL
+- An effective skill over 100 adds the tens digit of the excess to every success,
+  minimum +1 SL: `tbe105` rolling 83 scores 9 SL, and `tbe120` adds +2 SL
+- A failed test scores 0 SL; there are no negative SL
+- Rolls of 01-05 always succeed, 99-00 always fail
+
+**Criticals:**
+- A successful double, 05, or exact effective-skill match is a Critical Success
+  and adds +3 SL
+- A failed double is a Critical Failure
+- 99 is a Critical Failure below effective skill 99, and 00 below 100
 
 ### Marvel Multiverse RPG
 - `mm` → 3d6 Marvel Multiverse basic roll
