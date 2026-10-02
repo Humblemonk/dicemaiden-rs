@@ -395,11 +395,11 @@
 1d100 tbe98e2147483647	always-ok n=Some(1)
 1d100 tbe98e2147483648	always-err {"Broken Empires Expertise is too large"}
 1d1 tbe65e4	always-err {"The Broken Empires skill test requires exactly 1d100"}
-1d100 wfrp60 favor2	always-err {"Favor can only be spent on a The Broken Empires skill test"}
-1d100 ms60 favor2	always-err {"Favor can only be spent on a The Broken Empires skill test"}
+1d100 wfrp60 favor2	always-err {"Favor can only be spent on a Broken Empires skill test"}
+1d100 ms60 favor2	always-err {"Favor can only be spent on a Broken Empires skill test"}
 1d100 wfrp60 tbe60	always-err {"The Broken Empires skill test only supports difficulty, +N/-N, Favor, and Expertise; it cannot be combined with other modifiers or game systems"}
 1d100 tbe60 wfrp60	always-err {"The Broken Empires skill test only supports difficulty, +N/-N, Favor, and Expertise; it cannot be combined with other modifiers or game systems"}
-1d100 tbe60 tbe70	always-err {"Only one The Broken Empires skill per roll"}
+1d100 tbe60 tbe70	always-err {"Only one Broken Empires skill test per roll"}
 tbe65 e4	always-err {"The Broken Empires skill test only supports difficulty, +N/-N, Favor, and Expertise; it cannot be combined with other modifiers or game systems"}
 1d100 wfrp0	always-ok n=Some(1)
 1d100 wfrp1	always-ok n=Some(1)

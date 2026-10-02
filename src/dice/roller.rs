@@ -105,7 +105,7 @@ pub fn roll_dice_with_rng(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
 
     if spends_favor && !has_broken_empires {
         return Err(anyhow!(
-            "Favor can only be spent on a The Broken Empires skill test"
+            "Favor can only be spent on a Broken Empires skill test"
         ));
     }
 
@@ -980,7 +980,7 @@ fn apply_special_system_modifiers(
             }
             Modifier::BrokenEmpiresFavor(_) => {
                 return Err(anyhow!(
-                    "Favor can only be spent on a The Broken Empires skill test"
+                    "Favor can only be spent on a Broken Empires skill test"
                 ));
             }
             Modifier::PlotDie => {
@@ -4039,7 +4039,7 @@ fn handle_wfrp_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
     })
 }
 
-/// The result of reading one The Broken Empires d100 skill test.
+/// The result of reading one Broken Empires d100 skill test.
 pub struct BrokenEmpiresTest {
     pub success: bool,
     pub critical: bool,
@@ -4113,7 +4113,7 @@ impl BrokenEmpiresTest {
     }
 }
 
-/// Resolve one The Broken Empires skill test without rolling it. `expertise`
+/// Resolve one Broken Empires skill test without rolling it. `expertise`
 /// is a floor for a successful test's SL (0 for none).
 pub fn broken_empires_test_outcome(
     effective_skill: i64,
@@ -4172,7 +4172,7 @@ fn handle_broken_empires_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<Roll
     for modifier in &dice.modifiers {
         match modifier {
             Modifier::BrokenEmpires(..) if test.is_some() => {
-                return Err(anyhow!("Only one The Broken Empires skill per roll"));
+                return Err(anyhow!("Only one Broken Empires skill test per roll"));
             }
             Modifier::BrokenEmpires(skill, expertise) => test = Some((*skill, *expertise)),
             Modifier::BrokenEmpiresFavor(_) if favor > 0 => {
