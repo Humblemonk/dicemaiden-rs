@@ -25,8 +25,7 @@ RUN mkdir -p src && \
 # reuses the stub. Do not remove this.
 COPY src ./src
 RUN find src -name '*.rs' -exec touch {} + && \
-    cargo build --release --locked && \
-    ldd target/release/dicemaiden-rs
+    cargo build --release --locked
 
 # ---------- Runtime stage ----------
 FROM registry.access.redhat.com/ubi9/ubi-minimal:${UBI_VERSION}
@@ -35,7 +34,7 @@ LABEL org.opencontainers.image.title="Dice Maiden" \
       org.opencontainers.image.description="Discord dice bot" \
       org.opencontainers.image.source="https://github.com/Humblemonk/dicemaiden-rs"
 
-# TLS is rustls end to end (serenity rustls_backend, sqlx runtime-tokio-rustls) and
+# TLS is rustls end to end (serenity rustls_backend; sqlx's sqlite driver needs no TLS) and
 # sqlx bundles libsqlite3-sys, so openssl-libs and sqlite-libs are not linked by the
 # bot; `ldd` on the built binary shows only libgcc_s, libm and libc.
 #
@@ -56,6 +55,13 @@ RUN microdnf update -y && \
 RUN useradd -m -u 1000 -s /bin/sh dicemaiden
 
 COPY --from=builder --chmod=755 /app/target/release/dicemaiden-rs /usr/local/bin/dicemaiden-rs
+
+# The builder (Debian) ships a newer glibc than UBI 9, so a dependency that starts using a
+# newer symbol would build fine and then fail at pod startup. Check against the runtime's
+# glibc here. Plain ldd exits 0 on a version mismatch and only prints "not found", so grep.
+# pipefail would add nothing (DL4006): ldd exits 0 either way, and grep decides the result.
+# hadolint ignore=DL4006
+RUN ! ldd /usr/local/bin/dicemaiden-rs 2>&1 | grep 'not found'
 
 # Operator spot-check scripts, run by hand against a live deployment:
 #   kubectl exec deploy/dicemaiden-rs -- topgg.sh --dry-run
