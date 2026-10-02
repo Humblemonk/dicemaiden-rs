@@ -24,6 +24,7 @@ pub const HELP_TOPICS: &[&str] = &[
     "tdh",
     "cpr",
     "wfrp",
+    "tbe",
 ];
 
 /// Resolve a topic name to its help text, or `None` if the topic is unknown.
@@ -44,6 +45,7 @@ pub fn generate_topic_help(topic: &str) -> Option<String> {
         "tdh" => generate_darkest_house_help(),
         "cpr" => generate_cyberpunk_red_help(),
         "wfrp" => generate_wfrp_help(),
+        "tbe" => generate_broken_empires_help(),
         _ => return None,
     })
 }
@@ -145,8 +147,7 @@ pub fn generate_alias_help() -> String {
 • `dd34` → 1d3*10 + 1d4 (double-digit d66 style)
 • `ed15` → Earthdawn step 15
 • `cs 3` → Cypher System 1d20 cs3 (Level 3 task, target 9+)
-• `cpr` / `cpd3` → Cyberpunk Red (`/help cpr`)
-• `wfrp67` → WFRP 4e (`/help wfrp`)
+• `cpr`/`cpd3`, `wfrp67`, `tbe65` → `/help cpr`, `/help wfrp`, `/help tbe`
 • `conan tn12f3` → Conan (target 12, Focus 3)
 • `sil3` → Silhouette (`/help system`)
 • `ol5` → Open Legend (`/help ol`)
@@ -380,6 +381,52 @@ Roll d100 against a Characteristic or Skill and succeed on equal or lower.
 - 11, 22 ... 99, 00 are an Astounding Success or Astounding Failure
 - In combat that is a Critical Hit or a Fumble
 - Independent of SL: both apply to the same roll"#
+        .to_string()
+}
+
+pub fn generate_broken_empires_help() -> String {
+    r#"🎲 **The Broken Empires RPG** 🎲
+
+**Note:**
+- Additional support can be found on GitHub `https://github.com/Humblemonk/dicemaiden-rs`
+- If you experience a bug, please report the issue on GitHub!
+
+Roll d100 against a skill and succeed on equal or lower, aiming as high as possible.
+
+**Tests:**
+- `tbe65` → test a skill of 65
+- `tbe110` → skills over 100 are valid
+- `3 tbe45` → three separate tests
+- The result shown is the SL; the note carries the verdict
+
+**Difficulty:**
+- `tbe60 hard` → Hard test, effective skill 40
+- `tbe60 - 15` → custom modifier, effective skill 45
+- `tbe60 hard + 5` → difficulty and modifier combine, giving 45
+- `simple` +20, `easy` +10, `medium` +0, `challenging` -10, `hard` -20, `severe` -30
+
+**Favor:**
+- `tbe60 favor2` → spend 2 Favor for +20, effective skill 80
+- Spend 1-3 Favor per roll; it stacks with difficulty
+
+**Expertise:**
+- `tbe65e4` → every success scores at least 4 SL
+- Attach `e#` to the skill; other options may follow in any order
+- Expertise never turns a failure into a success
+
+**Success Levels:**
+- SL is the tens digit of the roll: 42 → 4 SL, 01-09 → 1 SL
+- Effective skill over 100 adds the tens digit of the excess, minimum +1 SL
+- A failure scores 0 SL
+
+**Automatic Results:**
+- 01-05 always succeeds; 99-00 always fails
+
+**Criticals:**
+- A successful double, 05, or exact skill match is a Critical Success: +3 SL
+- Critical SL and Expertise do not add; the higher applies
+- A failed double is a Critical Failure
+- 99 is critical below skill 99; 00 is critical below skill 100"#
         .to_string()
 }
 

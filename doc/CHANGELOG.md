@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.0] - 2026-10-02
+
+## Added
+
+- The Broken Empires RPG skill tests: `tbe65` rolls 1d100 against a skill of 65 and reports
+  Success Levels, with Critical Success (+3 SL) and Critical Failure. Add a difficulty
+  (`tbe60 hard`), a custom modifier (`tbe60 - 15`), Favor (`tbe60 favor2`), and Expertise
+  (`tbe65e4`) in any order after the skill. `/help tbe` covers the rules.
+
 ## [1.6.6] - 2026-10-01
 
 ## Security

@@ -29,7 +29,7 @@ To restrict the bot to specific channels, go to **Server Settings → Integratio
 | --- | --- |
 | `/roll <dice>` | Roll dice using RPG notation |
 | `/r <dice>` | Short alias for `/roll` |
-| `/help [topic]` | Help — topics: `basic`, `alias`, `system`, `a5e`, `aliens`, `mothership` |
+| `/help [topic]` | Help — topics include `basic`, `alias`, `system`, `a5e`, `aliens`, `tbe`, and `mothership` |
 | `/purge <count>` | Delete recent messages (requires Manage Messages) |
 | `/roll donate` | Support information |
 

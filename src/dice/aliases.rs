@@ -31,6 +31,7 @@
 //! | `tdh`            | The Darkest House (Monte Cook Games) |
 //! | `cpr` / `cpd`    | Cyberpunk Red skill check / damage    |
 //! | `wfrp`           | Warhammer Fantasy Roleplay 4e         |
+//! | `tbe`            | The Broken Empires RPG                |
 //!
 //! See `roll_syntax.md` for the full syntax reference.  All regex patterns are
 //! compiled once at startup via `once_cell::Lazy`.
@@ -177,6 +178,16 @@ static WIT_REGEX: Lazy<Regex> =
 // folds into a target of 87 at expansion time rather than reaching the total.
 static WFRP_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^wfrp(\d+)(?:\s*([+-])\s*(\d+))?$").expect("Failed to compile WFRP_REGEX")
+});
+
+static TBE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^tbe(\d+)(e\d+)?(.*)$").expect("Failed to compile TBE_REGEX"));
+
+static TBE_OPTION_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"^(?:\s*(simple|easy|medium|challenging|hard|severe)\b|\s*([+-])\s*(\d+)|\s+favor(\d+)\b)",
+    )
+    .expect("Failed to compile TBE_OPTION_REGEX")
 });
 
 static CS_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -845,6 +856,68 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let target = target.clamp(0, i64::from(crate::dice::WFRP_MAX_TARGET));
 
         return Some(format!("1d100 wfrp{target}"));
+    }
+
+    if let Some(captures) = TBE_REGEX.captures(input) {
+        let skill: u32 = captures[1].parse().ok()?;
+        if skill == 0 {
+            return None;
+        }
+
+        let mut difficulty = None;
+        let mut custom_modifier = None;
+        let mut favor = None;
+        let mut remaining = captures.get(3)?.as_str();
+
+        while !remaining.trim().is_empty() {
+            let option = TBE_OPTION_REGEX.captures(remaining)?;
+            if let Some(name) = option.get(1) {
+                if difficulty.is_some() {
+                    return None;
+                }
+                difficulty = Some(match name.as_str() {
+                    "simple" => 20,
+                    "easy" => 10,
+                    "medium" => 0,
+                    "challenging" => -10,
+                    "hard" => -20,
+                    "severe" => -30,
+                    _ => return None,
+                });
+            } else if let (Some(sign), Some(amount)) = (option.get(2), option.get(3)) {
+                if custom_modifier.is_some() {
+                    return None;
+                }
+                let amount: i32 = amount.as_str().parse().ok()?;
+                custom_modifier = Some(if sign.as_str() == "+" {
+                    amount
+                } else {
+                    -amount
+                });
+            } else {
+                let points: u32 = option.get(4)?.as_str().parse().ok()?;
+                if favor.is_some() || !(1..=3).contains(&points) {
+                    return None;
+                }
+                favor = Some(points);
+            }
+
+            remaining = &remaining[option.get(0)?.end()..];
+        }
+
+        // Expertise (`e#`) is passed through for the parser to validate.
+        let expertise = captures.get(2).map_or("", |level| level.as_str());
+        let mut expansion = format!("1d100 tbe{skill}{expertise}");
+        if let Some(modifier) = difficulty.filter(|modifier| *modifier != 0) {
+            expansion.push_str(&format!(" {modifier:+}"));
+        }
+        if let Some(modifier) = custom_modifier.filter(|modifier| *modifier != 0) {
+            expansion.push_str(&format!(" {modifier:+}"));
+        }
+        if let Some(points) = favor {
+            expansion.push_str(&format!(" favor{points}"));
+        }
+        return Some(expansion);
     }
 
     if let Some(captures) = CS_REGEX.captures(input) {
