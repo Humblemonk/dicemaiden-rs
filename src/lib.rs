@@ -11,6 +11,7 @@
 //! dicemaiden_rs
 //! ├── commands/        Discord slash-command handlers (roll, help, purge)
 //! ├── database         SQLite statistics persistence
+//! ├── guild_counts     Server/member counts (replaces Serenity's guild cache)
 //! ├── dice/            Core dice engine
 //! │   ├── mod.rs       Types: DiceRoll, RollResult, Modifier, DiceGroup
 //! │   ├── aliases.rs   Game-system alias expansion
@@ -27,13 +28,14 @@
 //! `parse_and_roll`, `format_multiple_results`) are re-exported from the crate
 //! root for convenience in tests and external consumers.
 //!
-//! [`ShardManagerContainer`] and [`DatabaseContainer`] are Serenity
+//! [`ShardManagerContainer`], [`DatabaseContainer`] and [`GuildCountsContainer`] are Serenity
 //! [`TypeMapKey`] wrappers that allow the shard manager and database handles to
 //! be stored in, and retrieved from, the Serenity shared data map.
 
 pub mod commands;
 pub mod database;
 pub mod dice;
+pub mod guild_counts;
 pub mod help_text;
 
 use serenity::prelude::*;
@@ -50,6 +52,12 @@ pub struct DatabaseContainer;
 
 impl TypeMapKey for DatabaseContainer {
     type Value = Arc<database::Database>;
+}
+
+pub struct GuildCountsContainer;
+
+impl TypeMapKey for GuildCountsContainer {
+    type Value = Arc<guild_counts::GuildCounts>;
 }
 
 // Re-export commonly used items for easier testing

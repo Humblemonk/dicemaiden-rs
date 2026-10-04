@@ -43,10 +43,12 @@
 //! SIGTERM/SIGINT/Ctrl-C and shuts down cleanly via a `broadcast` channel.
 
 use anyhow::Result;
-use dicemaiden_rs::{DatabaseContainer, ShardManagerContainer, commands, database};
+use dicemaiden_rs::{
+    DatabaseContainer, GuildCountsContainer, ShardManagerContainer, commands, database,
+    guild_counts::GuildCounts,
+};
 use serenity::{
-    all::*, async_trait, cache::Settings as CacheSettings, gateway::ShardManager, http::Http,
-    model::gateway::Ready, prelude::*,
+    all::*, async_trait, gateway::ShardManager, http::Http, model::gateway::Ready, prelude::*,
 };
 use std::{collections::HashSet, env, sync::Arc, time::Duration};
 use sysinfo::{Pid, ProcessesToUpdate, System};
@@ -60,17 +62,15 @@ use tracing::{error, info, warn};
 
 struct Handler {
     shard_count: u32,
-}
-
-impl Handler {
-    fn new(shard_count: u32) -> Self {
-        Self { shard_count }
-    }
+    guild_counts: Arc<GuildCounts>,
 }
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, ctx: Context, _ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
+        self.guild_counts
+            .ready(ready.guilds.iter().map(|guild| guild.id));
+
         let connected = get_connected_shard_count(&ctx).await;
 
         // Display the actual shard ID, not an adjusted one
@@ -146,6 +146,20 @@ impl EventHandler for Handler {
                 self.shard_count
             );
         }
+    }
+
+    async fn guild_create(&self, _ctx: Context, guild: Guild, _is_new: Option<bool>) {
+        self.guild_counts.create(guild.id, guild.member_count);
+    }
+
+    async fn guild_delete(
+        &self,
+        _ctx: Context,
+        incomplete: UnavailableGuild,
+        _full: Option<Guild>,
+    ) {
+        self.guild_counts
+            .delete(incomplete.id, incomplete.unavailable);
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
@@ -419,26 +433,15 @@ async fn main() -> Result<()> {
 
     let intents = GatewayIntents::GUILDS;
 
-    // Configure minimal cache settings to dramatically reduce memory usage
-    let mut cache_settings = CacheSettings::default();
+    // No Serenity cache (the `cache` feature is off): it held every server's full
+    // data, ~50 KB each, and only the server and member counts were ever read.
+    let guild_counts = Arc::new(GuildCounts::default());
 
-    // Disable message caching completely (biggest memory saver for a dice bot)
-    cache_settings.max_messages = 0;
-
-    // Disable caching of unnecessary data for a dice bot
-    cache_settings.cache_guilds = true; // Keep guild info for stats, but minimal data
-    cache_settings.cache_channels = false; // Don't cache channel data - we don't need it
-    cache_settings.cache_users = false; // Don't cache user data - we don't need it for dice rolling
-
-    // Set TTL for temporary data (reduces memory over time)
-    cache_settings.time_to_live = Duration::from_secs(3600); // 1 hour TTL
-
-    info!("Configured minimal cache settings for reduced memory usage");
-
-    // Create client with explicit shard configuration and optimized cache
     let client = Client::builder(&token, intents)
-        .event_handler(Handler::new(shard_count))
-        .cache_settings(cache_settings) // Apply optimized cache settings
+        .event_handler(Handler {
+            shard_count,
+            guild_counts: Arc::clone(&guild_counts),
+        })
         .await
         .expect("Error creating client");
 
@@ -447,6 +450,7 @@ async fn main() -> Result<()> {
         let mut data = client.data.write().await;
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
         data.insert::<DatabaseContainer>(Arc::clone(&db));
+        data.insert::<GuildCountsContainer>(Arc::clone(&guild_counts));
     }
 
     // Create shutdown broadcast channel
@@ -454,14 +458,13 @@ async fn main() -> Result<()> {
 
     let shard_manager = Arc::clone(&client.shard_manager);
     let db_clone = Arc::clone(&db);
-    let cache_clone = Arc::clone(&client.cache);
     let stats_shutdown_rx = shutdown_tx.subscribe();
 
     // Start the statistics collection task with graceful shutdown
     let stats_handle = tokio::spawn(async move {
         if let Err(e) = collect_shard_stats_with_shutdown(
             db_clone,
-            cache_clone,
+            guild_counts,
             shard_manager,
             stats_shutdown_rx,
         )
@@ -664,7 +667,7 @@ async fn setup_signal_handlers(shutdown_tx: broadcast::Sender<()>) {
 // Optimized statistics collection to support both single-process and multi-process sharding
 async fn collect_shard_stats_with_shutdown(
     db: Arc<database::Database>,
-    cache: Arc<serenity::cache::Cache>,
+    guild_counts: Arc<GuildCounts>,
     shard_manager: Arc<ShardManager>,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<()> {
@@ -727,7 +730,7 @@ async fn collect_shard_stats_with_shutdown(
         };
 
         // Get total guild count more efficiently
-        let total_guilds = cache.guilds().len() as i32;
+        let total_guilds = guild_counts.totals().0 as i32;
 
         if is_multi_process {
             // Multi-process mode: Use process_stats table

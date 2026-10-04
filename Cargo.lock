@@ -292,20 +292,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dashmap"
-version = "5.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
-dependencies = [
- "cfg-if",
- "hashbrown 0.14.5",
- "lock_api",
- "once_cell",
- "parking_lot_core",
- "serde",
-]
-
-[[package]]
 name = "data-encoding"
 version = "2.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -322,7 +308,7 @@ dependencies = [
 
 [[package]]
 name = "dicemaiden-rs"
-version = "1.7.0"
+version = "1.8.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -611,12 +597,6 @@ dependencies = [
  "rand_core 0.10.1",
  "wasm-bindgen",
 ]
-
-[[package]]
-name = "hashbrown"
-version = "0.14.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "hashbrown"
@@ -1628,7 +1608,6 @@ dependencies = [
  "bitflags",
  "bytes",
  "command_attr",
- "dashmap",
  "flate2",
  "futures",
  "levenshtein",
@@ -1636,7 +1615,6 @@ dependencies = [
  "parking_lot",
  "percent-encoding",
  "reqwest",
- "rustc-hash",
  "secrecy",
  "serde",
  "serde_cow",

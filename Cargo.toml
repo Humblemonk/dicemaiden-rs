@@ -1,6 +1,6 @@
 [package]
 name = "dicemaiden-rs"
-version = "1.7.0"
+version = "1.8.0"
 edition = "2024"
 rust-version = "1.95.0"
 keywords = ["discord", "bot", "dice", "rpg", "tabletop"]
@@ -16,7 +16,6 @@ serenity = { version = "0.12", default-features = false, features = [
     "gateway",
     "rustls_backend",
     "model",
-    "cache",
     "standard_framework",
     "builder",
 ] }
