@@ -89,10 +89,6 @@ impl EventHandler for Handler {
             );
         }
 
-        // Set the bot's activity status to "Listening to /roll"
-        let activity = ActivityData::listening("/roll");
-        ctx.set_activity(Some(activity));
-
         // Only do initial setup from shard 0 globally (not per-process)
         if ctx.shard_id.0 == 0 {
             info!("Bot activity set to 'Listening to /roll'");
@@ -438,6 +434,8 @@ async fn main() -> Result<()> {
     let guild_counts = Arc::new(GuildCounts::default());
 
     let client = Client::builder(&token, intents)
+        // Sent in each shard's IDENTIFY, so no extra presence update on every reconnect
+        .activity(ActivityData::listening("/roll"))
         .event_handler(Handler {
             shard_count,
             guild_counts: Arc::clone(&guild_counts),

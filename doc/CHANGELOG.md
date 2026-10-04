@@ -10,6 +10,9 @@
   statistics database are counted the same way as before, except that a server that is
   briefly unavailable during a Discord outage keeps its member count instead of dropping
   to 0.
+- The "Listening to /roll" status is now sent when each shard connects, instead of as a
+  separate update after every reconnect.
+- Removed the unused `standard_framework` Serenity feature.
 
 ## [1.7.0] - 2026-10-02
 

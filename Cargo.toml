@@ -16,7 +16,6 @@ serenity = { version = "0.12", default-features = false, features = [
     "gateway",
     "rustls_backend",
     "model",
-    "standard_framework",
     "builder",
 ] }
 tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread", "signal", "time", "sync"] }
