@@ -65,6 +65,7 @@ When running the bot locally for manual testing, set `GUILD_ID` in your `.env` t
 src/
 ├── main.rs             # Entry point, Discord client setup, sharding
 ├── database.rs         # SQLite shard statistics — prepared statements only
+├── guild_counts.rs     # Server/member counts for stats (no Serenity cache)
 ├── help_text.rs        # Shared help text for all help commands
 ├── lib.rs              # Exposes internals to the test suite
 ├── dice/
