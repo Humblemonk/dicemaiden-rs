@@ -18,9 +18,9 @@
 //!                   └─ CommandResponse { content, ephemeral }
 //! ```
 
-use crate::DatabaseContainer;
 use crate::dice;
 use crate::help_text; // Import the shared help text module from src root
+use crate::{DatabaseContainer, GuildCountsContainer};
 use anyhow::Result;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -101,22 +101,12 @@ fn get_display_name(command: &CommandInteraction) -> String {
     }
 }
 
-// Helper function to calculate server and user counts from cache
-fn get_server_and_user_counts(ctx: &Context) -> (usize, usize) {
-    let server_count = ctx.cache.guilds().len();
-    let user_count: usize = ctx
-        .cache
-        .guilds()
-        .iter()
-        .map(|guild_id| {
-            ctx.cache
-                .guild(*guild_id)
-                .map(|guild| guild.member_count as usize)
-                .unwrap_or(0)
-        })
-        .sum();
-
-    (server_count, user_count)
+async fn get_server_and_user_counts(ctx: &Context) -> (usize, usize) {
+    ctx.data
+        .read()
+        .await
+        .get::<GuildCountsContainer>()
+        .map_or((0, 0), |counts| counts.totals())
 }
 
 pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandResponse> {
@@ -150,7 +140,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
         "donate" => return Ok(CommandResponse::public(generate_donate_text())),
         "bot-info" => {
             // Operator-only: generating this report scans /proc and walks the
-            // full guild cache, so it is gated to server administrators rather
+            // server counts, so it is gated to server administrators rather
             // than exposed on the public roll path.  The report itself replies
             // ephemerally so it never spams the channel.
             if !is_guild_administrator(command) {
@@ -301,7 +291,7 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
             .unwrap_or(shard_count);
 
         // Get current process's server and user counts using helper function
-        let (process_server_count, process_user_count) = get_server_and_user_counts(ctx);
+        let (process_server_count, process_user_count) = get_server_and_user_counts(ctx).await;
 
         format!(
             r#"**Current Process Stats:**
@@ -319,7 +309,7 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
         )
     } else {
         // Single process mode: Show normal stats using helper function
-        let (server_count, user_count) = get_server_and_user_counts(ctx);
+        let (server_count, user_count) = get_server_and_user_counts(ctx).await;
 
         format!(
             r#"**Current Stats:**

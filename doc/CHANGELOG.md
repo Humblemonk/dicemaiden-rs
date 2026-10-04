@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.8.0] - 2026-10-04
+
+## Changed
+
+- Much lower memory use. The bot kept a full copy of every server's channels, roles and
+  emojis (about 50 KB per server, ~1.4 GB per 30k servers) only to report server and member
+  counts. It now keeps just those two numbers. Server and user totals in `bot-info` and the
+  statistics database are counted the same way as before, except that a server that is
+  briefly unavailable during a Discord outage keeps its member count instead of dropping
+  to 0.
+- The "Listening to /roll" status is now sent when each shard connects, instead of as a
+  separate update after every reconnect.
+- Removed the unused `standard_framework` Serenity feature.
+
 ## [1.7.0] - 2026-10-02
 
 ## Added
