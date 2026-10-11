@@ -34,7 +34,7 @@
 - The statistics task no longer holds the shard list locked while it writes to the database.
 - Documented that in multi-process mode `SHARD_COUNT` is one less than the number of shards
   each process runs, because Serenity's `start_shard_range` treats the end of the range as
-  inclusive. The README and `env.example` examples are corrected to match.
+  inclusive. The readme and `env.example` examples are corrected to match.
 
 ## [1.8.0] - 2026-10-04
 
