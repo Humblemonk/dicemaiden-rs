@@ -13,7 +13,8 @@
 //! | unset              | unset         | —                                | single            |
 //!
 //! In **multi-process** mode several bot processes each own a contiguous shard
-//! range (`SHARD_START..SHARD_START+SHARD_COUNT`), sharing a single SQLite DB
+//! range (`SHARD_START..=SHARD_START+SHARD_COUNT`, i.e. `SHARD_COUNT + 1` shards, because
+//! Serenity's `start_shard_range` treats the range end as inclusive), sharing a single SQLite DB
 //! via the `process_stats` table.  Single-process mode uses `shard_stats`.
 //!
 //! # Environment variables
@@ -23,7 +24,7 @@
 //! | `DISCORD_TOKEN`     | ✓        | Bot token from the Discord developer portal      |
 //! | `DATABASE_URL`      |          | SQLite URL; defaults to `./main.db`              |
 //! | `GUILD_ID`          |          | Register commands to one guild (dev/testing)     |
-//! | `SHARD_COUNT`       |          | Number of shards for this process                |
+//! | `SHARD_COUNT`       |          | Shards to run; multi-process: one less than that |
 //! | `SHARD_START`       |          | First shard ID in multi-process deployments      |
 //! | `TOTAL_SHARDS`      |          | Total shards across all processes                |
 //! | `USE_AUTOSHARDING`  |          | Let Discord decide the shard count (`true`)      |
@@ -160,14 +161,22 @@ impl EventHandler for Handler {
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(command) = interaction {
+            // `/purge` can fall back to deleting up to 100 messages one at a
+            // time, which outlasts Discord's 3-second response window, so it
+            // acknowledges first and edits the result in afterwards.
+            let deferred = command.data.name == "purge";
+            if deferred && let Err(why) = command.defer(&ctx.http).await {
+                error!("Cannot defer purge command: {}", why);
+                return;
+            }
+
             let response = match command.data.name.as_str() {
                 "roll" => commands::roll::run(&ctx, &command).await,
                 "r" => commands::roll::run(&ctx, &command).await,
                 "help" => commands::help::run(&ctx, &command).await,
-                "purge" => match commands::purge::run(&ctx, &command).await {
-                    Ok(content) => Ok(commands::CommandResponse::public(content)),
-                    Err(e) => Err(e),
-                },
+                "purge" => commands::purge::run(&ctx, &command)
+                    .await
+                    .map(commands::CommandResponse::public),
                 _ => Ok(commands::CommandResponse::public(
                     "Unknown command".to_string(),
                 )),
@@ -184,20 +193,33 @@ impl EventHandler for Handler {
                 }
             };
 
-            let mut response_message = serenity::builder::CreateInteractionResponseMessage::new()
-                .content(response_content);
+            let sent = if deferred {
+                // A deferred response's visibility was fixed by the defer
+                command
+                    .edit_response(
+                        &ctx.http,
+                        serenity::builder::EditInteractionResponse::new().content(response_content),
+                    )
+                    .await
+                    .map(|_| ())
+            } else {
+                let mut response_message =
+                    serenity::builder::CreateInteractionResponseMessage::new()
+                        .content(response_content);
 
-            if ephemeral {
-                response_message = response_message.ephemeral(true);
-            }
+                if ephemeral {
+                    response_message = response_message.ephemeral(true);
+                }
 
-            if let Err(why) = command
-                .create_response(
-                    &ctx.http,
-                    serenity::builder::CreateInteractionResponse::Message(response_message),
-                )
-                .await
-            {
+                command
+                    .create_response(
+                        &ctx.http,
+                        serenity::builder::CreateInteractionResponse::Message(response_message),
+                    )
+                    .await
+            };
+
+            if let Err(why) = sent {
                 error!("Cannot respond to slash command: {}", why);
             }
         }
@@ -608,17 +630,23 @@ async fn start_client_with_shard_strategy(
                     shard_count,
                     shard_count - 1
                 );
-                client.start_shard_range(0..shard_count, shard_count).await
+                // Not start_shard_range: its inclusive end would also boot an invalid shard
+                // `shard_count` (see the multi_process arm). start_shards boots 0..shard_count.
+                client.start_shards(shard_count).await
             }
         }
         "multi_process" => {
-            // The range should be shard_start..(shard_start + shard_count)
+            // Serenity's `start_shard_range` takes a `Range` but treats `range.end` as
+            // inclusive (`init = end - start + 1`; its docs say `4..7` starts "shards 4
+            // through 7"), so this boots shard_start..=end_shard, which is
+            // SHARD_COUNT + 1 shards. Deployments set SHARD_COUNT one lower to compensate.
+            // E.g. SHARD_START=208, SHARD_COUNT=15 boots 208..=223 (16 shards).
             let end_shard = shard_start + shard_count;
 
             info!(
                 "Starting shard range {} to {} ({} shards) out of {} total",
                 shard_start,
-                shard_start + shard_count + 1,
+                end_shard,
                 shard_count + 1,
                 total_shards
             );
@@ -627,8 +655,6 @@ async fn start_client_with_shard_strategy(
                 shard_count * 5
             );
 
-            // This should create a range from shard_start to shard_start + shard_count (exclusive)
-            // For example: 208..224 includes shards 208, 209, 210, ..., 223 (16 shards)
             client
                 .start_shard_range(shard_start..end_shard, total_shards)
                 .await
@@ -713,12 +739,27 @@ async fn collect_shard_stats_with_shutdown(
         // Only refresh our specific process memory usage instead of scanning all system processes
         system.refresh_processes(ProcessesToUpdate::Some(&[current_pid]), false);
 
-        let shard_info = shard_manager.runners.lock().await;
-        if shard_info.is_empty() {
+        // Copy what the stats need and release the runners lock before any
+        // database await: the ShardManager and every `ready` handler wait on it.
+        let (total_shards_in_process, connected_shards) = {
+            let runners = shard_manager.runners.lock().await;
+            // Only single-process mode writes per-shard rows
+            let connected: Vec<ShardId> = if is_multi_process {
+                Vec::new()
+            } else {
+                runners
+                    .iter()
+                    .filter(|(_, runner)| {
+                        runner.stage == serenity::gateway::ConnectionStage::Connected
+                    })
+                    .map(|(&shard_id, _)| shard_id)
+                    .collect()
+            };
+            (runners.len(), connected)
+        };
+        if total_shards_in_process == 0 {
             continue;
         }
-
-        let total_shards_in_process = shard_info.len();
 
         // Calculate memory once for all shards (they share the same process)
         let memory_usage = if let Some(process) = system.process(current_pid) {
@@ -786,11 +827,7 @@ async fn collect_shard_stats_with_shutdown(
             };
 
             // Process shards more efficiently
-            for (&shard_id, shard_runner) in shard_info.iter() {
-                if shard_runner.stage != serenity::gateway::ConnectionStage::Connected {
-                    continue;
-                }
-
+            for shard_id in connected_shards {
                 // Approximate guild distribution instead of expensive per-shard calculations
                 let shard_guild_count = if shard_id.0 == 0 {
                     // Shard 0 gets any remainder
@@ -807,14 +844,7 @@ async fn collect_shard_stats_with_shutdown(
                     .update_shard_stats(shard_id.0 as i32, shard_guild_count, shard_memory)
                     .await
                 {
-                    if shard_runner.stage == serenity::gateway::ConnectionStage::Connected {
-                        error!("Failed to update shard {} stats: {}", shard_id.0, e);
-                    } else {
-                        warn!(
-                            "Shard {} stats update failed during shutdown: {}",
-                            shard_id.0, e
-                        );
-                    }
+                    error!("Failed to update shard {} stats: {}", shard_id.0, e);
                 }
             }
 

@@ -444,14 +444,29 @@ impl ArithmeticOp {
         }
     }
 
-    fn apply(self, value: &mut i32) {
-        match self {
-            Self::Add(operand) => *value += operand,
-            Self::Subtract(operand) => *value -= operand,
-            Self::Multiply(operand) => *value *= operand,
-            Self::Divide(operand) => *value /= operand,
-        }
+    fn apply(self, value: &mut i32) -> Result<()> {
+        let applied = match self {
+            Self::Add(operand) => value.checked_add(operand),
+            Self::Subtract(operand) => value.checked_sub(operand),
+            Self::Multiply(operand) => value.checked_mul(operand),
+            Self::Divide(operand) => value.checked_div(operand),
+        };
+        *value = applied.ok_or_else(result_too_large)?;
+        Ok(())
     }
+}
+
+/// Error for arithmetic that leaves the `i32` range. Operands are not bounded
+/// at parse time, so `3d6*2147483647` reaches here instead of wrapping.
+pub(crate) fn result_too_large() -> anyhow::Error {
+    anyhow!("Result is too large")
+}
+
+fn checked_sum(values: &[i32]) -> Result<i32> {
+    values
+        .iter()
+        .try_fold(0i32, |sum, value| sum.checked_add(*value))
+        .ok_or_else(result_too_large)
 }
 
 /// True for the arithmetic modifiers (`+n`, `-n`, `*n`, `/n`).
@@ -468,31 +483,25 @@ fn is_arithmetic_modifier(modifier: &Modifier) -> bool {
 fn apply_arithmetic_modifiers(modifiers: &[Modifier], total: &mut i32) -> Result<()> {
     for modifier in modifiers {
         if let Some(op) = ArithmeticOp::from_modifier(modifier)? {
-            op.apply(total);
+            op.apply(total)?;
         }
     }
     Ok(())
 }
 
-// Update apply_mathematical_modifiers to handle the special division case AND continue with remaining modifiers
+// Apply arithmetic modifiers, handling the `number / dice` form first
 fn apply_mathematical_modifiers(
     result: &mut RollResult,
     dice: &DiceRoll,
     rng: &mut impl Rng,
 ) -> Result<()> {
-    // Check for special division pattern: Multiply(0) followed by Add(number)
-    if dice.modifiers.len() >= 2
-        && let (Modifier::Multiply(0), Modifier::Add(number)) =
-            (&dice.modifiers[0], &dice.modifiers[1])
-    {
-        // This is our special "number / dice" case
+    if let Some(Modifier::NumberDividedByRoll(number)) = dice.modifiers.first() {
         if result.total == 0 {
             return Err(anyhow!("Cannot divide by zero (dice result was 0)"));
         }
         result.total = number / result.total;
 
-        // IMPORTANT: Continue processing remaining modifiers starting from index 2
-        let remaining_modifiers = &dice.modifiers[2..];
+        let remaining_modifiers = &dice.modifiers[1..];
         if !remaining_modifiers.is_empty() {
             apply_modifier_expression(result, remaining_modifiers, POST_DIVISION_MATH_RULES, rng)?;
         }
@@ -573,24 +582,19 @@ fn apply_dice_operand(
 }
 
 /// How a modifier expression is built. The standard path and the path that
-/// resumes after the `number / dice` special case differ only here, and the
-/// difference is load-bearing: the standard path merges an added roll's notes
-/// and drops the `*0` marker the parser uses to encode `number / dice`, while
-/// the resumed path does neither, because that marker was already consumed.
+/// resumes after the `number / dice` special case differ only here: the
+/// standard path merges an added roll's notes and the resumed path does not.
 #[derive(Debug, Clone, Copy)]
 struct MathModifierRules {
     merge_added_dice_notes: bool,
-    skip_zero_multiplier: bool,
 }
 
 const STANDARD_MATH_RULES: MathModifierRules = MathModifierRules {
     merge_added_dice_notes: true,
-    skip_zero_multiplier: true,
 };
 
 const POST_DIVISION_MATH_RULES: MathModifierRules = MathModifierRules {
     merge_added_dice_notes: false,
-    skip_zero_multiplier: false,
 };
 
 /// Build an expression from `modifiers` and evaluate it with proper precedence,
@@ -645,7 +649,6 @@ fn apply_modifier_expression(
                     rng,
                 )?;
             }
-            Modifier::Multiply(0) if rules.skip_zero_multiplier => {}
             _ => {
                 if let Some(op) = ArithmeticOp::from_modifier(modifier)? {
                     expression_parts.push(op.symbol().to_string());
@@ -747,17 +750,18 @@ fn apply_left_to_right_operations(tokens: &mut Vec<Token>) -> Result<()> {
                 (&tokens[op_pos - 1], &tokens[op_pos], &tokens[op_pos + 1])
             {
                 let result = match op {
-                    Token::Plus => left + right,
-                    Token::Minus => left - right,
-                    Token::Multiply => left * right,
+                    Token::Plus => left.checked_add(*right),
+                    Token::Minus => left.checked_sub(*right),
+                    Token::Multiply => left.checked_mul(*right),
                     Token::Divide => {
                         if *right == 0 {
                             return Err(anyhow!("Cannot divide by zero"));
                         }
-                        left / right
+                        left.checked_div(*right)
                     }
                     _ => return Err(anyhow!("Unexpected token type")),
-                };
+                }
+                .ok_or_else(result_too_large)?;
 
                 // Replace the three tokens (left operand, operator, right operand) with the result
                 tokens[op_pos - 1] = Token::Number(result);
@@ -1759,7 +1763,7 @@ fn apply_mathematical_modifiers_to_successes_from_slice(
         if let Some(op) = ArithmeticOp::from_modifier(modifier)?
             && let Some(successes) = result.successes.as_mut()
         {
-            op.apply(successes);
+            op.apply(successes)?;
         }
     }
     Ok(())
@@ -2484,15 +2488,16 @@ fn apply_mathematical_modifiers_to_cpr_total(
 
     for modifier in &dice.modifiers {
         match ArithmeticOp::from_modifier(modifier)? {
-            Some(ArithmeticOp::Add(value)) => modifier_total += value,
-            Some(ArithmeticOp::Subtract(value)) => modifier_total -= value,
-            Some(op) => op.apply(&mut result.total),
+            Some(op @ (ArithmeticOp::Add(_) | ArithmeticOp::Subtract(_))) => {
+                op.apply(&mut modifier_total)?
+            }
+            Some(op) => op.apply(&mut result.total)?,
             None => {} // Skip non-mathematical modifiers
         }
     }
 
     if modifier_total != 0 {
-        result.total += modifier_total;
+        ArithmeticOp::Add(modifier_total).apply(&mut result.total)?;
     }
 
     Ok(())
@@ -3056,71 +3061,28 @@ fn apply_pre_target_mathematical_modifiers(
     result: &mut RollResult,
     modifiers: &[Modifier],
 ) -> Result<()> {
-    // Apply each mathematical modifier to individual dice
+    // Apply each mathematical modifier to individual dice, including the
+    // dice groups used for display
     for modifier in modifiers {
-        match modifier {
-            Modifier::Add(value) => {
-                for die_value in &mut result.kept_rolls {
-                    *die_value += value;
-                }
-                for die_value in &mut result.individual_rolls {
-                    *die_value += value;
-                }
-                // Update dice groups for display
-                for group in &mut result.dice_groups {
-                    for die_value in &mut group.rolls {
-                        *die_value += value;
-                    }
-                }
-            }
-            Modifier::Subtract(value) => {
-                for die_value in &mut result.kept_rolls {
-                    *die_value -= value;
-                }
-                for die_value in &mut result.individual_rolls {
-                    *die_value -= value;
-                }
-                for group in &mut result.dice_groups {
-                    for die_value in &mut group.rolls {
-                        *die_value -= value;
-                    }
-                }
-            }
-            Modifier::Multiply(value) => {
-                for die_value in &mut result.kept_rolls {
-                    *die_value *= value;
-                }
-                for die_value in &mut result.individual_rolls {
-                    *die_value *= value;
-                }
-                for group in &mut result.dice_groups {
-                    for die_value in &mut group.rolls {
-                        *die_value *= value;
-                    }
-                }
-            }
-            Modifier::Divide(value) => {
-                if *value == 0 {
-                    return Err(anyhow!("Cannot divide by zero"));
-                }
-                for die_value in &mut result.kept_rolls {
-                    *die_value /= value;
-                }
-                for die_value in &mut result.individual_rolls {
-                    *die_value /= value;
-                }
-                for group in &mut result.dice_groups {
-                    for die_value in &mut group.rolls {
-                        *die_value /= value;
-                    }
-                }
-            }
-            _ => {} // Not a mathematical modifier
+        let Some(op) = ArithmeticOp::from_modifier(modifier)? else {
+            continue;
+        };
+        let group_rolls = result
+            .dice_groups
+            .iter_mut()
+            .flat_map(|g| g.rolls.iter_mut());
+        for die_value in result
+            .kept_rolls
+            .iter_mut()
+            .chain(result.individual_rolls.iter_mut())
+            .chain(group_rolls)
+        {
+            op.apply(die_value)?;
         }
     }
 
     // Update the total to reflect the modified dice values
-    result.total = result.kept_rolls.iter().sum();
+    result.total = checked_sum(&result.kept_rolls)?;
 
     Ok(())
 }
@@ -3395,9 +3357,9 @@ fn apply_mathematical_modifiers_to_vtm5_successes(
         if let Some(op) = ArithmeticOp::from_modifier(modifier)?
             && let Some(mut successes) = result.successes
         {
-            op.apply(&mut successes);
+            op.apply(&mut successes)?;
             result.successes = Some(successes);
-            op.apply(&mut result.total);
+            op.apply(&mut result.total)?;
         }
     }
     Ok(())

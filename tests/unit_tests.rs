@@ -6,7 +6,10 @@
 // - Core dice modifier behavior (exploding, keep/drop, rerolls)
 // - Error handling and input validation
 
-use dicemaiden_rs::dice::{Modifier, parse_and_roll, parser};
+use dicemaiden_rs::dice::{
+    Modifier, format_multiple_results, parse_and_roll, parse_and_roll_with_rng, parser,
+    rng::create_seeded_rng,
+};
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -198,6 +201,37 @@ fn test_mathematical_modifiers_with_game_systems() {
             expression,
             description
         );
+    }
+}
+
+#[test]
+fn test_leading_number_ignores_spacing() {
+    // A leading number lands after the dice's own modifiers whether or not
+    // they are written as one token. `4 + 4d10t7` has always added 4 to the
+    // success count, so the spaced form must too.
+    let same_roll = vec![
+        ("4 + 4d10t7", "4 + 4d10 t7"),
+        ("4 + 4d10t7+1", "4 + 4d10 t7 + 1"),
+        ("5 - 3d10t7", "5 - 3d10 t7"),
+        ("2 * 4d10t7", "2 * 4d10 t7"),
+        ("4 + 4d6k3", "4 + 4d6 k3"),
+        ("4 + 4d10e10", "4 + 4d10 e10"),
+        ("5 + 1d6+2", "5 + 1d6 + 2"),
+    ];
+
+    for (unspaced, spaced) in same_roll {
+        for seed in [1, 42, 1337] {
+            let roll = |expression: &str| {
+                let results = parse_and_roll_with_rng(expression, &mut create_seeded_rng(seed))
+                    .unwrap_or_else(|e| panic!("'{expression}' should roll: {e}"));
+                format_multiple_results(&results)
+            };
+            assert_eq!(
+                roll(unspaced),
+                roll(spaced),
+                "'{unspaced}' and '{spaced}' should be the same roll (seed {seed})"
+            );
+        }
     }
 }
 
@@ -1291,6 +1325,38 @@ fn test_complex_mathematical_expressions() {
         } else {
             // For multiplication and division, just verify success counting exists
             // The actual result depends on random dice rolls
+        }
+    }
+}
+
+#[test]
+fn test_private_flag_detected_on_failed_rolls() {
+    // A failed roll has no results to carry `private`, so its error asks the
+    // parser directly. That answer must match the flag on rolls that succeed.
+    let cases = vec![
+        ("p 100/4cod", true),
+        ("p 1d6+2147483647+1", true),
+        ("s p 10 + 2 + 2d6", true),
+        ("1d20 ; p 100/3df", true),
+        ("p 2d6", true),
+        ("1d20 ; p 2d6", true),
+        ("100/4cod", false),
+        ("1d6 ! p", false),
+        ("2d6", false),
+    ];
+
+    for (expression, expected) in cases {
+        assert_eq!(
+            parser::is_private_expression(expression),
+            expected,
+            "private detection for '{expression}'"
+        );
+        if let Ok(results) = parse_and_roll(expression) {
+            assert_eq!(
+                results.iter().any(|r| r.private),
+                expected,
+                "result flag for '{expression}'"
+            );
         }
     }
 }

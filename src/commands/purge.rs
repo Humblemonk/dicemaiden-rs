@@ -7,7 +7,7 @@
 
 use anyhow::Result;
 use serenity::{
-    all::{CommandDataOptionValue, CommandInteraction, CommandOptionType, GetMessages},
+    all::{CommandDataOptionValue, CommandInteraction, CommandOptionType, GetMessages, MessageId},
     builder::{CreateCommand, CreateCommandOption},
     model::prelude::Permissions,
     prelude::Context,
@@ -66,10 +66,15 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<String> 
         return Ok("❌ Message count must be between 2 and 100.".to_string());
     }
 
-    // Get recent messages
+    // Get the messages sent before this command. The deferred "thinking"
+    // response is newer than the command, so it is never one of them.
+    let before_command = MessageId::new(command.id.get());
     let messages = command
         .channel_id
-        .messages(&ctx.http, GetMessages::new().limit(count))
+        .messages(
+            &ctx.http,
+            GetMessages::new().before(before_command).limit(count),
+        )
         .await?;
 
     if messages.is_empty() {
