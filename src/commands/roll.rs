@@ -205,15 +205,19 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
         Err(e) => {
             // Check if this is an input length error to avoid spamming Discord
             let error_message = e.to_string();
-            if error_message.contains("Input too long") {
+            let content = if error_message.contains("Input too long") {
                 // For input length errors, don't show the request to avoid spam
-                let content = format!("🎲 **{display_name}** ❌ **Error**: {e}");
-                Ok(CommandResponse::public(content))
+                format!("🎲 **{display_name}** ❌ **Error**: {e}")
             } else {
                 // For other errors, show the cleaned request as before
                 let clean_expr = strip_label_and_comment_from_expression(dice_expr);
-                let content =
-                    format!("🎲 **{display_name}** used `{clean_expr}` - ❌ **Error**: {e}");
+                format!("🎲 **{display_name}** used `{clean_expr}` - ❌ **Error**: {e}")
+            };
+
+            // A private roll's error is as private as its result would have been
+            if dice::parser::is_private_expression(dice_expr) {
+                Ok(CommandResponse::private(content))
+            } else {
                 Ok(CommandResponse::public(content))
             }
         }

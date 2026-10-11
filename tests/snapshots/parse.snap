@@ -686,6 +686,44 @@ tbe65 e4	OK	[1d100 mods=[BrokenEmpires(65, 0), Explode(Some(4))] label=None comm
 100/(Attack) 1d20 + 5	ERR	Unexpected `/ (Attack)` between `100` and the dice
 100/wng 4d6	ERR	Unexpected `/ wng` between `100` and the dice
 100 / 6 2d1	ERR	Unexpected `/ 6` between `100` and the dice
+10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=----]
+2 * 3 + 1d1	OK	[1d1 mods=[Add(6)] label=None comment=None flags=----]
+2 + 3 * 1d1	OK	[1d1 mods=[Multiply(5)] label=None comment=None flags=----]
+1 + 1 + 1 + 1d1	OK	[1d1 mods=[Add(3)] label=None comment=None flags=----]
+10 - 2 - 2d1	OK	[2d1 mods=[Multiply(-1), Add(8)] label=None comment=None flags=----]
+20 / 2 / 2d1	OK	[2d1 mods=[NumberDividedByRoll(10)] label=None comment=None flags=----]
+10 + 2 + 2d1 + 3	OK	[2d1 mods=[Add(12), Add(3)] label=None comment=None flags=----]
+2147483646 + 1 - 1d1	OK	[1d1 mods=[Multiply(-1), Add(2147483647)] label=None comment=None flags=----]
+2147483647 + 1 + 1d1	ERR	Result is too large
+10 / 0 + 1d1	ERR	Cannot divide by zero
+10 + x + 2d1	ERR	Unexpected `+ x +` between `10` and the dice
+3 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=Some("Set 1") comment=None flags=---- | 2d1 mods=[Add(12)] label=Some("Set 2") comment=None flags=---- | 2d1 mods=[Add(12)] label=Some("Set 3") comment=None flags=----]
+1d1 ; 10 + 2 + 2d1	OK	[1d1 mods=[] label=None comment=None flags=---- | 2d1 mods=[Add(12)] label=None comment=None flags=----]
+10 + 2 + 2d1 ! fire	OK	[2d1 mods=[Add(12)] label=None comment=Some("fire") flags=----]
+(Hit) 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=Some("Hit") comment=None flags=----]
+p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
+5 + 1d1 + 2	OK	[1d1 mods=[Add(5), Add(2)] label=None comment=None flags=----]
+4 + 4d1 + 2	OK	[4d1 mods=[Add(4), Add(2)] label=None comment=None flags=----]
+5 + 1d1 - 1	OK	[1d1 mods=[Add(5), Subtract(1)] label=None comment=None flags=----]
+5 + 1d1 * 2	OK	[1d1 mods=[Add(5), Multiply(2)] label=None comment=None flags=----]
+5 - 1d1 + 2	OK	[1d1 mods=[Multiply(-1), Add(5), Add(2)] label=None comment=None flags=----]
+2 * 1d1 + 1	OK	[1d1 mods=[Multiply(2), Add(1)] label=None comment=None flags=----]
+5 + 1d1+2	OK	[1d1 mods=[Add(5), Add(2)] label=None comment=None flags=----]
+3 + 4d1 t1	OK	[4d1 mods=[Target(1), Add(3)] label=None comment=None flags=----]
+5 + 1d1 + 2 ! fire	OK	[1d1 mods=[Add(5), Add(2)] label=None comment=Some("fire") flags=----]
+3 5 + 1d1 + 2	OK	[1d1 mods=[Add(5), Add(2)] label=Some("Set 1") comment=None flags=---- | 1d1 mods=[Add(5), Add(2)] label=Some("Set 2") comment=None flags=---- | 1d1 mods=[Add(5), Add(2)] label=Some("Set 3") comment=None flags=----]
+1d1 ; 5 + 1d1 + 2	OK	[1d1 mods=[] label=None comment=None flags=---- | 1d1 mods=[Add(5), Add(2)] label=None comment=None flags=----]
+5 + 1d1 + 2147483641	OK	[1d1 mods=[Add(5), Add(2147483641)] label=None comment=None flags=----]
+5 + 1d1 + 2147483642	OK	[1d1 mods=[Add(5), Add(2147483642)] label=None comment=None flags=----]
+4 + 4d1t1	OK	[4d1 mods=[Target(1), Add(4)] label=None comment=None flags=----]
+4 + 4d1 t1	OK	[4d1 mods=[Target(1), Add(4)] label=None comment=None flags=----]
+4 + 4d1t1+1	OK	[4d1 mods=[Target(1), Add(4), Add(1)] label=None comment=None flags=----]
+4 + 4d1 t1 + 1	OK	[4d1 mods=[Target(1), Add(4), Add(1)] label=None comment=None flags=----]
+5 - 3d1 t1	OK	[3d1 mods=[Target(1), Multiply(-1), Add(5)] label=None comment=None flags=----]
+2 * 4d1 t1	OK	[4d1 mods=[Target(1), Multiply(2)] label=None comment=None flags=----]
+10 + 2 + 3d1 t1	OK	[3d1 mods=[Target(1), Add(12)] label=None comment=None flags=----]
+20 / 2 / 2d1 k1	OK	[2d1 mods=[NumberDividedByRoll(10), KeepHigh(1)] label=None comment=None flags=----]
+4 + 4d1 k1	OK	[4d1 mods=[KeepHigh(1), Add(4)] label=None comment=None flags=----]
 99999999999/2d6	ERR	Number too large to divide by dice: 99999999999
 2147483647/2d1	OK	[2d1 mods=[NumberDividedByRoll(2147483647)] label=None comment=None flags=----]
 2147483648/2d1	ERR	Number too large to divide by dice: 2147483648

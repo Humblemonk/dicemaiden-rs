@@ -12,7 +12,16 @@
   a game system it added the number instead (`100/3df` gave the Fudge total + 100,
   `100/4cod` reported 100 successes). Those rolls, such as `100/3d10 t7`, `100/4cod` and
   `100/+d%`, now report an error.
-- Anything between a leading number and the dice was dropped, leaving a stray `+N`:
+- Only the first of several numbers in front of the dice was used: `10 + 2 + 2d6` rolled
+  2d6 + 10 and `2 * 3 + 1d6` rolled 1d6 + 2. The numbers are now worked out left to right
+  first, the same order as math after the dice, so these roll 2d6 + 12 and 1d6 + 6.
+  Left to right means `2 + 3 * 1d6` rolls 5 × 1d6, not 2 + 3d6, just as `1d6 + 2 * 3` is
+  already (1d6 + 2) × 3.
+- A number in front of the dice with more math after them (`5 + 1d6 + 2`, `4 + 4d10 - 1`)
+  failed with "Unable to parse combined modifier". It now rolls as written: 1d6 + 7.
+  Spacing doesn't change the result: on a success-counting roll the leading number adds to
+  the success count whether you write `4 + 4d10t7` or `4 + 4d10 t7`.
+- Anything else between a leading number and the dice was dropped, leaving a stray `+N`:
   `100/gb 3d8` rolled 3d8 + 100, and `100 - -d%` rolled a plain d100 without the
   disadvantage. These now report an error naming the part that could not be read.
 - Very large modifiers (`3d6*2147483647`) could wrap round to a negative total. They now
@@ -20,6 +29,8 @@
   (`2 1d1 +2147483646`) now shows the real `Total:` instead of a negative one.
 - A private roll with a very long result could fail to send. It now falls back to a
   simplified result, as public rolls already did.
+- A private roll (`p`) that failed posted its error, with the expression, publicly in the
+  channel. The error is now shown only to the person who rolled.
 - `/purge` could report "interaction failed" after deleting the messages when Discord
   rejected the bulk delete (messages over 14 days old) and the bot deleted them one by
   one. The bot now acknowledges the command straight away and posts the result when done.

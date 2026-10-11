@@ -39,7 +39,8 @@ Systems without a dedicated alias are listed under [Other Popular Systems](#othe
 - **Success Counting**: `t7` (count successes ≥7), `tl6` (count successes ≤6), `f1` (count failures ≤1)
 - **Double Success**: `t7ds10` (target 7+, double success on 10; defaults to target value), `tl6ds5` (target 6-, double success on 5)
 - **Botch Counting**: `b1` (count botches ≤1), `b` (count botches ≤1)
-- **Math Operations**: `+5`, `-3`, `*2`, `/2`
+- **Math Operations**: `+5`, `-3`, `*2`, `/2`, worked out left to right (`1d6 + 2 * 3` is
+  `(1d6 + 2) * 3`). Numbers can also come first: `10 + 2 + 2d6` rolls 2d6 + 12
 - **Number Divided by Dice**: `100/2d6` (100 divided by the dice total) — plain dice only,
   not with success counting or a game system
 - **Additional Dice**: `+2d6`, `-1d4` (add/subtract dice rolls)

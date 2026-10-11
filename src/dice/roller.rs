@@ -458,7 +458,7 @@ impl ArithmeticOp {
 
 /// Error for arithmetic that leaves the `i32` range. Operands are not bounded
 /// at parse time, so `3d6*2147483647` reaches here instead of wrapping.
-fn result_too_large() -> anyhow::Error {
+pub(crate) fn result_too_large() -> anyhow::Error {
     anyhow!("Result is too large")
 }
 
