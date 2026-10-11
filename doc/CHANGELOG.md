@@ -16,7 +16,8 @@
   `100/gb 3d8` rolled 3d8 + 100, and `100 - -d%` rolled a plain d100 without the
   disadvantage. These now report an error naming the part that could not be read.
 - Very large modifiers (`3d6*2147483647`) could wrap round to a negative total. They now
-  report "Result is too large".
+  report "Result is too large". A roll set whose results add up past that limit
+  (`2 1d1 +2147483646`) now shows the real `Total:` instead of a negative one.
 - A private roll with a very long result could fail to send. It now falls back to a
   simplified result, as public rolls already did.
 - `/purge` could report "interaction failed" after deleting the messages when Discord
