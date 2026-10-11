@@ -313,10 +313,12 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
 
     Ok(format!(
         r#"🤖 **Dice Maiden Bot Info** 🤖
+Version: {}
 
 {stats_section}
 
-{db_stats_result}"#
+{db_stats_result}"#,
+        env!("CARGO_PKG_VERSION")
     ))
 }
 
