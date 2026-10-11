@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.8.1] - 2026-10-11
+
+## Fixed
+
+- Multiplying by zero was ignored: `3d6*0` returned the dice total and `3d6*0-5` returned
+  the total minus 5. `*0` now gives 0, then applies anything after it.
+- A roll like `2d6*0+6` was read as `6/2d6` and divided 6 by the dice. It now returns 6.
+  Rolls that start with a number divided by dice, such as `100/2d6`, are unchanged.
+- A number divided by dice only ever divided on plain dice. In front of success counting or
+  a game system it added the number instead (`100/3df` gave the Fudge total + 100,
+  `100/4cod` reported 100 successes). Those rolls, such as `100/3d10 t7`, `100/4cod` and
+  `100/+d%`, now report an error.
+- Anything between a leading number and the dice was dropped, leaving a stray `+N`:
+  `100/gb 3d8` rolled 3d8 + 100, and `100 - -d%` rolled a plain d100 without the
+  disadvantage. These now report an error naming the part that could not be read.
+- Very large modifiers (`3d6*2147483647`) could wrap round to a negative total. They now
+  report "Result is too large".
+- A private roll with a very long result could fail to send. It now falls back to a
+  simplified result, as public rolls already did.
+- `/purge` could report "interaction failed" after deleting the messages when Discord
+  rejected the bulk delete (messages over 14 days old) and the bot deleted them one by
+  one. The bot now acknowledges the command straight away and posts the result when done.
+- `bot-info` showed one shard too many at the end of a process's range ("80 to 96" for
+  shards 80-95). The startup log had the same mistake.
+- Manual sharding (`SHARD_COUNT` without `SHARD_START`) also started one shard past the
+  total, which Discord rejects. It now starts exactly `SHARD_COUNT` shards.
+
+## Changed
+
+- `bot-info` reads only the bot's own memory instead of scanning every process on the host.
+- The statistics task no longer holds the shard list locked while it writes to the database.
+- Documented that in multi-process mode `SHARD_COUNT` is one less than the number of shards
+  each process runs, because Serenity's `start_shard_range` treats the end of the range as
+  inclusive. The README and `env.example` examples are corrected to match.
+
 ## [1.8.0] - 2026-10-04
 
 ## Changed

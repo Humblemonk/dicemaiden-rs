@@ -29,7 +29,7 @@ use serenity::{
     builder::{CreateCommand, CreateCommandOption},
     prelude::Context,
 };
-use sysinfo::{Pid, System};
+use sysinfo::{Pid, ProcessesToUpdate, System};
 
 // Custom response type to include privacy information
 #[derive(Debug)]
@@ -88,17 +88,13 @@ fn get_display_name(command: &CommandInteraction) -> String {
     }
 
     // Fall back to the user's global display name or username
-    if !command
+    command
         .user
         .global_name
-        .as_ref()
-        .unwrap_or(&String::new())
-        .is_empty()
-    {
-        command.user.global_name.as_ref().unwrap().clone()
-    } else {
-        command.user.name.clone()
-    }
+        .as_deref()
+        .filter(|name| !name.is_empty())
+        .unwrap_or(&command.user.name)
+        .to_string()
 }
 
 async fn get_server_and_user_counts(ctx: &Context) -> (usize, usize) {
@@ -161,59 +157,49 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
     match dice::parse_and_roll(dice_expr) {
         Ok(results) => {
             let formatted = dice::format_multiple_results_with_limit(&results);
+            let clean_expr = strip_label_and_comment_from_expression(dice_expr);
 
             // Check if any roll was marked as private
             let is_private = results.iter().any(|r| r.private);
 
-            if is_private {
-                // For private rolls, strip comment and label from request display
-                let clean_expr = strip_label_and_comment_from_expression(dice_expr);
-                Ok(CommandResponse::private(format!(
-                    "🎲 **Private Roll** `{clean_expr}` {formatted}"
-                )))
+            // For private rolls, the request is shown without the user's name
+            let request = if is_private {
+                format!("🎲 **Private Roll** `{clean_expr}`")
             } else {
-                // Check if this has multiple results that are semicolon-separated
-                let is_semicolon_separated = results.len() > 1
-                    && results.iter().any(|r| r.original_expression.is_some())
-                    && !results
-                        .iter()
-                        .all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
+                format!("🎲 **{display_name}** Request: `{clean_expr}`")
+            };
 
-                let content = if is_semicolon_separated {
-                    // For semicolon-separated rolls, the formatted string already contains individual requests
-                    format!("🎲 **{display_name}** {formatted}")
-                } else if results.len() > 1 {
-                    // For roll sets, strip comment and label from request display
-                    let clean_expr = strip_label_and_comment_from_expression(dice_expr);
-                    format!("🎲 **{display_name}** Request: `{clean_expr}`\n{formatted}")
+            let content = if is_private || results.len() <= 1 {
+                format!("{request} {formatted}")
+            } else if dice::is_semicolon_separated(&results) {
+                // For semicolon-separated rolls, the formatted string already contains individual requests
+                format!("🎲 **{display_name}** {formatted}")
+            } else {
+                format!("{request}\n{formatted}")
+            };
+
+            // Check if final content exceeds Discord limit
+            let content = if content.len() > dice::DISCORD_MESSAGE_LIMIT {
+                // Final fallback - just show the simplified result
+                let simplified_result = if results.len() == 1 {
+                    let mut simplified = results[0].create_simplified();
+                    simplified.simple = true; // Show only result, no dice breakdown
+                    simplified.to_string()
                 } else {
-                    // Single result, strip comment and label from request display
-                    let clean_expr = strip_label_and_comment_from_expression(dice_expr);
-                    format!("🎲 **{display_name}** Request: `{clean_expr}` {formatted}")
+                    format!(
+                        "**{}** total results Reason: `Simplified roll due to character limit`",
+                        results.len()
+                    )
                 };
+                format!("{request} {simplified_result}")
+            } else {
+                content
+            };
 
-                // Check if final content exceeds Discord limit
-                if content.len() > 2000 {
-                    // Final fallback - just show the simplified result
-                    let clean_expr = strip_label_and_comment_from_expression(dice_expr);
-                    let simplified_result = if results.len() == 1 {
-                        let mut simplified = results[0].create_simplified();
-                        simplified.simple = true; // Show only result, no dice breakdown
-                        simplified.to_string()
-                    } else {
-                        format!(
-                            "**{}** total results Reason: `Simplified roll due to character limit`",
-                            results.len()
-                        )
-                    };
-
-                    let simplified_content = format!(
-                        "🎲 **{display_name}** Request: `{clean_expr}` {simplified_result}"
-                    );
-                    Ok(CommandResponse::public(simplified_content))
-                } else {
-                    Ok(CommandResponse::public(content))
-                }
+            if is_private {
+                Ok(CommandResponse::private(content))
+            } else {
+                Ok(CommandResponse::public(content))
             }
         }
         Err(e) => {
@@ -250,12 +236,13 @@ fn generate_donate_text() -> String {
 }
 
 async fn generate_bot_info(ctx: &Context) -> Result<String> {
-    let mut system = System::new_all();
-    system.refresh_all();
+    // Refresh only this process: a full refresh walks every process on the host
+    let current_pid = Pid::from_u32(std::process::id());
+    let mut system = System::new();
+    system.refresh_processes(ProcessesToUpdate::Some(&[current_pid]), false);
 
     // Get memory usage
-    let current_pid = std::process::id();
-    let memory_usage = if let Some(process) = system.process(Pid::from_u32(current_pid)) {
+    let memory_usage = if let Some(process) = system.process(current_pid) {
         process.memory() as f64 / 1024.0 / 1024.0 // Convert from KB to MB
     } else {
         0.0
@@ -300,7 +287,8 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
 • Process Users: ~{}
 • Process Memory: {}"#,
             shard_start,
-            shard_start + shard_count + 1,
+            // Serenity boots SHARD_COUNT + 1 shards; see the multi_process arm in main.rs
+            shard_start + shard_count,
             shard_count + 1,
             total_shards,
             process_server_count,
@@ -433,15 +421,9 @@ async fn get_database_stats(ctx: &Context) -> String {
 static LEADING_LABEL_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s*\([^)]*\)\s*").expect("Failed to compile LEADING_LABEL_REGEX"));
 
-static TRAILING_COMMENT_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\s*!\s*.*$").expect("Failed to compile TRAILING_COMMENT_REGEX"));
-
 fn strip_label_and_comment_from_expression(expr: &str) -> String {
     // Remove labels in parentheses at the beginning: (label) dice_expression
     let cleaned = LEADING_LABEL_REGEX.replace(expr, "");
 
-    // Remove comments (everything after ! including the !)
-    let cleaned = TRAILING_COMMENT_REGEX.replace(&cleaned, "");
-
-    cleaned.trim().to_string()
+    dice::strip_comment_from_expression(&cleaned)
 }

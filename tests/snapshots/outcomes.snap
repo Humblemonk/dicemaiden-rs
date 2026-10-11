@@ -116,7 +116,7 @@
 /roll 6 4d6	always-err {"Invalid dice expression: /"}
 /roll d%	always-err {"Invalid dice expression: /"}
 /roll d100	always-err {"Invalid dice expression: /"}
-0 + +d%	always-ok n=Some(1)
+0 + +d%	always-err {"Unexpected `+ +` between `0` and the dice"}
 0 d6	always-err {"Set count must be between 2 and 20"}
 0d1	always-err {"Cannot roll 0 dice"}
 0d6	always-err {"Cannot roll 0 dice"}
@@ -129,7 +129,7 @@
 10 / 1d1	always-ok n=Some(1)
 10 / 2d1	always-ok n=Some(1)
 10 1d12+6 t8	always-ok n=Some(10)
-100 - -d%	always-ok n=Some(1)
+100 - -d%	always-err {"Unexpected `- -` between `100` and the dice"}
 100 / 2d1	always-ok n=Some(1)
 100 1d6	always-err {"Set count must be between 2 and 20"}
 100/2d1	always-ok n=Some(1)
@@ -646,6 +646,49 @@ tbe65 e4	always-err {"The Broken Empires skill test only supports difficulty, +N
 2d1 ! comment	always-ok n=Some(1)
 2d1 * 2d1	always-ok n=Some(1)
 2d1 *0	always-ok n=Some(1)
+2d1*0+6	always-ok n=Some(1)
+3d1*0+5+2	always-ok n=Some(1)
+3d1*0-5	always-ok n=Some(1)
+3d1*2*0	always-ok n=Some(1)
+1d1*2147483647	always-ok n=Some(1)
+3d1*2147483647	always-err {"Result is too large"}
+1d1+2147483646	always-ok n=Some(1)
+1d1+2147483647+1	always-err {"Result is too large"}
+1d1-2147483647-3	always-err {"Result is too large"}
+100/2d1+2147483647	always-err {"Result is too large"}
+3d1 t1 +2147483647+1	always-err {"Result is too large"}
+2d1 t1 +2147483647	always-err {"Result is too large"}
+3d1 t5 +2147483646	always-err {"Result is too large"}
+2d1 +2147483646 t1	always-err {"Result is too large"}
+4d1 b1 +5	always-ok n=Some(1)
+4d1 b2 + 3	always-ok n=Some(1)
+4d1 b1 *0	always-ok n=Some(1)
+4d1 b1 -5 *2	always-ok n=Some(1)
+3d1 *1000000000 b1	always-err {"Result is too large"}
+4d1 f1 +5	always-ok n=Some(1)
+2 1d1 +2147483646	always-ok n=Some(2)
+2 3d1 t5 +2147483646	always-err {"Result is too large"}
+1d1+2*0+3	always-ok n=Some(1)
+100/2d1*0	always-ok n=Some(1)
+100/2d1*0+7	always-ok n=Some(1)
+3d1 t1 *0	always-ok n=Some(1)
+100/5d1 t1	always-err {"A number divided by dice (like `100/2d6`) only works on a plain dice roll, not with success counting or a game system"}
+100/2d1 k1	always-ok n=Some(1)
+100/2d1 t1	always-err {"A number divided by dice (like `100/2d6`) only works on a plain dice roll, not with success counting or a game system"}
+100/2d1 f1	always-err {"A number divided by dice (like `100/2d6`) only works on a plain dice roll, not with success counting or a game system"}
+100/4cod	always-err {"A number divided by dice (like `100/2d6`) only works on a plain dice roll, not with success counting or a game system"}
+100/3df	always-err {"A number divided by dice (like `100/2d6`) only works on a plain dice roll, not with success counting or a game system"}
+100/dheart	always-err {"A number divided by dice (like `100/2d6`) only works on a plain dice roll, not with success counting or a game system"}
+100/cpd3	always-err {"A number divided by dice (like `100/2d6`) only works on a plain dice roll, not with success counting or a game system"}
+100/+d%	always-err {"A number divided by dice (like `100/2d6`) only works on a plain dice roll, not with success counting or a game system"}
+100/6 4d6	always-err {"Unexpected `/ 6` between `100` and the dice"}
+100/gb 3d8	always-err {"Unexpected `/ gb` between `100` and the dice"}
+100/(Attack) 1d20 + 5	always-err {"Unexpected `/ (Attack)` between `100` and the dice"}
+100/wng 4d6	always-err {"Unexpected `/ wng` between `100` and the dice"}
+100 / 6 2d1	always-err {"Unexpected `/ 6` between `100` and the dice"}
+99999999999/2d6	always-err {"Number too large to divide by dice: 99999999999"}
+2147483647/2d1	always-ok n=Some(1)
+2147483648/2d1	always-err {"Number too large to divide by dice: 2147483648"}
 2d1 *1	always-ok n=Some(1)
 2d1 *2	always-ok n=Some(1)
 2d1 *3	always-ok n=Some(1)

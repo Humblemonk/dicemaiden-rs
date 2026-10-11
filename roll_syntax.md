@@ -40,6 +40,8 @@ Systems without a dedicated alias are listed under [Other Popular Systems](#othe
 - **Double Success**: `t7ds10` (target 7+, double success on 10; defaults to target value), `tl6ds5` (target 6-, double success on 5)
 - **Botch Counting**: `b1` (count botches ≤1), `b` (count botches ≤1)
 - **Math Operations**: `+5`, `-3`, `*2`, `/2`
+- **Number Divided by Dice**: `100/2d6` (100 divided by the dice total) — plain dice only,
+  not with success counting or a game system
 - **Additional Dice**: `+2d6`, `-1d4` (add/subtract dice rolls)
 
 ### How Modifiers Combine

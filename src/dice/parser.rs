@@ -85,6 +85,10 @@ static ADVANTAGE_REGEX: Lazy<Regex> =
 static WHITESPACE_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\s+").expect("Failed to compile WHITESPACE_REGEX"));
 
+/// Internal operator token for `number / dice`, emitted by the tokenizer ahead of
+/// the number. It contains a space so no whitespace-split user token can equal it.
+const NUMBER_DIVIDED_BY_ROLL_OP: &str = "÷ roll";
+
 static NUMBER_OP_DICE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(\d+)\s*([+\-*/])\s+(d\d+.*|d%.*|\d*d\d+.*)$")
         .expect("Failed to compile NUMBER_OP_DICE_REGEX")
@@ -244,6 +248,105 @@ fn try_parse_roll_set(input: &str, metadata: Option<&DiceRoll>) -> Result<Option
 }
 
 pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
+    let rolls = parse_rolls(input)?;
+    for roll in &rolls {
+        validate_number_divided_by_roll(roll)?;
+    }
+    Ok(rolls)
+}
+
+/// `N/dice` divides N by the dice total, so it only means something on a plain
+/// roll whose result is that total. On success counting or a game system there
+/// is no such total: the roller used to turn `N/` into `+N` there, and since
+/// 1.8.1 ignored it, so it is rejected instead.
+fn validate_number_divided_by_roll(roll: &DiceRoll) -> Result<()> {
+    let Some(position) = roll
+        .modifiers
+        .iter()
+        .position(|m| matches!(m, Modifier::NumberDividedByRoll(_)))
+    else {
+        return Ok(());
+    };
+    if position == 0 && roll.modifiers[1..].iter().all(is_plain_dice_modifier) {
+        return Ok(());
+    }
+    Err(anyhow!(
+        "A number divided by dice (like `100/2d6`) only works on a plain dice roll, \
+         not with success counting or a game system"
+    ))
+}
+
+/// Modifiers that leave a roll's result as its dice total. Exhaustive on
+/// purpose: a new modifier must be classified here, not fall through.
+fn is_plain_dice_modifier(modifier: &Modifier) -> bool {
+    match modifier {
+        Modifier::Add(_)
+        | Modifier::Subtract(_)
+        | Modifier::Multiply(_)
+        | Modifier::Divide(_)
+        | Modifier::AddDice(_)
+        | Modifier::SubtractDice(_)
+        | Modifier::MultiplyDice(_)
+        | Modifier::DivideDice(_)
+        | Modifier::Explode(_)
+        | Modifier::ExplodeIndefinite(_)
+        | Modifier::Implode(_)
+        | Modifier::Drop(_)
+        | Modifier::Advantage(_)
+        | Modifier::Disadvantage(_)
+        | Modifier::KeepHigh(_)
+        | Modifier::KeepLow(_)
+        | Modifier::KeepMiddle(_)
+        | Modifier::Reroll(_)
+        | Modifier::RerollIndefinite(_)
+        | Modifier::RerollGreater(_)
+        | Modifier::RerollGreaterIndefinite(_) => true,
+        Modifier::NumberDividedByRoll(_)
+        | Modifier::Target(_)
+        | Modifier::TargetLower(_)
+        | Modifier::TargetWithDoubleSuccess(..)
+        | Modifier::TargetLowerWithDoubleSuccess(..)
+        | Modifier::Failure(_)
+        | Modifier::Botch(_)
+        | Modifier::Cancel
+        | Modifier::WrathGlory(..)
+        | Modifier::Godbound(_)
+        | Modifier::HeroSystem(_)
+        | Modifier::Fudge
+        | Modifier::DarkHeresy
+        | Modifier::SavageWorlds(_)
+        | Modifier::D6System(..)
+        | Modifier::Shadowrun(_)
+        | Modifier::MarvelMultiverse(..)
+        | Modifier::CyberpunkRed
+        | Modifier::CyberpunkRedDamage
+        | Modifier::Wfrp(_)
+        | Modifier::BrokenEmpires(..)
+        | Modifier::BrokenEmpiresFavor(_)
+        | Modifier::Witcher
+        | Modifier::CypherSystem(_)
+        | Modifier::BraveNewWorld(_)
+        | Modifier::ConanSkill(_)
+        | Modifier::ConanCombat(_)
+        | Modifier::TwoD20Test { .. }
+        | Modifier::Silhouette(_)
+        | Modifier::VampireMasquerade5(..)
+        | Modifier::LaserFeelings(..)
+        | Modifier::Alien
+        | Modifier::AlienStress(_)
+        | Modifier::ForgedDark
+        | Modifier::ForgedDarkZero
+        | Modifier::Daggerheart
+        | Modifier::WildWords(_)
+        | Modifier::Mothership(..)
+        | Modifier::MutantsMasterminds
+        | Modifier::PlotDie
+        | Modifier::Essence20(..)
+        | Modifier::DarkestHouse(_) => false,
+    }
+}
+
+fn parse_rolls(input: &str) -> Result<Vec<DiceRoll>> {
     let input = input.trim();
 
     // Input length validation for DoS protection
@@ -522,6 +625,17 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
             // Get the initial number and operator
             let initial_number = parts[0].parse::<i32>().unwrap();
 
+            // Only "number operator dice" is understood here. Anything between
+            // them (`100 / gb 3d8`, `100 / 6 4d6`) used to be dropped silently,
+            // leaving a stray `+100`.
+            if dice_idx > 2 {
+                return Err(anyhow!(
+                    "Unexpected `{}` between `{}` and the dice",
+                    parts[1..dice_idx].join(" "),
+                    parts[0]
+                ));
+            }
+
             // Check if there's an operator before the dice
             if dice_idx > 1 {
                 match parts[dice_idx - 1].as_str() {
@@ -536,11 +650,14 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
                         dice.modifiers.push(Modifier::Multiply(initial_number));
                     }
                     "/" => {
-                        dice.modifiers.push(Modifier::Multiply(0)); // Special marker
-                        dice.modifiers.push(Modifier::Add(initial_number));
+                        dice.modifiers
+                            .push(Modifier::NumberDividedByRoll(initial_number));
                     }
-                    _ => {
-                        dice.modifiers.push(Modifier::Add(initial_number));
+                    other => {
+                        return Err(anyhow!(
+                            "Unexpected `{other}` between `{}` and the dice",
+                            parts[0]
+                        ));
                     }
                 }
             } else {
@@ -630,9 +747,7 @@ fn parse_expression_to_parts(input: &str) -> Result<Vec<String>> {
 
             let mut result_parts = vec![
                 dice_parts.dice_part,
-                "*".to_string(),
-                "0".to_string(),
-                "+".to_string(),
+                NUMBER_DIVIDED_BY_ROLL_OP.to_string(),
                 number.to_string(),
             ];
 
@@ -850,9 +965,7 @@ fn parse_combined_expression(input: &str) -> Result<Vec<String>> {
             // Create the base parts for division
             let mut parts = vec![
                 parsed.dice_part,
-                "*".to_string(),
-                "0".to_string(), // Special marker
-                "+".to_string(),
+                NUMBER_DIVIDED_BY_ROLL_OP.to_string(),
                 number.to_string(), // The number to divide by dice result
             ];
 
@@ -1513,6 +1626,13 @@ fn try_parse_operator_pair(
     second: &str,
 ) -> Result<Option<usize>> {
     match first {
+        NUMBER_DIVIDED_BY_ROLL_OP => {
+            let num = second
+                .parse::<i32>()
+                .map_err(|_| anyhow!("Number too large to divide by dice: {second}"))?;
+            dice.modifiers.push(Modifier::NumberDividedByRoll(num));
+            return Ok(Some(2));
+        }
         "+" => {
             if let Ok(num) = second.parse::<i32>() {
                 dice.modifiers.push(Modifier::Add(num));

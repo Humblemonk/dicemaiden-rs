@@ -130,11 +130,15 @@ WantedBy=multi-user.target
 
 Each process owns a contiguous shard range and shares one SQLite database.
 
+`SHARD_COUNT` here is **one less** than the number of shards the process runs: Serenity 0.12's
+`start_shard_range` treats the end of the range as inclusive, so each process boots shards
+`SHARD_START` through `SHARD_START + SHARD_COUNT`.
+
 ```bash
 # 3 processes handling 64 shards total
-SHARD_COUNT=21 SHARD_START=0  TOTAL_SHARDS=64 ./dicemaiden-rs &   # shards 0-20
-SHARD_COUNT=21 SHARD_START=21 TOTAL_SHARDS=64 ./dicemaiden-rs &   # shards 21-41
-SHARD_COUNT=22 SHARD_START=42 TOTAL_SHARDS=64 ./dicemaiden-rs &   # shards 42-63
+SHARD_COUNT=20 SHARD_START=0  TOTAL_SHARDS=64 ./dicemaiden-rs &   # shards 0-20
+SHARD_COUNT=20 SHARD_START=21 TOTAL_SHARDS=64 ./dicemaiden-rs &   # shards 21-41
+SHARD_COUNT=21 SHARD_START=42 TOTAL_SHARDS=64 ./dicemaiden-rs &   # shards 42-63
 ```
 
 </details>

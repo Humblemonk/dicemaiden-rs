@@ -133,6 +133,8 @@ pub enum Modifier {
     Subtract(i32),
     Multiply(i32),
     Divide(i32),
+    /// `N/XdY`: N divided by the roll total. Always the first modifier.
+    NumberDividedByRoll(i32),
     Explode(Option<u32>),                   // e or e#
     ExplodeIndefinite(Option<u32>),         // ie or ie#
     Implode(Option<u32>),                   // i or i#
@@ -537,30 +539,27 @@ pub fn format_multiple_results(results: &[RollResult]) -> String {
         return results[0].to_string();
     }
 
-    // Check if this is a roll set (all results have "Set X" labels)
-    let is_roll_set = results.len() > 1
-        && results
-            .iter()
-            .all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
-
-    // Check if these are semicolon-separated rolls (have original expressions but no "Set X" labels)
-    let is_semicolon_separated = results.len() > 1
-        && !is_roll_set
-        && results.iter().any(|r| r.original_expression.is_some());
-
-    if is_roll_set {
+    if is_roll_set(results) {
         format_roll_set_results(results)
-    } else if is_semicolon_separated {
+    } else if is_semicolon_separated(results) {
         format_semicolon_separated_results(results)
     } else {
         format_standard_multiple_results(results)
     }
 }
 
+/// Sum of a roll set's results. In `i64` because each result can be near
+/// `i32::MAX` (`2 1d1 +2147483646`), and a formatter has no error to return.
+fn roll_set_total(results: &[RollResult]) -> i64 {
+    results
+        .iter()
+        .map(|result| i64::from(calculate_result_value(result)))
+        .sum()
+}
+
 /// Format roll set results with totals and single comment display
 fn format_roll_set_results(results: &[RollResult]) -> String {
     let mut output = String::new();
-    let mut total_sum = 0;
 
     // Extract the comment from the first roll to show once for the entire set
     let set_comment = results.first().and_then(|r| r.comment.as_ref());
@@ -575,12 +574,9 @@ fn format_roll_set_results(results: &[RollResult]) -> String {
         display_result.suppress_comment = true;
 
         output.push_str(&display_result.to_string());
-
-        // Sum based on what type of result this is
-        total_sum += calculate_result_value(result);
     }
 
-    output.push_str(&format!("\n**Total: {total_sum}**"));
+    output.push_str(&format!("\n**Total: {}**", roll_set_total(results)));
 
     // Add the comment once for the entire set
     if let Some(comment) = set_comment {
@@ -638,12 +634,28 @@ fn format_standard_multiple_results(results: &[RollResult]) -> String {
 static COMMENT_SUFFIX_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\s*!\s*.*$").expect("Failed to compile COMMENT_SUFFIX_REGEX"));
 
-fn strip_comment_from_expression(expr: &str) -> String {
+pub(crate) fn strip_comment_from_expression(expr: &str) -> String {
     // Use regex to remove comment (everything after ! including the !)
     COMMENT_SUFFIX_REGEX.replace(expr, "").trim().to_string()
 }
 
-const DISCORD_MESSAGE_LIMIT: usize = 2000;
+/// A roll set: several results, each labelled "Set N".
+pub(crate) fn is_roll_set(results: &[RollResult]) -> bool {
+    results.len() > 1
+        && results
+            .iter()
+            .all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")))
+}
+
+/// Semicolon-separated rolls: several results carrying their own expressions,
+/// and not a roll set.
+pub(crate) fn is_semicolon_separated(results: &[RollResult]) -> bool {
+    results.len() > 1
+        && !is_roll_set(results)
+        && results.iter().any(|r| r.original_expression.is_some())
+}
+
+pub(crate) const DISCORD_MESSAGE_LIMIT: usize = 2000;
 
 pub fn format_multiple_results_with_limit(results: &[RollResult]) -> String {
     let full_output = format_multiple_results(results);
@@ -661,12 +673,7 @@ pub fn format_multiple_results_with_limit(results: &[RollResult]) -> String {
         simplified.simple = true;
         simplified.to_string()
     } else {
-        let is_roll_set = simplified_results.len() > 1
-            && simplified_results
-                .iter()
-                .all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
-
-        if is_roll_set {
+        if is_roll_set(&simplified_results) {
             format_roll_set_results(&simplified_results)
         } else {
             format_results_with_separator(&simplified_results, |result| {
@@ -696,7 +703,8 @@ pub fn format_multiple_results_with_limit(results: &[RollResult]) -> String {
     // Level 4: Emergency truncation
     let mut emergency_output = level3_output;
     if emergency_output.len() > DISCORD_MESSAGE_LIMIT - 3 {
-        emergency_output.truncate(DISCORD_MESSAGE_LIMIT - 3);
+        // Cut on a char boundary: `truncate` panics inside a multi-byte char (emoji)
+        emergency_output.truncate(emergency_output.floor_char_boundary(DISCORD_MESSAGE_LIMIT - 3));
         emergency_output.push_str("...");
     }
     emergency_output
@@ -718,13 +726,7 @@ fn format_ultra_compact_results(results: &[RollResult]) -> String {
             format!("**{}**", result.total)
         }
     } else {
-        // Check if this is a roll set
-        let is_roll_set = results.len() > 1
-            && results
-                .iter()
-                .all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
-
-        if is_roll_set {
+        if is_roll_set(results) {
             // Show individual set results AND combined total
             let formatted_results: Vec<String> = results
                 .iter()
@@ -740,8 +742,11 @@ fn format_ultra_compact_results(results: &[RollResult]) -> String {
                 })
                 .collect();
 
-            let total_sum: i32 = results.iter().map(calculate_result_value).sum();
-            format!("{}\n**Total: {}**", formatted_results.join(", "), total_sum)
+            format!(
+                "{}\n**Total: {}**",
+                formatted_results.join(", "),
+                roll_set_total(results)
+            )
         } else {
             // Multiple separate rolls (semicolon-separated)
             let formatted_results: Vec<String> = results
@@ -770,14 +775,12 @@ fn format_summary_results(results: &[RollResult]) -> String {
     if results.len() == 1 {
         format!("Result: **{}**", calculate_result_value(&results[0]))
     } else {
-        let is_roll_set = results.len() > 1
-            && results
-                .iter()
-                .all(|r| r.label.as_ref().is_some_and(|l| l.starts_with("Set ")));
-
-        if is_roll_set {
-            let total: i32 = results.iter().map(calculate_result_value).sum();
-            format!("{} sets, Total: **{}**", results.len(), total)
+        if is_roll_set(results) {
+            format!(
+                "{} sets, Total: **{}**",
+                results.len(),
+                roll_set_total(results)
+            )
         } else {
             format!("{} results", results.len())
         }
