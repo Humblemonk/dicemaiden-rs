@@ -387,7 +387,6 @@ Modifiers apply in stages, not in the order you type them:
 - **Twist**: doubles among the remaining dice add a twist — a narrative
   complication that may be good or bad. Triples add nothing beyond doubles
 - **Cutting**: Remove highest dice before evaluation (simulates difficulty)
-- d6 only: `3d20 ww` reports an error
 - The Wild Words engine by Felix Isaacs, used by The Wildsea. The `ww` alias
   keeps its name from an earlier release
 
