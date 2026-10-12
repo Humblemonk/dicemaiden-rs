@@ -47,14 +47,14 @@ formatting). Core types live in `dice/mod.rs`; all randomness in `dice/rng.rs`.
   |---|---|---|
   | `k` `kl` `d` `e` `ie` `r` `adv` | total | total |
   | `t` `tl` `t#ds#` 2d20 test (`Modifier::sets_success_count`) | each die | success count |
-  | `f#` without `t#` | each die | ignored (known gap) |
+  | `f#` without `t#` | each die | ignored, leading number too (known gap) |
   | `b#` without `t#` | each die | total; ignored if math also comes before |
   | Between two targets | | ignored |
   | Other game systems | read the arm; `ignored_numbers.snap` lists those that ignore math | |
 
   A leading number (`4 + 4d10 t7`) goes on the success count of a success-counting roll, is
-  rejected on an `f#`/`b#`-only roll with math before the target, and otherwise goes in front
-  of the user's math (left to right).
+  rejected on an `f#`/`b#`-only roll with math before the target, is ignored on any other
+  `f#`-only roll (`4 + 4d1 f1` shows -4), and otherwise goes in front of the user's math.
 
 ## Adding a Game System
 
@@ -93,11 +93,13 @@ Behavioral variants belong in a parameter, never a twin function (see `RerollDir
   e.g. Savage Worlds, Wrath & Glory).
   `ignored_numbers.snap` lists every expression where an added `+ 0` vs `+ 1000` (leading or
   trailing) changes nothing: known gaps. It should only shrink. A new line is a number your
-  change started dropping; fix the change, don't regenerate.
+  change started dropping; fix the change, don't regenerate. A removed line is a fixed gap
+  *or* a probe that no longer rolls at all — check which.
 - After regenerating snapshots, **read the diff** — every changed line is a change a user
   will see. Never regenerate just to turn a red test green.
 - For any parser or roller change, run `tools/diff-vs-release.sh HEAD` and account for every
-  changed shape in the commit message. It rolls the corpus plus generated variants (math
+  changed shape in the commit message; it exits 1 when a roll that worked now differs or
+  errors. It rolls the corpus plus generated variants (math
   around every line, a grid of modifier families) at fixed seeds in both trees. Before a
   release, run it against the last `v*` tag, and tag the release (`git tag -a vX.Y.Z`) when it
   ships.

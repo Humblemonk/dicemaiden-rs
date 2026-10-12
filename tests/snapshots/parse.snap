@@ -2412,3 +2412,24 @@ wod	ERR	Invalid dice expression: wod
 ww3	OK	[3d6 mods=[WildWords(None)] label=None comment=None flags=----]
 ww4c2	OK	[4d6 mods=[WildWords(Some(2))] label=None comment=None flags=----]
 yz	ERR	Invalid dice expression: yz
+3d20 ww	OK	[3d20 mods=[WildWords(None)] label=None comment=None flags=----]
+3d20 wwc1	OK	[3d20 mods=[WildWords(Some(1))] label=None comment=None flags=----]
+4 + 4d1 + 1 t2	OK	[4d1 mods=[Add(1), Target(2), Add(4)] label=None comment=None flags=----]
+10 - 4d1 + 1 t2	OK	[4d1 mods=[Add(1), Target(2), Multiply(-1), Add(10)] label=None comment=None flags=----]
+2 * 4d1 + 1 t2	OK	[4d1 mods=[Add(1), Target(2), Multiply(2)] label=None comment=None flags=----]
+4 + 4d10 + 1 t7	OK	[4d10 mods=[Add(1), Target(7), Add(4)] label=None comment=None flags=----]
+4 + 4d1 + 1 t2 + 3	OK	[4d1 mods=[Add(1), Target(2), Add(4), Add(3)] label=None comment=None flags=----]
+10 - 1d1+5 mnm	OK	[1d1 mods=[Multiply(-1), Add(10), Add(5), MutantsMasterminds] label=None comment=None flags=----]
+2 * 1d1+5 mnm	OK	[1d1 mods=[Multiply(2), Add(5), MutantsMasterminds] label=None comment=None flags=----]
+4 + 4d1 + 1 f1	ERR	A number in front of the dice can't be combined with math before `f#` or `b#` unless there is also a target (`t#`)
+4 + 4d1 + 1 b1	ERR	A number in front of the dice can't be combined with math before `f#` or `b#` unless there is also a target (`t#`)
+10 - 4d1 + 1 f1	ERR	A number in front of the dice can't be combined with math before `f#` or `b#` unless there is also a target (`t#`)
+4 + 4d1 f1	OK	[4d1 mods=[Failure(1), Add(4)] label=None comment=None flags=----]
+4 + 4d1 f1 + 1	OK	[4d1 mods=[Failure(1), Add(4), Add(1)] label=None comment=None flags=----]
+4 + 4d1 + 1 tl3	OK	[4d1 mods=[Add(1), TargetLower(3), Add(4)] label=None comment=None flags=----]
+4 + 4d1 t2 + 1 f1	OK	[4d1 mods=[Target(2), Add(1), Failure(1), Add(4)] label=None comment=None flags=----]
+4 + 4d1 + 1 t2 f1	OK	[4d1 mods=[Add(1), Target(2), Failure(1), Add(4)] label=None comment=None flags=----]
+4 + 4d1 + 1 t2 b1	OK	[4d1 mods=[Add(1), Target(2), Botch(Some(1)), Add(4)] label=None comment=None flags=----]
+4 + 4d1 + 1 t2ds2	OK	[4d1 mods=[Add(1), TargetWithDoubleSuccess(2, 2), Add(4)] label=None comment=None flags=----]
+4d1 + 1 f1	OK	[4d1 mods=[Add(1), Failure(1)] label=None comment=None flags=----]
+4d1 + 1 b1	OK	[4d1 mods=[Add(1), Botch(Some(1))] label=None comment=None flags=----]
