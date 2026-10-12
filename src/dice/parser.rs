@@ -664,14 +664,40 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
             // The leading number goes after the dice's own modifiers and before
             // any math that follows them, so `4 + 4d10 t7` and `4 + 4d10t7`
             // both add 4 to the success count, as the single-token form always
-            // has. `N/dice` must stay first: the roller reads it from there.
+            // has. It also goes after the last target: in `4 + 4d10 + 1 t7`
+            // the `+ 1` is per-die math before the target, but the 4 still
+            // belongs on the success count. Only targets split math this way;
+            // other systems (`mnm`, Conan) apply math to the total in written
+            // order, so there the 4 stays in front of it. With only `f#`/`b#`
+            // the roller drops math after them once there is math before them,
+            // so that shape is rejected rather than losing the number.
+            // `N/dice` must stay first: the roller reads it from there.
             let position = if operator == "/" {
                 0
             } else {
-                dice.modifiers
+                let after_target = if dice.modifiers.iter().any(Modifier::sets_success_count) {
+                    dice.modifiers
+                        .iter()
+                        .rposition(Modifier::is_target)
+                        .map_or(0, |i| i + 1)
+                } else if dice
+                    .modifiers
+                    .iter()
+                    .take_while(|m| !m.is_target())
+                    .any(|m| modifier_kind(m) == ModifierKind::Math)
+                    && dice.modifiers.iter().any(Modifier::is_target)
+                {
+                    return Err(anyhow!(
+                        "A number in front of the dice can't be combined with math before \
+                         `f#` or `b#` unless there is also a target (`t#`)"
+                    ));
+                } else {
+                    0
+                };
+                dice.modifiers[after_target..]
                     .iter()
                     .position(|m| modifier_kind(m) == ModifierKind::Math)
-                    .unwrap_or(dice.modifiers.len())
+                    .map_or(dice.modifiers.len(), |i| after_target + i)
             };
             dice.modifiers.splice(position..position, leading);
 

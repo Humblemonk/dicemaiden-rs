@@ -165,6 +165,7 @@ If a new system needs *almost* the same behavior as an existing helper, add a pa
 - **Drop before explode** — dropped dice are never reconsidered for explosion. This is intentional and tested. Do not change the ordering.
 - Multi-character prefixes (`ie`, `irg`, `ir`, `km`, `kl`, `tl`) must be matched **before** their single-character counterparts (`e`, `r`, `k`, `t`).
 - The ordered pattern lists are the `COMBINED_MODIFIER_PATTERNS`, `SPLIT_MODIFIER_PATTERNS`, and `MODIFIER_START_PATTERNS` statics in `parser.rs`. They are ordered lists rather than sets because the order is load-bearing — never sort or dedupe them.
+- **Math does not mean the same thing next to every modifier.** Next to `k`, `e`, `r` and friends it changes the total. Written before a success target (`t`, `tl`, `t#ds#`, the 2d20 test) it is added to each die; written after one it changes the success count. With `f#` alone, math after it is currently ignored, and with `b#` alone it is lost once math also comes before. Other game systems each decide for themselves. So before the parser moves math around a modifier, read how `roller.rs` handles that modifier — the names of enums and helpers are not a reliable guide, and two regressions in 1.8.2 came from trusting them. `AGENTS.md` has this as a table.
 
 ---
 
@@ -188,8 +189,11 @@ Dice syntax is a public API, and a silently changed roll result is the worst bug
 - `snapshots/deterministic_rolls.snap` — for expressions whose dice cannot vary (`d1` pools), the full result *and* the formatted Discord output, pinned exactly
 - `snapshots/outcomes.snap` — for randomly-rolling expressions, only what cannot vary with the dice: result count, success/failure, and exact error text
 - `snapshots/seeded_rolls.snap` — every expression rolled at four fixed seeds, which pins the exact result for game systems whose dice are fixed by the rules rather than by what you type (Savage Worlds' trait die, Wrath & Glory's pool)
+- `snapshots/ignored_numbers.snap` — expressions where adding a number changes nothing (`+ 0` and `+ 1000`, in front of the dice or after them, give the same output). These are known gaps, so the list should only get shorter; if your change adds a line, your change is dropping a number the user typed
 
 **If you add or change syntax, add cases to `tests/corpus/expressions.txt`**: a happy-path expression, the boundary values of every numeric parameter, and a `d1` form (for example `4d1 k1`) so the roll is deterministic and lands in the exact-value snapshot. These tests only cover what the corpus contains — a keep-count bug at `k1` once slipped through because the corpus had `k2` but no `k1`.
+
+If your change applies to a group of modifiers — anything matched by one predicate or one list of match arms — give each member of the group its own corpus line. A 1.8.2 bug affecting `f#` and `b#` went unnoticed because only `t#` was in the corpus.
 
 If a snapshot fails, **read the diff before doing anything else**. Every changed line is a change your users will see. Once you have confirmed the change is intended:
 
@@ -198,6 +202,14 @@ UPDATE_SNAPSHOTS=1 cargo test --test snapshot_tests
 ```
 
 Never regenerate a snapshot just to turn a red test green.
+
+Snapshots only see the corpus. To see everything a parser or roller change does, compare it against the last commit:
+
+```bash
+tools/diff-vs-release.sh HEAD      # or a release tag, e.g. v1.8.1; defaults to the latest v* tag
+```
+
+The script builds the other version in a temporary worktree and rolls the same expressions in both: the corpus, each corpus line with numbers and math around it, and a grid of modifier families with math before and after. It groups the differences by shape, most dangerous first (results that changed, then rolls that now fail, then rolls that now work), and exits 1 if any result changed. Explain every changed shape in your commit message. Tag each release when it ships (`git tag -a v1.8.2`) so the next one has something to compare against.
 
 `seeded_rolls.snap` is sensitive to the order dice are drawn from the generator, so an internal change that draws them in a different order rewrites it without altering anything a user sees. `deterministic_rolls.snap` is not sensitive to that. If both move, behavior changed; if only the seeded one moves, it did not.
 
