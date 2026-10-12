@@ -55,6 +55,12 @@ Modifiers apply in stages, not in the order you type them:
 5. Math (`+5`, `*2`, `+2d6`) applies to that total
 6. Success counting (`t#`, `f#`, `b#`) counts the dice that survived stage 3
 
+- On success counting, math written before `t#` applies to each die before counting
+  (`4d10 + 1 t7`), and math after it applies to the success count (`4d10 t7 + 1`).
+  A number in front of the dice goes on the success count: `4 + 4d10 + 1 t7` adds 1 to
+  each die and 4 to the successes. With only `f#` or `b#` and no `t#`, a number in front
+  can't be combined with math before them
+
 - `k3` and `d1` run after exploding, so they can keep or drop an exploded die;
   `adv#` / `dis#` discard beforehand, so they never can
 - Imploded dice never join the pool — they can't be kept, dropped, or counted

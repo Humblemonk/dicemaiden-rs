@@ -49,6 +49,9 @@ use dicemaiden_rs::{
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
+mod common;
+use common::with_leading;
+
 /// Trials used to confirm a "deterministic" expression really is fixed, and to
 /// confirm a random expression's result shape never varies.
 const STABILITY_TRIALS: usize = 25;
@@ -57,7 +60,7 @@ const STABILITY_TRIALS: usize = 25;
 /// exact result pinned. Checked before the snapshot is written, so it holds
 /// even during `UPDATE_SNAPSHOTS=1` — a regeneration run cannot quietly shrink
 /// the set of expressions being pinned exactly.
-const DETERMINISTIC_EXPRESSIONS: usize = 793;
+const DETERMINISTIC_EXPRESSIONS: usize = 808;
 
 fn repo_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
@@ -328,4 +331,57 @@ fn seeded_roll_snapshot_is_unchanged() {
     }
 
     assert_snapshot("seeded_rolls.snap", &format!("{}\n", lines.join("\n")));
+}
+
+/// Every expression where a number the user adds changes nothing: `+ 0` and
+/// `+ 1000`, in front of the dice or after them, give identical output from the
+/// same seed. Each line is a roll that silently ignores part of what was typed —
+/// known gaps, not intended behavior. The file should only shrink: a new line is
+/// a number your change started dropping (as `4 + 4d1 + 1 f1` once did), never
+/// a snapshot to regenerate. A removed line is either a fixed gap or a probe
+/// that now fails to roll at all (only rolls that work are checked), so confirm
+/// which before celebrating.
+#[test]
+fn ignored_numbers_snapshot_is_unchanged() {
+    let roll = |expression: &str| {
+        parse_and_roll_with_rng(expression, &mut create_seeded_rng(SNAPSHOT_SEEDS[0]))
+            .map(|results| format_multiple_results(&results))
+            .map_err(|e| e.to_string())
+    };
+    let mut lines = Vec::new();
+
+    // Skipped, because there the number is honored but can't show: after
+    // `! comment` it is comment text, and `nr` hides results by design.
+    let hides_number = |e: &str| e.contains('!') || e.split_whitespace().any(|w| w == "nr");
+    for expression in corpus().iter().filter(|e| !hides_number(e)) {
+        // Math runs left to right, so a later `*0` rightly cancels a leading
+        // number. `*05` is not a zero: the 0 must end the operand.
+        let compact = expression.replace(' ', "");
+        let multiplies_by_zero = compact
+            .match_indices("*0")
+            .any(|(i, _)| !compact[i + 2..].starts_with(|c: char| c.is_ascii_digit() || c == '.'));
+        let probes = [
+            (
+                "leading",
+                with_leading(expression, "0 + "),
+                with_leading(expression, "1000 + "),
+            ),
+            (
+                "trailing",
+                format!("{expression} + 0"),
+                format!("{expression} + 1000"),
+            ),
+        ];
+        for (position, zero, thousand) in probes {
+            if position == "leading" && multiplies_by_zero {
+                continue;
+            }
+            let zero = roll(&zero);
+            if zero.is_ok() && zero == roll(&thousand) {
+                lines.push(format!("{expression}\t{position}"));
+            }
+        }
+    }
+
+    assert_snapshot("ignored_numbers.snap", &format!("{}\n", lines.join("\n")));
 }

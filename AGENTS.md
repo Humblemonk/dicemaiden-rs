@@ -11,6 +11,7 @@ Discord dice-rolling bot in Rust (Serenity), a rewrite of the Ruby DiceMaiden, r
 cargo clippy -- -D warnings && cargo fmt --check && cargo test    # all must pass before done
 UPDATE_SNAPSHOTS=1 cargo test --test snapshot_tests               # regenerate golden snapshots
 npx jscpd@3 --threshold 0 --min-lines 5 --min-tokens 50 --max-lines 20000 --max-size 10mb src tests
+tools/diff-vs-release.sh HEAD                                     # every roll, working tree vs last commit
 ```
 
 - Tests need no Discord token. For live testing, set `GUILD_ID` in `.env` so slash commands
@@ -37,6 +38,23 @@ formatting). Core types live in `dice/mod.rs`; all randomness in `dice/rng.rs`.
   for this reason. Never sort or dedupe them.
 - **Drop before explode**: dropped dice are never reconsidered for explosion. Intentional and
   tested; do not change modifier ordering semantics.
+- **Where math applies depends on the modifier, and only the roller knows.** Before the parser
+  moves or groups math around a modifier, read that modifier's arm in `roller.rs`. Never infer
+  from a name (`ModifierKind::System`, `find_target_modifier_positions`): both 1.8.2
+  regressions came from that. Verified behavior:
+
+  | Roll | Math written before the modifier | Math written after it |
+  |---|---|---|
+  | `k` `kl` `d` `e` `ie` `r` `adv` | total | total |
+  | `t` `tl` `t#ds#` 2d20 test (`Modifier::sets_success_count`) | each die | success count |
+  | `f#` without `t#` | each die | ignored, leading number too (known gap) |
+  | `b#` without `t#` | each die | total; ignored if math also comes before |
+  | Between two targets | | ignored |
+  | Other game systems | read the arm; `ignored_numbers.snap` lists those that ignore math | |
+
+  A leading number (`4 + 4d10 t7`) goes on the success count of a success-counting roll, is
+  rejected on an `f#`/`b#`-only roll with math before the target, is ignored on any other
+  `f#`-only roll (`4 + 4d1 f1` shows -4), and otherwise goes in front of the user's math.
 
 ## Adding a Game System
 
@@ -65,13 +83,26 @@ Behavioral variants belong in a parameter, never a twin function (see `RerollDir
   `tests/corpus/expressions.txt`. **When you add or change syntax, add corpus lines**: the
   happy path, the boundary values of every numeric parameter, and a `d1` form so the roll is
   pinned deterministically. (A `k1` bug once slipped through because the corpus only had `k2`.)
+- When a change goes through a set of modifiers (a predicate, a list of match arms), add a
+  corpus line for **every member**, not only the one you were fixing. The 1.8.2 `f#` bug hid
+  behind corpus lines that only used `t#`.
 - What each snapshot in `tests/snapshots/` pins: `parse.snap` — parsed form and every parse
   error, exactly; `deterministic_rolls.snap` — full result and Discord output of `d1` pools;
   `outcomes.snap` — for random rolls, only result count, success/failure, and error text;
   `seeded_rolls.snap` — exact results at four fixed seeds (covers systems with fixed dice,
   e.g. Savage Worlds, Wrath & Glory).
+  `ignored_numbers.snap` lists every expression where an added `+ 0` vs `+ 1000` (leading or
+  trailing) changes nothing: known gaps. It should only shrink. A new line is a number your
+  change started dropping; fix the change, don't regenerate. A removed line is a fixed gap
+  *or* a probe that no longer rolls at all — check which.
 - After regenerating snapshots, **read the diff** — every changed line is a change a user
   will see. Never regenerate just to turn a red test green.
+- For any parser or roller change, run `tools/diff-vs-release.sh HEAD` and account for every
+  changed shape in the commit message; it exits 1 when a roll that worked now differs or
+  errors. It rolls the corpus plus generated variants (math
+  around every line, a grid of modifier families) at fixed seeds in both trees. Before a
+  release, run it against the last `v*` tag, and tag the release (`git tag -a vX.Y.Z`) when it
+  ships.
 - Signal: if only `seeded_rolls.snap` moved, RNG draw order changed but behavior did not; if
   `deterministic_rolls.snap` moved too, behavior changed.
 - Tests are **table-driven** (`vec![(input, expected), ...]`). The table changes; the loop body

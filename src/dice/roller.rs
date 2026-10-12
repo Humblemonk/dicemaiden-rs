@@ -965,7 +965,7 @@ fn apply_special_system_modifiers(
                 has_special_system = true;
             }
             Modifier::WildWords(cut_count) => {
-                apply_wild_words_mechanics(result, *cut_count)?;
+                apply_wild_words_mechanics(result, *cut_count, dice.sides)?;
                 has_special_system = true;
             }
             Modifier::MutantsMasterminds => {
@@ -3038,22 +3038,8 @@ fn find_target_modifier_positions(modifiers: &[Modifier]) -> Vec<usize> {
     modifiers
         .iter()
         .enumerate()
-        .filter_map(|(i, m)| {
-            if matches!(
-                m,
-                Modifier::Target(_)
-                    | Modifier::TargetLower(_)
-                    | Modifier::TargetWithDoubleSuccess(_, _)
-                    | Modifier::TargetLowerWithDoubleSuccess(_, _)
-                    | Modifier::TwoD20Test { .. }
-                    | Modifier::Failure(_)
-                    | Modifier::Botch(_)
-            ) {
-                Some(i)
-            } else {
-                None
-            }
-        })
+        .filter(|(_, m)| m.is_target())
+        .map(|(i, _)| i)
         .collect()
 }
 
@@ -3641,7 +3627,14 @@ fn apply_daggerheart_mechanics(result: &mut RollResult) -> Result<()> {
 }
 
 /// Apply Wild Words RPG mechanics (The Wildsea RPG system)
-fn apply_wild_words_mechanics(result: &mut RollResult, cut_count: Option<u32>) -> Result<()> {
+fn apply_wild_words_mechanics(
+    result: &mut RollResult,
+    cut_count: Option<u32>,
+    sides: u32,
+) -> Result<()> {
+    if sides != 6 {
+        return Err(anyhow!("Wild Words only works with d6 dice"));
+    }
     if result.individual_rolls.is_empty() {
         return Err(anyhow!("No dice to apply Wild Words mechanics to"));
     }
@@ -3668,12 +3661,10 @@ fn apply_wild_words_mechanics(result: &mut RollResult, cut_count: Option<u32>) -
         result.notes.push(format!("Cut {} highest dice", cut));
     }
 
-    if working_dice.is_empty() {
-        return Err(anyhow!("No dice remaining after cutting"));
-    }
-
     // Find the highest die value (this determines the result in Wild Words)
-    let highest_die = *working_dice.iter().max().unwrap();
+    let Some(&highest_die) = working_dice.iter().max() else {
+        return Err(anyhow!("No dice remaining after cutting"));
+    };
 
     // Check for doubles/triples (any matching values = twist)
     let has_twist = has_matching_dice(&working_dice);
@@ -3683,7 +3674,12 @@ fn apply_wild_words_mechanics(result: &mut RollResult, cut_count: Option<u32>) -
         6 => "Triumph",      // Complete success
         4 | 5 => "Conflict", // Success with drawback
         1..=3 => "Disaster", // Failure with complication
-        _ => unreachable!("d6 can only roll 1-6"),
+        _ => {
+            return Err(anyhow!(
+                "Wild Words dice must show 1-6, got {}",
+                highest_die
+            ));
+        }
     };
 
     // Set the result total to the highest die (Wild Words uses highest die, not sum)

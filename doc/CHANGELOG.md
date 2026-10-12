@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.2] - 2026-10-12
+
+## Fixed
+
+- A leading number with math before a target, as in `4 + 4d10 + 1 t7`, was added to every
+  die along with the `+ 1`. It now goes on the success count, as it does in `4 + 4d10 t7`:
+  the `+ 1` still applies to each die, and the 4 is added to the successes. With only `f#`
+  or `b#` and no `t#` (`4 + 4d10 + 1 f1`) there is no success count to put the number on,
+  so that now reports an error instead of adding the number to every die.
+- Wild Words (`ww`) on anything but d6 (`3d20 ww`) crashed the roll with no reply. It now
+  reports "Wild Words only works with d6 dice".
+
 ## [1.8.1] - 2026-10-11
 
 ## Fixed

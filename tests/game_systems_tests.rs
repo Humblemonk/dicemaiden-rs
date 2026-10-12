@@ -5811,6 +5811,9 @@ fn test_wild_words_rpg_system() {
         ("ww3c3", "Cannot cut all dice"),
         ("ww2c2", "Cannot cut all dice"),
         ("ww4c5", "Cannot cut more than rolled"),
+        ("3d20 ww", "Wild Words is d6 only (used to panic)"),
+        ("2d100 ww", "Wild Words is d6 only"),
+        ("3d20 wwc1", "Wild Words is d6 only"),
     ];
 
     for (expression, description) in error_tests {

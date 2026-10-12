@@ -206,6 +206,28 @@ pub enum Modifier {
     DarkestHouse(bool),            // tdh / tdhc - House Die (true = called upon the house)
 }
 
+impl Modifier {
+    /// Splits math by position: math before the first target applies to each
+    /// die, math after the last applies to the success count (when one of the
+    /// targets sets a success count, see `sets_success_count`).
+    pub fn is_target(&self) -> bool {
+        self.sets_success_count() || matches!(self, Modifier::Failure(_) | Modifier::Botch(_))
+    }
+
+    /// Targets that make the roller apply math after them to the success count.
+    /// `f#` and `b#` don't: with only those, math after them is not applied.
+    pub fn sets_success_count(&self) -> bool {
+        matches!(
+            self,
+            Modifier::Target(_)
+                | Modifier::TargetLower(_)
+                | Modifier::TargetWithDoubleSuccess(..)
+                | Modifier::TargetLowerWithDoubleSuccess(..)
+                | Modifier::TwoD20Test { .. }
+        )
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DiceGroup {
     pub _description: String, // Currently unused but kept for future debugging

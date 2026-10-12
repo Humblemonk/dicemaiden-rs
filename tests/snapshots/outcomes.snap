@@ -2412,3 +2412,24 @@ wod	always-err {"Invalid dice expression: wod"}
 ww3	always-ok n=Some(1)
 ww4c2	always-ok n=Some(1)
 yz	always-err {"Invalid dice expression: yz"}
+3d20 ww	always-err {"Wild Words only works with d6 dice"}
+3d20 wwc1	always-err {"Wild Words only works with d6 dice"}
+4 + 4d1 + 1 t2	always-ok n=Some(1)
+10 - 4d1 + 1 t2	always-ok n=Some(1)
+2 * 4d1 + 1 t2	always-ok n=Some(1)
+4 + 4d10 + 1 t7	always-ok n=Some(1)
+4 + 4d1 + 1 t2 + 3	always-ok n=Some(1)
+10 - 1d1+5 mnm	always-ok n=Some(1)
+2 * 1d1+5 mnm	always-ok n=Some(1)
+4 + 4d1 + 1 f1	always-err {"A number in front of the dice can't be combined with math before `f#` or `b#` unless there is also a target (`t#`)"}
+4 + 4d1 + 1 b1	always-err {"A number in front of the dice can't be combined with math before `f#` or `b#` unless there is also a target (`t#`)"}
+10 - 4d1 + 1 f1	always-err {"A number in front of the dice can't be combined with math before `f#` or `b#` unless there is also a target (`t#`)"}
+4 + 4d1 f1	always-ok n=Some(1)
+4 + 4d1 f1 + 1	always-ok n=Some(1)
+4 + 4d1 + 1 tl3	always-ok n=Some(1)
+4 + 4d1 t2 + 1 f1	always-ok n=Some(1)
+4 + 4d1 + 1 t2 f1	always-ok n=Some(1)
+4 + 4d1 + 1 t2 b1	always-ok n=Some(1)
+4 + 4d1 + 1 t2ds2	always-ok n=Some(1)
+4d1 + 1 f1	always-ok n=Some(1)
+4d1 + 1 b1	always-ok n=Some(1)
