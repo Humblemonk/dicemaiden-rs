@@ -203,7 +203,7 @@ impl EventHandler for Handler {
                         &ctx.http,
                         serenity::builder::EditInteractionResponse::new()
                             .content(response_content)
-                            .allowed_mentions(no_mentions()),
+                            .allowed_mentions(user_mentions_only()),
                     )
                     .await
                     .map(|_| ())
@@ -211,7 +211,7 @@ impl EventHandler for Handler {
                 let mut response_message =
                     serenity::builder::CreateInteractionResponseMessage::new()
                         .content(response_content)
-                        .allowed_mentions(no_mentions());
+                        .allowed_mentions(user_mentions_only());
 
                 if ephemeral {
                     response_message = response_message.ephemeral(true);
@@ -233,10 +233,11 @@ impl EventHandler for Handler {
 }
 
 // Replies echo user text (labels, comments, nicknames, expressions in error
-// messages), so `/roll (@everyone) 1d6` pinged the whole server. The bot never
-// needs to ping anyone; this keeps every mention in a reply inert.
-fn no_mentions() -> serenity::builder::CreateAllowedMentions {
-    serenity::builder::CreateAllowedMentions::new()
+// messages), so `/roll (@everyone) 1d6` pinged the whole server. A roll may
+// ping the users it names (`/roll (@player) 1d20`); @everyone, @here and role
+// mentions stay inert.
+fn user_mentions_only() -> serenity::builder::CreateAllowedMentions {
+    serenity::builder::CreateAllowedMentions::new().all_users(true)
 }
 
 #[tokio::main]
