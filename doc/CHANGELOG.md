@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1] - 2026-10-15
+
+## Changed
+
+- A roll can ping the users it names again, as in `/roll (@player) 1d20`. `@everyone`,
+  `@here` and role mentions still never ping.
+
 ## [2.0.0] - 2026-10-15
 
 A full bug hunt: every game system's handler, the parser and the bot's own operations were
