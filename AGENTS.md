@@ -12,6 +12,7 @@ cargo clippy -- -D warnings && cargo fmt --check && cargo test    # all must pas
 UPDATE_SNAPSHOTS=1 cargo test --test snapshot_tests               # regenerate golden snapshots
 npx jscpd@3 --threshold 0 --min-lines 5 --min-tokens 50 --max-lines 20000 --max-size 10mb src tests
 tools/diff-vs-release.sh HEAD                                     # every roll, working tree vs last commit
+cargo test --test fuzz_tests -- --ignored --nocapture             # mutation fuzz: panics, hangs, long replies
 ```
 
 - Tests need no Discord token. For live testing, set `GUILD_ID` in `.env` so slash commands
@@ -56,6 +57,36 @@ formatting). Core types live in `dice/mod.rs`; all randomness in `dice/rng.rs`.
   rejected on an `f#`/`b#`-only roll with math before the target, is ignored on any other
   `f#`-only roll (`4 + 4d1 f1` shows -4), and otherwise goes in front of the user's math.
 
+## Real-Play Check
+
+Before fixing or extending how a roll behaves, ask: **would a player of that game system type
+this roll in an actual session?** Answer from evidence, not instinct: the documented syntax
+(`roll_syntax.md`, the help text, the original Ruby DiceMaiden readme) and how the system's
+rulebook modifies a roll (flat numbers, a bigger pool, rerolls).
+
+- **Passes**: documented syntax and alias forms, the system's own rolls with the modifiers its
+  rules use, and mistakes players really make (a typo, math they'd expect to work). Fix it
+  properly.
+- **Fails**: internal tokens only aliases produce (`2d1 sw8`, `1d6 sil3`, `3d6 mme2`) and
+  combinations the system gives no meaning (`k1` on a keep-highest pool, `t7` on VtM). Don't
+  design behavior for it, and don't change what it does today. Only make sure it can't panic,
+  hang or overflow (the fuzz test covers this), then list it as deferred.
+- Borderline? Report the finding with its verdict and let the user decide before building.
+  Code reviews should give each finding a verdict too.
+
+**Severity.** Code reviews hunt for P0 and P1 first and rank findings by severity:
+
+- **P0**: takes down shards or the bot, or lets a user abuse it: a panic or hang reachable from
+  `/roll`, a startup failure in any sharding mode, mass pings, `/purge` acting without
+  permission.
+- **P1**: a silently wrong result, or a broken documented roll, on input that passes the
+  real-play check.
+- **P2**: a minor bug on input that passes the real-play check: a misleading message, wrong
+  display or stats, a wrong result only in a rare corner of a real roll.
+- **P3**: inputs that fail the real-play check, cleanup, docs and style. A failing input that
+  panics, hangs or overflows is still P0.
+- List P2 and P3 briefly; don't fix either without asking.
+
 ## Adding a Game System
 
 In order, no skipped steps: `aliases.rs` → `Modifier` variant in `dice/mod.rs` → `parser.rs`
@@ -72,6 +103,8 @@ JSCPD clones. Build from the shared helpers and write only what is specific to t
 - `indexed_rolls` + `partition_kept_dice` — keep/drop bookkeeping
 - `finalize_d10_explosion` — d10 crit/fumble tails (Cyberpunk Red, Witcher)
 - `build_roll_set`, `try_parse_roll_set` — roll sets and their parsing
+- `checked_add(..).ok_or_else(result_too_large)?` — any arithmetic on `result.total` after the
+  user's math is in it; a plain `+=` wraps in release (`1d6 + 2147483646 ess3`)
 
 `CONTRIBUTING.md` § Shared helpers is the canonical list; update it if a helper changes.
 Behavioral variants belong in a parameter, never a twin function (see `RerollDirection`,
@@ -103,6 +136,11 @@ Behavioral variants belong in a parameter, never a twin function (see `RerollDir
   around every line, a grid of modifier families) at fixed seeds in both trees. Before a
   release, run it against the last `v*` tag, and tag the release (`git tag -a vX.Y.Z`) when it
   ships.
+- Run the fuzz test before a release and after adding or changing a game-system handler
+  (`FUZZ_ITERS=200000` sweeps deeper). It mutates corpus lines and reports panics (debug builds
+  trap the integer overflow release would wrap), hangs, and replies over the limit, each with a
+  seed that reproduces it. It stays on demand because a corpus edit reshuffles what it
+  generates. Fix each finding and add it to the corpus, which remains the regression guard.
 - Signal: if only `seeded_rolls.snap` moved, RNG draw order changed but behavior did not; if
   `deterministic_rolls.snap` moved too, behavior changed.
 - Tests are **table-driven** (`vec![(input, expected), ...]`). The table changes; the loop body
@@ -118,7 +156,11 @@ Behavioral variants belong in a parameter, never a twin function (see `RerollDir
 - Fallible functions return `anyhow::Result<T>`; propagate with `?`; avoid deep nesting.
 - No `unwrap()`/`expect()` in production paths, no `panic!()` outside tests, no
   `todo!()`/`unimplemented!()`, no `println!()` (use `tracing`).
-- No wildcard `_` arms on `Modifier` — a missed arm silently ignores a modifier.
+- A `_` arm on `Modifier` only where it can't silently ignore one: in matches that pick out
+  specific variants (`ArithmeticOp::from_modifier`, `net_advantage_level`), or an arm that
+  errors. The roll-pipeline dispatchers in `roller.rs` skip other stages' modifiers with `_`;
+  a new modifier with no arm there is caught by its own `game_systems_tests.rs` tests, so
+  never skip them.
 - SQL uses prepared statements only. Randomness goes through `rng.rs` only.
 - Prefer borrowing; justify every `.clone()`. Meaningful names; delete replaced code; no
   versioned names (`process_v2`).

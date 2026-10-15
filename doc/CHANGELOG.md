@@ -1,5 +1,75 @@
 # Changelog
 
+## [2.0.0] - 2026-10-15
+
+A full bug hunt: every game system's handler, the parser and the bot's own operations were
+reviewed, every roll that changes was checked against 1.8.2, and a new fuzz test rolled over
+a million random expressions without a crash, hang or oversized reply. Rules fixes follow
+the publishers' own texts.
+
+## Fixed
+
+- **Marvel Multiverse** (checked against the Roll20 compendium): a trouble rerolls the M
+  first, as "an M is always considered to be the best die number"; it could reroll a plain
+  6 instead. A rerolled Marvel die that shows the logo is an M (worth 6, Fantastic), and a
+  trouble that rerolls the M away no longer leaves it shown as Fantastic. A 6 M 6 is an
+  ultimate Fantastic success and ignores trouble.
+- **Wrath & Glory** (Core Rulebook v2.1): `wng 4d6 !soak`, `!dmg` and `!exempt` never
+  reached their mode; they now count Icons with no Wrath Die, as Determination and damage
+  rolls do. A one-word comment such as `wng 4d6 !hi` is no longer lost. Total mode
+  (`wngt + 2`) keeps the `+ 2`, and `wngw1t` no longer drops its `t`.
+- **Mothership** (Player's Survival Guide): a Skill bonus adds to the Stat you roll under,
+  so `ms45 + 10` rolls under 55; the bonus used to be ignored. A roll of 00 is always a
+  critical success and 99 always a critical failure; 00 used to count as a critical failure.
+  With advantage the dropped die was shown twice.
+- **Cypher System** (Cypher System Reference Document): `cs 3 + 2` judged success on the
+  bare die; it now uses the total. Natural 19 and 20 are minor and major effects only on a
+  success, and 17 and 18 add 1 or 2 damage on an attack instead of being called effects.
+- `dh 4d10 + 2` and `wng 4d6 + 1` rolled an extra die with the wrong pool; they keep the
+  dice you asked for.
+- `2hsk1` (Hero System) worked out killing damage from the half die alone.
+- An A5E bonus without a sign (`a5e 5 ex1`) became part of the dice (`1d205`).
+- `dndstats` with a flag, label or comment (`p dndstats`, `dndstats ! new character`)
+  rolled one stat instead of six.
+- On success-counting rolls, `-`, `*` and `/` with dice added the dice to the pool:
+  `2d1 t1 - 1d1` counted 3 successes. These now report an error; `+ 1d10` still adds a die.
+- Godbound treated `* 1d2` and `/ 1d2` as extra damage dice instead of applying them.
+- Dropped dice shown struck through now include math applied to each die
+  (`4d6 k2 + 1 t5`), so they match the dice listed beside them.
+- Savage Worlds, D6 System, Brave New World, Silhouette, Mutants & Masterminds and Marvel
+  Multiverse ignored dice added with `+ 1d6`; those dice are now rolled.
+- Huge numbers could crash a roll or hang the bot: `1d6 + 1d4000000000`, `d6s4294967295`,
+  very large Marvel edges, and modifiers near two billion on several game systems. Dice
+  operands and pools now share the 500-dice and 1000-sides limits, and results too large to
+  hold report "Result is too large". A dice count too large to read (`99999999999d6`) used
+  to roll one die.
+- A label, comment or nickname containing `@everyone`, `@here` or a role could ping the
+  server through the bot. Replies no longer ping anyone.
+- An error about a very long expression could exceed Discord's message limit and fail to
+  send. Every reply is now kept within the limit.
+- `/purge` in a channel where the bot lacks Manage Messages sent up to 100 failing requests
+  and then reported "Successfully deleted 0". It now says which permission is missing, and
+  reports how many messages it actually deleted.
+- `bot-info` (and the top.gg server count) counted a restarted process twice for up to half
+  an hour. Memory between 1000 and 1024 MB showed as "0.99 GB".
+- The bot could fail to start if Discord's API briefly failed during startup.
+
+## Changed
+
+- Math on systems that count dice or read the highest die (Alien, Forged in the Dark, Wild
+  Words, Lasers & Feelings, and Wrath & Glory tests) was silently ignored; `alien4 + 2`
+  rolled four dice. It now reports an error that suggests adding dice instead
+  (`+ 2d6`), which these systems treat as a bonus.
+- Rolls beyond the dice limits that used to roll anyway now report an error: a dice operand
+  over 1000 sides, a D6 System pool over 500 dice, and Marvel edges or troubles left over
+  500 after cancelling.
+- A bare `3d6 mme` or `3d6 mmt` is now one edge or trouble, as `mm e` is; it was none. Using
+  more than one Marvel modifier token in a roll is an error; use `mm 2e 1t`.
+- `/purge` is no longer offered in DMs.
+- A push at Alien stress 10 (`alien4s10p`) explains that stress can't go higher, instead of
+  an error about a roll you never typed.
+- `3 dndstats` reports an error: `dndstats` already rolls six sets.
+
 ## [1.8.2] - 2026-10-12
 
 ## Fixed

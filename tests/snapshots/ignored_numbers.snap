@@ -1,13 +1,5 @@
-(Attack) fitd4	leading
-(Attack) fitd4	trailing
 (Label) 4d1 f1	leading
 (Label) 4d1 f1	trailing
-10d6 alien	leading
-10d6 alien	trailing
-10d6 fitd	leading
-10d6 fitd	trailing
-10d6 ww	leading
-10d6 ww	trailing
 1d1 f0	leading
 1d1 f0	trailing
 1d1 f1	leading
@@ -36,14 +28,6 @@
 1d100 wfrp67	trailing
 1d100 wfrp87	leading
 1d100 wfrp87	trailing
-1d6 fitd	leading
-1d6 fitd	trailing
-1d6 lf5	leading
-1d6 lf5	trailing
-1d6 wng	leading
-1d6 wng	trailing
-1d6 ww	leading
-1d6 ww	trailing
 2 4d1 f1	trailing
 20 4d1 f1	trailing
 4d1 f1 +5	leading
@@ -68,33 +52,7 @@
 2d100 msa	trailing
 2d100 msd	leading
 2d100 msd	trailing
-2d6 fitd	leading
-2d6 fitd	trailing
-2d6 fitd0	leading
-2d6 fitd0	trailing
-2d6 lf4	leading
-2d6 lf4	trailing
-2d6 lf4f	leading
-2d6 lf4f	trailing
-2d6 lf4l	leading
-2d6 lf4l	trailing
-2d6 ww	leading
-2d6 ww	trailing
-2lf4	trailing
-2lf4f	trailing
-2lf4l	trailing
-2lf5 + 1d6	trailing
 3 4d1 f1	trailing
-3d6 alien	leading
-3d6 alien	trailing
-3d6 alien + 1d6 aliens1	leading
-3d6 alien + 1d6 aliens1	trailing
-3d6 fitd	leading
-3d6 fitd	trailing
-3d6 lf2	leading
-3d6 lf2	trailing
-3d6 ww	leading
-3d6 ww	trailing
 4d1 f0	leading
 4d1 f0	trailing
 4d1 f1	leading
@@ -105,32 +63,10 @@
 4d1 f3	trailing
 4d1 f5	leading
 4d1 f5	trailing
-4d6 alien	leading
-4d6 alien	trailing
-4d6 alien + 2d6 aliens2	leading
-4d6 alien + 2d6 aliens2	trailing
 4d6 f1 b1	leading
 4d6 f1 b1	trailing
-4d6 fitd	leading
-4d6 fitd	trailing
-4d6 ww	leading
-4d6 ww	trailing
-4d6 wwc1	leading
-4d6 wwc1	trailing
-4d6 wwc2	leading
-4d6 wwc2	trailing
 4d6f1	leading
 4d6f1	trailing
-5d6 alien + 3d6 aliens3	leading
-5d6 alien + 3d6 aliens3	trailing
-5d6 fitd	leading
-5d6 fitd	trailing
-5d6 ww	leading
-5d6 ww	trailing
-5d6 wwc1	leading
-5d6 wwc1	trailing
-5d6 wwc2	leading
-5d6 wwc2	trailing
 6d1 f0	leading
 6d1 f0	trailing
 6d1 f1	leading
@@ -141,39 +77,6 @@
 6d1 f3	trailing
 6d1 f5	leading
 6d1 f5	trailing
-6d6 alien	leading
-6d6 alien	trailing
-6d6 alien + 5d6 aliens5	leading
-6d6 alien + 5d6 aliens5	trailing
-6d6 fitd	leading
-6d6 fitd	trailing
-6d6 ww	leading
-6d6 ww	trailing
-6d6 wwc1	leading
-6d6 wwc1	trailing
-6d6 wwc2	leading
-6d6 wwc2	trailing
-6d6 wwc3	leading
-6d6 wwc3	trailing
-7d6 fitd	leading
-7d6 fitd	trailing
-7d6 ww	leading
-7d6 ww	trailing
-8d6 fitd	leading
-8d6 fitd	trailing
-8d6 ww	leading
-8d6 ww	trailing
-9d6 ww	leading
-9d6 ww	trailing
-alien3s2 + 2d10	trailing
-alien3s2p	trailing
-alien4	trailing
-alien4 + 1d6	trailing
-alien4s3 - 2d4	trailing
-alien5s1	trailing
-alien5s2	trailing
-alien6s3p	trailing
-alien6s4 + 1d6	trailing
 conan tn1	trailing
 conan tn12	trailing
 conan tn12 + 2	trailing
@@ -191,61 +94,19 @@ conan3cd5 tn12f3	trailing
 conan4 tn14f5	trailing
 conan5tn17f5c18	trailing
 conantn12	trailing
-fitd0	leading
-fitd0	trailing
-fitd1	leading
-fitd1	trailing
-fitd10	leading
-fitd10	trailing
-fitd2	leading
-fitd2	trailing
-fitd2 k1	leading
-fitd2 k1	trailing
-fitd3	leading
-fitd3	trailing
-fitd3 + 2	leading
-fitd3 + 2	trailing
-fitd3 d1	leading
-fitd3 d1	trailing
-fitd4	leading
-fitd4	trailing
-fitd4 * 2	leading
-fitd4 * 2	trailing
-fitd5	leading
-fitd5	trailing
-fitd6	leading
-fitd6	trailing
-fitd7	leading
-fitd7	trailing
-fitd8	leading
-fitd8	trailing
-ms	trailing
-ms30	trailing
-ms45	trailing
 p 4d1 f1	leading
 p 4d1 f1	trailing
-p fitd3	leading
-p fitd3	trailing
-p s fitd3	leading
-p s fitd3	trailing
 s 4d1 f1	leading
 s 4d1 f1	trailing
-s fitd4	leading
-s fitd4	trailing
 ul 4d1 f1	leading
 ul 4d1 f1	trailing
-ul fitd5	leading
-ul fitd5	trailing
 wfrp67 + 20	trailing
 wfrp67 - 30	trailing
-wng	trailing
-wng 4d6	trailing
-wng 6d6 + 2	trailing
-ww3	trailing
-ww4c2	trailing
 4 + 4d1 f1	leading
 4 + 4d1 f1	trailing
 4 + 4d1 f1 + 1	leading
 4 + 4d1 f1 + 1	trailing
 4d1 + 1 f1	trailing
 4d1 + 1 b1	trailing
+4d1 f1 + 1d1	leading
+4d1 f1 + 1d1	trailing

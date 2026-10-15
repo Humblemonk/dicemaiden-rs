@@ -191,7 +191,7 @@ pub fn generate_system_help() -> String {
 • `/roll wng 4d6` - Standard roll with wrath die
 • `/roll wng w2 4d6` - Standard roll with 2 wrath dice
 • `/roll wng dn2 4d6` - Difficulty 2 test (shows PASS/FAIL)
-• `/roll wng 4d6 !soak` - Damage/soak roll (no wrath die)
+• `/roll wng 4d6 !soak` - Soak roll: Icons, no wrath die
 
 **Marvel Multiverse:**
 • `/roll mm` - Basic 3d6 roll (Marvel die in middle)

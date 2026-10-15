@@ -8,8 +8,8 @@
 // - User workflow scenarios
 
 use dicemaiden_rs::{
-    dice::parser, format_multiple_results, format_multiple_results_with_limit, help_text,
-    parse_and_roll,
+    commands::roll::error_reply, dice::parser, format_multiple_results,
+    format_multiple_results_with_limit, help_text, parse_and_roll,
 };
 
 // ============================================================================
@@ -239,11 +239,11 @@ fn test_complex_expressions() {
     // Test complex expressions that combine multiple features
     let complex_expressions = vec![
         "10d6 e6 k8 +4",                                   // Exploding, keep, add
-        "6d10 t7 f1 b1 ie10 + 5d6 e6 - 2d4",               // Target system with math
+        "6d10 t7 f1 b1 ie10 + 5d6 e6 - 2",                 // Target system with math
         "4d6 k3 + 2d6 * 3 - 1d4",                          // Keep with complex math
         "3 sw8 + 5",    // Roll sets with game system and modifier
         "p s 5 4d6 k3", // Flags + roll sets + modifiers
-        "wng 6d6 + 2",  // Game system with modifier (simplified)
+        "6d6 wngt + 2", // Game system with modifier (W&G total mode)
         "(WoD Attack) 4wod8c + 1 ! Supernatural strength", // WoD cancel with label and comment
     ];
 
@@ -346,8 +346,8 @@ fn test_common_rpg_scenarios() {
         ("alien3s1p", "Alien RPG push mechanic (low stress)"),
         ("alien6s4", "Alien RPG high-stress situation"),
         ("3 alien4s2", "Multiple Alien RPG rolls for group actions"),
-        ("alien4 + 2", "Alien RPG with situational modifier"),
-        ("alien5s3 - 1", "Alien RPG stress roll with penalty"),
+        ("alien6", "Alien RPG with a +2 gear bonus (two more dice)"),
+        ("alien4s3", "Alien RPG stress roll with a die less"),
         // Generic scenarios
         ("3 4d6 k3", "Multiple character stats"),
         ("1d20; 1d8 + 3", "Attack and damage"),
@@ -616,7 +616,7 @@ fn test_performance_scenarios() {
         ("500d6", "Maximum dice"),
         ("20 10d10", "Maximum roll sets"),
         ("100d6 e6 k50", "Complex modifiers"),
-        ("10d10 t7 ie10 + 5d6 e6 - 2d4", "Complex expression"),
+        ("10d10 t7 ie10 + 5d6 e6 - 2", "Complex expression"),
     ];
 
     for (expression, description) in performance_tests {
@@ -1528,15 +1528,21 @@ fn test_alien_rpg_full_integration() {
         ("alien3s2p", "Pushing a moderate stress roll"),
         ("alien4s1p", "Pushing a low stress roll"),
         // Mathematical modifiers in stressful situations
-        ("alien4s2 + 2", "Stress roll with equipment bonus"),
-        ("alien3s3 - 1", "Stress roll with injury penalty"),
-        ("alien5s1 * 2", "Stress roll with doubled effect"),
+        (
+            "alien6s2",
+            "Stress roll with an equipment bonus (two more dice)",
+        ),
+        (
+            "alien2s3",
+            "Stress roll with an injury penalty (a die less)",
+        ),
+        ("alien10s1", "Stress roll with a large pool"),
         // Group action scenarios
         ("3 alien4s2", "Group performing same stressful action"),
         ("5 alien3s1", "Large group with light stress"),
         // Complex scenarios
-        ("alien6s4 + 1d6", "High stress with additional dice"),
-        ("alien4s3 - 2d4", "Stress roll with variable penalty"),
+        ("alien7s4", "High stress with an extra die"),
+        ("alien4s3 ! variable penalty", "Stress roll with a comment"),
     ];
 
     for (expression, description) in alien_workflows {
@@ -1647,8 +1653,8 @@ fn test_alien_rpg_cross_system_compatibility() {
     // Test that Aliens RPG doesn't interfere with other systems
     let cross_system_tests = vec![
         // Aliens RPG mixed with other dice
-        ("alien4 + 1d6", "Alien roll with regular dice addition"),
-        ("alien3s2 + 2d10", "Alien stress with regular dice"),
+        ("alien5", "Alien roll with one more die"),
+        ("alien3s2", "Alien stress roll"),
         // Multiple different systems in one expression
         ("alien4; 1d20 + 5", "Alien and D&D in same expression"),
         ("alien3s1; 4cod", "Alien and Chronicles of Darkness"),
@@ -1708,4 +1714,126 @@ fn test_daggerheart_with_roll_sets() {
             assert!(roll.label.as_ref().unwrap().starts_with("Set "));
         }
     }
+}
+
+// ============================================================================
+// ERROR REPLIES
+// ============================================================================
+
+#[test]
+fn test_error_reply_fits_discord_limit() {
+    let long_modifier = "z".repeat(990);
+    let long_expr = format!("1d6 {long_modifier}");
+    let unknown = format!("Unknown modifier: {long_modifier}");
+    let huge_error = "é".repeat(1500); // multi-byte, so the cut must respect char boundaries
+
+    // (expression, error, exact reply, or None when it is too long to send whole)
+    let cases = vec![
+        (
+            "1d6 zz",
+            "Unknown modifier: zz",
+            Some("🎲 **Tester** used `1d6 zz` - ❌ **Error**: Unknown modifier: zz"),
+        ),
+        (
+            "1d6",
+            "Input too long: 1200 characters (max 1000)",
+            Some("🎲 **Tester** ❌ **Error**: Input too long: 1200 characters (max 1000)"),
+        ),
+        (long_expr.as_str(), unknown.as_str(), None),
+        ("1d6", huge_error.as_str(), None),
+    ];
+
+    for (expr, error, expected) in cases {
+        let reply = error_reply("Tester", expr, error);
+        assert!(
+            reply.len() <= 2000,
+            "reply for '{expr}' is {} bytes, over Discord's limit",
+            reply.len()
+        );
+        match expected {
+            Some(exact) => assert_eq!(reply, exact, "reply for '{expr}'"),
+            None => assert!(
+                reply.starts_with("🎲 **Tester** ❌ **Error**: "),
+                "over-long reply for '{expr}' should drop the request: {reply}"
+            ),
+        }
+    }
+}
+
+// ============================================================================
+// PURGE
+// ============================================================================
+
+#[test]
+fn test_purge_count_and_bot_permissions() {
+    use dicemaiden_rs::commands::purge::{bot_can_purge, purge_count};
+    use serenity::all::{CommandDataOptionValue, Permissions};
+
+    // (count option, accepted count) — a cast once wrapped 300 to 44
+    let counts = vec![
+        (Some(CommandDataOptionValue::Integer(2)), Some(2)),
+        (Some(CommandDataOptionValue::Integer(100)), Some(100)),
+        (Some(CommandDataOptionValue::Integer(1)), None),
+        (Some(CommandDataOptionValue::Integer(101)), None),
+        (Some(CommandDataOptionValue::Integer(300)), None),
+        (Some(CommandDataOptionValue::Integer(-50)), None),
+        (Some(CommandDataOptionValue::Boolean(true)), None),
+        (None, None),
+    ];
+    for (option, expected) in counts {
+        assert_eq!(purge_count(option.as_ref()), expected, "count {option:?}");
+    }
+
+    // (bot's channel permissions, can purge)
+    let manage_and_read = Permissions::MANAGE_MESSAGES | Permissions::READ_MESSAGE_HISTORY;
+    let permissions = vec![
+        (Some(manage_and_read), true),
+        (Some(Permissions::ADMINISTRATOR), true),
+        (Some(Permissions::MANAGE_MESSAGES), false),
+        (Some(Permissions::READ_MESSAGE_HISTORY), false),
+        (Some(Permissions::SEND_MESSAGES), false),
+        (None, true), // not sent: try, and report what Discord refused
+    ];
+    for (perms, expected) in permissions {
+        assert_eq!(bot_can_purge(perms), expected, "bot permissions {perms:?}");
+    }
+}
+
+#[test]
+fn test_format_memory_units() {
+    use dicemaiden_rs::commands::roll::format_memory;
+    // (megabytes, shown) — it switched at 1000 but divided by 1024
+    let cases = vec![
+        (68.69, "68.69 MB"),
+        (1010.0, "1010.00 MB"),
+        (1023.99, "1023.99 MB"),
+        (1024.0, "1.00 GB"),
+        (1167.36, "1.14 GB"),
+    ];
+    for (megabytes, shown) in cases {
+        assert_eq!(format_memory(megabytes), shown, "{megabytes} MB");
+    }
+}
+
+#[test]
+fn test_roll_set_alias_behind_flags_label_and_comment() {
+    // `dndstats` expands to the roll set `6 4d6 k3`; behind a flag, label or
+    // comment it used to become one `6 + 4d6 k3` roll.
+    for expression in [
+        "dndstats",
+        "dndstats ! new character",
+        "p dndstats",
+        "s dndstats",
+        "(Stats) dndstats",
+    ] {
+        let rolls = parser::parse_dice_string(expression)
+            .unwrap_or_else(|e| panic!("'{expression}' should parse: {e}"));
+        assert_eq!(rolls.len(), 6, "'{expression}' should roll six stats");
+        assert!(
+            rolls.iter().all(|r| r.count == 4 && r.sides == 6),
+            "'{expression}' should roll 4d6 each"
+        );
+    }
+    // A set count around it would nest one roll set in another
+    assert!(parser::parse_dice_string("3 dndstats").is_err());
 }

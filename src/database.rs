@@ -19,7 +19,7 @@
 //!
 //! | Column         | Type      | Description                          |
 //! |----------------|-----------|--------------------------------------|
-//! | `process_id`   | TEXT PK   | `process_<shard_start>_<pid>`        |
+//! | `process_id`   | TEXT PK   | `process_<shard_start>`              |
 //! | `shard_start`  | INT       | First shard owned by this process    |
 //! | `shard_count`  | INT       | Number of shards in this process     |
 //! | `total_shards` | INT       | Total shards across all processes    |
@@ -28,7 +28,8 @@
 //! | `timestamp`    | DATETIME  | Last update time                     |
 //!
 //! Stats are written every 15 minutes by `main::collect_shard_stats_with_shutdown`.
-//! Old `process_stats` rows are pruned by [`Database::cleanup_old_process_stats`].
+//! Old `process_stats` rows (45 minutes unwritten) are pruned by
+//! [`Database::cleanup_old_process_stats`].
 //! The database file location is controlled by the `DATABASE_URL` environment
 //! variable; it defaults to `main.db` in the project root.
 
@@ -68,9 +69,13 @@ impl Database {
         };
 
         info!("Using database at: {}", database_url);
+        Self::connect(&database_url).await
+    }
 
+    /// Open (creating if missing) the database at `database_url`.
+    pub async fn connect(database_url: &str) -> Result<Self> {
         let pool = SqlitePool::connect_with(
-            SqliteConnectOptions::from_str(&database_url)?.create_if_missing(true),
+            SqliteConnectOptions::from_str(database_url)?.create_if_missing(true),
         )
         .await?;
 
@@ -174,10 +179,10 @@ impl Database {
 
         if let Some(row) = row {
             Ok(Some(ShardStats {
-                shard_id: row.get("shard_id"),
-                server_count: row.get("server_count"),
-                timestamp: row.get("timestamp"),
-                memory_mb: row.get("mem"),
+                shard_id: row.try_get("shard_id")?,
+                server_count: row.try_get("server_count")?,
+                timestamp: row.try_get("timestamp")?,
+                memory_mb: row.try_get("mem")?,
             }))
         } else {
             Ok(None)
@@ -194,10 +199,10 @@ impl Database {
         let mut stats = Vec::new();
         for row in rows {
             stats.push(ShardStats {
-                shard_id: row.get("shard_id"),
-                server_count: row.get("server_count"),
-                timestamp: row.get("timestamp"),
-                memory_mb: row.get("mem"),
+                shard_id: row.try_get("shard_id")?,
+                server_count: row.try_get("server_count")?,
+                timestamp: row.try_get("timestamp")?,
+                memory_mb: row.try_get("mem")?,
             });
         }
 
@@ -219,22 +224,41 @@ impl Database {
         let mut stats = Vec::new();
         for row in rows {
             stats.push(ProcessStats {
-                process_id: row.get("process_id"),
-                shard_start: row.get("shard_start"),
-                shard_count: row.get("shard_count"),
-                total_shards: row.get("total_shards"),
-                server_count: row.get("server_count"),
-                memory_mb: row.get("memory_mb"),
-                timestamp: row.get("timestamp"),
+                process_id: row.try_get("process_id")?,
+                shard_start: row.try_get("shard_start")?,
+                shard_count: row.try_get("shard_count")?,
+                total_shards: row.try_get("total_shards")?,
+                server_count: row.try_get("server_count")?,
+                memory_mb: row.try_get("memory_mb")?,
+                timestamp: row.try_get("timestamp")?,
             });
         }
 
         Ok(stats)
     }
 
-    // Clean up old process stats (remove entries older than 30 minutes)
+    /// Delete rows for `shard_start` written under any other process ID: the
+    /// PID-keyed rows from before process IDs were stable across restarts.
+    pub async fn remove_stale_process_rows(
+        &self,
+        process_id: &str,
+        shard_start: i32,
+    ) -> Result<()> {
+        sqlx::query("DELETE FROM process_stats WHERE shard_start = ? AND process_id != ?")
+            .bind(shard_start)
+            .bind(process_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Remove rows not written for 45 minutes: three missed 15-minute writes.
+    /// A restarted process skips its first tick, so its row can be up to 30
+    /// minutes old plus downtime before it writes again; at 30 minutes another
+    /// process's cleanup could delete it first.
     pub async fn cleanup_old_process_stats(&self) -> Result<()> {
-        sqlx::query("DELETE FROM process_stats WHERE timestamp < datetime('now', '-30 minutes')")
+        sqlx::query("DELETE FROM process_stats WHERE timestamp < datetime('now', '-45 minutes')")
             .execute(&self.pool)
             .await?;
 

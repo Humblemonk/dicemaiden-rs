@@ -183,7 +183,7 @@
 10d1 ul	always-err {"Unknown modifier: ul"}
 10d10 e10 k5 +3	always-ok n=Some(1)
 10d10 f1 t8 c	always-ok n=Some(1)
-10d10 t7 ie10 + 5d6 e6 - 2d4	always-ok n=Some(1)
+10d10 t7 ie10 + 5d6 e6 - 2d4	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
 10d10 t7 t10	always-ok n=Some(1)
 10d10 vtm5p10h0	always-ok n=Some(1)
 10d10 vtm5p10h3	always-ok n=Some(1)
@@ -1736,7 +1736,7 @@ p 10 + 2 + 2d1	always-ok n=Some(1)
 6d10 km3	always-ok n=Some(1)
 6d10 t5 tl5	always-ok n=Some(1)
 6d10 t7 f1	always-ok n=Some(1)
-6d10 t7 f1 b1 ie10 + 5d6 e6 - 2d4	always-ok n=Some(1)
+6d10 t7 f1 b1 ie10 + 5d6 e6 - 2d4	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
 6d10 t7 f1 c	always-ok n=Some(1)
 6d10 t7 ie10	always-ok n=Some(1)
 6d10b	always-ok n=Some(1)
@@ -1908,7 +1908,7 @@ alien3s2p	always-ok n=Some(1)
 alien4	always-ok n=Some(1)
 alien4 + 1d6	always-ok n=Some(1)
 alien4; 1d20 + 5	always-ok n=Some(2)
-alien4s3 - 2d4	always-ok n=Some(1)
+alien4s3 - 2d4	always-err {"Alien counts sixes, so math doesn't apply; add dice (`+ 1d6`) or roll fewer instead"}
 alien5s1	always-ok n=Some(1)
 alien5s2	always-ok n=Some(1)
 alien6s3p	always-ok n=Some(1)
@@ -2124,12 +2124,12 @@ fitd2 k1	always-ok n=Some(1)
 fitd3	always-ok n=Some(1)
 fitd3 ! Action; fitd4 ! Resistance; fitd0 ! Desperate	always-ok n=Some(3)
 fitd3 ! Sneaking past guards	always-ok n=Some(1)
-fitd3 + 2	always-ok n=Some(1)
+fitd3 + 2	always-err {"Forged in the Dark reads the highest die, so `+ 2` doesn't apply; add dice instead (`+ 2d6`)"}
 fitd3 ; 4cod ; sw8	always-ok n=Some(3)
 fitd3 d1	always-ok n=Some(1)
 fitd4	always-ok n=Some(1)
 fitd4 ! Desperate leap across rooftops	always-ok n=Some(1)
-fitd4 * 2	always-ok n=Some(1)
+fitd4 * 2	always-err {"Forged in the Dark reads the highest die, so math doesn't apply; add dice (`+ 1d6`) or roll fewer instead"}
 fitd5	always-ok n=Some(1)
 fitd6	always-ok n=Some(1)
 fitd7	always-ok n=Some(1)
@@ -2385,7 +2385,7 @@ wng 4d6 !soak invalid	always-ok n=Some(1)
 wng 5d6 !dmg	always-ok n=Some(1)
 wng 5d6 !dmg - 1	always-ok n=Some(1)
 wng 6d6 !exempt	always-ok n=Some(1)
-wng 6d6 + 2	always-ok n=Some(1)
+wng 6d6 + 2	always-err {"Wrath & Glory counts Icons, so `+ 2` doesn't apply; add dice instead (`+ 2d6`)"}
 wng dn2 4d6	always-ok n=Some(1)
 wng dn2 4d6 !exempt	always-ok n=Some(1)
 wng dn3 4d6	always-ok n=Some(1)
@@ -2393,7 +2393,7 @@ wng dn3 4d6 !soak	always-ok n=Some(1)
 wng dn3 5d6	always-ok n=Some(1)
 wng dn3 6d6 !soak / 2	always-ok n=Some(1)
 wng dn4 6d6 !exempt	always-ok n=Some(1)
-wng w0 4d6	always-err {"Wrath dice count must be 1-5, got 0"}
+wng w0 4d6	always-ok n=Some(1)
 wng w1 1d6	always-ok n=Some(1)
 wng w1 4d6	always-ok n=Some(1)
 wng w1 4d6 !soak	always-ok n=Some(1)
@@ -2407,7 +2407,7 @@ wng w3 dn1 5d6 !exempt	always-ok n=Some(1)
 wng w5 4d6	always-ok n=Some(1)
 wng w5 5d6	always-ok n=Some(1)
 wng w5 6d6 !dmg	always-ok n=Some(1)
-wng w6 4d6	always-err {"Wrath dice count must be 1-5, got 6"}
+wng w6 4d6	always-err {"Wrath dice count must be 0-5, got 6"}
 wod	always-err {"Invalid dice expression: wod"}
 ww3	always-ok n=Some(1)
 ww4c2	always-ok n=Some(1)
@@ -2433,3 +2433,208 @@ yz	always-err {"Invalid dice expression: yz"}
 4 + 4d1 + 1 t2ds2	always-ok n=Some(1)
 4d1 + 1 f1	always-ok n=Some(1)
 4d1 + 1 b1	always-ok n=Some(1)
+1d1 + 1d4000000000	always-err {"Maximum 1000 sides allowed"}
+1d1 - 1d4000000000	always-err {"Maximum 1000 sides allowed"}
+1d1 * 1d4000000000	always-err {"Maximum 1000 sides allowed"}
+1d1 / 1d4000000000	always-err {"Maximum 1000 sides allowed"}
+1d1 + 1d4000000000e4	always-err {"Maximum 1000 sides allowed"}
+1d1 + 1d1000	always-ok n=Some(1)
+1d1 + 1d1001	always-err {"Maximum 1000 sides allowed"}
+1d1 + 500d1	always-ok n=Some(1)
+1d1 + 501d1	always-err {"Maximum 500 dice allowed"}
+1d1 + 0d1	always-err {"Cannot roll 0 dice"}
+1d1 + 1d0	always-err {"Dice must have at least 1 side"}
+1d1 + 99999999999d1	always-err {"Maximum 500 dice allowed"}
+1d1 + 1d99999999999	always-err {"Maximum 1000 sides allowed"}
+99999999999d6	always-err {"Maximum 500 dice allowed"}
+1d99999999999	always-err {"Maximum 1000 sides allowed"}
+3d1 10d1	always-ok n=Some(1)
+3d1 501d1	always-err {"Maximum 500 dice allowed"}
+3d1 10d1001	always-err {"Maximum 1000 sides allowed"}
+d6s0	always-ok n=Some(1)
+d6s500	always-ok n=Some(1)
+d6s501	always-err {"Maximum 500 dice allowed"}
+1d1 d6s500	always-ok n=Some(1)
+1d1 d6s501	always-err {"Maximum 500 dice allowed"}
+3d6 mme	always-ok n=Some(1)
+3d6 mmt	always-ok n=Some(1)
+3d6 mme0	always-ok n=Some(1)
+3d6 mme1	always-ok n=Some(1)
+3d6 mme500	always-ok n=Some(1)
+3d6 mme501	always-err {"Maximum 500 edges allowed"}
+3d6 mmt500	always-ok n=Some(1)
+3d6 mmt501	always-err {"Maximum 500 troubles allowed"}
+3d6 mme99999999999	always-err {"Maximum 500 edges allowed"}
+3d6 mmt99999999999	always-err {"Maximum 500 troubles allowed"}
+3d6 mmex	always-err {"Invalid Marvel Multiverse modifier 'mmex'"}
+mm 500e	always-ok n=Some(1)
+mm 501e	always-err {"Maximum 500 edges allowed"}
+mm 500t	always-ok n=Some(1)
+mm 501t	always-err {"Maximum 500 troubles allowed"}
+mm 0e	always-ok n=Some(1)
+mm 99999999999e	always-err {"Maximum 500 edges allowed"}
+mm 99999999999t	always-err {"Maximum 500 troubles allowed"}
+mm 501e 501t	always-ok n=Some(1)
+mm 501e 1t	always-ok n=Some(1)
+mm 500e 500t	always-ok n=Some(1)
+mm 2147483647e 2147483647e	always-err {"Maximum 500 edges allowed"}
+d6s5+2	always-ok n=Some(1)
+d6s5 + 2	always-ok n=Some(1)
+d6s5-1	always-ok n=Some(1)
+1d1 d6s5+2	always-ok n=Some(1)
+mm 501e 500t	always-ok n=Some(1)
+mm 600e 300t	always-ok n=Some(1)
+mm 300e 800t	always-ok n=Some(1)
+mm 1000e 499t	always-err {"Maximum 500 edges allowed"}
+mm 99999999999e 99999999999t	always-err {"Maximum 500 edges allowed"}
+mm 2147483647e 1e	always-err {"Maximum 500 edges allowed"}
+1d1 + 2147483646 ess3	always-err {"Result is too large"}
+1d1*2147483647 esss5	always-err {"Result is too large"}
+1d1 - 2147483647 mnm	always-err {"Result is too large"}
+1d1 - 2147483639 mnm	always-ok n=Some(1)
+1d1 - 2147483638 mnm	always-ok n=Some(1)
+4d1 fudge - 2147483647	always-err {"Result is too large"}
+alien3s4294967295p	always-err {"Invalid dice expression: alien3s4294967295p"}
+alien3s9p	always-ok n=Some(1)
+2d1 t1 + 1d1	always-ok n=Some(1)
+2d1 t1 - 1d1	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
+2d1 t1 * 1d1	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
+2d1 t1 / 1d1	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
+2d1 - 1d1 t1	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
+2d1 * 1d1 t1	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
+2d1 tl1 - 1d1	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
+2d1 t1ds1 * 1d1	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
+2d1 tl1ds1 / 1d1	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
+4d1 f1 - 1d1	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
+4d1 b1 * 1d1	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
+4d1 f1 + 1d1	always-ok n=Some(1)
+2d1 tn12 - 1d1	always-err {"Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the pool); use a number with `-`, `*` or `/`"}
+2d1 t1 - 1	always-ok n=Some(1)
+2d1 t1 + 1d1 - 1	always-ok n=Some(1)
+8d6l	always-ok n=Some(1)
+10d10 t7 ie10 + 5d6 e6 - 2	always-ok n=Some(1)
+6d10 t7 f1 b1 ie10 + 5d6 e6 - 2	always-ok n=Some(1)
+3d1 gb	always-ok n=Some(1)
+3d1 gb + 1d1	always-ok n=Some(1)
+3d1 gb - 1d1	always-ok n=Some(1)
+3d1 gb * 1d1	always-ok n=Some(1)
+3d1 gb / 1d1	always-ok n=Some(1)
+3d1 gb + 1	always-ok n=Some(1)
+3d1 gb - 1	always-ok n=Some(1)
+3d1 gb * 2	always-ok n=Some(1)
+3d1 gb / 2	always-ok n=Some(1)
+3d1 gbs * 1d1	always-ok n=Some(1)
+3d1 gbs / 1d1	always-ok n=Some(1)
+3d8 gb * 1d2	always-ok n=Some(1)
+4d1 k2 + 1 t2	always-ok n=Some(1)
+4d1 kl2 + 1 t2	always-ok n=Some(1)
+4d1 km2 + 1 t2	always-ok n=Some(1)
+4d1 d1 + 1 t2	always-ok n=Some(1)
+4d1 adv1 + 1 t2	always-ok n=Some(1)
+4d1 dis1 + 1 t2	always-ok n=Some(1)
+4d1 k2 * 3 t2	always-ok n=Some(1)
+4d1 k2 + 1 tl2	always-ok n=Some(1)
+4d1 k2 + 1 t2ds2	always-ok n=Some(1)
+4d1 k2 + 1 t2 f2	always-ok n=Some(1)
+4d1 k2 + 1 t2 b2	always-ok n=Some(1)
+4d6 k2 + 1 t5	always-ok n=Some(1)
+mm + 1d6	always-ok n=Some(1)
+mm 2e - 1d4	always-ok n=Some(1)
+mm 3t * 1d2	always-ok n=Some(1)
+mm / 1d2	always-ok n=Some(1)
+mm + 5 * 2	always-ok n=Some(1)
+mm 2e + 1d6 * 2	always-ok n=Some(1)
+3d6 mme2 + 1d6	always-ok n=Some(1)
+3d6 mm mme2	always-err {"Use one Marvel Multiverse modifier, like `mm 2e 1t`"}
+3d6 mme2 mm	always-err {"Use one Marvel Multiverse modifier, like `mm 2e 1t`"}
+3d6 mme2 mmt1	always-err {"Use one Marvel Multiverse modifier, like `mm 2e 1t`"}
+3d6 mme5 mme5	always-err {"Use one Marvel Multiverse modifier, like `mm 2e 1t`"}
+dh 4d10 + 2	always-ok n=Some(1)
+dh 2d10 - 1	always-ok n=Some(1)
+dh 2d10+1	always-ok n=Some(1)
+dh 3d10 * 2	always-ok n=Some(1)
+dh 2d10 + 1d6	always-ok n=Some(1)
+wng 4d6 + 1	always-err {"Wrath & Glory counts Icons, so `+ 1` doesn't apply; add dice instead (`+ 1d6`)"}
+wng dn3 5d6 - 1	always-err {"Wrath & Glory counts Icons, so math doesn't apply; add dice (`+ 1d6`) or roll fewer instead"}
+wng 4d6 + 2 !soak	always-err {"Wrath & Glory counts Icons, so `+ 2` doesn't apply; add dice instead (`+ 2d6`)"}
+wng 4d6 ! SOAK hits	always-ok n=Some(1)
+wng 4d6 !hi	always-ok n=Some(1)
+wng 4d6 ! hi there	always-ok n=Some(1)
+wng w2 4d6 !exempt	always-ok n=Some(1)
+4d6 wngw1t	always-ok n=Some(1)
+4d6 wngw0t	always-ok n=Some(1)
+4d6 wngw0	always-ok n=Some(1)
+4d6 wngw1x	always-err {"Invalid Wrath & Glory modifier: wngw1x"}
+4d6 wngdnt	always-err {"Invalid Wrath & Glory modifier: wngdnt"}
+4d1 wngt	always-ok n=Some(1)
+4d1 wngt + 2	always-ok n=Some(1)
+4d1 wngw0t + 2	always-ok n=Some(1)
+4d1 wngw2dn5t - 1	always-ok n=Some(1)
+sw8 + 1d6	always-ok n=Some(1)
+sw8 - 1d4	always-ok n=Some(1)
+sw8 * 1d2	always-ok n=Some(1)
+d6s4 + 1d6	always-ok n=Some(1)
+d6s4 / 1d2	always-ok n=Some(1)
+bnw3 + 1d6	always-ok n=Some(1)
+bnw3 - 1d4	always-ok n=Some(1)
+sil3 + 1d6	always-ok n=Some(1)
+sil3 * 1d2	always-ok n=Some(1)
+mnm + 1d4	always-ok n=Some(1)
+mnm - 1d4	always-ok n=Some(1)
+1d1 d6s0 + 1d1	always-ok n=Some(1)
+dndstats ! new character	always-ok n=Some(6)
+p dndstats	always-ok n=Some(6)
+s dndstats	always-ok n=Some(6)
+(Stats) dndstats	always-ok n=Some(6)
+3 dndstats	always-err {"`dndstats` already rolls 6 sets; roll it on its own"}
+p (Stats) dndstats ! hi	always-ok n=Some(6)
+3hsk1	always-ok n=Some(1)
+a5e 5 ex1	always-ok n=Some(1)
++a5e 5 ex1	always-ok n=Some(1)
+-a5e 3 ex2	always-ok n=Some(1)
+a5e5ex1	always-ok n=Some(1)
+a5e -2 ex1	always-ok n=Some(1)
+cs 3 + 2	always-ok n=Some(1)
+cs 3 - 2	always-ok n=Some(1)
+cs 7	always-ok n=Some(1)
+wfrp100 + 9223372036854775807	always-err {"Invalid modifier '+' - contains operator"}
+wfrp50 - 9223372036854775807	always-ok n=Some(1)
+tdh9223372036854775807 +1	always-err {"Invalid modifier '+' - contains operator"}
+tdh0 -9223372036854775808	always-err {"Invalid modifier '-' - contains operator"}
+ms45 + 10	always-ok n=Some(1)
+ms45 - 10	always-ok n=Some(1)
++ms45 + 10	always-ok n=Some(1)
+-ms45 + 15	always-ok n=Some(1)
+ms95 + 20	always-ok n=Some(1)
+ms1	always-ok n=Some(1)
+ms99	always-ok n=Some(1)
+ms45 + 10 + 5	always-ok n=Some(1)
+ms + 10	always-ok n=Some(1)
++ms + 3	always-ok n=Some(1)
+alien4s10p	always-err {"Stress is already 10, the most this bot tracks, so this roll can't be pushed"}
+alien4s9p	always-ok n=Some(1)
+ms20 - 30	always-err {"Mothership target can't be below 1, got -10"}
+ms45 - 44	always-ok n=Some(1)
+ms45 - 45	always-err {"Mothership target can't be below 1, got 0"}
+ms200	always-ok n=Some(1)
+ms201	always-err {"Mothership target must be 1-200, got 201"}
+ms45 + 155	always-ok n=Some(1)
+ms45 + 156	always-err {"Mothership target must be 1-200, got 201"}
+3 dndstats ! hi	always-err {"`dndstats` already rolls 6 sets; roll it on its own"}
+3 (Stats) dndstats	always-err {"`dndstats` already rolls 6 sets; roll it on its own"}
+alien4s10	always-ok n=Some(1)
+fitd0 + 1	always-err {"Forged in the Dark reads the highest die, so `+ 1` doesn't apply; add dice instead (`+ 1d6`)"}
+ww4 + 1	always-err {"Wild Words reads the highest die, so `+ 1` doesn't apply; add dice instead (`+ 1d6`)"}
+ww4c1 + 1	always-err {"Wild Words reads the highest die, so `+ 1` doesn't apply; add dice instead (`+ 1d6`)"}
+2lf4 + 1	always-err {"Lasers & Feelings counts dice against your number, so `+ 1` doesn't apply; add dice instead (`+ 1d6`)"}
+alien4s2 + 2	always-err {"Alien counts sixes, so `+ 2` doesn't apply; add dice instead (`+ 2d6`)"}
+alien4 + 1d6	always-ok n=Some(1)
+alien4s2 + 2d6	always-ok n=Some(1)
+fitd2 + 1d6	always-ok n=Some(1)
+wng 4d6 + 1d6	always-ok n=Some(1)
+ww4 + 1d6	always-ok n=Some(1)
+wng 4d6 k3	always-ok n=Some(1)
+4d6 ww + 1d6 ww	always-ok n=Some(1)
+Ms20 - 30	always-err {"Mothership target can't be below 1, got -10"}
+3 ms20 - 30	always-err {"Mothership target can't be below 1, got -10"}
+ms45 + 99999999999999999999	always-err {"Invalid modifier '+' - contains operator"}

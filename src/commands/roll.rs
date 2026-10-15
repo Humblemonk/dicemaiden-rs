@@ -203,16 +203,8 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
             }
         }
         Err(e) => {
-            // Check if this is an input length error to avoid spamming Discord
-            let error_message = e.to_string();
-            let content = if error_message.contains("Input too long") {
-                // For input length errors, don't show the request to avoid spam
-                format!("🎲 **{display_name}** ❌ **Error**: {e}")
-            } else {
-                // For other errors, show the cleaned request as before
-                let clean_expr = strip_label_and_comment_from_expression(dice_expr);
-                format!("🎲 **{display_name}** used `{clean_expr}` - ❌ **Error**: {e}")
-            };
+            let clean_expr = strip_label_and_comment_from_expression(dice_expr);
+            let content = error_reply(&display_name, &clean_expr, &e.to_string());
 
             // A private roll's error is as private as its result would have been
             if dice::parser::is_private_expression(dice_expr) {
@@ -221,6 +213,30 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> Result<CommandR
                 Ok(CommandResponse::public(content))
             }
         }
+    }
+}
+
+/// The reply for a roll that failed, cut to fit one Discord message. Errors such
+/// as "Unknown modifier" quote the input back, so a long expression echoed twice
+/// went over the limit, the send failed, and the user saw "interaction failed".
+/// The request is dropped first (always, for "Input too long", to avoid spam);
+/// only then is the error text cut.
+pub fn error_reply(display_name: &str, clean_expr: &str, error: &str) -> String {
+    let with_request = format!("🎲 **{display_name}** used `{clean_expr}` - ❌ **Error**: {error}");
+    if !error.contains("Input too long") && with_request.len() <= dice::DISCORD_MESSAGE_LIMIT {
+        return with_request;
+    }
+
+    dice::truncate_to_message_limit(format!("🎲 **{display_name}** ❌ **Error**: {error}"))
+}
+
+/// Megabytes as `MB`, or `GB` from 1024 MB up. The three copies this replaced
+/// switched at 1000 but divided by 1024, so 1010 MB showed as "0.99 GB".
+pub fn format_memory(megabytes: f64) -> String {
+    if megabytes >= 1024.0 {
+        format!("{:.2} GB", megabytes / 1024.0)
+    } else {
+        format!("{megabytes:.2} MB")
     }
 }
 
@@ -252,12 +268,7 @@ async fn generate_bot_info(ctx: &Context) -> Result<String> {
         0.0
     };
 
-    // Format memory with appropriate unit
-    let memory_display = if memory_usage > 1000.0 {
-        format!("{:.2} GB", memory_usage / 1024.0)
-    } else {
-        format!("{memory_usage:.2} MB")
-    };
+    let memory_display = format_memory(memory_usage);
 
     // Get database stats first to determine if we should show partial or total stats
     let db_stats_result = get_database_stats(ctx).await;
@@ -355,12 +366,7 @@ async fn get_database_stats(ctx: &Context) -> String {
                     // Get total shards from any process (they should all have the same total_shards)
                     let total_shards = process_stats.first().map(|s| s.total_shards).unwrap_or(0);
 
-                    // Format memory with appropriate unit
-                    let memory_display = if total_memory > 1000.0 {
-                        format!("{:.2} GB", total_memory / 1024.0)
-                    } else {
-                        format!("{total_memory:.2} MB")
-                    };
+                    let memory_display = format_memory(total_memory);
 
                     format!(
                         "**Total Stats (All Processes):**\n• Last update: {most_recent_timestamp}\n• Total servers: {total_servers} (across {total_shards} shards)\n• Total memory: {memory_display}\n• Active processes: {active_processes} (multi-process sharding)\n"
@@ -392,12 +398,7 @@ async fn get_database_stats(ctx: &Context) -> String {
                         .map(|s| s.memory_mb)
                         .unwrap_or(0.0);
 
-                    // Format recorded memory with appropriate unit
-                    let memory_display = if shard_0_memory > 1000.0 {
-                        format!("{:.2} GB", shard_0_memory / 1024.0)
-                    } else {
-                        format!("{shard_0_memory:.2} MB")
-                    };
+                    let memory_display = format_memory(shard_0_memory);
 
                     // Count how many shards we have data for
                     let shard_count = stats.len();

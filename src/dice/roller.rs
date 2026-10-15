@@ -50,16 +50,18 @@
 //! generator.  `roll_dice_with_rng` accepts the generator instead, which is
 //! what lets the test suite seed a roll and pin its exact result.
 
+use super::parser::{ModifierKind, modifier_kind};
 use super::rng::get_dice_rng;
 use super::{
-    DiceGroup, DiceRoll, ESSENCE20_RANKS, HeroSystemType, LaserFeelingsType, Modifier, RollResult,
+    ALIEN_MAX_STRESS, DiceGroup, DiceRoll, ESSENCE20_RANKS, HeroSystemType, LaserFeelingsType,
+    MAX_DICE, MOTHERSHIP_MAX_TARGET, Modifier, RollResult,
 };
 use anyhow::{Result, anyhow};
 use rand::{Rng, RngExt};
 
-/// Mirrors the parser's `Maximum 500 dice allowed` cap, which is enforced
-/// against the written dice count before advantage extras are known.
-const MAX_DICE_POOL: u64 = 500;
+/// The parser enforces MAX_DICE on the written dice count before advantage
+/// extras are known; this applies it to the whole pool.
+const MAX_DICE_POOL: u64 = MAX_DICE as u64;
 
 /// Net advantage level: advantage and disadvantage cancel each other out, per
 /// the Open Legend SRD ("find the difference between the two values").
@@ -148,7 +150,7 @@ pub fn roll_dice_with_rng(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
     let has_d6_system = dice
         .modifiers
         .iter()
-        .any(|m| matches!(m, Modifier::D6System(_, _)));
+        .any(|m| matches!(m, Modifier::D6System(_)));
 
     if has_d6_system {
         return handle_d6_system_roll(dice, rng);
@@ -235,13 +237,13 @@ pub fn roll_dice_with_rng(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
     }
 
     // Create initial dice group for the base dice
-    let base_group = DiceGroup {
-        _description: format!("{}d{}", pool_size, dice.sides),
-        rolls: result.individual_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "base".to_string(),
-    };
-    result.dice_groups.push(base_group);
+    let rolls = result.individual_rolls.clone();
+    push_dice_group(
+        &mut result,
+        format!("{}d{}", pool_size, dice.sides),
+        rolls,
+        "base",
+    );
 
     // Discard the advantage/disadvantage surplus *before* exploding, so dice
     // gained from explosions are never reconsidered for the drop.
@@ -480,6 +482,10 @@ fn is_arithmetic_modifier(modifier: &Modifier) -> bool {
 /// Fold every arithmetic modifier into `total`, in the order the user wrote
 /// them. Non-arithmetic modifiers belong to the caller's own game system and
 /// are skipped here.
+/// Numbers only. A handler whose roll can carry a dice operand (`+ 1d6`) must
+/// use apply_modifier_expression instead, or the operand is silently dropped:
+/// Savage Worlds, D6 System, Brave New World, Silhouette, Mutants &
+/// Masterminds and Marvel Multiverse all did.
 fn apply_arithmetic_modifiers(modifiers: &[Modifier], total: &mut i32) -> Result<()> {
     for modifier in modifiers {
         if let Some(op) = ArithmeticOp::from_modifier(modifier)? {
@@ -658,7 +664,7 @@ fn apply_modifier_expression(
         }
     }
 
-    // Evaluate the expression with proper precedence
+    // Evaluate the expression, left to right (see evaluate_expression)
     if expression_parts.len() > 1 {
         result.total = evaluate_expression(&expression_parts)?;
     }
@@ -797,18 +803,13 @@ fn apply_special_system_modifiers(
     // Find positions of target-based modifiers
     let target_positions = find_target_modifier_positions(&dice.modifiers);
 
-    // Check if we have mathematical modifiers
-    let has_math_modifiers = dice.modifiers.iter().any(|m| {
-        matches!(
-            m,
-            Modifier::Add(_)
-                | Modifier::Subtract(_)
-                | Modifier::Multiply(_)
-                | Modifier::Divide(_)
-                | Modifier::AddDice(_)
-                | Modifier::SubtractDice(_)
-        )
-    });
+    // Any `+ - * /`, with a number or with dice. A hand-kept list here missed
+    // `*`/`/` dice, so Godbound charted `3d8 gb * 1d2` die by die, the d2
+    // included, instead of converting the total as for every other math.
+    let has_math_modifiers = dice
+        .modifiers
+        .iter()
+        .any(|m| modifier_kind(m) == ModifierKind::Math);
 
     // Apply pre-target mathematical modifiers exactly ONCE at the beginning
     if !target_positions.is_empty() && has_math_modifiers {
@@ -912,17 +913,6 @@ fn apply_special_system_modifiers(
                 apply_shadowrun_critical_glitch_check(result, *dice_count)?;
                 has_special_system = true;
             }
-            Modifier::SavageWorlds(_) => {
-                // Savage Worlds is handled in the main roll_dice function
-                // Don't process it here
-            }
-            Modifier::D6System(_, _) => {
-                // D6 System is handled in the main roll_dice function
-            }
-            Modifier::MarvelMultiverse(_, _) => {
-                *result = handle_marvel_multiverse_roll(dice.clone(), rng)?;
-                return Ok(());
-            }
             Modifier::CyberpunkRed => {
                 apply_cyberpunk_red_mechanics(result, rng)?;
                 has_special_system = true;
@@ -967,17 +957,6 @@ fn apply_special_system_modifiers(
             Modifier::WildWords(cut_count) => {
                 apply_wild_words_mechanics(result, *cut_count, dice.sides)?;
                 has_special_system = true;
-            }
-            Modifier::MutantsMasterminds => {
-                has_special_system = true;
-            }
-            Modifier::Mothership(_, _) => {
-                // Mothership is handled in the main roll_dice function
-                // Don't process it here
-            }
-            Modifier::Wfrp(_) => {
-                // WFRP is handled in the main roll_dice function
-                // Don't process it here
             }
             Modifier::BrokenEmpires(..) => {
                 // The Broken Empires is handled in the main roll_dice function
@@ -1121,8 +1100,9 @@ fn count_wrath_glory_successes(
     let mut has_critical = false;
 
     if use_total {
-        // For soak/damage/exempt rolls, just use the total of dice values
-        result.total = result.kept_rolls.iter().sum();
+        // Total mode (`wngt`): the total is the result. It already holds the
+        // user's math from step 4; recomputing it from the dice here dropped
+        // that, so `4d6 wngt + 2` showed the dice alone.
         result.successes = None; // Don't show successes for total-based rolls
 
         // Check wrath dice effects (first N dice based on wrath_dice_count)
@@ -1452,12 +1432,12 @@ fn implode_dice(
         format!("{} dice imploded", imploded.len())
     });
 
-    result.dice_groups.push(DiceGroup {
-        _description: "imploded dice".to_string(),
-        rolls: imploded.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "subtract".to_string(),
-    });
+    push_dice_group(
+        result,
+        "imploded dice".to_string(),
+        imploded.clone(),
+        "subtract",
+    );
 
     result.implosion_rolls.extend(imploded);
 
@@ -1702,7 +1682,9 @@ fn apply_hero_system_calculation(
             // the 1d3 multiplier belongs to 6th Edition, not this one.
             let body_damage = result.total;
             let stun_multiplier = (rng.random_range(1..=6) - 1).max(1);
-            let stun_damage = body_damage * stun_multiplier;
+            let stun_damage = body_damage
+                .checked_mul(stun_multiplier)
+                .ok_or_else(result_too_large)?;
 
             result.notes.push(format!(
                 "Killing damage: {body_damage} BODY, {stun_damage} STUN (×{stun_multiplier})"
@@ -1744,7 +1726,10 @@ fn apply_fudge_conversion(result: &mut RollResult) -> Result<()> {
 
     let original_dice_total: i32 = result.kept_rolls.iter().sum();
     let fudge_adjustment = fudge_total - original_dice_total;
-    result.total += fudge_adjustment;
+    result.total = result
+        .total
+        .checked_add(fudge_adjustment)
+        .ok_or_else(result_too_large)?;
 
     result
         .notes
@@ -1862,7 +1847,7 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
     result.total = base_result;
 
     // NOW apply mathematical modifiers to the Savage Worlds result
-    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
+    apply_modifier_expression(&mut result, &dice.modifiers, STANDARD_MATH_RULES, rng)?;
 
     // Check for Snake Eyes (both dice show natural 1)
     let trait_natural = result.dice_groups[0].rolls.first().copied().unwrap_or(0);
@@ -1901,29 +1886,6 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
             .push(format!("Wild die exploded {wild_explosions} times"));
     }
 
-    // Show mathematical modifiers that were applied - commenting this out for now
-    // let math_modifier_total: i32 = dice
-    //    .modifiers
-    //    .iter()
-    //    .map(|m| match m {
-    //        Modifier::Add(v) => *v,
-    //        Modifier::Subtract(v) => -*v,
-    //        _ => 0,
-    //    })
-    //    .sum();
-
-    //if math_modifier_total != 0 {
-    //    if math_modifier_total > 0 {
-    //        result.notes.push(format!(
-    //            "Mathematical modifier: +{math_modifier_total} applied"
-    //        ));
-    //    } else {
-    //        result.notes.push(format!(
-    //            "Mathematical modifier: {math_modifier_total} applied"
-    //        ));
-    //    }
-    //}
-
     result
         .notes
         .push("Savage Worlds: Trait die + Wild die, keep highest".to_string());
@@ -1931,17 +1893,16 @@ fn handle_savage_worlds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollR
     Ok(result)
 }
 
-// 5. ADD handle_d6_system_roll function to roller.rs:
 fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
     let mut result = RollResult::from_dice(&dice);
 
     // Find the D6 System modifier
-    let (count, pips_str) = dice
+    let count = dice
         .modifiers
         .iter()
         .find_map(|m| {
-            if let Modifier::D6System(count, pips) = m {
-                Some((*count, pips.clone()))
+            if let Modifier::D6System(count) = m {
+                Some(*count)
             } else {
                 None
             }
@@ -1978,36 +1939,15 @@ fn handle_d6_system_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResul
     result.individual_rolls.extend(wild_die.rolls);
     result.kept_rolls = result.individual_rolls.clone();
 
-    // Calculate total
-    let dice_total = base_total + wild_total;
-
-    // Apply pips modifier if any
-    let pips_modifier = if !pips_str.is_empty() {
-        pips_str.parse::<i32>().unwrap_or(0)
-    } else {
-        0
-    };
-
-    result.total = dice_total + pips_modifier;
-
-    // Apply other mathematical modifiers
-    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
+    // Pips (`d6s5+2`) arrive as ordinary Add/Subtract modifiers
+    result.total = base_total + wild_total;
+    apply_modifier_expression(&mut result, &dice.modifiers, STANDARD_MATH_RULES, rng)?;
 
     // Add notes
     if wild_explosions > 0 {
         result
             .notes
             .push(format!("Wild die exploded {wild_explosions} times"));
-    }
-
-    if pips_modifier != 0 {
-        if pips_modifier > 0 {
-            result
-                .notes
-                .push(format!("Pips modifier: +{pips_modifier}"));
-        } else {
-            result.notes.push(format!("Pips modifier: {pips_modifier}"));
-        }
     }
 
     result
@@ -2060,6 +2000,80 @@ fn push_marvel_reroll_note(result: &mut RollResult, kind: &str, count: i32, deta
     }
 }
 
+/// Position of the Marvel die among the three d616 dice.
+const MARVEL_DIE: usize = 1;
+
+#[derive(Clone, Copy, PartialEq)]
+enum MarvelReroll {
+    /// Reroll the lowest die (the first, on a tie) and keep the better result
+    Edge,
+    /// Reroll the best die (the M, else the last highest) and keep the worse
+    Trouble,
+}
+
+/// "An M is always considered to be the best die number": an M outranks a
+/// plain 6 when choosing and comparing dice, while still totalling 6.
+fn marvel_rank(value: i32, logo: bool) -> i32 {
+    value * 2 + i32::from(logo)
+}
+
+fn marvel_face(value: i32, logo: bool) -> String {
+    if logo {
+        "M".to_string()
+    } else {
+        value.to_string()
+    }
+}
+
+/// Apply one edge or trouble to `dice` and describe it for the notes. Each
+/// reroll sees the dice as they stand, so stacked troubles take the M first and
+/// then the best die left ("2 M 5 ... reroll the M ... For their second
+/// trouble, they have to reroll the 5").
+fn marvel_reroll(
+    dice: &mut [i32; 3],
+    marvel_logo: &mut bool,
+    kind: MarvelReroll,
+    rng: &mut impl Rng,
+) -> String {
+    let rank_at = |dice: &[i32; 3], i: usize| marvel_rank(dice[i], i == MARVEL_DIE && *marvel_logo);
+    let index = (1..dice.len()).fold(0, |chosen, i| {
+        let (candidate, current) = (rank_at(dice, i), rank_at(dice, chosen));
+        let take = match kind {
+            MarvelReroll::Edge => candidate < current,
+            MarvelReroll::Trouble => candidate >= current,
+        };
+        if take { i } else { chosen }
+    });
+    let old_logo = index == MARVEL_DIE && *marvel_logo;
+    let old_value = dice[index];
+
+    let raw = rng.random_range(1..=6);
+    let new_logo = index == MARVEL_DIE && raw == 1;
+    let new_value = if new_logo { 6 } else { raw };
+
+    let (old_rank, new_rank) = (
+        marvel_rank(old_value, old_logo),
+        marvel_rank(new_value, new_logo),
+    );
+    let replace = match kind {
+        MarvelReroll::Edge => new_rank > old_rank,
+        MarvelReroll::Trouble => new_rank < old_rank,
+    };
+    let (old_face, new_face) = (
+        marvel_face(old_value, old_logo),
+        marvel_face(new_value, new_logo),
+    );
+    if replace {
+        dice[index] = new_value;
+        if index == MARVEL_DIE {
+            *marvel_logo = new_logo;
+        }
+        format!("{old_face} → {new_face}")
+    } else {
+        format!("{old_face} → {new_face} (kept {old_face})")
+    }
+}
+
 fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
     let mut result = RollResult::from_dice(&dice);
 
@@ -2098,27 +2112,31 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
         })
         .collect();
 
-    let base_group = DiceGroup {
-        _description: "3d6 Marvel Multiverse".to_string(),
-        rolls: initial_display_rolls,
-        dropped_rolls: Vec::new(),
-        modifier_type: "base".to_string(),
-    };
-    result.dice_groups.push(base_group);
+    push_dice_group(
+        &mut result,
+        "3d6 Marvel Multiverse".to_string(),
+        initial_display_rolls,
+        "base",
+    );
 
     // Store individual rolls for processing
     result.individual_rolls = initial_rolls.clone();
 
-    // Handle Fantastic result (Marvel die showing 1)
-    if is_marvel_fantastic {
-        marvel_die = 6; // Marvel die becomes 6 when Fantastic
-        result
-            .notes
-            .push("Fantastic! Marvel die rolled Marvel symbol, counts as 6".to_string());
+    // The Marvel die is final_rolls[MARVEL_DIE]. Its logo counts as 6 and makes
+    // the roll Fantastic ("Count the Marvel die as a 6 instead of a 1"), on a
+    // reroll too: the rulebook's edge example rerolls the Marvel die "in the
+    // hopes of getting a 6 or an M". A trouble that rerolls the M lower replaces
+    // it ("They roll 6 M 5 ... reroll the M ... now 6 2 5"), so the M shown and
+    // the Fantastic note follow the final die, not the first roll.
+    let mut marvel_logo = is_marvel_fantastic;
+    if marvel_logo {
+        marvel_die = 6;
     }
-
-    // Process edges and troubles with consolidated notes
     let mut final_rolls = [regular_die_1, marvel_die, regular_die_2];
+
+    // "if the action check comes up 6 M 6, that's an ultimate Fantastic
+    // success, and it automatically succeeds. Ignore any trouble at that point."
+    let ultimate_fantastic = marvel_logo && regular_die_1 == 6 && regular_die_2 == 6;
 
     // Add edge/trouble count notes that tests expect - but only if there are edges/troubles
     if edges > 0 {
@@ -2136,60 +2154,46 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
         ));
     }
 
-    // Process edges with consolidated reporting
     if edges > 0 {
-        let mut edge_details = Vec::new();
-
-        for _ in 0..edges {
-            // Find lowest die value and its index
-            let (min_value, min_index) = final_rolls
-                .iter()
-                .enumerate()
-                .min_by_key(|&(_, value)| value)
-                .map(|(index, &value)| (value, index))
-                .unwrap();
-
-            // Reroll the lowest die
-            let new_roll = rng.random_range(1..=6);
-
-            // Keep the higher of the two
-            if new_roll > min_value {
-                final_rolls[min_index] = new_roll;
-                edge_details.push(format!("{min_value} → {new_roll}"));
-            } else {
-                edge_details.push(format!("{min_value} → {new_roll} (kept {min_value})"));
-            }
-        }
-
+        let edge_details: Vec<String> = (0..edges)
+            .map(|_| marvel_reroll(&mut final_rolls, &mut marvel_logo, MarvelReroll::Edge, rng))
+            .collect();
         push_marvel_reroll_note(&mut result, "Edge", edges, &edge_details);
     }
 
-    // Process troubles with consolidated reporting
-    if troubles > 0 {
-        let mut trouble_details = Vec::new();
-
-        for _ in 0..troubles {
-            // Find highest die value and its index
-            let (max_value, max_index) = final_rolls
-                .iter()
-                .enumerate()
-                .max_by_key(|&(_, value)| value)
-                .map(|(index, &value)| (value, index))
-                .unwrap();
-
-            // Reroll the highest die
-            let new_roll = rng.random_range(1..=6);
-
-            // Keep the lower of the two
-            if new_roll < max_value {
-                final_rolls[max_index] = new_roll;
-                trouble_details.push(format!("{max_value} → {new_roll}"));
-            } else {
-                trouble_details.push(format!("{max_value} → {new_roll} (kept {max_value})"));
-            }
-        }
-
+    if troubles > 0 && !ultimate_fantastic {
+        let trouble_details: Vec<String> = (0..troubles)
+            .map(|_| {
+                marvel_reroll(
+                    &mut final_rolls,
+                    &mut marvel_logo,
+                    MarvelReroll::Trouble,
+                    rng,
+                )
+            })
+            .collect();
         push_marvel_reroll_note(&mut result, "Trouble", troubles, &trouble_details);
+    }
+
+    // Checked again on the final dice: an edge can turn `6 M 3` into 6 M 6.
+    // Troubles only ever lower dice, and edges and troubles cancel before
+    // rolling, so whether troubles were skipped still rests on the first roll.
+    let final_ultimate = marvel_logo && final_rolls[0] == 6 && final_rolls[2] == 6;
+    if final_ultimate {
+        let ignored = if troubles > 0 {
+            "; trouble ignored"
+        } else {
+            ""
+        };
+        result.notes.insert(
+            0,
+            format!("Ultimate Fantastic! 6 M 6 automatically succeeds{ignored}"),
+        );
+    } else if marvel_logo {
+        result.notes.insert(
+            0,
+            "Fantastic! Marvel die rolled Marvel symbol, counts as 6".to_string(),
+        );
     }
 
     // Create result dice group with proper Marvel symbol display
@@ -2197,7 +2201,7 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
         .iter()
         .enumerate()
         .map(|(i, &roll)| {
-            if i == 1 && is_marvel_fantastic {
+            if i == MARVEL_DIE && marvel_logo {
                 -1 // Use -1 to represent Marvel symbol for display
             } else {
                 roll
@@ -2205,18 +2209,20 @@ fn handle_marvel_multiverse_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<R
         })
         .collect();
 
-    let result_group = DiceGroup {
-        _description: "3d6 Marvel Multiverse result".to_string(),
-        rolls: final_display_rolls,
-        dropped_rolls: Vec::new(),
-        modifier_type: "result".to_string(),
-    };
-    result.dice_groups.push(result_group);
+    push_dice_group(
+        &mut result,
+        "3d6 Marvel Multiverse result".to_string(),
+        final_display_rolls,
+        "result",
+    );
 
     // Calculate total
     result.total = final_rolls.iter().sum::<i32>();
 
-    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
+    // The shared expression path, not apply_arithmetic_modifiers: that one
+    // knows only numbers, so `mm + 1d6` never rolled the d6. Both evaluate
+    // left to right, so number-only Marvel rolls are unchanged.
+    apply_modifier_expression(&mut result, &dice.modifiers, STANDARD_MATH_RULES, rng)?;
 
     Ok(result)
 }
@@ -2286,7 +2292,10 @@ fn apply_essence20_skill_dice(
         }
     }
 
-    result.total += rolled[kept].total;
+    result.total = result
+        .total
+        .checked_add(rolled[kept].total)
+        .ok_or_else(result_too_large)?;
 
     let discarded: Vec<i32> = rolled
         .iter()
@@ -2398,27 +2407,22 @@ fn finalize_d10_explosion(
     explosion_notes: Vec<String>,
 ) {
     if !additional_rolls.is_empty() {
-        let base_group = DiceGroup {
-            _description: "1d10".to_string(),
-            rolls: vec![original_roll],
-            dropped_rolls: Vec::new(),
-            modifier_type: "base".to_string(),
-        };
-
         let exploded_up = original_roll == 10;
-        let explosion_group = DiceGroup {
-            _description: if exploded_up {
-                "Critical Success"
-            } else {
-                "Critical Failure"
-            }
-            .to_string(),
-            rolls: additional_rolls.to_vec(),
-            dropped_rolls: Vec::new(),
-            modifier_type: if exploded_up { "add" } else { "subtract" }.to_string(),
+        let (tail, tail_type) = if exploded_up {
+            ("Critical Success", "add")
+        } else {
+            ("Critical Failure", "subtract")
         };
 
-        result.dice_groups = vec![base_group, explosion_group];
+        // These two groups replace whatever the roll had shown
+        result.dice_groups.clear();
+        push_dice_group(result, "1d10".to_string(), vec![original_roll], "base");
+        push_dice_group(
+            result,
+            tail.to_string(),
+            additional_rolls.to_vec(),
+            tail_type,
+        );
 
         // Show the exploded dice alongside the original
         result.individual_rolls.extend(additional_rolls.iter());
@@ -2599,41 +2603,43 @@ fn apply_cypher_system_mechanics(result: &mut RollResult, level: u32) -> Result<
         return Err(anyhow!("No dice rolled for Cypher System"));
     }
 
-    let roll = result.individual_rolls[0];
+    // Cypher System Reference Document: a bonus counts toward the target ("If
+    // a character adds 1 to a d20 roll for some reason, it changes a target
+    // number of 15 to 14"), so success compares the total. Special rolls read
+    // the die itself. It judged the bare die, so `cs 3 + 2` showed a total of
+    // 10 and FAILURE against 9.
+    let natural = result.individual_rolls[0];
     let target_number = level * 3;
-    let success = roll >= target_number as i32;
+    let total = result.total;
+    let success = total >= target_number as i32;
 
     // Clear any existing success/failure counts - Cypher is binary success/fail
     result.successes = None;
     result.failures = None;
     result.botches = None;
 
-    // Add success/failure note
-    if success {
-        result.notes.push(format!(
-            "**SUCCESS** (rolled {roll} vs target {target_number})"
-        ));
-    } else {
-        result.notes.push(format!(
-            "**FAILURE** (rolled {roll} vs target {target_number})"
-        ));
-    }
+    let verdict = if success { "SUCCESS" } else { "FAILURE" };
+    result.notes.push(format!(
+        "**{verdict}** (rolled {total} vs target {target_number})"
+    ));
 
-    // Add special result notes
-    match roll {
-        1 => {
-            result
-                .notes
-                .push("**GM INTRUSION** (Natural 1)".to_string());
-        }
-        17..=19 => {
-            result.notes.push("**MINOR EFFECT** (17-19)".to_string());
-        }
-        20 => {
-            result
-                .notes
-                .push("**MAJOR EFFECT** (Natural 20)".to_string());
-        }
+    // A natural 19 or 20 is a minor or major effect only "and the roll is a
+    // success"; a natural 17 or 18 adds 1 or 2 damage in combat, with "no
+    // special effect options". They were all labelled minor effects.
+    match natural {
+        1 => result
+            .notes
+            .push("**GM INTRUSION** (Natural 1)".to_string()),
+        17 | 18 => result.notes.push(format!(
+            "Natural {natural}: +{} damage if this is an attack",
+            natural - 16
+        )),
+        19 if success => result
+            .notes
+            .push("**MINOR EFFECT** (Natural 19)".to_string()),
+        20 if success => result
+            .notes
+            .push("**MAJOR EFFECT** (Natural 20)".to_string()),
         _ => {}
     }
 
@@ -2692,12 +2698,12 @@ pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result
     result.total = highest_result;
 
     // Create dice group for display
-    result.dice_groups.push(DiceGroup {
-        _description: format!("{pool_size}d6 bnw"),
-        rolls: all_results,
-        dropped_rolls: Vec::new(),
-        modifier_type: "base".to_string(),
-    });
+    push_dice_group(
+        &mut result,
+        format!("{pool_size}d6 bnw"),
+        all_results,
+        "base",
+    );
 
     // Add notes about the system and special results
     if is_disaster {
@@ -2720,7 +2726,7 @@ pub fn handle_brave_new_world_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result
     ));
 
     // Apply any mathematical modifiers after the core BNW mechanics
-    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
+    apply_modifier_expression(&mut result, &dice.modifiers, STANDARD_MATH_RULES, rng)?;
 
     Ok(result)
 }
@@ -2758,12 +2764,8 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
     }
 
     // Create dice group for skill dice
-    result.dice_groups.push(DiceGroup {
-        _description: format!("{dice_count}d20"),
-        rolls: result.individual_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "base".to_string(),
-    });
+    let rolls = result.individual_rolls.clone();
+    push_dice_group(&mut result, format!("{dice_count}d20"), rolls, "base");
 
     // 2. Process AddDice modifiers (this is where the 5d6 comes from)
     let mut combat_dice_total = 0;
@@ -2793,15 +2795,18 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
                     .extend(additional_result.kept_rolls.clone());
 
                 // Create dice group for combat dice
-                result.dice_groups.push(DiceGroup {
-                    _description: format!("{}d6", additional_dice.count),
-                    rolls: additional_result.individual_rolls.clone(),
-                    dropped_rolls: Vec::new(),
-                    modifier_type: "add".to_string(),
-                });
+                push_dice_group(
+                    &mut result,
+                    format!("{}d6", additional_dice.count),
+                    additional_result.individual_rolls.clone(),
+                    "add",
+                );
             } else {
                 // Regular additional dice (not combat)
-                result.total += additional_result.total;
+                result.total = result
+                    .total
+                    .checked_add(additional_result.total)
+                    .ok_or_else(result_too_large)?;
                 result
                     .individual_rolls
                     .extend(additional_result.individual_rolls.clone());
@@ -2809,12 +2814,12 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
                     .kept_rolls
                     .extend(additional_result.kept_rolls.clone());
 
-                result.dice_groups.push(DiceGroup {
-                    _description: format!("{}d{}", additional_dice.count, additional_dice.sides),
-                    rolls: additional_result.individual_rolls.clone(),
-                    dropped_rolls: Vec::new(),
-                    modifier_type: "add".to_string(),
-                });
+                push_dice_group(
+                    &mut result,
+                    format!("{}d{}", additional_dice.count, additional_dice.sides),
+                    additional_result.individual_rolls.clone(),
+                    "add",
+                );
             }
         }
     }
@@ -2824,7 +2829,11 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
     // number that is neither. On an attack the damage *is* the total, so the
     // d20 faces come back out of it — they were only ever a success count.
     if has_combat_dice {
-        result.total = result.total - skill_dice_total + combat_dice_total;
+        result.total = result
+            .total
+            .checked_sub(skill_dice_total)
+            .and_then(|total| total.checked_add(combat_dice_total))
+            .ok_or_else(result_too_large)?;
     }
 
     // Without a Target Number this is the rulebook's basic skill test — "To make
@@ -2928,12 +2937,8 @@ fn handle_conan_combat_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRe
     result.kept_rolls = result.individual_rolls.clone();
 
     // Create dice group for display
-    result.dice_groups.push(DiceGroup {
-        _description: format!("{dice_count}d6"),
-        rolls: result.individual_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "base".to_string(),
-    });
+    let rolls = result.individual_rolls.clone();
+    push_dice_group(&mut result, format!("{dice_count}d6"), rolls, "base");
 
     // Apply mathematical modifiers to the final total
     apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
@@ -2982,12 +2987,13 @@ fn handle_silhouette_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
     result.total = silhouette_result;
 
     // Create dice group for display
-    result.dice_groups.push(DiceGroup {
-        _description: format!("{dice_count}d6 Silhouette"),
-        rolls: result.individual_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "base".to_string(),
-    });
+    let rolls = result.individual_rolls.clone();
+    push_dice_group(
+        &mut result,
+        format!("{dice_count}d6 Silhouette"),
+        rolls,
+        "base",
+    );
 
     // Add explanatory notes
     if extra_sixes > 0 {
@@ -2997,7 +3003,7 @@ fn handle_silhouette_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
     }
 
     // Apply mathematical modifiers to final result
-    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
+    apply_modifier_expression(&mut result, &dice.modifiers, STANDARD_MATH_RULES, rng)?;
 
     Ok(result)
 }
@@ -3048,7 +3054,9 @@ fn apply_pre_target_mathematical_modifiers(
     modifiers: &[Modifier],
 ) -> Result<()> {
     // Apply each mathematical modifier to individual dice, including the
-    // dice groups used for display
+    // dice groups used for display. Dropped dice get it too, though they are
+    // never counted: the display lists every die and then strikes the dropped
+    // ones, and `4d6 k2 + 1 t5` struck them unmodified, so they matched nothing.
     for modifier in modifiers {
         let Some(op) = ArithmeticOp::from_modifier(modifier)? else {
             continue;
@@ -3061,6 +3069,7 @@ fn apply_pre_target_mathematical_modifiers(
             .kept_rolls
             .iter_mut()
             .chain(result.individual_rolls.iter_mut())
+            .chain(result.dropped_rolls.iter_mut())
             .chain(group_rolls)
         {
             op.apply(die_value)?;
@@ -3265,21 +3274,21 @@ fn handle_vtm5_roll(
 
     // Create dice groups for display
     if !regular_rolls.is_empty() {
-        result.dice_groups.push(DiceGroup {
-            _description: format!("{regular_dice}d10 Regular"),
-            rolls: regular_rolls.clone(),
-            dropped_rolls: Vec::new(),
-            modifier_type: "regular".to_string(),
-        });
+        push_dice_group(
+            &mut result,
+            format!("{regular_dice}d10 Regular"),
+            regular_rolls.clone(),
+            "regular",
+        );
     }
 
     if !hunger_rolls.is_empty() {
-        result.dice_groups.push(DiceGroup {
-            _description: format!("{hunger_dice}d10 Hunger"),
-            rolls: hunger_rolls.clone(),
-            dropped_rolls: Vec::new(),
-            modifier_type: "hunger".to_string(),
-        });
+        push_dice_group(
+            &mut result,
+            format!("{hunger_dice}d10 Hunger"),
+            hunger_rolls.clone(),
+            "hunger",
+        );
     }
 
     // Calculate basic successes (6+)
@@ -3462,8 +3471,9 @@ fn apply_alien_stress_modifier(
         result
             .notes
             .push("⚠️  **Cannot push this roll** (rolled 1s on stress dice)".to_string());
-    } else {
-        // Add push availability note
+    } else if stress_level < ALIEN_MAX_STRESS {
+        // At the cap a push is refused (aliases::alien_push_refusal), so the
+        // note offered a push that would then fail
         result
             .notes
             .push("🔄 **Push available**: Add 'p' to alias to push (e.g., alien4s2p)".to_string());
@@ -3499,12 +3509,10 @@ fn interpret_panic_roll(panic_total: i32) -> String {
 /// - Take the highest die from the pool
 /// - Classify result: 1-3=failure, 4-5=partial success, 6=success, multiple 6s=critical
 fn apply_forged_dark_mechanics(result: &mut RollResult) -> Result<()> {
-    if result.kept_rolls.is_empty() {
-        return Err(anyhow!("No dice to apply FitD mechanics to"));
-    }
-
     // Find the highest die
-    let highest_die = *result.kept_rolls.iter().max().unwrap();
+    let Some(&highest_die) = result.kept_rolls.iter().max() else {
+        return Err(anyhow!("No dice to apply FitD mechanics to"));
+    };
 
     // Count how many 6s we have for critical success detection
     let six_count = result.kept_rolls.iter().filter(|&&die| die == 6).count();
@@ -3546,7 +3554,9 @@ fn apply_forged_dark_zero_mechanics(result: &mut RollResult) -> Result<()> {
     }
 
     // Find the lowest die (opposite of standard FitD)
-    let lowest_die = *result.kept_rolls.iter().min().unwrap();
+    let Some(&lowest_die) = result.kept_rolls.iter().min() else {
+        return Err(anyhow!("FitD zero dice requires exactly 2 dice"));
+    };
 
     // Classify the result based on lowest die
     let (outcome, fitd_result) = match lowest_die {
@@ -3725,7 +3735,10 @@ fn apply_plot_die_conversion(result: &mut RollResult) -> Result<()> {
 
     let original_dice_total: i32 = result.kept_rolls.iter().sum();
     let plot_adjustment = plot_total - original_dice_total;
-    result.total += plot_adjustment;
+    result.total = result
+        .total
+        .checked_add(plot_adjustment)
+        .ok_or_else(result_too_large)?;
 
     Ok(())
 }
@@ -3759,7 +3772,10 @@ fn apply_darkest_house_die(
     let house_die = rng.random_range(1..=6);
 
     if called_upon {
-        result.total += house_die;
+        result.total = result
+            .total
+            .checked_add(house_die)
+            .ok_or_else(result_too_large)?;
         result.notes.push(format!(
             "House Die: [{house_die}] added to the roll - 🏚️ The House acts, and you gain 1 Doom"
         ));
@@ -3802,22 +3818,23 @@ pub fn handle_mutants_masterminds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Re
     }
 
     // Create dice group for display
-    result.dice_groups.push(DiceGroup {
-        _description: format!("{}d{}", dice.count, dice.sides),
-        rolls: result.individual_rolls.clone(),
-        dropped_rolls: Vec::new(),
-        modifier_type: "base".to_string(),
-    });
+    let rolls = result.individual_rolls.clone();
+    push_dice_group(
+        &mut result,
+        format!("{}d{}", dice.count, dice.sides),
+        rolls,
+        "base",
+    );
 
     // Calculate base total
     result.total = result.kept_rolls.iter().sum();
 
     // Apply mathematical modifiers (add, subtract, multiply, divide)
-    apply_arithmetic_modifiers(&dice.modifiers, &mut result.total)?;
+    apply_modifier_expression(&mut result, &dice.modifiers, STANDARD_MATH_RULES, rng)?;
 
     // Calculate degrees of success/failure against DC 10
     let dc = 10;
-    let total_vs_dc = result.total - dc;
+    let total_vs_dc = result.total.checked_sub(dc).ok_or_else(result_too_large)?;
 
     if total_vs_dc >= 0 {
         // Success: every 5 points above DC is one degree of success
@@ -3839,7 +3856,9 @@ pub fn handle_mutants_masterminds_roll(dice: DiceRoll, rng: &mut impl Rng) -> Re
         // Failure: the printed table anchors its failure bands at DC-5, not DC-1,
         // so missing by 1-5 is one degree, 6-10 is two, 11-15 is three. Both
         // sides use 5-wide bands; only the offset differs from the success case.
-        let degrees = ((-total_vs_dc - 1) / 5) + 1;
+        // `-(x + 1)`, not `-x - 1`: the same number, but it cannot overflow
+        // when `total_vs_dc` is i32::MIN.
+        let degrees = (-(total_vs_dc + 1) / 5) + 1;
         result.failures = Some(degrees);
 
         if degrees == 1 {
@@ -4096,8 +4115,13 @@ pub fn broken_empires_test_outcome(
     } else {
         0
     };
+    // Saturating, like the clamp on skill_bonus above: stacked `+ 2147483647`
+    // terms overflowed this sum (a panic in debug, a wrapped SL in release).
     let rolled = if success {
-        (roll / 10).max(1) + skill_bonus + if critical { 3 } else { 0 }
+        (roll / 10)
+            .max(1)
+            .saturating_add(skill_bonus)
+            .saturating_add(if critical { 3 } else { 0 })
     } else {
         0
     };
@@ -4164,6 +4188,19 @@ fn handle_broken_empires_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<Roll
     })
 }
 
+/// Whether a Mothership d% roll succeeds against `target`. Rolled as 1-100,
+/// with 100 standing for 00. Player's Survival Guide §4.1: "A roll of 00 is
+/// always a Critical Hit and a roll of 99 is always a Critical Failure"; both
+/// are doubles. Compared as plain numbers, 00 (100) failed every target and 99
+/// succeeded on a target of 99.
+fn mothership_success(roll: i32, target: u32) -> bool {
+    match roll {
+        100 => true,
+        99 => false,
+        _ => i64::from(roll) <= i64::from(target),
+    }
+}
+
 fn handle_mothership_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
     // Extract Mothership modifier
     let (stat_target, is_advantage_or_disadvantage) = dice
@@ -4181,9 +4218,11 @@ fn handle_mothership_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
     // Determine actual stat value (default to 50 if not specified)
     let stat = stat_target.unwrap_or(50);
 
-    // Validate stat range
-    if !(1..=99).contains(&stat) {
-        return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
+    // Validate stat range (the parser checks it too)
+    if !(1..=MOTHERSHIP_MAX_TARGET).contains(&stat) {
+        return Err(anyhow!(
+            "Mothership target must be 1-{MOTHERSHIP_MAX_TARGET}, got {stat}"
+        ));
     }
 
     // Roll the dice (either 1d100 or 2d100)
@@ -4218,7 +4257,7 @@ fn handle_mothership_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
 
     let categorize_roll = |roll: i32| -> RollCategory {
         let is_double = is_double_digit(roll);
-        let is_success = roll <= stat as i32;
+        let is_success = mothership_success(roll, stat);
 
         match (is_success, is_double) {
             (true, true) => RollCategory::CritSuccess,
@@ -4262,17 +4301,21 @@ fn handle_mothership_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
 
     // Build result
     let selected_category = categorize_roll(selected_roll);
-    let is_success = selected_roll <= stat as i32;
-    let _is_crit = is_double_digit(selected_roll);
+    let is_success = mothership_success(selected_roll, stat);
+
+    // The formatter prints individual + dropped dice, so the unchosen die goes
+    // in dropped only, as on every other advantage roll; listed in both, `+ms45`
+    // printed three dice. Chosen by position, not value, so a tie still drops one.
+    let selected_index = rolls.iter().position(|&r| r == selected_roll).unwrap_or(0);
+    let (kept, dropped): (Vec<_>, Vec<_>) = rolls
+        .iter()
+        .enumerate()
+        .partition(|(index, _)| *index == selected_index);
 
     let mut result = RollResult {
-        individual_rolls: rolls.clone(),
+        individual_rolls: kept.into_iter().map(|(_, &r)| r).collect(),
         kept_rolls: vec![selected_roll],
-        dropped_rolls: rolls
-            .iter()
-            .filter(|&&r| r != selected_roll)
-            .copied()
-            .collect(),
+        dropped_rolls: dropped.into_iter().map(|(_, &r)| r).collect(),
         total: selected_roll,
         successes: if is_success { Some(1) } else { None },
         failures: if !is_success { Some(1) } else { None },
@@ -4312,6 +4355,8 @@ fn handle_mothership_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
         let cat2 = categorize_roll(rolls[1]);
 
         if cat1 != cat2 {
+            // Two different dice, so the other one is the sum minus the chosen
+            let other_roll = rolls[0] + rolls[1] - selected_roll;
             let cat_name = |cat: &RollCategory| match cat {
                 RollCategory::CritSuccess => "crit success",
                 RollCategory::Success => "success",
@@ -4323,10 +4368,8 @@ fn handle_mothership_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResu
                 selected_roll,
                 selected_roll,
                 cat_name(&categorize_roll(selected_roll)),
-                rolls.iter().find(|&&r| r != selected_roll).unwrap(),
-                cat_name(&categorize_roll(
-                    *rolls.iter().find(|&&r| r != selected_roll).unwrap()
-                ))
+                other_roll,
+                cat_name(&categorize_roll(other_roll))
             ));
         }
     }

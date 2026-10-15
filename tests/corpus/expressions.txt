@@ -2433,3 +2433,208 @@ yz
 4 + 4d1 + 1 t2ds2
 4d1 + 1 f1
 4d1 + 1 b1
+1d1 + 1d4000000000
+1d1 - 1d4000000000
+1d1 * 1d4000000000
+1d1 / 1d4000000000
+1d1 + 1d4000000000e4
+1d1 + 1d1000
+1d1 + 1d1001
+1d1 + 500d1
+1d1 + 501d1
+1d1 + 0d1
+1d1 + 1d0
+1d1 + 99999999999d1
+1d1 + 1d99999999999
+99999999999d6
+1d99999999999
+3d1 10d1
+3d1 501d1
+3d1 10d1001
+d6s0
+d6s500
+d6s501
+1d1 d6s500
+1d1 d6s501
+3d6 mme
+3d6 mmt
+3d6 mme0
+3d6 mme1
+3d6 mme500
+3d6 mme501
+3d6 mmt500
+3d6 mmt501
+3d6 mme99999999999
+3d6 mmt99999999999
+3d6 mmex
+mm 500e
+mm 501e
+mm 500t
+mm 501t
+mm 0e
+mm 99999999999e
+mm 99999999999t
+mm 501e 501t
+mm 501e 1t
+mm 500e 500t
+mm 2147483647e 2147483647e
+d6s5+2
+d6s5 + 2
+d6s5-1
+1d1 d6s5+2
+mm 501e 500t
+mm 600e 300t
+mm 300e 800t
+mm 1000e 499t
+mm 99999999999e 99999999999t
+mm 2147483647e 1e
+1d1 + 2147483646 ess3
+1d1*2147483647 esss5
+1d1 - 2147483647 mnm
+1d1 - 2147483639 mnm
+1d1 - 2147483638 mnm
+4d1 fudge - 2147483647
+alien3s4294967295p
+alien3s9p
+2d1 t1 + 1d1
+2d1 t1 - 1d1
+2d1 t1 * 1d1
+2d1 t1 / 1d1
+2d1 - 1d1 t1
+2d1 * 1d1 t1
+2d1 tl1 - 1d1
+2d1 t1ds1 * 1d1
+2d1 tl1ds1 / 1d1
+4d1 f1 - 1d1
+4d1 b1 * 1d1
+4d1 f1 + 1d1
+2d1 tn12 - 1d1
+2d1 t1 - 1
+2d1 t1 + 1d1 - 1
+8d6l
+10d10 t7 ie10 + 5d6 e6 - 2
+6d10 t7 f1 b1 ie10 + 5d6 e6 - 2
+3d1 gb
+3d1 gb + 1d1
+3d1 gb - 1d1
+3d1 gb * 1d1
+3d1 gb / 1d1
+3d1 gb + 1
+3d1 gb - 1
+3d1 gb * 2
+3d1 gb / 2
+3d1 gbs * 1d1
+3d1 gbs / 1d1
+3d8 gb * 1d2
+4d1 k2 + 1 t2
+4d1 kl2 + 1 t2
+4d1 km2 + 1 t2
+4d1 d1 + 1 t2
+4d1 adv1 + 1 t2
+4d1 dis1 + 1 t2
+4d1 k2 * 3 t2
+4d1 k2 + 1 tl2
+4d1 k2 + 1 t2ds2
+4d1 k2 + 1 t2 f2
+4d1 k2 + 1 t2 b2
+4d6 k2 + 1 t5
+mm + 1d6
+mm 2e - 1d4
+mm 3t * 1d2
+mm / 1d2
+mm + 5 * 2
+mm 2e + 1d6 * 2
+3d6 mme2 + 1d6
+3d6 mm mme2
+3d6 mme2 mm
+3d6 mme2 mmt1
+3d6 mme5 mme5
+dh 4d10 + 2
+dh 2d10 - 1
+dh 2d10+1
+dh 3d10 * 2
+dh 2d10 + 1d6
+wng 4d6 + 1
+wng dn3 5d6 - 1
+wng 4d6 + 2 !soak
+wng 4d6 ! SOAK hits
+wng 4d6 !hi
+wng 4d6 ! hi there
+wng w2 4d6 !exempt
+4d6 wngw1t
+4d6 wngw0t
+4d6 wngw0
+4d6 wngw1x
+4d6 wngdnt
+4d1 wngt
+4d1 wngt + 2
+4d1 wngw0t + 2
+4d1 wngw2dn5t - 1
+sw8 + 1d6
+sw8 - 1d4
+sw8 * 1d2
+d6s4 + 1d6
+d6s4 / 1d2
+bnw3 + 1d6
+bnw3 - 1d4
+sil3 + 1d6
+sil3 * 1d2
+mnm + 1d4
+mnm - 1d4
+1d1 d6s0 + 1d1
+dndstats ! new character
+p dndstats
+s dndstats
+(Stats) dndstats
+3 dndstats
+p (Stats) dndstats ! hi
+3hsk1
+a5e 5 ex1
++a5e 5 ex1
+-a5e 3 ex2
+a5e5ex1
+a5e -2 ex1
+cs 3 + 2
+cs 3 - 2
+cs 7
+wfrp100 + 9223372036854775807
+wfrp50 - 9223372036854775807
+tdh9223372036854775807 +1
+tdh0 -9223372036854775808
+ms45 + 10
+ms45 - 10
++ms45 + 10
+-ms45 + 15
+ms95 + 20
+ms1
+ms99
+ms45 + 10 + 5
+ms + 10
++ms + 3
+alien4s10p
+alien4s9p
+ms20 - 30
+ms45 - 44
+ms45 - 45
+ms200
+ms201
+ms45 + 155
+ms45 + 156
+3 dndstats ! hi
+3 (Stats) dndstats
+alien4s10
+fitd0 + 1
+ww4 + 1
+ww4c1 + 1
+2lf4 + 1
+alien4s2 + 2
+alien4 + 1d6
+alien4s2 + 2d6
+fitd2 + 1d6
+wng 4d6 + 1d6
+ww4 + 1d6
+wng 4d6 k3
+4d6 ww + 1d6 ww
+Ms20 - 30
+3 ms20 - 30
+ms45 + 99999999999999999999

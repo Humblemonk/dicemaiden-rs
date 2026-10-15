@@ -18,9 +18,9 @@
 //! | `df`             | Fate / Fudge dice                    |
 //! | `dh`             | Dark Heresy                          |
 //! | `sr`             | Shadowrun                            |
-//! | `sp`             | Splittermond                         |
+//! | `sp`             | Storypath                            |
 //! | `yz`             | Year Zero Engine (generic)           |
-//! | `snm`            | Stars Without Number                 |
+//! | `snm`            | Sunsails New Millennium              |
 //! | `d6s`            | D6 System                            |
 //! | `hs`             | Hero System                          |
 //! | `ex`             | Exalted                              |
@@ -45,8 +45,10 @@
 //! 3. Add a match arm in `expand_alias`.
 //! 4. Document the syntax in `roll_syntax.md`.
 
+use super::ALIEN_MAX_STRESS;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
 // Pre-compile all regex patterns at startup to reduce memory allocations
@@ -59,9 +61,15 @@ static GB_SIMPLE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(gbs?)(?:\s*([+-]\s*\d+))?$").expect("Failed to compile GB_SIMPLE_REGEX")
 });
 
+// `wng` and `dh` take trailing math (`+ 2`, `* 1d6`). Without it in the
+// pattern, `dh 4d10 + 2` fell back to bare `dh` (1d10) with the 4d10 as an
+// extra operand, rolling 5 dice with no explosion. `wng` matches only its mode
+// keywords after `!`: matching any word swallowed comments (`wng 4d6 !hi`).
 static WNG_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^wng(?:\s+w(\d+))?(?:\s+dn(\d+))?\s+(\d+)d(\d+)(?:\s*!\s*(\w+))?$")
-        .expect("Failed to compile WNG_REGEX")
+    Regex::new(
+        r"^wng(?:\s+w(\d+))?(?:\s+dn(\d+))?\s+(\d+)d(\d+)((?:\s*[-+*/]\s*(?:\d+d\d+|\d+))*)(?:\s*!\s*(soak|exempt|dmg))?$",
+    )
+    .expect("Failed to compile WNG_REGEX")
 });
 
 static SW_REGEX: Lazy<Regex> =
@@ -83,8 +91,10 @@ static WOD_CANCEL_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(\d+)wod(\d+)c(?:\s*([+-]\s*\d+))?$").expect("Failed to compile WOD_CANCEL_REGEX")
 });
 
-static DH_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^dh\s+(\d+)d(\d+)$").expect("Failed to compile DH_REGEX"));
+static DH_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^dh\s+(\d+)d(\d+)((?:\s*[-+*/]\s*(?:\d+d\d+|\d+))*)$")
+        .expect("Failed to compile DH_REGEX")
+});
 
 static DF_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)df$").expect("Failed to compile DF_REGEX"));
@@ -271,8 +281,12 @@ static WILD_WORLDS_CUT_REGEX: Lazy<Regex> =
 static MNM_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^mnm(?:\s*([+-]\s*\d+))?$").expect("Failed to compile MNM_REGEX"));
 
-static MS_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^([+-])?ms(\d+)?$").expect("Failed to compile MS_REGEX"));
+static MS_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^([+-])?ms(\d+)?((?:\s*[+-]\s*\d+)*)$").expect("Failed to compile MS_REGEX")
+});
+
+static MS_BONUS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"([+-])\s*(\d+)").expect("Failed to compile MS_BONUS_REGEX"));
 
 static DP_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)dp$").expect("Failed to compile DP_REGEX"));
@@ -296,45 +310,12 @@ static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| 
     let mut aliases = HashMap::new();
     aliases.insert("age", "2d6 + 1d6");
     aliases.insert("dndstats", "6 4d6 k3");
-    aliases.insert("attack", "1d20");
-    aliases.insert("skill", "1d20");
-    aliases.insert("save", "1d20");
-    aliases.insert("gb", "1d20 gb");
-    aliases.insert("gbs", "1d20 gbs");
     aliases.insert("hsn", "1d6 hsn");
     aliases.insert("hsk", "1d6 hsk");
     aliases.insert("hsh", "3d6 hsh");
-    aliases.insert("3df", "3d3 fudge");
-    aliases.insert("4df", "4d3 fudge");
-    aliases.insert("dh", "1d10 dh");
-    aliases.insert("wng", "1d6 wng");
     aliases.insert("conan", "2d20 conan");
     aliases.insert("cd", "1d6 cd");
     aliases.insert("sil", "1d6 sil1");
-    aliases.insert("fitd1", "1d6 fitd");
-    aliases.insert("fitd2", "2d6 fitd");
-    aliases.insert("fitd3", "3d6 fitd");
-    aliases.insert("fitd4", "4d6 fitd");
-    aliases.insert("fitd5", "5d6 fitd");
-    aliases.insert("fitd6", "6d6 fitd");
-    aliases.insert("fitd0", "2d6 fitd0"); // Zero dice - special case
-    aliases.insert("ww1", "1d6 ww");
-    aliases.insert("ww2", "2d6 ww");
-    aliases.insert("ww3", "3d6 ww");
-    aliases.insert("ww4", "4d6 ww");
-    aliases.insert("ww5", "5d6 ww");
-    aliases.insert("ww6", "6d6 ww");
-    aliases.insert("ww7", "7d6 ww");
-    aliases.insert("ww8", "8d6 ww");
-    aliases.insert("ww9", "9d6 ww");
-    aliases.insert("ww10", "10d6 ww");
-    aliases.insert("ww4c1", "4d6 wwc1");
-    aliases.insert("ww4c2", "4d6 wwc2");
-    aliases.insert("ww5c1", "5d6 wwc1");
-    aliases.insert("ww5c2", "5d6 wwc2");
-    aliases.insert("ww6c1", "6d6 wwc1");
-    aliases.insert("ww6c2", "6d6 wwc2");
-    aliases.insert("ww6c3", "6d6 wwc3");
     aliases.insert("dp", "1d6 plot");
     aliases
 });
@@ -533,22 +514,23 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         let difficulty = captures.get(2).map(|m| m.as_str());
         let count = &captures[3];
         let sides = &captures[4];
-        let special = captures.get(5).map(|m| m.as_str());
+        let math = trailing_math(captures.get(5));
+        let special = captures.get(6).map(|m| m.as_str());
 
-        return Some(match (difficulty, special) {
-            (Some(dn), Some("soak") | Some("exempt") | Some("dmg")) => {
-                format!("{count}d{sides} wngw{wrath_count}dn{dn}t")
-            }
-            (Some(dn), _) => {
-                format!("{count}d{sides} wngw{wrath_count}dn{dn}")
-            }
-            (None, Some("soak") | Some("exempt") | Some("dmg")) => {
-                format!("{count}d{sides} wngw{wrath_count}t")
-            }
-            (None, _) => {
-                format!("{count}d{sides} wngw{wrath_count}")
-            }
-        });
+        // Soak (Determination), damage and exempt rolls count Icons with no
+        // Wrath Die. Core Rulebook v2.1: Damage "Roll your ED dice pool and add
+        // the Icons in the result" (p.183); Determination "Count the total
+        // Icons" (p.196); the Wrath Die belongs to Skill and Attribute Tests
+        // (p.162). They used to total the dice, keeping a wrath die.
+        let wrath = match special {
+            Some("soak" | "exempt" | "dmg") => "0",
+            _ => wrath_count,
+        };
+        let mode = match difficulty {
+            Some(dn) => format!("wngw{wrath}dn{dn}"),
+            None => format!("wngw{wrath}"),
+        };
+        return Some(format!("{count}d{sides} {mode}{math}"));
     }
 
     // Simple wng pattern (wng 4d6)
@@ -563,13 +545,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     if let Some(captures) = COD_REGEX.captures(input) {
         let count = &captures[1];
         let variant = captures.get(2).map_or("", |m| m.as_str());
-        let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
-
-        let modifier_part = if modifier.is_empty() {
-            String::new()
-        } else {
-            format!(" {modifier}")
-        };
+        let modifier_part = trailing_math(captures.get(3));
 
         return Some(match variant {
             "8" => format!("{count}d10 t8 ie8{modifier_part}"), // 8-again
@@ -581,27 +557,28 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
 
     // World of Darkness with cancel (4wod8c -> 4d10 f1 t8 c)
     if let Some(captures) = WOD_CANCEL_REGEX.captures(input) {
-        return process_wod_regex_captures(
-            &captures,
-            "{count}d10 f1 t{difficulty} c",
-            "{count}d10 f1 t{difficulty} c {modifier}",
-        );
+        let (count, difficulty) = (&captures[1], &captures[2]);
+        return Some(format!(
+            "{count}d10 f1 t{difficulty} c{}",
+            trailing_math(captures.get(3))
+        ));
     }
 
     // World of Darkness (4wod8 -> 4d10 f1 ie10 t8)
     if let Some(captures) = WOD_REGEX.captures(input) {
-        return process_wod_regex_captures(
-            &captures,
-            "{count}d10 f1 t{difficulty}",
-            "{count}d10 f1 t{difficulty} {modifier}",
-        );
+        let (count, difficulty) = (&captures[1], &captures[2]);
+        return Some(format!(
+            "{count}d10 f1 t{difficulty}{}",
+            trailing_math(captures.get(3))
+        ));
     }
 
     // Dark Heresy (dh 4d10 -> 4d10 ie10)
     if let Some(captures) = DH_REGEX.captures(input) {
         let count = &captures[1];
         let sides = &captures[2];
-        return Some(format!("{count}d{sides} ie{sides} dh"));
+        let math = trailing_math(captures.get(3));
+        return Some(format!("{count}d{sides} ie{sides} dh{math}"));
     }
 
     // Fudge dice (3df -> 3d3 fudge)
@@ -642,12 +619,6 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some(format!("{count}d100"));
     }
 
-    // Shadowrun (sr6 -> 6d6 t5)
-    if let Some(captures) = SR_REGEX.captures(input) {
-        let count = &captures[1];
-        return Some(format!("{count}d6 t5"));
-    }
-
     // Storypath (sp4 -> 4d10 t8 ie10, sp4t7 -> 4d10 t7 ie10)
     if let Some(captures) = SP_REGEX.captures(input) {
         let count = &captures[1];
@@ -684,8 +655,11 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
 
         return Some(match (damage_type, fraction) {
             ("k", "1") => {
-                // Killing damage with +0.5 dice: 2hsk1 = 2d6 + 1d3
-                format!("{dice_count}d6 + 1d3 hsk")
+                // Killing damage with +0.5 dice: 2hsk1 = 2.5hsk. `hsk` goes on
+                // the main dice, as process_hero_system_dice places it;
+                // written after the 1d3 it was parsed as part of that operand,
+                // so BODY and STUN came from the half die alone.
+                format!("{dice_count}d6 hsk + 1d3")
             }
             ("n", _) => {
                 // Normal damage ignores fraction
@@ -800,34 +774,19 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
     }
 
     if let Some(captures) = CPR_REGEX.captures(input) {
-        let modifier = captures.get(1).map(|m| m.as_str().trim()).unwrap_or("");
-
-        if modifier.is_empty() {
-            return Some("1d10 cpr".to_string());
-        } else {
-            return Some(format!("1d10 cpr {modifier}"));
-        }
+        return Some(format!("1d10 cpr{}", trailing_math(captures.get(1))));
     }
 
     if let Some(captures) = CPD_REGEX.captures(input) {
-        let dice_count = captures.get(1).map(|m| m.as_str()).unwrap_or("");
-        let modifier = captures.get(2).map(|m| m.as_str().trim()).unwrap_or("");
-
-        if modifier.is_empty() {
-            return Some(format!("{dice_count}d6 cpd"));
-        } else {
-            return Some(format!("{dice_count}d6 cpd {modifier}"));
-        }
+        let dice_count = captures.get(1).map_or("", |m| m.as_str());
+        return Some(format!(
+            "{dice_count}d6 cpd{}",
+            trailing_math(captures.get(2))
+        ));
     }
 
     if let Some(captures) = WIT_REGEX.captures(input) {
-        let modifier = captures.get(1).map(|m| m.as_str().trim()).unwrap_or("");
-
-        if modifier.is_empty() {
-            return Some("1d10 wit".to_string());
-        } else {
-            return Some(format!("1d10 wit {modifier}"));
-        }
+        return Some(format!("1d10 wit{}", trailing_math(captures.get(1))));
     }
 
     if let Some(captures) = WFRP_REGEX.captures(input) {
@@ -841,11 +800,12 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
 
         let target = match (captures.get(2), captures.get(3)) {
             (Some(sign), Some(amount)) => {
+                // Checked: `wfrp100 + 9223372036854775807` overflowed here
                 let amount: i64 = amount.as_str().parse().ok()?;
                 if sign.as_str() == "+" {
-                    base_target + amount
+                    base_target.checked_add(amount)?
                 } else {
-                    base_target - amount
+                    base_target.checked_sub(amount)?
                 }
             }
             _ => base_target,
@@ -922,13 +882,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
 
     if let Some(captures) = CS_REGEX.captures(input) {
         let level = &captures[1];
-        let modifier = captures.get(2).map(|m| m.as_str().trim()).unwrap_or("");
-
-        if modifier.is_empty() {
-            return Some(format!("1d20 cs{level}"));
-        } else {
-            return Some(format!("1d20 cs{level} {modifier}"));
-        }
+        return Some(format!("1d20 cs{level}{}", trailing_math(captures.get(2))));
     }
 
     // Brave New World (bnw3 -> 3d6 bnw)
@@ -1236,6 +1190,15 @@ fn get_earthdawn_4e_step(step: u32) -> String {
     "1d6".to_string() // fallback
 }
 
+/// The math captured after an alias's dice (`+ 2`, `*1d6`), as ` + 2` to
+/// append to the expansion, or empty.
+fn trailing_math(captured: Option<regex::Match>) -> String {
+    match captured.map(|m| m.as_str().trim()) {
+        Some(math) if !math.is_empty() => format!(" {math}"),
+        _ => String::new(),
+    }
+}
+
 fn expand_marvel_multiverse_alias(input: &str) -> Option<String> {
     if input == "mm" {
         return Some("3d6 mm".to_string());
@@ -1243,60 +1206,40 @@ fn expand_marvel_multiverse_alias(input: &str) -> Option<String> {
 
     // IMPORTANT: Use the existing MM_REGEX first - it's stricter than our custom parsing
     if let Some(captures) = MM_REGEX.captures(input) {
-        let mut edges = 0i32;
-        let mut troubles = 0i32;
-
-        // Parse first modifier
-        if let Some(first_num) = captures.get(1) {
-            let num = if first_num.as_str().is_empty() {
-                1
-            } else {
-                first_num.as_str().parse().unwrap_or(1)
+        // Summed in i64 so two i32-sized counts cannot overflow. A count too big
+        // for i32 (the regex admits only digits, so a failed parse is an overflow)
+        // never cancels: it goes to the parser as written, which rejects it.
+        // Falling back to 1 made `mm 99999999999e` roll one edge.
+        let mut edges = 0i64;
+        let mut troubles = 0i64;
+        for (count_group, kind_group) in [(1, 2), (3, 4)] {
+            let (Some(count), Some(kind)) = (captures.get(count_group), captures.get(kind_group))
+            else {
+                continue;
             };
-            if let Some(first_type) = captures.get(2) {
-                match first_type.as_str() {
-                    "e" => edges += num,
-                    "t" => troubles += num,
-                    _ => {}
-                }
+            let count = match count.as_str() {
+                "" => 1,
+                digits => match digits.parse::<i32>() {
+                    Ok(count) => i64::from(count),
+                    Err(_) => return Some(format!("3d6 mm{}{digits}", kind.as_str())),
+                },
+            };
+            match kind.as_str() {
+                "e" => edges += count,
+                "t" => troubles += count,
+                _ => {}
             }
         }
 
-        // Parse second modifier
-        if let Some(second_num) = captures.get(3) {
-            let num = if second_num.as_str().is_empty() {
-                1
-            } else {
-                second_num.as_str().parse().unwrap_or(1)
-            };
-            if let Some(second_type) = captures.get(4) {
-                match second_type.as_str() {
-                    "e" => edges += num,
-                    "t" => troubles += num,
-                    _ => {}
-                }
-            }
-        }
-
-        let net_edges = if edges > troubles {
-            edges - troubles
-        } else {
-            0
+        // Edges and troubles cancel one for one ("you only need to deal with what's
+        // left") and the roller loops only over what is left, so the parser's cap
+        // applies to the net count: `mm 501e 500t` is one edge.
+        let expansion = match edges.cmp(&troubles) {
+            Ordering::Greater => format!("3d6 mme{}", edges - troubles),
+            Ordering::Less => format!("3d6 mmt{}", troubles - edges),
+            Ordering::Equal => "3d6 mm".to_string(),
         };
-        let net_troubles = if troubles > edges {
-            troubles - edges
-        } else {
-            0
-        };
-
-        // Create format that's easier for parser to handle
-        if net_edges > 0 {
-            return Some(format!("3d6 mme{net_edges}"));
-        } else if net_troubles > 0 {
-            return Some(format!("3d6 mmt{net_troubles}"));
-        } else {
-            return Some("3d6 mm".to_string());
-        }
+        return Some(expansion);
     }
 
     // ONLY handle mathematical modifiers if we have a clear pattern
@@ -1323,38 +1266,13 @@ fn expand_marvel_multiverse_alias(input: &str) -> Option<String> {
     None
 }
 
-fn process_wod_regex_captures(
-    captures: &regex::Captures,
-    base_format: &str,
-    base_format_with_modifier: &str,
-) -> Option<String> {
-    let count = &captures[1];
-    let difficulty = &captures[2];
-    let modifier = captures.get(3).map(|m| m.as_str().trim()).unwrap_or("");
-
-    if modifier.is_empty() {
-        Some(
-            base_format
-                .replace("{count}", count)
-                .replace("{difficulty}", difficulty),
-        )
-    } else {
-        Some(
-            base_format_with_modifier
-                .replace("{count}", count)
-                .replace("{difficulty}", difficulty)
-                .replace("{modifier}", modifier),
-        )
-    }
-}
-
 /// Expand A5E (Level Up Advanced 5th Edition) aliases
 ///
 /// Concise syntax assuming d20 by default:
-/// - a5e +5 ed1 → 1d20+5 + 1d4
-/// - a5e ed2 → 1d20 + 1d6 (no modifier)
-/// - +a5e +5 ed1 → 2d20 kh1+5 + 1d4 (advantage)
-/// - -a5e +5 ed1 → 2d20 kl1+5 + 1d4 (disadvantage)
+/// - a5e +5 ex1 → 1d20+5 + 1d4
+/// - a5e ex2 → 1d20 + 1d6 (no modifier)
+/// - +a5e +5 ex1 → 2d20 k1+5 + 1d4 (advantage)
+/// - -a5e +5 ex1 → 2d20 kl1+5 + 1d4 (disadvantage)
 pub fn expand_a5e_alias(input: &str) -> Option<String> {
     let input = input.trim();
 
@@ -1378,8 +1296,14 @@ pub fn expand_a5e_alias(input: &str) -> Option<String> {
     // Helper function to process A5E captures and eliminate duplication
     let process_a5e_captures =
         |captures: regex::Captures, roll_type: A5eRollType| -> Option<String> {
-            let modifier = captures.get(1).map(|m| m.as_str()).unwrap_or("");
-            let ed_value = captures.get(2).unwrap().as_str();
+            // The regex accepts the bonus unsigned (`a5e 5 ex1`), and gluing
+            // that onto the dice made `1d205` or a keep of `k15`: read it as +5.
+            let modifier = match captures.get(1).map(|m| m.as_str()) {
+                Some(signed) if signed.starts_with(['+', '-']) => signed.to_string(),
+                Some(unsigned) => format!("+{unsigned}"),
+                None => String::new(),
+            };
+            let ed_value = captures.get(2)?.as_str();
 
             if let Some(expertise_die) = get_expertise_die(ed_value) {
                 let base_roll = match roll_type {
@@ -1417,12 +1341,29 @@ pub fn expand_a5e_alias(input: &str) -> Option<String> {
     None
 }
 
+/// Why a push can't be rolled, for a push at the stress cap. Pushing adds a
+/// level, so `alien4s10p` became `alien4s11`, which failed with an error about
+/// a roll the user never typed.
+pub fn alien_push_refusal(input: &str) -> Option<String> {
+    let captures = ALIEN_PUSH_REGEX.captures(input.trim())?;
+    let stress: u32 = captures[2].parse().ok()?;
+    (stress == ALIEN_MAX_STRESS).then(|| {
+        format!(
+            "Stress is already {ALIEN_MAX_STRESS}, the most this bot tracks, so this roll can't be pushed"
+        )
+    })
+}
+
 fn expand_alien_alias(input: &str) -> Option<String> {
     // Check for push roll first (alien4s3p -> alien4s4)
     if let Some(captures) = ALIEN_PUSH_REGEX.captures(input) {
         let base_dice = &captures[1];
         let current_stress: u32 = captures[2].parse().ok()?;
-        let new_stress = current_stress + 1; // Push adds 1 stress
+        // At the cap the push isn't expanded; alien_push_refusal explains why
+        if current_stress >= ALIEN_MAX_STRESS {
+            return None;
+        }
+        let new_stress = current_stress.checked_add(1)?; // Push adds 1 stress
 
         // Return the new stress level alias (which will be expanded again)
         return Some(format!("alien{base_dice}s{new_stress}"));
@@ -1441,7 +1382,7 @@ fn expand_alien_alias(input: &str) -> Option<String> {
         if base_count == 0 || base_count > 20 {
             return None; // Invalid base dice count
         }
-        if stress_level == 0 || stress_level > 10 {
+        if stress_level == 0 || stress_level > ALIEN_MAX_STRESS {
             return None; // Invalid stress level
         }
 
@@ -1616,7 +1557,8 @@ fn expand_darkest_house_alias(input: &str) -> Option<String> {
         Some(matched) => matched.as_str().replace(' ', "").parse().ok()?,
         None => 0,
     };
-    let total = rating + flat_modifier;
+    // Checked: `tdh9223372036854775807 +1` overflowed here
+    let total = rating.checked_add(flat_modifier)?;
 
     let dice = match captures.get(2).map(|m| m.as_str()) {
         Some("b") => "2d6 adv1",
@@ -1632,16 +1574,69 @@ fn expand_darkest_house_alias(input: &str) -> Option<String> {
     let modifier = match total {
         0 => String::new(),
         positive if positive > 0 => format!(" + {positive}"),
-        negative => format!(" - {}", -negative),
+        // unsigned_abs: negating i64::MIN overflows
+        negative => format!(" - {}", negative.unsigned_abs()),
     };
 
     Some(format!("{dice} {house_die}{modifier}"))
 }
 
+/// The target after folding a Mothership roll's Skill bonuses into its stat
+/// (Player's Survival Guide §5), or None when it has no bonus. Without a stat
+/// the bonuses go on the default target of 50.
+fn mothership_folded_target(captures: &regex::Captures) -> Option<i64> {
+    let bonuses = captures.get(3).map_or("", |m| m.as_str());
+    if bonuses.trim().is_empty() {
+        return None;
+    }
+    let mut target: i64 = captures
+        .get(2)
+        .map_or(Some(50), |stat| stat.as_str().parse().ok())?;
+    for term in MS_BONUS_REGEX.captures_iter(bonuses) {
+        let amount: i64 = term[2].parse().ok()?;
+        target = if &term[1] == "+" {
+            target.checked_add(amount)?
+        } else {
+            target.checked_sub(amount)?
+        };
+    }
+    Some(target)
+}
+
+/// Why a Mothership roll can't be made, for a bonus that takes the target
+/// below 1. Its expansion (`ms-10`) parsed as a bare `ms`, so `ms20 - 30` was
+/// silently judged against the default 50.
+pub fn mothership_target_refusal(input: &str) -> Option<String> {
+    // Lowercased like expand_alias: `Ms20 - 30` (a phone's capital) skipped it
+    let input = input.trim().to_lowercase();
+    let captures = MS_REGEX.captures(&input)?;
+    let target = mothership_folded_target(&captures)?;
+    (target < 1).then(|| format!("Mothership target can't be below 1, got {target}"))
+}
+
 fn expand_mothership_alias(input: &str) -> Option<String> {
     if let Some(captures) = MS_REGEX.captures(input) {
         let advantage_sign = captures.get(1).map(|m| m.as_str());
-        let stat_value = captures.get(2).map(|m| m.as_str());
+
+        // A Skill adds its bonus to the Stat you roll under (Player's
+        // Survival Guide §5), so `ms45 + 10` is a target of 55. The bonus was
+        // ignored, judging the roll against 45. Without a stat it stays as is.
+        // Bonuses can stack (Tactics, Command), so every `± N` term folds in.
+        // A target below 1 is refused by mothership_target_refusal.
+        let has_bonus = captures
+            .get(3)
+            .is_some_and(|m| !m.as_str().trim().is_empty());
+        let folded;
+        let stat_value = match mothership_folded_target(&captures) {
+            // A bonus too big to read must not vanish into the bare stat
+            None if has_bonus => return None,
+            Some(target) if target < 1 => return None,
+            Some(target) => {
+                folded = target.to_string();
+                Some(folded.as_str())
+            }
+            None => captures.get(2).map(|m| m.as_str()),
+        };
 
         // We need to create modifiers that DON'T use +/- suffixes
         // Instead, use a different marker that won't be confused with operators

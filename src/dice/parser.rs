@@ -40,13 +40,14 @@
 
 use super::{
     CONAN_MAX_FOCUS, CONAN_MAX_POOL, DiceRoll, ESSENCE20_RANKS, HeroSystemType, LaserFeelingsType,
-    Modifier, WFRP_MAX_TARGET,
+    MAX_DICE, MOTHERSHIP_MAX_TARGET, Modifier, WFRP_MAX_TARGET,
 };
 use anyhow::{Result, anyhow};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
 const MAX_INPUT_LENGTH: usize = 1000;
+const MAX_SIDES: u32 = 1000;
 
 // Pre-compile all regex patterns at startup to reduce memory allocations
 static SET_REGEX: Lazy<Regex> =
@@ -60,9 +61,6 @@ static LABEL_REGEX: Lazy<Regex> =
 
 static COMMENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"!\s*(.*)$").expect("Failed to compile COMMENT_REGEX"));
-
-static DICE_MOD_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^([+\-])(\d+)d(\d+)$").expect("Failed to compile DICE_MOD_REGEX"));
 
 // Add regex for advantage/disadvantage patterns with modifiers
 static ADV_WITH_SIMPLE_MOD_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -167,8 +165,10 @@ fn parse_mothership_stat(stat_str: &str, part: &str) -> Result<u32> {
     let stat: u32 = stat_str
         .parse()
         .map_err(|_| anyhow!("Invalid Mothership stat value in '{}'", part))?;
-    if !(1..=99).contains(&stat) {
-        return Err(anyhow!("Mothership stat must be 1-99, got {}", stat));
+    if !(1..=MOTHERSHIP_MAX_TARGET).contains(&stat) {
+        return Err(anyhow!(
+            "Mothership target must be 1-{MOTHERSHIP_MAX_TARGET}, got {stat}"
+        ));
     }
     Ok(stat)
 }
@@ -224,6 +224,34 @@ fn try_parse_roll_set(input: &str, metadata: Option<&DiceRoll>) -> Result<Option
     };
 
     let expression = &captures[2];
+
+    // `3 dndstats` would nest one roll set inside another; it used to roll three
+    // single rolls of `6 + 4d6 k3` instead. Checked without any label, comment
+    // or flags, which kept `3 dndstats ! hi` from matching the alias.
+    let mut scratch = create_default_dice_roll();
+    let bare = parse_flags(&mut scratch, expression);
+    let bare = parse_label(&mut scratch, bare);
+    let bare = parse_comment(&mut scratch, bare).trim();
+
+    // A set's own parse errors are swallowed below (it falls back to other
+    // readings), so refusals surface here: `3 ms20 - 30` said "Invalid dice
+    // expression: 3".
+    if let Some(refusal) = super::aliases::alien_push_refusal(bare)
+        .or_else(|| super::aliases::mothership_target_refusal(bare))
+    {
+        return Err(anyhow!(refusal));
+    }
+    if let Some(expanded) = super::aliases::expand_alias(bare)
+        && let Some(inner) = SET_REGEX.captures(&expanded)
+        && is_valid_roll_set_expression(&inner[2])
+    {
+        return Err(anyhow!(
+            "`{}` already rolls {} sets; roll it on its own",
+            bare,
+            &inner[1]
+        ));
+    }
+
     if !is_valid_roll_set_expression(expression) {
         return Ok(None);
     }
@@ -251,8 +279,108 @@ pub fn parse_dice_string(input: &str) -> Result<Vec<DiceRoll>> {
     let rolls = parse_rolls(input)?;
     for roll in &rolls {
         validate_number_divided_by_roll(roll)?;
+        validate_dice_math_on_success_pool(roll)?;
+        validate_single_marvel_modifier(roll)?;
+        validate_no_math_on_dice_count(roll)?;
     }
     Ok(rolls)
+}
+
+/// Math the roller would drop on a dice-counting system (see
+/// Modifier::counts_dice_without_math) is refused, not silently ignored:
+/// `wng dn2 4d6 + 2`, `alien4 + 2`, `fitd3 + 1`. Adding dice is allowed, since
+/// the added dice join the pool those systems count; refusing them (as a 2.0.0
+/// draft briefly did) blocked the rules' own "+1d6".
+fn validate_no_math_on_dice_count(roll: &DiceRoll) -> Result<()> {
+    let Some(counts) = roll
+        .modifiers
+        .iter()
+        .find_map(Modifier::counts_dice_without_math)
+    else {
+        return Ok(());
+    };
+    let dropped = roll
+        .modifiers
+        .iter()
+        .find(|m| modifier_kind(m) == ModifierKind::Math && !matches!(m, Modifier::AddDice(_)));
+    match dropped {
+        None => Ok(()),
+        Some(Modifier::Add(bonus)) if (1..=MAX_DICE as i32).contains(bonus) => Err(anyhow!(
+            "{counts}, so `+ {bonus}` doesn't apply; add dice instead (`+ {bonus}d6`)"
+        )),
+        Some(_) => Err(anyhow!(
+            "{counts}, so math doesn't apply; add dice (`+ 1d6`) or roll fewer instead"
+        )),
+    }
+}
+
+/// The part of a `wng` token after the wrath count: `""`, `t`, `dn3`, `dn3t`,
+/// or a bare difficulty (`3`, `3t`). Returns the difficulty and total mode.
+fn parse_wrath_glory_mode(rest: &str) -> Option<(Option<u32>, bool)> {
+    let (rest, use_total) = match rest.strip_suffix('t') {
+        Some(without_t) => (without_t, true),
+        None => (rest, false),
+    };
+    let (rest, has_dn) = match rest.strip_prefix("dn") {
+        Some(number) => (number, true),
+        None => (rest, false),
+    };
+    if rest.is_empty() {
+        // `dn` needs a number after it
+        return (!has_dn).then_some((None, use_total));
+    }
+    rest.parse().ok().map(|dn| (Some(dn), use_total))
+}
+
+/// The Wrath & Glory mode named by the first word of a `wng` roll's comment:
+/// `wng 4d6 !soak`, `wng 4d6 ! SOAK hits`.
+fn wrath_glory_mode(roll: &str, comment: Option<&str>) -> Option<&'static str> {
+    if !roll.starts_with("wng ") {
+        return None;
+    }
+    let keyword = comment?.split_whitespace().next()?.to_lowercase();
+    ["soak", "exempt", "dmg"]
+        .into_iter()
+        .find(|mode| *mode == keyword)
+}
+
+/// The roller reads one Marvel Multiverse modifier, so a second raw token was
+/// ignored: `3d6 mme2 mmt1` dropped the trouble. Only raw `mm`/`mme`/`mmt`
+/// tokens can repeat; the documented `mm 2e 1t` already combines into one.
+fn validate_single_marvel_modifier(roll: &DiceRoll) -> Result<()> {
+    let marvel_modifiers = roll
+        .modifiers
+        .iter()
+        .filter(|m| matches!(m, Modifier::MarvelMultiverse(..)))
+        .count();
+    if marvel_modifiers > 1 {
+        return Err(anyhow!(
+            "Use one Marvel Multiverse modifier, like `mm 2e 1t`"
+        ));
+    }
+    Ok(())
+}
+
+/// On success counting (`t#`, `f#`, `b#`), a dice operand's dice join the pool
+/// and are counted like the rest. That is what `+` means (`4d10 t7 + 1d10`, and
+/// the D6 Legends wild die), but the roller had no other meaning to give `-`,
+/// `*` or `/`: `2d1 t1 - 1d1` counted 3 successes. No game system expands to
+/// that, so it is rejected rather than counted.
+fn validate_dice_math_on_success_pool(roll: &DiceRoll) -> Result<()> {
+    let counts_successes = roll.modifiers.iter().any(Modifier::is_target);
+    let has_non_additive_dice = roll.modifiers.iter().any(|m| {
+        matches!(
+            m,
+            Modifier::SubtractDice(_) | Modifier::MultiplyDice(_) | Modifier::DivideDice(_)
+        )
+    });
+    if counts_successes && has_non_additive_dice {
+        return Err(anyhow!(
+            "Dice can only be added to a success-counting roll (`+ 1d10` adds a die to the \
+             pool); use a number with `-`, `*` or `/`"
+        ));
+    }
+    Ok(())
 }
 
 /// `N/dice` divides N by the dice total, so it only means something on a plain
@@ -277,10 +405,11 @@ fn validate_number_divided_by_roll(roll: &DiceRoll) -> Result<()> {
 }
 
 /// How a modifier affects a roll's result, for the leading-number and `N/dice`
-/// rules. Exhaustive on purpose: a new modifier must be classified here, not
-/// fall through.
+/// rules and for the roller's "does this roll have math" check. Exhaustive on
+/// purpose: a new modifier must be classified here, not fall through. The
+/// roller once kept its own list of math modifiers; it missed `*`/`/` dice.
 #[derive(Clone, Copy, PartialEq)]
-enum ModifierKind {
+pub(crate) enum ModifierKind {
     /// Arithmetic with a number or a dice operand (`+2`, `*3`, `+1d6`)
     Math,
     /// Changes which dice count but leaves the result a dice total (`k3`, `e`)
@@ -289,7 +418,7 @@ enum ModifierKind {
     System,
 }
 
-fn modifier_kind(modifier: &Modifier) -> ModifierKind {
+pub(crate) fn modifier_kind(modifier: &Modifier) -> ModifierKind {
     match modifier {
         Modifier::Add(_)
         | Modifier::Subtract(_)
@@ -408,6 +537,15 @@ fn parse_rolls(input: &str) -> Result<Vec<DiceRoll>> {
 
     // PRIORITY 2: Check for roll sets AGAIN after processing flags, with same validation
     if let Some(results) = try_parse_roll_set(remaining_input, Some(&temp_dice))? {
+        return Ok(results);
+    }
+
+    // An alias that expands to a roll set (`dndstats` -> `6 4d6 k3`) keeps that
+    // shape behind a flag, label or comment. Only the bare alias was checked,
+    // so `p dndstats` read the expansion as `6 + 4d6 k3`: one roll, not six.
+    if let Some(expanded) = super::aliases::expand_alias(remaining_input)
+        && let Some(results) = try_parse_roll_set(&expanded, Some(&temp_dice))?
+    {
         return Ok(results);
     }
 
@@ -582,6 +720,24 @@ fn parse_single_dice_expression(input: &str) -> Result<DiceRoll> {
     {
         // D6 System expansion: "d6s5" -> "1d1 d6s5"
         // This creates a dummy roll that triggers the D6System modifier
+        let mut expanded_dice = parse_single_dice_expression(&expanded)?;
+        transfer_dice_metadata(&dice, &mut expanded_dice);
+        return Ok(expanded_dice);
+    }
+
+    if let Some(refusal) = super::aliases::alien_push_refusal(remaining)
+        .or_else(|| super::aliases::mothership_target_refusal(remaining))
+    {
+        return Err(anyhow!(refusal));
+    }
+
+    // Wrath & Glory's `!soak`, `!exempt` and `!dmg` are modes written as a
+    // comment, as the Ruby bot read them. parse_comment has already taken the
+    // comment, which left them unreachable, so the keyword goes back to the
+    // alias. The text stays on the roll as its comment.
+    if let Some(mode) = wrath_glory_mode(remaining, dice.comment.as_deref())
+        && let Some(expanded) = super::aliases::expand_alias(&format!("{remaining} !{mode}"))
+    {
         let mut expanded_dice = parse_single_dice_expression(&expanded)?;
         transfer_dice_metadata(&dice, &mut expanded_dice);
         return Ok(expanded_dice);
@@ -1384,7 +1540,9 @@ fn parse_label<'a>(dice: &mut DiceRoll, remaining: &'a str) -> &'a str {
         let label_content = &captures[1];
         let trimmed = label_content.trim();
         dice.label = Some(trimmed.to_string());
-        return &remaining[captures.get(0).unwrap().end()..];
+        return captures
+            .get(0)
+            .map_or(remaining, |label| &remaining[label.end()..]);
     }
     remaining
 }
@@ -1410,7 +1568,9 @@ fn parse_comment<'a>(dice: &mut DiceRoll, remaining: &'a str) -> &'a str {
             dice.comment = Some(comment_content.to_string());
         }
 
-        remaining[..captures.get(0).unwrap().start()].trim()
+        captures
+            .get(0)
+            .map_or(remaining, |comment| remaining[..comment.start()].trim())
     } else {
         remaining
     }
@@ -1429,14 +1589,6 @@ fn parse_base_dice(dice: &mut DiceRoll, part: &str) -> Result<()> {
     // Check if this is a simple dice expression
     if DICE_ONLY_REGEX.is_match(part) {
         return parse_simple_dice_part(dice, part);
-    }
-
-    // Handle simple dice expressions that start with 'd' (like "d10", "d20")
-    if part.starts_with('d') && part.len() > 1 {
-        let full_dice = format!("1{part}"); // Convert "d10" to "1d10"
-        if DICE_ONLY_REGEX.is_match(&full_dice) {
-            return parse_simple_dice_part(dice, &full_dice);
-        }
     }
 
     // If it's not a simple dice expression, it might be a combined expression
@@ -1468,38 +1620,49 @@ fn parse_modifiers_from_part(dice: &mut DiceRoll, modifiers_part: &str) -> Resul
 }
 
 fn parse_simple_dice_part(dice: &mut DiceRoll, part: &str) -> Result<()> {
-    if let Some(captures) = DICE_ONLY_REGEX.captures(part) {
-        dice.count = captures
-            .get(1)
-            .map(|m| m.as_str().parse().unwrap_or(1))
-            .unwrap_or(1);
+    let (count, sides) = parse_dice_term(part)?;
+    dice.count = count;
+    dice.sides = sides;
+    Ok(())
+}
 
-        if &captures[2] == "%" {
-            dice.sides = 100;
-        } else {
-            dice.sides = captures[2]
-                .parse()
-                .map_err(|_| anyhow!("Invalid dice sides"))?;
-        }
+// Every `NdS` term, main roll or `+ 2d6` operand, goes through these limits. Operands once
+// skipped them: `1d6 + 1d4000000000` panicked the roller and `99999999999d6` rolled one die.
+// DICE_ONLY_REGEX guarantees digits, so a failed parse can only mean the number overflowed.
+fn parse_dice_term(part: &str) -> Result<(u32, u32)> {
+    let captures = DICE_ONLY_REGEX
+        .captures(part)
+        .ok_or_else(|| anyhow!("Invalid dice expression: {}", part))?;
 
-        if dice.count == 0 {
-            return Err(anyhow!("Cannot roll 0 dice"));
-        }
-
-        if dice.count > 500 {
-            return Err(anyhow!("Maximum 500 dice allowed"));
-        }
-        if dice.sides < 1 {
-            return Err(anyhow!("Dice must have at least 1 side"));
-        }
-        if dice.sides > 1000 {
-            return Err(anyhow!("Maximum 1000 sides allowed"));
-        }
-
-        Ok(())
+    let count = match captures.get(1) {
+        Some(m) => m
+            .as_str()
+            .parse()
+            .map_err(|_| anyhow!("Maximum {MAX_DICE} dice allowed"))?,
+        None => 1,
+    };
+    let sides = if &captures[2] == "%" {
+        100
     } else {
-        Err(anyhow!("Invalid dice expression: {}", part))
+        captures[2]
+            .parse()
+            .map_err(|_| anyhow!("Maximum {MAX_SIDES} sides allowed"))?
+    };
+
+    if count == 0 {
+        return Err(anyhow!("Cannot roll 0 dice"));
     }
+    if count > MAX_DICE {
+        return Err(anyhow!("Maximum {MAX_DICE} dice allowed"));
+    }
+    if sides < 1 {
+        return Err(anyhow!("Dice must have at least 1 side"));
+    }
+    if sides > MAX_SIDES {
+        return Err(anyhow!("Maximum {MAX_SIDES} sides allowed"));
+    }
+
+    Ok((count, sides))
 }
 
 fn parse_all_modifiers(dice: &mut DiceRoll, parts: &[String]) -> Result<()> {
@@ -1823,6 +1986,23 @@ fn parse_complex_dice_expression(input: &str) -> Result<DiceRoll> {
     }
 }
 
+// Edge/trouble count for `mme<N>`/`mmt<N>`. A bare `mme` is one edge, as `mm e` is
+// and as the rules define an edge; it used to mean none. Each count is a reroll loop in
+// the roller, so it shares the dice cap: `mme2147483647` would have hung a worker, and an
+// overflowing count silently became 0.
+fn parse_marvel_count(digits: &str, part: &str, what: &str) -> Result<i32> {
+    if digits.is_empty() {
+        return Ok(1);
+    }
+    if !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(anyhow!("Invalid Marvel Multiverse modifier '{}'", part));
+    }
+    match digits.parse::<u32>() {
+        Ok(count) if count <= MAX_DICE => Ok(count as i32),
+        _ => Err(anyhow!("Maximum {MAX_DICE} {what} allowed")),
+    }
+}
+
 // Shared level parsing for the advantage/disadvantage modifiers. The upper
 // bound mirrors the 500 dice cap, since each level rolls one extra die.
 fn parse_advantage_level(digits: &str, part: &str) -> Result<u32> {
@@ -1830,8 +2010,10 @@ fn parse_advantage_level(digits: &str, part: &str) -> Result<u32> {
         .parse()
         .map_err(|_| anyhow!("Invalid advantage/disadvantage level in '{}'", part))?;
 
-    if level > 500 {
-        return Err(anyhow!("Maximum advantage/disadvantage level is 500"));
+    if level > MAX_DICE {
+        return Err(anyhow!(
+            "Maximum advantage/disadvantage level is {MAX_DICE}"
+        ));
     }
 
     Ok(level)
@@ -2129,29 +2311,18 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
 
     // Handle D6 System BEFORE drop modifier to avoid conflicts
     // D6 System handling (Handle BEFORE drop modifier since both start with 'd')
+    // Pips (`d6s5+2`) never arrive here: the operator check above rejects a part
+    // holding `+`/`-`, and tokenizing has already split them off as Add/Subtract.
     if let Some(stripped) = part.strip_prefix("d6s") {
-        // Parse count and optional pips like "5" or "5+2"
-        let count_and_pips = stripped.to_string();
-
-        // Extract count (before any +/-)
-        let count_str = if let Some(pos) = count_and_pips.find(['+', '-']) {
-            &count_and_pips[..pos]
-        } else {
-            &count_and_pips
-        };
-
-        let count = count_str
+        let count: u32 = stripped
             .parse()
             .map_err(|_| anyhow!("Invalid D6 System count in '{}'", part))?;
+        // The roller rolls `count` dice in one go; uncapped, `d6s4294967295` hung a worker.
+        if count > MAX_DICE {
+            return Err(anyhow!("Maximum {MAX_DICE} dice allowed"));
+        }
 
-        // Extract pips part (everything after count)
-        let pips = if let Some(pos) = count_and_pips.find(['+', '-']) {
-            count_and_pips[pos..].to_string()
-        } else {
-            String::new()
-        };
-
-        return Ok(Modifier::D6System(count, pips));
+        return Ok(Modifier::D6System(count));
     }
 
     // Handle drop modifier (AFTER D6 System to avoid conflicts)
@@ -2405,66 +2576,31 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             return Ok(Modifier::WrathGlory(None, false, 1)); // Default 1 wrath die
         }
 
-        // Parse wrath dice count first
+        // Wrath dice count (`w2`), then difficulty (`dn3`) and total mode (`t`).
+        // The count was read char by char and dropped whatever single character
+        // followed it, so `wngw1t` lost its `t` and `wngw1x` passed as `w1`.
         let mut remaining = stripped;
         let mut wrath_count = 1u32;
-
-        if let Some(w_stripped) = remaining.strip_prefix("w") {
-            // Extract wrath count
-            let mut chars = w_stripped.chars();
-            let mut count_str = String::new();
-
-            for ch in chars.by_ref() {
-                if ch.is_ascii_digit() {
-                    count_str.push(ch);
-                } else {
-                    remaining = &w_stripped[count_str.len()..];
-                    break;
-                }
-            }
-
-            if chars.as_str().is_empty() && !count_str.is_empty() {
-                remaining = "";
-            }
-
+        if let Some(w_stripped) = remaining.strip_prefix('w') {
+            let digits = w_stripped.bytes().take_while(u8::is_ascii_digit).count();
+            let (count_str, rest) = w_stripped.split_at(digits);
+            remaining = rest;
             if !count_str.is_empty() {
                 wrath_count = count_str
                     .parse()
                     .map_err(|_| anyhow!("Invalid wrath dice count in '{}'", part))?;
-
-                // Validate reasonable range (1-5 wrath dice max)
-                if !(1..=5).contains(&wrath_count) {
-                    return Err(anyhow!("Wrath dice count must be 1-5, got {}", wrath_count));
-                }
             }
         }
 
-        // Parse difficulty and special modes
-        if remaining == "t" {
-            return Ok(Modifier::WrathGlory(None, true, wrath_count));
-        } else if let Some(dn_part) = remaining.strip_prefix("dn") {
-            if let Some(dn_str) = dn_part.strip_suffix('t') {
-                let dn = dn_str
-                    .parse()
-                    .map_err(|_| anyhow!("Invalid difficulty value in '{}'", part))?;
-                return Ok(Modifier::WrathGlory(Some(dn), true, wrath_count));
-            } else {
-                let dn = dn_part
-                    .parse()
-                    .map_err(|_| anyhow!("Invalid difficulty value in '{}'", part))?;
-                return Ok(Modifier::WrathGlory(Some(dn), false, wrath_count));
-            }
-        } else if let Some(dn_str) = remaining.strip_suffix('t') {
-            if let Ok(dn) = dn_str.parse::<u32>() {
-                return Ok(Modifier::WrathGlory(Some(dn), true, wrath_count));
-            }
-        } else if let Ok(dn) = remaining.parse::<u32>() {
-            return Ok(Modifier::WrathGlory(Some(dn), false, wrath_count));
-        } else if remaining.is_empty() {
-            return Ok(Modifier::WrathGlory(None, false, wrath_count));
-        }
+        let (difficulty, use_total) = parse_wrath_glory_mode(remaining)
+            .ok_or_else(|| anyhow!("Invalid Wrath & Glory modifier: {}", part))?;
 
-        return Err(anyhow!("Invalid Wrath & Glory modifier: {}", part));
+        // 0 for rolls without a Wrath Die: damage, Determination and
+        // Initiative ("This roll does not include a Wrath Die", p.178).
+        if wrath_count > 5 {
+            return Err(anyhow!("Wrath dice count must be 0-5, got {wrath_count}"));
+        }
+        return Ok(Modifier::WrathGlory(difficulty, use_total, wrath_count));
     }
 
     // Savage Worlds handling (AFTER D6 System but before other modifiers)
@@ -2504,29 +2640,6 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::WildWords(Some(cut_count)));
     }
 
-    // Additional dice modifiers
-    if let Some(captures) = DICE_MOD_REGEX.captures(part) {
-        let count: u32 = captures[2].parse()?;
-        let sides: u32 = captures[3].parse()?;
-        let dice_roll = DiceRoll {
-            count,
-            sides,
-            modifiers: Vec::new(),
-            comment: None,
-            label: None,
-            private: false,
-            simple: false,
-            no_results: false,
-            unsorted: false,
-            original_expression: None,
-        };
-        return match &captures[1] {
-            "+" => Ok(Modifier::AddDice(dice_roll)),
-            "-" => Ok(Modifier::SubtractDice(dice_roll)),
-            _ => Err(anyhow!("Invalid dice modifier")),
-        };
-    }
-
     if let Ok(num) = part.parse::<i32>() {
         return Ok(Modifier::Add(num));
     }
@@ -2537,12 +2650,12 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
     }
 
     if let Some(stripped) = part.strip_prefix("mme") {
-        let edges = stripped.parse().unwrap_or(0);
+        let edges = parse_marvel_count(stripped, part, "edges")?;
         return Ok(Modifier::MarvelMultiverse(edges, 0));
     }
 
     if let Some(stripped) = part.strip_prefix("mmt") {
-        let troubles = stripped.parse().unwrap_or(0);
+        let troubles = parse_marvel_count(stripped, part, "troubles")?;
         return Ok(Modifier::MarvelMultiverse(0, troubles));
     }
 
@@ -2718,7 +2831,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
 }
 
 fn is_dice_expression(input: &str) -> bool {
-    // Check for basic dice patterns
+    // Basic dice patterns, `d10` and `d%` included (the count is optional)
     if DICE_ONLY_REGEX.is_match(input) {
         return true;
     }
@@ -2728,51 +2841,17 @@ fn is_dice_expression(input: &str) -> bool {
         return true;
     }
 
-    // Check for dice expressions that start with 'd' (like "d10", "d20", "d%")
-    if input.starts_with('d') && input.len() > 1 {
-        let after_d = &input[1..];
-        // Check if it's just numbers or '%'
-        if after_d == "%" || after_d.chars().all(|c| c.is_ascii_digit()) {
-            return true;
-        }
-    }
-
     false
 }
 
+// `d10` needs no rewrite to `1d10`: parse_dice_term treats a missing count as 1.
 fn parse_dice_expression_only(input: &str) -> Result<DiceRoll> {
-    // Handle cases like "d10", "d20", "d%"
-    if input.starts_with('d') && !input.contains(char::is_alphabetic) {
-        let full_dice = format!("1{input}"); // Convert "d10" to "1d10"
-        return parse_dice_expression_only(&full_dice);
-    }
-
-    if let Some(captures) = DICE_ONLY_REGEX.captures(input) {
-        let count = captures
-            .get(1)
-            .map(|m| m.as_str().parse().unwrap_or(1))
-            .unwrap_or(1);
-        let sides = if &captures[2] == "%" {
-            100
-        } else {
-            captures[2].parse()?
-        };
-
-        Ok(DiceRoll {
-            count,
-            sides,
-            modifiers: Vec::new(),
-            comment: None,
-            label: None,
-            private: false,
-            simple: false,
-            no_results: false,
-            unsorted: false,
-            original_expression: None,
-        })
-    } else {
-        Err(anyhow!("Invalid dice expression: {}", input))
-    }
+    let (count, sides) = parse_dice_term(input)?;
+    Ok(DiceRoll {
+        count,
+        sides,
+        ..create_default_dice_roll()
+    })
 }
 
 static MULTI_DIGIT_COUNT_DICE_REGEX: Lazy<Regex> = Lazy::new(|| {
