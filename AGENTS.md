@@ -61,7 +61,7 @@ formatting). Core types live in `dice/mod.rs`; all randomness in `dice/rng.rs`.
 
 Before fixing or extending how a roll behaves, ask: **would a player of that game system type
 this roll in an actual session?** Answer from evidence, not instinct: the documented syntax
-(`roll_syntax.md`, the help text, the original Ruby DiceMaiden README) and how the system's
+(`roll_syntax.md`, the help text, the original Ruby DiceMaiden readme) and how the system's
 rulebook modifies a roll (flat numbers, a bigger pool, rerolls).
 
 - **Passes**: documented syntax and alias forms, the system's own rolls with the modifiers its
