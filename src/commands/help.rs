@@ -23,7 +23,8 @@ pub fn register() -> CreateCommand {
         CreateCommandOption::new(
             CommandOptionType::String,
             "topic",
-            "Help topic (basic, alias, system, a5e)",
+            // The choices come from HELP_TOPICS; listing some here went stale
+            "Help topic",
         )
         .required(false),
         |option, topic| option.add_string_choice(*topic, *topic),

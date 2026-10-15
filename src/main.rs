@@ -43,15 +43,15 @@
 //! every 15 minutes and writes them to the database.  The task listens for
 //! SIGTERM/SIGINT/Ctrl-C and shuts down cleanly via a `broadcast` channel.
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use dicemaiden_rs::{
     DatabaseContainer, GuildCountsContainer, ShardManagerContainer, commands, database,
-    guild_counts::GuildCounts,
+    dice::truncate_to_message_limit, guild_counts::GuildCounts,
 };
 use serenity::{
     all::*, async_trait, gateway::ShardManager, http::Http, model::gateway::Ready, prelude::*,
 };
-use std::{collections::HashSet, env, sync::Arc, time::Duration};
+use std::{env, sync::Arc, time::Duration};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 use tokio::{
     select,
@@ -192,20 +192,26 @@ impl EventHandler for Handler {
                     )
                 }
             };
+            // Each command fits its own output where it can do so gracefully;
+            // this is the backstop for every reply, so none fails to send.
+            let response_content = truncate_to_message_limit(response_content);
 
             let sent = if deferred {
                 // A deferred response's visibility was fixed by the defer
                 command
                     .edit_response(
                         &ctx.http,
-                        serenity::builder::EditInteractionResponse::new().content(response_content),
+                        serenity::builder::EditInteractionResponse::new()
+                            .content(response_content)
+                            .allowed_mentions(no_mentions()),
                     )
                     .await
                     .map(|_| ())
             } else {
                 let mut response_message =
                     serenity::builder::CreateInteractionResponseMessage::new()
-                        .content(response_content);
+                        .content(response_content)
+                        .allowed_mentions(no_mentions());
 
                 if ephemeral {
                     response_message = response_message.ephemeral(true);
@@ -226,6 +232,13 @@ impl EventHandler for Handler {
     }
 }
 
+// Replies echo user text (labels, comments, nicknames, expressions in error
+// messages), so `/roll (@everyone) 1d6` pinged the whole server. The bot never
+// needs to ping anyone; this keeps every mention in a reply inert.
+fn no_mentions() -> serenity::builder::CreateAllowedMentions {
+    serenity::builder::CreateAllowedMentions::new()
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
@@ -241,7 +254,7 @@ async fn main() -> Result<()> {
     let db = Arc::new(database::Database::new().await?);
     db.init().await?;
 
-    let token = env::var("DISCORD_TOKEN").expect("Expected DISCORD_TOKEN in environment");
+    let token = env::var("DISCORD_TOKEN").context("Expected DISCORD_TOKEN in environment")?;
 
     // Read max_concurrency from environment, but use Discord's reported value if available
     let env_max_concurrency = env::var("MAX_CONCURRENCY")
@@ -412,22 +425,6 @@ async fn main() -> Result<()> {
     // Use Discord's actual max_concurrency instead of environment variable
     let max_concurrency = actual_max_concurrency;
 
-    let (_owners, _bot_id) = match http.get_current_application_info().await {
-        Ok(info) => {
-            let mut owners = HashSet::new();
-            if let Some(owner) = &info.owner {
-                owners.insert(owner.id);
-            }
-            if let Some(team) = info.team {
-                for member in &team.members {
-                    owners.insert(member.user.id);
-                }
-            }
-            (owners, info.id)
-        }
-        Err(why) => panic!("Could not access application info: {why:?}"),
-    };
-
     // Validate shard configuration for verified bots
     if max_concurrency > 1 {
         info!(
@@ -463,7 +460,7 @@ async fn main() -> Result<()> {
             guild_counts: Arc::clone(&guild_counts),
         })
         .await
-        .expect("Error creating client");
+        .context("Error creating client")?;
 
     // Configure sharding after client creation
     {
@@ -667,8 +664,27 @@ async fn start_client_with_shard_strategy(
 }
 
 async fn setup_signal_handlers(shutdown_tx: broadcast::Sender<()>) {
-    let mut sigterm = signal(SignalKind::terminate()).expect("Failed to register SIGTERM handler");
-    let mut sigint = signal(SignalKind::interrupt()).expect("Failed to register SIGINT handler");
+    let (mut sigterm, mut sigint) = match (
+        signal(SignalKind::terminate()),
+        signal(SignalKind::interrupt()),
+    ) {
+        (Ok(sigterm), Ok(sigint)) => (sigterm, sigint),
+        (Err(e), _) | (_, Err(e)) => {
+            // Returning would start a shutdown (main awaits this), so keep
+            // running and fall back to Ctrl+C; if even that can't be awaited,
+            // wait for the process to be killed.
+            error!("Failed to register signal handlers: {}", e);
+            if let Err(e) = tokio::signal::ctrl_c().await {
+                error!("Failed to listen for Ctrl+C: {}", e);
+                std::future::pending::<()>().await;
+            }
+            info!("Received Ctrl+C");
+            if let Err(e) = shutdown_tx.send(()) {
+                error!("Failed to send shutdown signal: {}", e);
+            }
+            return;
+        }
+    };
 
     select! {
         _ = sigterm.recv() => {
@@ -704,11 +720,12 @@ async fn collect_shard_stats_with_shutdown(
     // Check if we're in multi-process mode
     let is_multi_process = env::var("SHARD_START").is_ok() && env::var("TOTAL_SHARDS").is_ok();
 
-    // Generate a unique process ID for multi-process mode
+    // One row per shard range, stable across restarts. It held the PID, so a
+    // restarted container added a second row while the old one lived on until
+    // the 30-minute cleanup, and bot-info's totals counted that process twice.
     let process_id = if is_multi_process {
         let shard_start = env::var("SHARD_START").unwrap_or_default();
-        let process_pid = std::process::id();
-        format!("process_{shard_start}_{process_pid}")
+        format!("process_{shard_start}")
     } else {
         "single_process".to_string()
     };
@@ -724,6 +741,15 @@ async fn collect_shard_stats_with_shutdown(
     if is_multi_process {
         info!("Process ID: {}", process_id);
     }
+    // Rows from before the stable ID (`process_<start>_<pid>`) are removed
+    // after this process's first write, not at startup: removing them first
+    // left the range out of bot-info and topgg.sh until that write.
+    let mut stale_rows_removed = false;
+
+    // The first tick fires at once, before the guild counts have loaded; it
+    // replaced this range's full count with a near-empty one. Skip it, so the
+    // last full count stands until a real one replaces it.
+    interval.tick().await;
 
     loop {
         select! {
@@ -799,6 +825,11 @@ async fn collect_shard_stats_with_shutdown(
                 .await
             {
                 error!("Failed to update process stats: {}", e);
+            } else if !stale_rows_removed {
+                match db.remove_stale_process_rows(&process_id, shard_start).await {
+                    Ok(()) => stale_rows_removed = true,
+                    Err(e) => warn!("Failed to remove stale process stats: {}", e),
+                }
             }
 
             // In multi-process mode, we only use process_stats table

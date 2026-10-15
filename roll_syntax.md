@@ -241,13 +241,13 @@ Modifiers apply in stages, not in the order you type them:
 - `cs 1` - Level 1 task (target 3+, routine)
 - `cs 3` - Level 3 task (target 9+, typical)
 - `cs 6` - Level 6 task (target 18+, demanding)
-- Special Results: 1=GM Intrusion, 17-19=Minor Effect, 20=Major Effect
+- Special Results: 1=GM Intrusion; on a success, 19=Minor Effect, 20=Major Effect; 17-18=+1-2 damage on an attack
 
 ### Hero System 5th Edition
 - `2hsn` → 2d6 hsn (normal damage)
 - `3hsk` → 3d6 hsk (killing damage; STUN = BODY × 1d6-1, minimum 1)
-- `2.5hsk` → 2d6 + 1d3 hsk (fractional killing damage)
-- `2hsk1` → 2d6 + 1d3 hsk (alternative fractional notation)
+- `2.5hsk` → 2d6 hsk + 1d3 (fractional killing damage)
+- `2hsk1` → 2d6 hsk + 1d3 (alternative fractional notation)
 - `3hsh` → 3d6 hsh (to-hit roll, roll-under)
 - `hsn`, `hsk`, `hsh` → Single die versions
 
@@ -276,8 +276,10 @@ Modifiers apply in stages, not in the order you type them:
 - `wng 4d6` → 4d6 with wrath die and success counting
 - `wng w2 4d6` → 4d6 with 2 wrath dice (unbound psyker powers)
 - `wng dn3 5d6` → 5d6 with difficulty 3 (shows PASS/FAIL)
-- `wng 4d6 !soak` → 4d6 soak roll (uses total, not successes)
-- `wng dn4 6d6 !exempt` → 6d6 exempt test without wrath die
+- `wng w0 4d6` → 4d6 with no wrath die (Initiative)
+- `wng 4d6 !soak` → 4d6 Determination (soak) roll: counts Icons, no wrath die
+- `wng 2d6 !dmg` → 2d6 Extra Damage dice: counts Icons, no wrath die
+- `wng dn4 6d6 !exempt` → 6d6 test without wrath die
 
 ### Warhammer Fantasy Roleplay 4e
 - `wfrp67` → 1d100 against a Characteristic or Skill of 67
@@ -500,9 +502,10 @@ plain dice syntax — `1d6 + 4 - 2` — and `adv1` / `dis1` for a Boon or Bane o
 - `ms`    → 1d100 roll-under (default target 50)
 - `ms45`  → 1d100 roll-under Strength 45
 - `ms30`  → 1d100 roll-under Speed 30
+- `ms45 + 10` → Strength 45 with a Trained Skill (+10): roll under 55
 - `+ms45` → Roll twice, select better result using Mothership logic
 - `-ms45` → Roll twice, select worse result using Mothership logic
-- **Crit System**: Doubles (11, 22, 33, ..., 99, 00) are critical rolls
+- **Crit System**: Doubles (11, 22, 33, ..., 99, 00) are critical rolls; 00 is always a Critical Success and 99 always a Critical Failure
 - **Selection Logic**: Advantage prioritizes Crit Success > Success > Failure > Crit Failure — a Critical Failure is an ordinary failure plus a Panic Check, so it is the worst outcome. Disadvantage reverses the order
 
 ### Exalted (White Wolf)
@@ -578,8 +581,9 @@ plain dice syntax — `1d6 + 4 - 2` — and `adv1` / `dis1` for a Boon or Bane o
 ```text
 /roll wng 4d6              # Standard test with wrath die
 /roll wng dn3 5d6          # Difficulty 3 test
-/roll wng 4d6 !soak        # Soak test (total damage, not successes)
-/roll wng dn2 6d6 !exempt  # Exempt test without wrath die
+/roll wng 4d6 !soak        # Determination (soak): Icons, no wrath die
+/roll wng 2d6 !dmg         # Extra Damage dice: Icons, no wrath die
+/roll wng dn2 6d6 !exempt  # Test without wrath die
 ```
 
 ### Marvel Multiverse Examples

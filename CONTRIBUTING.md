@@ -93,6 +93,12 @@ Test files live in `tests/` — see [Testing](#testing) below.
 
 Read [`roll_syntax.md`](roll_syntax.md) to understand the existing dice syntax. The parser uses **prefix matching**, so new syntax identifiers must not overlap with — or be a prefix of — any existing ones. Conflicts are a real risk and can silently break unrelated rolls.
 
+### Is anyone going to roll this?
+
+Before you change how an input behaves, ask whether someone playing that game would actually type it at the table. The evidence is the documented syntax (`roll_syntax.md`, `/help`, the original Ruby DiceMaiden README) and the game's own rules for modifying a roll. Documented forms, the game's normal rolls and the mistakes players genuinely make deserve a proper fix. Raw internal tokens that only alias expansion produces (`2d1 sw8`, `1d6 sil3`), and modifier combinations the game gives no meaning to, do not: leave their current behavior as it is, make sure they cannot crash or hang the bot, and note them as deferred. If it is unclear which side an input falls on, say so in your PR rather than building for it.
+
+When you review code, look for the serious bugs before anything else. The worst kind can bring the bot down or be abused by a user: a roll that crashes or hangs, a startup that fails in one of the sharding modes, a reply that pings a whole server, or `/purge` deleting without permission. Next come rolls a player would really type that silently give the wrong result, and documented rolls that stop working. After those, minor bugs in rolls people do make, such as a misleading message, a wrong display or a stats figure that is off. Last of all are inputs nobody would type, tidying and documentation, unless such an input crashes or hangs the bot, which puts it back at the top. Mention the minor and last-place findings briefly, and agree on them before spending time on fixes.
+
 ### Data flow
 
 ```text
@@ -157,6 +163,7 @@ Each of these exists because the same block had been pasted between 2 and 10 tim
 | Keep/drop index bookkeeping | `indexed_rolls(result)` + `partition_kept_dice(result, &kept)` |
 | A d10 crit/fumble explosion tail (Cyberpunk Red, Witcher) | `finalize_d10_explosion(..)` |
 | Building `Set 1..N` copies, or roll-set parsing | `build_roll_set(..)` / `try_parse_roll_set(..)` |
+| `result.total += x` once the user's math is applied | `result.total.checked_add(x).ok_or_else(result_too_large)?` — `+=` wraps silently in a release build |
 
 If a new system needs *almost* the same behavior as an existing helper, add a parameter rather than a second copy of the function — see `RerollDirection` (`r` vs `rg`) and `MathModifierRules` (standard vs post-division), each of which replaced a near-identical twin function. Document why the two paths differ; that difference is usually load-bearing.
 
@@ -210,6 +217,14 @@ tools/diff-vs-release.sh HEAD      # or a release tag, e.g. v1.8.1; defaults to 
 ```
 
 The script builds the other version in a temporary worktree and rolls the same expressions in both: the corpus, each corpus line with numbers and math around it, and a grid of modifier families with math before and after. It groups the differences by shape, most dangerous first (results that changed, then rolls that now fail, then rolls that now work), and exits 1 if a roll that worked in the other version now gives a different result or an error (2 means it couldn't build or roll one of the trees, and the reason is printed). Explain every changed shape in your commit message. Tag each release when it ships (`git tag -a v1.8.2`) so the next one has something to compare against.
+
+Snapshots and the release diff only check expressions someone wrote down. To find the ones nobody did, run the mutation fuzzer before a release and after adding or changing a game-system handler:
+
+```bash
+cargo test --test fuzz_tests -- --ignored --nocapture    # FUZZ_ITERS=200000 FUZZ_SEED=2 to go deeper
+```
+
+It builds expressions from corpus lines (boundary numbers, spliced tokens, extra math) and reports panics, hangs and over-limit replies with the seed that reproduces each. A debug build traps integer overflow, so arithmetic that would wrap silently in production shows up as a panic. It is not part of `cargo test`: adding a corpus line changes what it generates, so a failure would land on an unrelated change. Fix what it finds and add those expressions to the corpus.
 
 `seeded_rolls.snap` is sensitive to the order dice are drawn from the generator, so an internal change that draws them in a different order rewrites it without altering anything a user sees. `deterministic_rolls.snap` is not sensitive to that. If both move, behavior changed; if only the seeded one moves, it did not.
 
@@ -286,7 +301,7 @@ builds regexes, add it to the list in that test.
 ### Style
 
 - Meaningful names: `dice_count` not `n`, `shard_id` not `id`
-- Exhaustive match arms — avoid wildcard `_` that silently swallows variants (especially on the `Modifier` enum, where a missed arm means a modifier is silently ignored)
+- A missed `Modifier` arm silently ignores a modifier, so a wildcard `_` is acceptable only when it cannot do that: a match that extracts particular variants (such as `ArithmeticOp::from_modifier`), or an arm that returns an error. The stage dispatchers in `roller.rs` (dice, keep/drop, game systems) do pass other stages' modifiers through `_`; there, the tests a new game system must add to `game_systems_tests.rs` are what fail when its roller arm is missing
 - Delete replaced code — do not leave old and new implementations side by side
 - No versioned function names (`process_v2`, `handle_new`)
 

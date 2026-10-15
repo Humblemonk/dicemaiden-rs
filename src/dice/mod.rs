@@ -118,6 +118,16 @@ impl fmt::Display for LaserFeelingsType {
 /// succeeds anyway.
 pub const WFRP_MAX_TARGET: u32 = 200;
 
+/// The highest stress level the Alien aliases track: the character sheet's ten
+/// boxes. No rule found says what a push at this level does, so the bot
+/// refuses it plainly rather than claim one (aliases::alien_push_refusal).
+pub(crate) const ALIEN_MAX_STRESS: u32 = 10;
+
+/// Highest Mothership target. A relevant Skill adds its bonus to the Stat
+/// (Player's Survival Guide §5: Trained +10%, Expert +15%, Master +20%), so a
+/// target can pass 99; every roll but 99 then succeeds.
+pub const MOTHERSHIP_MAX_TARGET: u32 = 200;
+
 /// Conan caps Expertise and Focus at 5, so a Focus above this is a typo rather
 /// than a legal rating.
 pub const CONAN_MAX_FOCUS: u32 = 5;
@@ -126,6 +136,12 @@ pub const CONAN_MAX_FOCUS: u32 = 5;
 /// toward that limit and are capped at +4d20, so nine is the largest pool the
 /// rules can produce.
 pub const CONAN_MAX_POOL: u32 = 9;
+
+/// The largest pool any roll may draw: written dice, advantage extras, a dice
+/// operand, a `d6s` pool, Marvel edges or troubles. Each die or reroll is a step
+/// of a loop on a shard worker, so an unbounded count hangs every shard in the
+/// process.
+pub(crate) const MAX_DICE: u32 = 500;
 
 #[derive(Debug, Clone)]
 pub enum Modifier {
@@ -165,7 +181,7 @@ pub enum Modifier {
     Fudge,                              // df - Fudge dice with symbol display
     DarkHeresy,
     SavageWorlds(u32),
-    D6System(u32, String),
+    D6System(u32),
     Shadowrun(u32),
     MarvelMultiverse(i32, i32), // (edges, troubles) - already calculated net values
     CyberpunkRed,
@@ -216,6 +232,27 @@ impl Modifier {
 
     /// Targets that make the roller apply math after them to the success count.
     /// `f#` and `b#` don't: with only those, math after them is not applied.
+    /// Systems whose roller counts the pooled dice (Icons, sixes, the highest
+    /// die) and applies no math to the result. An added dice operand joins the
+    /// pool (apply_dice_operand puts its dice in kept_rolls, which these count),
+    /// so `+ 1d6` works, as their rules phrase a bonus; a number or `- * /` is
+    /// dropped by the roller, so the parser refuses it. Returns what the system
+    /// does, for the error. W&G total mode (`wngt`) sums the dice, keeping math.
+    pub fn counts_dice_without_math(&self) -> Option<&'static str> {
+        match self {
+            Modifier::WrathGlory(_, false, _) => Some("Wrath & Glory counts Icons"),
+            Modifier::Alien | Modifier::AlienStress(_) => Some("Alien counts sixes"),
+            Modifier::ForgedDark | Modifier::ForgedDarkZero => {
+                Some("Forged in the Dark reads the highest die")
+            }
+            Modifier::WildWords(_) => Some("Wild Words reads the highest die"),
+            Modifier::LaserFeelings(..) => {
+                Some("Lasers & Feelings counts dice against your number")
+            }
+            _ => None,
+        }
+    }
+
     pub fn sets_success_count(&self) -> bool {
         matches!(
             self,
@@ -405,12 +442,16 @@ impl RollResult {
     /// Format the result value (damage, successes, or total)
     fn format_result_value(&self) -> String {
         // Special handling for Wrath & Glory
-        if let (Some(wrath_dice), Some(icons), Some(exalted_icons)) = (
-            self.wng_wrath_dice.as_ref(),
-            self.wng_icons,
-            self.wng_exalted_icons,
-        ) {
+        if let (Some(icons), Some(exalted_icons)) = (self.wng_icons, self.wng_exalted_icons) {
             let exalted_value = exalted_icons * 2;
+            let icon_totals = format!(
+                "TOTAL - Icons: `{icons}` Exalted Icons: `{exalted_icons}` (Value:{exalted_value})"
+            );
+
+            // Damage, Determination and exempt rolls have no Wrath Die
+            let Some(wrath_dice) = self.wng_wrath_dice.as_ref() else {
+                return icon_totals;
+            };
 
             // Format wrath dice display
             let wrath_display = if wrath_dice.len() == 1 {
@@ -426,9 +467,7 @@ impl RollResult {
                 )
             };
 
-            return format!(
-                "{wrath_display} | TOTAL - Icons: `{icons}` Exalted Icons: `{exalted_icons}` (Value:{exalted_value})"
-            );
+            return format!("{wrath_display} | {icon_totals}");
         }
 
         // Forged in the Dark result formatting
@@ -679,6 +718,18 @@ pub(crate) fn is_semicolon_separated(results: &[RollResult]) -> bool {
 
 pub(crate) const DISCORD_MESSAGE_LIMIT: usize = 2000;
 
+/// Cut `content` to fit one Discord message, marking the cut with `...`. A send
+/// over the limit fails outright and the user sees "interaction failed", so
+/// every reply passes through this before it goes out.
+pub fn truncate_to_message_limit(mut content: String) -> String {
+    if content.len() > DISCORD_MESSAGE_LIMIT {
+        // Cut on a char boundary: `truncate` panics inside a multi-byte char (emoji)
+        content.truncate(content.floor_char_boundary(DISCORD_MESSAGE_LIMIT - 3));
+        content.push_str("...");
+    }
+    content
+}
+
 pub fn format_multiple_results_with_limit(results: &[RollResult]) -> String {
     let full_output = format_multiple_results(results);
 
@@ -723,13 +774,7 @@ pub fn format_multiple_results_with_limit(results: &[RollResult]) -> String {
     }
 
     // Level 4: Emergency truncation
-    let mut emergency_output = level3_output;
-    if emergency_output.len() > DISCORD_MESSAGE_LIMIT - 3 {
-        // Cut on a char boundary: `truncate` panics inside a multi-byte char (emoji)
-        emergency_output.truncate(emergency_output.floor_char_boundary(DISCORD_MESSAGE_LIMIT - 3));
-        emergency_output.push_str("...");
-    }
-    emergency_output
+    truncate_to_message_limit(level3_output)
 }
 
 /// Format ultra-compact results (totals only, minimal text)

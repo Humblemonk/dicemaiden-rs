@@ -7,7 +7,7 @@
 // - Game system modifiers and edge cases
 
 use dicemaiden_rs::{
-    RollResult,
+    Modifier, RollResult,
     dice::aliases,
     dice::rng::create_seeded_rng,
     dice::roller::{broken_empires_test_outcome, wfrp_test_outcome},
@@ -35,6 +35,14 @@ fn roll_one(input: &str, description: &str) -> RollResult {
         .unwrap_or_else(|e| panic!("'{input}' should parse: {description} - {e}"));
     assert_eq!(results.len(), 1, "Should have one result for '{input}'");
     results.remove(0)
+}
+
+/// Every die a roll rolled: the ones it kept and the ones it dropped. An
+/// advantage roll lists only its chosen die in `individual_rolls`.
+fn rolled_dice(result: &RollResult) -> Vec<i32> {
+    let mut dice = result.individual_rolls.clone();
+    dice.extend(&result.dropped_rolls);
+    dice
 }
 
 /// Roll `expression` against a fixed seed, returning its single result.
@@ -482,26 +490,17 @@ fn test_game_system_cross_compatibility() {
 
         assert!(result1.is_ok() && result2.is_ok(), "{}", description);
 
-        // They should produce different types of results
-        let r1 = result1.unwrap();
-        let r2 = result2.unwrap();
-
-        assert!(
-            r1[0].total != 0
-                || r1[0].successes.is_some()
-                || r1[0].godbound_damage.is_some()
-                || r1[0].fudge_symbols.is_some(),
-            "System '{}' should produce valid results",
-            system1
-        );
-        assert!(
-            r2[0].total != 0
-                || r2[0].successes.is_some()
-                || r2[0].godbound_damage.is_some()
-                || r2[0].fudge_symbols.is_some(),
-            "System '{}' should produce valid results",
-            system2
-        );
+        // Each should have rolled dice. Not `total != 0`: a Cyberpunk Red
+        // critical failure (`[1] - [1]`) legitimately totals 0, about 1 roll in
+        // 110, which made this test fail at random.
+        for (system, result) in [(system1, result1), (system2, result2)] {
+            let rolls = result.unwrap();
+            assert!(
+                !rolls[0].individual_rolls.is_empty(),
+                "System '{}' should produce valid results",
+                system
+            );
+        }
     }
 }
 
@@ -1441,6 +1440,320 @@ fn test_marvel_multiverse_mechanics() {
 }
 
 #[test]
+fn test_marvel_multiverse_edge_trouble_counts() {
+    // A bare `mme`/`mmt` is one edge/trouble, as `mm e` is (it used to be none).
+    // Edges and troubles cancel first; the 500 dice cap applies to what is left.
+    // An overflow is rejected, never dropped or cancelled.
+    // (expression, the edge/trouble note it must carry, or None to be rejected)
+    let cases = vec![
+        ("mm e", Some("1 edge")),
+        ("3d6 mme", Some("1 edge")),
+        ("3d6 mmt", Some("1 trouble")),
+        ("mm 500e", Some("500 edges")),
+        ("3d6 mmt500", Some("500 troubles")),
+        ("mm 501e 500t", Some("1 edge")),
+        ("mm 501e 1t", Some("500 edges")),
+        ("mm 300e 800t", Some("500 troubles")),
+        ("mm 1000e 499t", None), // 501 left after cancelling
+        ("mm 501t", None),
+        ("3d6 mme501", None),
+        ("mm 99999999999e", None),              // once rolled 1 edge
+        ("mm 99999999999e 99999999999t", None), // must not cancel to a plain roll
+        ("3d6 mmt99999999999", None),           // once rolled 0 troubles
+        ("3d6 mmex", None),
+        // One Marvel modifier per roll: a second raw token used to be ignored
+        ("3d6 mm mme2", None),
+        ("3d6 mme2 mmt1", None),
+        ("3d6 mme5 mme5", None),
+    ];
+
+    for (expression, note) in cases {
+        match note {
+            Some(note) => {
+                let result = roll_one(expression, "Marvel edge/trouble count");
+                assert!(
+                    result.notes.iter().any(|n| n == note),
+                    "'{expression}' should note '{note}': {:?}",
+                    result.notes
+                );
+            }
+            None => assert_invalid(expression),
+        }
+    }
+}
+
+#[test]
+fn test_marvel_multiverse_rulebook_rerolls() {
+    // Seeds chosen to land on each rule (Roll20 compendium, Edges and Troubles /
+    // Fantastic Rolls): "An M is always considered to be the best die number";
+    // a rerolled Marvel die can come up M; 6 M 6 "automatically succeeds.
+    // Ignore any trouble at that point."
+    // (expression, seed, total, a note it must carry, whether the M shows)
+    let cases = vec![
+        // Trouble rerolls the M, not the regular 6 beside it
+        ("mm t", 3, 13, "Trouble 1: Rerolled M → 3", false),
+        // The rerolled-away M no longer shows, and the roll is not Fantastic
+        ("mm t", 7, 6, "Trouble 1: Rerolled M → 2", false),
+        // An edge on the Marvel die can roll the logo: an M, worth 6
+        ("mm e", 32, 15, "Edge 1: Rerolled 2 → M", true),
+        // Ultimate Fantastic ignores trouble
+        ("mm t", 22, 18, "trouble ignored", true),
+        ("mm 2t", 22, 18, "trouble ignored", true),
+    ];
+
+    for (expression, seed, total, note, shows_m) in cases {
+        let result = roll_at_seed(expression, seed);
+        assert_eq!(result.total, total, "'{expression}' at seed {seed}");
+        assert!(
+            result.notes.iter().any(|n| n.contains(note)),
+            "'{expression}' at seed {seed} should note '{note}': {:?}",
+            result.notes
+        );
+        let final_dice = &result.dice_groups[1].rolls;
+        assert_eq!(
+            final_dice[1] == -1,
+            shows_m,
+            "'{expression}' at seed {seed}: M shown on {final_dice:?}"
+        );
+        assert_eq!(
+            result.notes.iter().any(|n| n.contains("Fantastic")),
+            shows_m,
+            "'{expression}' at seed {seed}: Fantastic note should match the final die"
+        );
+    }
+}
+
+#[test]
+fn test_marvel_multiverse_dice_operands() {
+    // Dice math on a Marvel roll is rolled and shown, as numbers already were
+    // applied; `mm + 1d6` used to drop the d6 without a word.
+    // (expression, display group the operand dice must appear in)
+    let cases = vec![
+        ("mm + 1d6", "add"),
+        ("mm 2e - 1d4", "subtract"),
+        ("mm 3t * 1d2", "multiply"),
+        ("3d6 mme2 / 1d2", "divide"),
+    ];
+
+    for (expression, group) in cases {
+        let result = roll_one(expression, "Marvel with a dice operand");
+        assert!(
+            result.dice_groups.iter().any(|g| g.modifier_type == group),
+            "'{expression}' should roll and show its operand dice"
+        );
+    }
+}
+
+#[test]
+fn test_wrath_glory_modes_and_trailing_math() {
+    // `!soak`, `!exempt` and `!dmg` count Icons with no Wrath Die (Core
+    // Rulebook v2.1); they used to roll an ordinary test with one. Total mode
+    // (`wngt`) keeps the user's math, which it used to drop.
+    // (expression, use_total, wrath dice, pool size, comment kept)
+    let cases = vec![
+        ("wng 4d6 !soak", false, 0, 4, None),
+        ("wng 5d6 !dmg", false, 0, 5, None),
+        ("wng w2 4d6 !exempt", false, 0, 4, None),
+        ("wng dn3 6d6 !soak", false, 0, 6, None),
+        ("wng 4d6 ! SOAK hits", false, 0, 4, Some("SOAK hits")),
+        // A comment that names no mode stays a comment on an ordinary test
+        ("wng 4d6 !hi", false, 1, 4, Some("hi")),
+        // Trailing math no longer turns the pool into an extra operand
+    ];
+
+    for (expression, use_total, wrath, pool, comment) in cases {
+        let rolls = dicemaiden_rs::parser::parse_dice_string(expression)
+            .unwrap_or_else(|e| panic!("'{expression}' should parse: {e}"));
+        let roll = &rolls[0];
+        assert_eq!(roll.count, pool, "'{expression}' pool size");
+        assert!(
+            roll.modifiers.iter().any(|m| matches!(
+                m,
+                Modifier::WrathGlory(_, total, w) if *total == use_total && *w == wrath
+            )),
+            "'{expression}' should be total={use_total} with {wrath} wrath dice: {:?}",
+            roll.modifiers
+        );
+        assert_eq!(roll.comment.as_deref(), comment, "'{expression}' comment");
+    }
+
+    // Icon counts take no math (bonuses are pool dice); it used to be dropped
+    for expression in ["wng 4d6 + 1", "wng w2 dn3 5d6 - 1", "wng 4d6 + 2 !soak"] {
+        assert_invalid(expression);
+    }
+
+    // Total mode keeps the math: [1, 1, 1, 1] + 2
+    assert_eq!(roll_one("4d1 wngt + 2", "W&G total with math").total, 6);
+    assert_eq!(roll_one("4d1 wngw0t + 2", "W&G total, no wrath").total, 6);
+}
+
+#[test]
+fn test_dark_heresy_trailing_math() {
+    // `dh 4d10 + 2` fell back to bare `dh` with the 4d10 as an extra operand:
+    // 5 dice and no explosion on the pool. It now keeps the pool and its ie10.
+    // (expression, pool size, the math modifier it must carry)
+    let cases = vec![
+        ("dh 4d10 + 2", 4, "Add(2)"),
+        ("dh 2d10 - 1", 2, "Subtract(1)"),
+        ("dh 2d10+1", 2, "Add(1)"),
+        ("dh 3d10 * 2", 3, "Multiply(2)"),
+    ];
+
+    for (expression, pool, math) in cases {
+        let rolls = dicemaiden_rs::parser::parse_dice_string(expression)
+            .unwrap_or_else(|e| panic!("'{expression}' should parse: {e}"));
+        let roll = &rolls[0];
+        let modifiers: Vec<String> = roll.modifiers.iter().map(|m| format!("{m:?}")).collect();
+        assert_eq!((roll.count, roll.sides), (pool, 10), "'{expression}' pool");
+        assert!(
+            ["ExplodeIndefinite(Some(10))", "DarkHeresy", math]
+                .iter()
+                .all(|wanted| modifiers.iter().any(|m| m == wanted)),
+            "'{expression}' should explode, be Dark Heresy and apply {math}: {modifiers:?}"
+        );
+    }
+}
+
+#[test]
+fn test_cypher_total_and_special_rolls() {
+    // Cypher System Reference Document: a bonus counts toward the target; a
+    // natural 19/20 is a minor/major effect only on a success; a natural 17/18
+    // is +1/+2 damage in combat with no effect. Seeds land on each natural.
+    // (expression, seed, natural, the verdict note, the special note or "")
+    let cases = vec![
+        ("cs 3 + 2", 18, 7, "**SUCCESS** (rolled 9 vs target 9)", ""),
+        (
+            "cs 3",
+            0,
+            17,
+            "**SUCCESS**",
+            "+1 damage if this is an attack",
+        ),
+        (
+            "cs 3",
+            16,
+            19,
+            "**SUCCESS**",
+            "**MINOR EFFECT** (Natural 19)",
+        ),
+        ("cs 7", 16, 19, "**FAILURE**", ""),
+    ];
+    for (expression, seed, natural, verdict, special) in cases {
+        let result = roll_at_seed(expression, seed);
+        assert_eq!(
+            result.individual_rolls[0], natural,
+            "'{expression}' seed {seed}"
+        );
+        assert!(
+            result.notes.iter().any(|n| n.contains(verdict)),
+            "'{expression}' seed {seed}: {:?}",
+            result.notes
+        );
+        let has_effect = result
+            .notes
+            .iter()
+            .any(|n| n.contains("EFFECT") || n.contains("damage"));
+        if special.is_empty() {
+            assert!(
+                !has_effect,
+                "'{expression}' seed {seed}: {:?}",
+                result.notes
+            );
+        } else {
+            assert!(
+                result.notes.iter().any(|n| n.contains(special)),
+                "'{expression}' seed {seed}: {:?}",
+                result.notes
+            );
+        }
+    }
+}
+
+#[test]
+fn test_mothership_skill_bonus_and_00_99() {
+    // Player's Survival Guide §5: a Skill adds its bonus to the Stat you roll
+    // under. §4.1: "A roll of 00 is always a Critical Hit and a roll of 99 is
+    // always a Critical Failure" (00 is rolled as 100).
+    let folds = vec![
+        ("ms45 + 10", "1d100 ms55"),
+        ("ms45 + 10 + 5", "1d100 ms60"), // bonuses stack (Tactics, Command)
+        ("ms45 - 10", "1d100 ms35"),
+        ("+ms45 + 10", "2d100 ms55a"),
+        ("-ms45 + 15", "2d100 ms60d"),
+        ("ms95 + 20", "1d100 ms115"),
+        ("ms + 10", "1d100 ms60"), // on the default target of 50
+        ("+ms + 3", "2d100 ms53a"),
+    ];
+    for (alias, expansion) in folds {
+        assert_eq!(
+            aliases::expand_alias(alias),
+            Some(expansion.to_string()),
+            "'{alias}'"
+        );
+    }
+
+    // (expression, seed, roll, succeeds)
+    let edges = vec![
+        ("ms1", 0, 100, true),
+        ("ms99", 0, 100, true),
+        ("ms99", 0, 99, false),
+        ("ms95 + 20", 0, 99, false),
+    ];
+    for (expression, _, roll, succeeds) in edges {
+        let seed = (0..20000u64)
+            .find(|&seed| roll_at_seed(expression, seed).kept_rolls[0] == roll)
+            .unwrap_or_else(|| panic!("no seed rolls {roll} for '{expression}'"));
+        let result = roll_at_seed(expression, seed);
+        assert_eq!(
+            result.successes.is_some(),
+            succeeds,
+            "'{expression}' rolling {roll}: {:?}",
+            result.notes
+        );
+        let critical = if succeeds {
+            "CRITICAL SUCCESS"
+        } else {
+            "CRITICAL FAILURE"
+        };
+        assert!(
+            result.notes.iter().any(|n| n.contains(critical)),
+            "'{expression}' rolling {roll}: {:?}",
+            result.notes
+        );
+    }
+}
+
+#[test]
+fn test_no_math_on_dice_count_systems() {
+    // These read Icons, sixes or the highest die and apply no math. Added dice
+    // join the pool and work; a number or `- * /` is refused, naming dice to
+    // add instead. (expression, refused?, hint in the error)
+    let cases = vec![
+        ("fitd3 + 1", true, "`+ 1d6`"),
+        ("fitd0 - 1", true, "`+ 1d6`"),
+        ("ww4 + 1", true, "`+ 1d6`"),
+        ("ww4c1 + 2", true, "`+ 2d6`"),
+        ("2lf4 + 1", true, "`+ 1d6`"),
+        ("wng 4d6 + 3", true, "`+ 3d6`"),
+        ("fitd2 + 1d6", false, ""),
+        ("ww4 + 1d6", false, ""),
+        ("2lf4 + 1d6", false, ""),
+        ("wng 4d6 + 1d6", false, ""),
+        ("wng 4d6 k3", false, ""),
+    ];
+    for (expression, refused, hint) in cases {
+        match parse_and_roll(expression) {
+            Err(e) if refused => assert!(e.to_string().contains(hint), "'{expression}': {e}"),
+            Ok(_) if !refused => {}
+            other => panic!(
+                "'{expression}' refused={refused}: {:?}",
+                other.map(|r| r.len())
+            ),
+        }
+    }
+}
+
+#[test]
 fn test_fudge_dice_mechanics() {
     // Test Fudge dice symbols and ranges
     let result = parse_and_roll("4df").unwrap();
@@ -1518,7 +1831,7 @@ fn test_system_validation_edge_cases() {
     // Wrath & Glory - 1-5 wrath dice
     assert_valid("wng w1 4d6"); // Minimum
     assert_valid("wng w5 4d6"); // Maximum
-    assert_invalid("wng w0 4d6"); // Too small
+    assert_valid("wng w0 4d6"); // No Wrath Die, as for Initiative (p.178)
     assert_invalid("wng w6 4d6"); // Too large
     // // Lasers & Feelings - target 2-5
     assert_valid("2lf2"); // Minimum target
@@ -1661,6 +1974,30 @@ fn test_hero_killing_stun_multiplier_is_fifth_edition() {
         multipliers_seen,
         [1, 2, 3, 4, 5].into_iter().collect(),
         "the 5e STUN Multiplier is 1d6-1, minimum 1"
+    );
+}
+
+#[test]
+fn test_hero_killing_stun_overflow_is_an_error() {
+    // STUN = BODY x the multiplier. With BODY near i32::MIN, a multiplier of 1
+    // fits and any higher one used to wrap to a nonsense total in release
+    // builds. Seeded, not in the corpus: whether it overflows depends on the
+    // multiplier roll, which would make outcomes.snap vary between runs.
+    let expression = "3hsk * 999 - 2147483647";
+    let mut overflowed = 0;
+    for seed in 0..50 {
+        if let Err(e) = parse_and_roll_with_rng(expression, &mut create_seeded_rng(seed)) {
+            assert_eq!(
+                e.to_string(),
+                "Result is too large",
+                "'{expression}' seed {seed}"
+            );
+            overflowed += 1;
+        }
+    }
+    assert!(
+        overflowed > 0,
+        "a multiplier above 1 should overflow '{expression}'"
     );
 }
 
@@ -3051,88 +3388,30 @@ fn test_exalted_invalid_cases() {
 
 #[test]
 fn test_wrath_glory_special_modes_comprehensive() {
-    // Test Wrath & Glory special modes: !soak, !exempt, !dmg
+    // !soak (Determination), !exempt and !dmg count Icons with no Wrath Die,
+    // per the Core Rulebook v2.1 (pp.162, 183, 196), whatever `w#` says.
     let wng_special_modes = vec![
-        ("wng 4d6 !soak", true, "Basic soak test"),
-        ("wng w2 5d6 !soak", true, "Soak with multiple wrath dice"),
-        ("wng dn3 4d6 !soak", true, "Soak with difficulty"),
-        ("wng 6d6 !exempt", true, "Basic exempt test"),
-        ("wng dn2 4d6 !exempt", true, "Exempt with difficulty"),
-        ("wng 5d6 !dmg", true, "Basic damage test"),
-        ("wng w2 6d6 !dmg", true, "Damage with multiple wrath dice"),
+        ("wng 4d6 !soak", "Basic soak test"),
+        ("wng w2 5d6 !soak", "Soak ignores a wrath count"),
+        ("wng dn3 4d6 !soak", "Soak with difficulty"),
+        ("wng 6d6 !exempt", "Basic exempt test"),
+        ("wng dn2 4d6 !exempt", "Exempt with difficulty"),
+        ("wng 5d6 !dmg", "Basic damage test"),
+        ("wng w2 6d6 !dmg", "Damage ignores a wrath count"),
     ];
 
-    for (expression, should_use_total, description) in wng_special_modes {
-        let result = parse_and_roll(expression);
+    for (expression, description) in wng_special_modes {
+        let roll = roll_one(expression, description);
         assert!(
-            result.is_ok(),
-            "W&G special mode '{}' should parse: {}",
-            expression,
-            description
+            roll.successes.is_some() && roll.wng_icons.is_some(),
+            "'{expression}' should count Icons: {description}"
         );
-
-        let results = result.unwrap();
         assert!(
-            !results.is_empty(),
-            "Should have results for '{}': {}",
-            expression,
-            description
+            roll.wng_wrath_dice.is_none()
+                && roll.wng_wrath_die.is_none()
+                && !roll.notes.iter().any(|n| n.contains("Wrath die")),
+            "'{expression}' should roll no Wrath Die: {description}"
         );
-
-        let roll = &results[0];
-
-        if should_use_total {
-            // For soak/damage/exempt tests, should use total instead of successes
-            assert!(
-                roll.total > 0 || roll.individual_rolls.iter().sum::<i32>() >= 0,
-                "Should have meaningful total for '{}': {}",
-                expression,
-                description
-            );
-
-            // May or may not have successes depending on implementation
-            // but should have some kind of meaningful result
-            assert!(
-                roll.total != 0 || roll.successes.is_some() || !roll.individual_rolls.is_empty(),
-                "Should have meaningful result for '{}': {}",
-                expression,
-                description
-            );
-        }
-
-        // Wrath dice should still be tracked for complications/glory
-        if expression.contains("w2") || expression.contains("w3") {
-            // Should have multiple wrath dice information
-            let has_wrath_info = roll.wng_wrath_dice.is_some()
-                || roll.wng_wrath_die.is_some()
-                || roll
-                    .notes
-                    .iter()
-                    .any(|note| note.to_lowercase().contains("wrath"));
-
-            assert!(
-                has_wrath_info,
-                "Should have wrath dice information for '{}': {}",
-                expression, description
-            );
-        }
-
-        // Check difficulty mechanics if specified
-        if expression.contains("dn2") {
-            let has_difficulty_note = roll.notes.iter().any(|note| {
-                note.contains("Difficulty 2")
-                    || note.contains("dn2")
-                    || note.contains("PASS")
-                    || note.contains("FAIL")
-            });
-
-            if !has_difficulty_note {
-                println!(
-                    "Note: Difficulty mechanics for '{}' may need clearer indication",
-                    expression
-                );
-            }
-        }
     }
 
     // Test that standard W&G (without special modes) still works normally
@@ -4576,29 +4855,29 @@ fn test_alien_rpg_notes_and_formatting() {
 
 #[test]
 fn test_alien_rpg_mathematical_modifiers() {
-    // Test that mathematical modifiers work with Alien RPG
-    let modifier_tests = vec![
-        ("alien4 + 2", "Alien roll with addition"),
-        ("alien4s2 - 1", "Alien stress roll with subtraction"),
-        ("alien3s1 * 2", "Alien roll with multiplication"),
-    ];
-
-    for (expression, description) in modifier_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Alien mathematical modifier '{}' should work: {} - Error: {:?}",
-            expression,
-            description,
-            result.err()
-        );
-
-        let results = result.unwrap();
-        assert!(
-            results[0].successes.is_some(),
-            "Should maintain success counting with modifiers for '{}'",
-            expression
-        );
+    // Alien counts sixes and applies no math to that count. Added dice join
+    // the pool (a gear bonus is more dice), so `+ 1d6` works; a number or
+    // `- * /` would be dropped, so it is refused with a hint that keeps stress.
+    for (expression, hint) in [
+        ("alien4 + 2", "`+ 2d6`"),
+        ("alien4s2 + 2", "`+ 2d6`"),
+        ("alien4s2 - 1", "`+ 1d6`"),
+        ("alien3s1 * 2", "`+ 1d6`"),
+        ("alien4 - 1d6", "`+ 1d6`"),
+    ] {
+        let error = parse_and_roll(expression)
+            .expect_err("math on an Alien roll should be refused")
+            .to_string();
+        assert!(error.contains(hint), "'{expression}': {error}");
+    }
+    for expression in [
+        "alien4",
+        "alien4s2",
+        "alien4s2p",
+        "alien4 + 1d6",
+        "alien4s2 + 2d6",
+    ] {
+        assert_valid(expression);
     }
 }
 #[test]
@@ -6187,14 +6466,14 @@ fn test_mothership_advantage_disadvantage_mechanics() {
     // Test that advantage/disadvantage roll 2 dice
     let advantage_result = parse_and_roll("+ms45").unwrap();
     assert_eq!(
-        advantage_result[0].individual_rolls.len(),
+        rolled_dice(&advantage_result[0]).len(),
         2,
         "Advantage should roll 2 dice"
     );
 
     let disadvantage_result = parse_and_roll("-ms45").unwrap();
     assert_eq!(
-        disadvantage_result[0].individual_rolls.len(),
+        rolled_dice(&disadvantage_result[0]).len(),
         2,
         "Disadvantage should roll 2 dice"
     );
@@ -6218,7 +6497,13 @@ fn test_mothership_advantage_never_selects_the_worse_outcome() {
     // Ranked best (0) to worst (3)
     let rank = |roll: i32| -> u8 {
         let is_double = roll == 100 || (roll / 10) == (roll % 10);
-        match (roll <= STAT, is_double) {
+        // 00 (rolled as 100) always succeeds, 99 always fails (PSG §4.1)
+        let success = match roll {
+            100 => true,
+            99 => false,
+            _ => roll <= STAT,
+        };
+        match (success, is_double) {
             (true, true) => 0,  // crit success
             (true, false) => 1, // success
             (false, false) => 2,
@@ -6230,7 +6515,7 @@ fn test_mothership_advantage_never_selects_the_worse_outcome() {
 
     for (expression, wants_better) in [("+ms45", true), ("-ms45", false)] {
         for result in roll_across_seeds(expression, 400) {
-            let pair = &result.individual_rolls;
+            let pair = rolled_dice(&result);
             assert_eq!(pair.len(), 2, "'{expression}' should roll two dice");
 
             let selected = result.total;
@@ -6264,9 +6549,9 @@ fn test_mothership_advantage_never_selects_the_worse_outcome() {
 fn test_mothership_stat_validation() {
     // Test invalid stat values
     let invalid_stats = vec![
-        "ms0",   // Zero
-        "ms100", // Too high
-        "ms200", // Way too high
+        "ms0", // Zero
+        // A Skill bonus can lift a target past 99, so the cap is 200
+        "ms201", "ms999",
     ];
 
     for invalid_test in invalid_stats {
@@ -6302,7 +6587,7 @@ fn test_mothership_with_roll_sets() {
 
         // Should roll 2 dice for advantage
         assert_eq!(
-            roll.individual_rolls.len(),
+            rolled_dice(&roll).len(),
             2,
             "Each advantage set should roll 2 dice"
         );
