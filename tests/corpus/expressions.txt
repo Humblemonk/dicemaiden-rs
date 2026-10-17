@@ -13,6 +13,7 @@
 (Attack) 1d20 ie20 + 2d6 ie6 adv1
 (Attack) fitd4
 (Bad) sw15
+(Combat Roll) +ms50 ! Attacking the alien
 (Complex) 1d20 * / 2
 (Damage) 2d6
 (Damage) 2d6 ! Fire
@@ -51,6 +52,7 @@
 (Save) 1d20 !
 (Spell) wit + 4 ! Witcher magic attempt
 (Stealth Check) 1d20 - 2
+(Strength Check) ms45
 (Strength) 4d6 k3 ! Primary stat
 (Test "Quotes") +d%
 (Test "Quotes") 1d20 ! Comment with 'quotes'
@@ -122,6 +124,7 @@
 -ess1d10s
 -ess1d8
 -ms
+-ms35 ! Sneaking past the crew
 -ms45
 /roll (Attack) 1d20 + 5
 /roll 2d6
@@ -678,6 +681,9 @@ tbe65 e4
 2d1*0+6
 2d6 !    
 2d6 ! Multi word comment
+2hsn
+2wh3+
+2wh5+
 3d1*0+5+2
 3d1*0-5
 3d1*2*0
@@ -1205,6 +1211,8 @@ p 10 + 2 + 2d1
 3d6e6
 3d8 e6
 3df
+3hsh
+3lf3
 3lf3f k2
 3lf5
 3wh4+
@@ -1536,6 +1544,7 @@ p 10 + 2 + 2d1
 4d8 t5ds
 4df
 4df + 2
+4dp
 4wod8
 4wod8c
 4wod8c + 2
@@ -1606,6 +1615,8 @@ p 10 + 2 + 2d1
 5d6l
 5d8 e8
 5d8 tl6ds
+5wh3+
+5wh5+
 5wod6
 5wod6c
 5wod6c + 2
@@ -1963,6 +1974,7 @@ alien4s1
 alien4s1p
 alien4s2
 alien4s2; sr6
+alien4s3
 alien4s3 ! variable penalty
 alien4s3 - 2d4
 alien4s5
@@ -1983,6 +1995,7 @@ attack -2
 bnw
 bnw3
 bnw4 + 2
+cd
 cd0
 cd10
 cd4
@@ -2121,6 +2134,7 @@ dheartgm
 dheartx
 dis1
 dndstats
+dp
 ed
 ed1
 ed15
@@ -2211,6 +2225,7 @@ gb + 5
 gb 1d8
 gb 3d8
 gb 3d8 - 2
+gbs
 gbs - 2
 gbs 1d20 * 2
 gbs 2d10
@@ -2220,6 +2235,7 @@ hs
 ie6
 invalid
 invalid_fitd ; sw8
+invalid_system
 ir2
 irg2
 kl2
@@ -2247,6 +2263,7 @@ mnm ; 1d20+5 ; mnm -2
 ms
 ms30
 ms45
+ms45 ! Trying to open the airlock
 ms45 ; 1d20+5 ; +ms50
 nr (Behind Screen) 3d6 ! GM planning roll
 nr (Concentration) 1d20 + 5 ! Maintaining spell
@@ -2349,7 +2366,9 @@ save +8
 save -1
 sil
 sil + 3
+sil0
 sil10
+sil11
 sil3
 sil5
 skill
@@ -2357,16 +2376,24 @@ skill +3
 skill -4
 skill -5
 snm
+snm3
 snm4 * 3
 snm5
 snm6 + 1d4
+snm8
 sp
+sp3
 sp3 + 1d6
 sp4
 sp4 + 2d6
 sp4t6
+sp4t7
+sp5t9
+sp6
 sp6 * 2 - 3
+sp8
 sr12
+sr5
 sr6
 sr6 * 2
 sw
@@ -2374,6 +2401,8 @@ sw10
 sw10 * 2
 sw10 + 2
 sw12
+sw14
+sw3
 sw4
 sw6
 sw8
@@ -2637,11 +2666,20 @@ dh 2d10 - 1
 dh 2d10+1
 dh 3d10 * 2
 dh 2d10 + 1d6
+vtm0h1
+vtm10h3
+vtm1h1
+vtm31h2
+vtm3h4
 vtm4h0 * 2
+vtm5
+vtm5h
 vtm5h1 - 1
 vtm5h2
+vtm5h6
 vtm6h2 + 2
 vtm8h3 / 2
+vtmh2
 wng 4d6 + 1
 wng dn3 5d6 - 1
 wng 4d6 + 2 !soak
@@ -2719,6 +2757,8 @@ alien4s2 + 2
 alien4 + 1d6
 alien4s2 + 2d6
 fitd2 + 1d6
+vtm8h0
+vtm8h5
 wng 4d6 + 1d6
 ww4 + 1d6
 wng 4d6 k3

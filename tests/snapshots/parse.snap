@@ -13,6 +13,7 @@
 (Attack) 1d20 ie20 + 2d6 ie6 adv1	OK	[1d20 mods=[ExplodeIndefinite(Some(20)), AddDice(DiceRoll { count: 2, sides: 6, modifiers: [ExplodeIndefinite(Some(6)), Advantage(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Attack") comment=None flags=----]
 (Attack) fitd4	OK	[4d6 mods=[ForgedDark] label=Some("Attack") comment=None flags=----]
 (Bad) sw15	ERR	Invalid dice expression: sw15
+(Combat Roll) +ms50 ! Attacking the alien	OK	[2d100 mods=[Mothership(Some(50), true)] label=Some("Combat Roll") comment=Some("Attacking the alien") flags=----]
 (Complex) 1d20 * / 2	ERR	Invalid modifier '*' - contains operator
 (Damage) 2d6	OK	[2d6 mods=[] label=Some("Damage") comment=None flags=----]
 (Damage) 2d6 ! Fire	OK	[2d6 mods=[] label=Some("Damage") comment=Some("Fire") flags=----]
@@ -51,6 +52,7 @@
 (Save) 1d20 !	OK	[1d20 mods=[] label=Some("Save") comment=Some("") flags=----]
 (Spell) wit + 4 ! Witcher magic attempt	OK	[1d10 mods=[Witcher, Add(4)] label=Some("Spell") comment=Some("Witcher magic attempt") flags=----]
 (Stealth Check) 1d20 - 2	OK	[1d20 mods=[Subtract(2)] label=Some("Stealth Check") comment=None flags=----]
+(Strength Check) ms45	OK	[1d100 mods=[Mothership(Some(45), false)] label=Some("Strength Check") comment=None flags=----]
 (Strength) 4d6 k3 ! Primary stat	OK	[4d6 mods=[KeepHigh(3)] label=Some("Strength") comment=Some("Primary stat") flags=----]
 (Test "Quotes") +d%	OK	[2d10 mods=[KeepLow(1), Multiply(10), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Subtract(10)] label=Some("Test \"Quotes\"") comment=None flags=----]
 (Test "Quotes") 1d20 ! Comment with 'quotes'	OK	[1d20 mods=[] label=Some("Test \"Quotes\"") comment=Some("Comment with 'quotes'") flags=----]
@@ -122,6 +124,7 @@
 -ess1d10s	OK	[2d20 mods=[KeepLow(1), Essence20(5, true)] label=None comment=None flags=----]
 -ess1d8	OK	[2d20 mods=[KeepLow(1), Essence20(4, false)] label=None comment=None flags=----]
 -ms	OK	[2d100 mods=[Mothership(None, false)] label=None comment=None flags=----]
+-ms35 ! Sneaking past the crew	OK	[2d100 mods=[Mothership(Some(35), false)] label=None comment=Some("Sneaking past the crew") flags=----]
 -ms45	OK	[2d100 mods=[Mothership(Some(45), false)] label=None comment=None flags=----]
 /roll (Attack) 1d20 + 5	ERR	Invalid dice expression: /
 /roll 2d6	ERR	Invalid dice expression: /
@@ -678,6 +681,9 @@ tbe65 e4	OK	[1d100 mods=[BrokenEmpires(65, 0), Explode(Some(4))] label=None comm
 2d1*0+6	OK	[2d1 mods=[Multiply(0), Add(6)] label=None comment=None flags=----]
 2d6 !    	OK	[2d6 mods=[] label=None comment=Some("") flags=----]
 2d6 ! Multi word comment	OK	[2d6 mods=[] label=None comment=Some("Multi word comment") flags=----]
+2hsn	OK	[2d6 mods=[HeroSystem(Normal)] label=None comment=None flags=----]
+2wh3+	OK	[2d6 mods=[Target(3)] label=None comment=None flags=----]
+2wh5+	OK	[2d6 mods=[Target(5)] label=None comment=None flags=----]
 3d1*0+5+2	OK	[3d1 mods=[Multiply(0), Add(5), Add(2)] label=None comment=None flags=----]
 3d1*0-5	OK	[3d1 mods=[Multiply(0), Subtract(5)] label=None comment=None flags=----]
 3d1*2*0	OK	[3d1 mods=[Multiply(2), Multiply(0)] label=None comment=None flags=----]
@@ -1205,6 +1211,8 @@ p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 3d6e6	OK	[3d6 mods=[Explode(Some(6))] label=None comment=None flags=----]
 3d8 e6	OK	[3d8 mods=[Explode(Some(6))] label=None comment=None flags=----]
 3df	OK	[3d3 mods=[Fudge] label=None comment=None flags=----]
+3hsh	OK	[3d6 mods=[HeroSystem(Hit)] label=None comment=None flags=----]
+3lf3	OK	[3d6 mods=[LaserFeelings(0, 3, Lasers)] label=None comment=None flags=----]
 3lf3f k2	OK	[3d6 mods=[LaserFeelings(0, 3, Feelings), KeepHigh(2)] label=None comment=None flags=----]
 3lf5	OK	[3d6 mods=[LaserFeelings(0, 5, Lasers)] label=None comment=None flags=----]
 3wh4+	OK	[3d6 mods=[Target(4)] label=None comment=None flags=----]
@@ -1536,6 +1544,7 @@ p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 4d8 t5ds	OK	[4d8 mods=[TargetWithDoubleSuccess(5, 5)] label=None comment=None flags=----]
 4df	OK	[4d3 mods=[Fudge] label=None comment=None flags=----]
 4df + 2	OK	[4d3 mods=[Fudge, Add(2)] label=None comment=None flags=----]
+4dp	OK	[4d6 mods=[PlotDie] label=None comment=None flags=----]
 4wod8	OK	[4d10 mods=[Failure(1), Target(8)] label=None comment=None flags=----]
 4wod8c	OK	[4d10 mods=[Failure(1), Target(8), Cancel] label=None comment=None flags=----]
 4wod8c + 2	OK	[4d10 mods=[Failure(1), Target(8), Cancel, Add(2)] label=None comment=None flags=----]
@@ -1606,6 +1615,8 @@ p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 5d6l	OK	[4d6 mods=[Target(4), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [Target(4), Failure(1), ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 5d8 e8	OK	[5d8 mods=[Explode(Some(8))] label=None comment=None flags=----]
 5d8 tl6ds	OK	[5d8 mods=[TargetLowerWithDoubleSuccess(6, 6)] label=None comment=None flags=----]
+5wh3+	OK	[5d6 mods=[Target(3)] label=None comment=None flags=----]
+5wh5+	OK	[5d6 mods=[Target(5)] label=None comment=None flags=----]
 5wod6	OK	[5d10 mods=[Failure(1), Target(6)] label=None comment=None flags=----]
 5wod6c	OK	[5d10 mods=[Failure(1), Target(6), Cancel] label=None comment=None flags=----]
 5wod6c + 2	OK	[5d10 mods=[Failure(1), Target(6), Cancel, Add(2)] label=None comment=None flags=----]
@@ -1963,6 +1974,7 @@ alien4s1	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 1, sides: 6, modifiers: 
 alien4s1p	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 alien4s2	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 alien4s2; sr6	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=---- | 6d6 mods=[Target(5), Shadowrun(6)] label=None comment=None flags=----]
+alien4s3	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 alien4s3 ! variable penalty	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=Some("variable penalty") flags=----]
 alien4s3 - 2d4	ERR	Alien counts sixes, so math doesn't apply; add dice (`+ 1d6`) or roll fewer instead
 alien4s5	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 5, sides: 6, modifiers: [AlienStress(5)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
@@ -1983,6 +1995,7 @@ attack -2	OK	[1d20 mods=[Subtract(2)] label=None comment=None flags=----]
 bnw	ERR	Invalid dice expression: bnw
 bnw3	OK	[3d6 mods=[BraveNewWorld(0)] label=None comment=None flags=----]
 bnw4 + 2	OK	[4d6 mods=[BraveNewWorld(0), Add(2)] label=None comment=None flags=----]
+cd	OK	[1d6 mods=[ConanCombat(1)] label=None comment=None flags=----]
 cd0	ERR	Cannot roll 0 dice
 cd10	OK	[10d6 mods=[ConanCombat(10)] label=None comment=None flags=----]
 cd4	OK	[4d6 mods=[ConanCombat(4)] label=None comment=None flags=----]
@@ -2121,6 +2134,7 @@ dheartgm	OK	[1d20 mods=[] label=None comment=None flags=----]
 dheartx	ERR	Invalid dice expression: dheartx
 dis1	ERR	Invalid dice expression: dis1
 dndstats	OK	[4d6 mods=[KeepHigh(3)] label=Some("Set 1") comment=None flags=---- | 4d6 mods=[KeepHigh(3)] label=Some("Set 2") comment=None flags=---- | 4d6 mods=[KeepHigh(3)] label=Some("Set 3") comment=None flags=---- | 4d6 mods=[KeepHigh(3)] label=Some("Set 4") comment=None flags=---- | 4d6 mods=[KeepHigh(3)] label=Some("Set 5") comment=None flags=---- | 4d6 mods=[KeepHigh(3)] label=Some("Set 6") comment=None flags=----]
+dp	OK	[1d6 mods=[PlotDie] label=None comment=None flags=----]
 ed	ERR	Invalid dice expression: ed
 ed1	OK	[1d4 mods=[ExplodeIndefinite(None), Subtract(2)] label=None comment=None flags=----]
 ed15	OK	[1d12 mods=[ExplodeIndefinite(None), AddDice(DiceRoll { count: 2, sides: 6, modifiers: [ExplodeIndefinite(None)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
@@ -2211,6 +2225,7 @@ gb + 5	OK	[1d20 mods=[Godbound(false), Add(5)] label=None comment=None flags=---
 gb 1d8	OK	[1d8 mods=[Godbound(false)] label=None comment=None flags=----]
 gb 3d8	OK	[3d8 mods=[Godbound(false)] label=None comment=None flags=----]
 gb 3d8 - 2	OK	[3d8 mods=[Godbound(false), Subtract(2)] label=None comment=None flags=----]
+gbs	OK	[1d20 mods=[Godbound(true)] label=None comment=None flags=----]
 gbs - 2	OK	[1d20 mods=[Godbound(true), Subtract(2)] label=None comment=None flags=----]
 gbs 1d20 * 2	OK	[1d20 mods=[Godbound(true), AddDice(DiceRoll { count: 1, sides: 20, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Multiply(2)] label=None comment=None flags=----]
 gbs 2d10	OK	[2d10 mods=[Godbound(true)] label=None comment=None flags=----]
@@ -2220,6 +2235,7 @@ hs	ERR	Invalid dice expression: hs
 ie6	ERR	Invalid dice expression: ie6
 invalid	ERR	Invalid dice expression: invalid
 invalid_fitd ; sw8	ERR	Invalid dice expression: invalid_fitd
+invalid_system	ERR	Invalid dice expression: invalid_system
 ir2	ERR	Invalid dice expression: ir2
 irg2	ERR	Invalid dice expression: irg2
 kl2	ERR	Invalid dice expression: kl2
@@ -2247,6 +2263,7 @@ mnm ; 1d20+5 ; mnm -2	OK	[1d20 mods=[MutantsMasterminds] label=None comment=None
 ms	OK	[1d100 mods=[Mothership(None, false)] label=None comment=None flags=----]
 ms30	OK	[1d100 mods=[Mothership(Some(30), false)] label=None comment=None flags=----]
 ms45	OK	[1d100 mods=[Mothership(Some(45), false)] label=None comment=None flags=----]
+ms45 ! Trying to open the airlock	OK	[1d100 mods=[Mothership(Some(45), false)] label=None comment=Some("Trying to open the airlock") flags=----]
 ms45 ; 1d20+5 ; +ms50	OK	[1d100 mods=[Mothership(Some(45), false)] label=None comment=None flags=---- | 1d20 mods=[Add(5)] label=None comment=None flags=---- | 2d100 mods=[Mothership(Some(50), true)] label=None comment=None flags=----]
 nr (Behind Screen) 3d6 ! GM planning roll	OK	[3d6 mods=[] label=Some("Behind Screen") comment=Some("GM planning roll") flags=--n-]
 nr (Concentration) 1d20 + 5 ! Maintaining spell	OK	[1d20 mods=[Add(5)] label=Some("Concentration") comment=Some("Maintaining spell") flags=--n-]
@@ -2349,7 +2366,9 @@ save +8	OK	[1d20 mods=[Add(8)] label=None comment=None flags=----]
 save -1	OK	[1d20 mods=[Subtract(1)] label=None comment=None flags=----]
 sil	OK	[1d6 mods=[Silhouette(1)] label=None comment=None flags=----]
 sil + 3	OK	[1d6 mods=[Silhouette(1), Add(3)] label=None comment=None flags=----]
+sil0	ERR	Invalid dice expression: sil0
 sil10	OK	[1d6 mods=[Silhouette(10)] label=None comment=None flags=----]
+sil11	ERR	Invalid dice expression: sil11
 sil3	OK	[1d6 mods=[Silhouette(3)] label=None comment=None flags=----]
 sil5	OK	[1d6 mods=[Silhouette(5)] label=None comment=None flags=----]
 skill	OK	[1d20 mods=[] label=None comment=None flags=----]
@@ -2357,16 +2376,24 @@ skill +3	OK	[1d20 mods=[Add(3)] label=None comment=None flags=----]
 skill -4	OK	[1d20 mods=[Subtract(4)] label=None comment=None flags=----]
 skill -5	OK	[1d20 mods=[Subtract(5)] label=None comment=None flags=----]
 snm	ERR	Invalid dice expression: snm
+snm3	OK	[3d6 mods=[ExplodeIndefinite(Some(6)), Target(4)] label=None comment=None flags=----]
 snm4 * 3	OK	[4d6 mods=[ExplodeIndefinite(Some(6)), Target(4), Multiply(3)] label=None comment=None flags=----]
 snm5	OK	[5d6 mods=[ExplodeIndefinite(Some(6)), Target(4)] label=None comment=None flags=----]
 snm6 + 1d4	OK	[6d6 mods=[ExplodeIndefinite(Some(6)), Target(4), AddDice(DiceRoll { count: 1, sides: 4, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+snm8	OK	[8d6 mods=[ExplodeIndefinite(Some(6)), Target(4)] label=None comment=None flags=----]
 sp	ERR	Invalid dice expression: sp
+sp3	OK	[3d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
 sp3 + 1d6	OK	[3d10 mods=[Target(8), ExplodeIndefinite(Some(10)), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 sp4	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
 sp4 + 2d6	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(10)), AddDice(DiceRoll { count: 2, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 sp4t6	OK	[4d10 mods=[Target(6), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
+sp4t7	OK	[4d10 mods=[Target(7), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
+sp5t9	OK	[5d10 mods=[Target(9), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
+sp6	OK	[6d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
 sp6 * 2 - 3	OK	[6d10 mods=[Target(8), ExplodeIndefinite(Some(10)), Multiply(2), Subtract(3)] label=None comment=None flags=----]
+sp8	OK	[8d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
 sr12	OK	[12d6 mods=[Target(5), Shadowrun(12)] label=None comment=None flags=----]
+sr5	OK	[5d6 mods=[Target(5), Shadowrun(5)] label=None comment=None flags=----]
 sr6	OK	[6d6 mods=[Target(5), Shadowrun(6)] label=None comment=None flags=----]
 sr6 * 2	OK	[6d6 mods=[Target(5), Shadowrun(6), Multiply(2)] label=None comment=None flags=----]
 sw	ERR	Invalid dice expression: sw
@@ -2374,6 +2401,8 @@ sw10	OK	[2d1 mods=[SavageWorlds(10)] label=None comment=None flags=----]
 sw10 * 2	OK	[2d1 mods=[SavageWorlds(10), Multiply(2)] label=None comment=None flags=----]
 sw10 + 2	OK	[2d1 mods=[SavageWorlds(10), Add(2)] label=None comment=None flags=----]
 sw12	OK	[2d1 mods=[SavageWorlds(12)] label=None comment=None flags=----]
+sw14	ERR	Invalid dice expression: sw14
+sw3	ERR	Invalid dice expression: sw3
 sw4	OK	[2d1 mods=[SavageWorlds(4)] label=None comment=None flags=----]
 sw6	OK	[2d1 mods=[SavageWorlds(6)] label=None comment=None flags=----]
 sw8	OK	[2d1 mods=[SavageWorlds(8)] label=None comment=None flags=----]
@@ -2637,11 +2666,20 @@ dh 2d10 - 1	OK	[2d10 mods=[ExplodeIndefinite(Some(10)), DarkHeresy, Subtract(1)]
 dh 2d10+1	OK	[2d10 mods=[ExplodeIndefinite(Some(10)), DarkHeresy, Add(1)] label=None comment=None flags=----]
 dh 3d10 * 2	OK	[3d10 mods=[ExplodeIndefinite(Some(10)), DarkHeresy, Multiply(2)] label=None comment=None flags=----]
 dh 2d10 + 1d6	OK	[2d10 mods=[ExplodeIndefinite(Some(10)), DarkHeresy, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+vtm0h1	ERR	Invalid dice expression: vtm0h1
+vtm10h3	OK	[10d10 mods=[VampireMasquerade5(10, 3)] label=None comment=None flags=----]
+vtm1h1	OK	[1d10 mods=[VampireMasquerade5(1, 1)] label=None comment=None flags=----]
+vtm31h2	ERR	Invalid dice expression: vtm31h2
+vtm3h4	ERR	Invalid dice expression: vtm3h4
 vtm4h0 * 2	OK	[4d10 mods=[VampireMasquerade5(4, 0), Multiply(2)] label=None comment=None flags=----]
+vtm5	ERR	Invalid dice expression: vtm5
+vtm5h	ERR	Invalid dice expression: vtm5h
 vtm5h1 - 1	OK	[5d10 mods=[VampireMasquerade5(5, 1), Subtract(1)] label=None comment=None flags=----]
 vtm5h2	OK	[5d10 mods=[VampireMasquerade5(5, 2)] label=None comment=None flags=----]
+vtm5h6	ERR	Invalid dice expression: vtm5h6
 vtm6h2 + 2	OK	[6d10 mods=[VampireMasquerade5(6, 2), Add(2)] label=None comment=None flags=----]
 vtm8h3 / 2	OK	[8d10 mods=[VampireMasquerade5(8, 3), Divide(2)] label=None comment=None flags=----]
+vtmh2	ERR	Invalid dice expression: vtmh2
 wng 4d6 + 1	ERR	Wrath & Glory counts Icons, so `+ 1` doesn't apply; add dice instead (`+ 1d6`)
 wng dn3 5d6 - 1	ERR	Wrath & Glory counts Icons, so math doesn't apply; add dice (`+ 1d6`) or roll fewer instead
 wng 4d6 + 2 !soak	ERR	Wrath & Glory counts Icons, so `+ 2` doesn't apply; add dice instead (`+ 2d6`)
@@ -2719,6 +2757,8 @@ alien4s2 + 2	ERR	Alien counts sixes, so `+ 2` doesn't apply; add dice instead (`
 alien4 + 1d6	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 alien4s2 + 2d6	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), AddDice(DiceRoll { count: 2, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 fitd2 + 1d6	OK	[2d6 mods=[ForgedDark, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+vtm8h0	OK	[8d10 mods=[VampireMasquerade5(8, 0)] label=None comment=None flags=----]
+vtm8h5	OK	[8d10 mods=[VampireMasquerade5(8, 5)] label=None comment=None flags=----]
 wng 4d6 + 1d6	OK	[4d6 mods=[WrathGlory(None, false, 1), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 ww4 + 1d6	OK	[4d6 mods=[WildWords(None), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 wng 4d6 k3	OK	[1d6 mods=[WrathGlory(None, false, 1), AddDice(DiceRoll { count: 4, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), KeepHigh(3)] label=None comment=None flags=----]

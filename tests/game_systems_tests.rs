@@ -211,234 +211,6 @@ fn assert_no_prefix_conflicts(system: &str, patterns: &[&str], existing_patterns
 // COMPREHENSIVE GAME SYSTEM TESTS
 // ============================================================================
 
-#[test]
-fn test_game_systems_comprehensive() {
-    // Single table-driven test replacing 15+ individual test functions
-    let game_systems = vec![
-        // (alias, should_parse, expected_feature, description)
-
-        // World/Chronicles of Darkness
-        (
-            "4cod",
-            true,
-            Some("success"),
-            "Chronicles of Darkness standard",
-        ),
-        ("4cod8", true, Some("success"), "Chronicles 8-again"),
-        ("4cod9", true, Some("success"), "Chronicles 9-again"),
-        ("4codr", true, Some("success"), "Chronicles rote quality"),
-        ("4wod8", true, Some("success"), "World of Darkness diff 8"),
-        ("5wod6", true, Some("success"), "World of Darkness diff 6"),
-        (
-            "4wod8c",
-            true,
-            Some("success"),
-            "World of Darkness diff 8 with cancel",
-        ),
-        (
-            "5wod6c",
-            true,
-            Some("success"),
-            "World of Darkness diff 6 with cancel",
-        ),
-        (
-            "6wod7c + 2",
-            true,
-            Some("success"),
-            "World of Darkness with cancel and modifier",
-        ),
-        // Shadowrun
-        ("sr5", true, Some("success"), "Shadowrun 5th edition"),
-        ("sr6", true, Some("success"), "Shadowrun 6th edition"),
-        // Godbound
-        ("gb", true, Some("damage"), "Godbound basic damage"),
-        ("gbs", true, Some("damage"), "Godbound straight damage"),
-        ("gb 1d8", true, Some("damage"), "Godbound with dice"),
-        (
-            "gbs 2d10",
-            true,
-            Some("damage"),
-            "Godbound straight with dice",
-        ),
-        // Fudge/FATE
-        ("3df", true, Some("fudge"), "3 Fudge dice"),
-        ("4df", true, Some("fudge"), "4 Fudge dice"),
-        // Savage Worlds
-        ("sw4", true, None, "Savage Worlds d4 trait"),
-        ("sw6", true, None, "Savage Worlds d6 trait"),
-        ("sw8", true, None, "Savage Worlds d8 trait"),
-        ("sw10", true, None, "Savage Worlds d10 trait"),
-        ("sw12", true, None, "Savage Worlds d12 trait"),
-        // Hero System
-        ("2hsn", true, None, "Hero System normal damage"),
-        ("3hsk", true, None, "Hero System killing damage"),
-        ("3hsh", true, None, "Hero System to-hit"),
-        ("2hsk1", true, None, "Hero System fractional killing"),
-        // Cyberpunk Red & Witcher
-        ("cpr", true, None, "Cyberpunk Red basic"),
-        ("cpr + 5", true, None, "Cyberpunk Red with modifier"),
-        ("wit", true, None, "Witcher basic"),
-        ("wit + 5", true, None, "Witcher with modifier"),
-        // Other Systems
-        ("age", true, None, "AGE system"),
-        ("dndstats", true, None, "D&D ability scores"),
-        ("ed15", true, None, "Earthdawn step 15"),
-        ("d6s4", true, None, "D6 System"),
-        ("bnw3", true, None, "Brave New World 3-die pool"),
-        ("sil3", true, None, "Silhouette 3 dice"),
-        (
-            "conan",
-            true,
-            None,
-            "Conan 2d20 skill without a target number",
-        ),
-        ("conan tn12", true, Some("success"), "Conan 2d20 skill test"),
-        ("cd", true, None, "Conan combat dice"),
-        // Wrath & Glory variations
-        ("wng 4d6", true, Some("success"), "W&G basic test"),
-        ("wng dn2 4d6", true, Some("success"), "W&G difficulty test"),
-        (
-            "wng w2 4d6",
-            true,
-            Some("success"),
-            "W&G multiple wrath dice",
-        ),
-        // Marvel Multiverse
-        ("mm", true, None, "Marvel Multiverse basic"),
-        ("mm e", true, None, "Marvel with edge"),
-        ("mm t", true, None, "Marvel with trouble"),
-        // Cypher System
-        ("cs 1", true, None, "Cypher System level 1"),
-        ("cs 6", true, None, "Cypher System level 6"),
-        ("cs 10", true, None, "Cypher System level 10"),
-        // Invalid cases
-        ("invalid_system", false, None, "Should fail"),
-        ("sil0", false, None, "Silhouette zero dice"),
-        ("sil11", false, None, "Silhouette too many dice"),
-        ("sw3", false, None, "Invalid Savage Worlds die"),
-        ("sw14", false, None, "Invalid Savage Worlds die"),
-        ("cs 0", false, None, "Invalid Cypher level"),
-        ("cs 11", false, None, "Invalid Cypher level"),
-        // Storypath System
-        ("sp3", true, Some("success"), "Storypath 3 dice"),
-        ("sp4", true, Some("success"), "Storypath 4 dice"),
-        ("sp6", true, Some("success"), "Storypath 6 dice"),
-        ("sp8", true, Some("success"), "Storypath 8 dice"),
-        ("sp4t7", true, Some("success"), "Storypath 4 dice target 7"),
-        ("sp5t9", true, Some("success"), "Storypath 5 dice target 9"),
-        // Double Digit Dice
-        ("dd34", true, None, "Double digit d3*10 + d4"),
-        ("dd26", true, None, "Double digit d2*10 + d6"),
-        ("dd66", true, None, "Double digit d6*10 + d6"),
-        ("dd46", true, None, "Double digit d4*10 + d6"),
-        // Sunsails New Millennium
-        ("snm3", true, Some("success"), "SNM 3 dice"),
-        ("snm5", true, Some("success"), "SNM 5 dice"),
-        ("snm8", true, Some("success"), "SNM 8 dice"),
-        // Year Zero Engine
-        ("3yz", true, Some("success"), "Year Zero 3 dice"),
-        ("6yz", true, Some("success"), "Year Zero 6 dice"),
-        ("8yz", true, Some("success"), "Year Zero 8 dice"),
-        // Warhammer 40k/Age of Sigmar
-        ("2wh3+", true, Some("success"), "Warhammer 2d6 3+"),
-        ("3wh4+", true, Some("success"), "Warhammer 3d6 4+"),
-        ("5wh5+", true, Some("success"), "Warhammer 5d6 5+"),
-        // D6 Legends
-        ("1d6l", true, Some("success"), "D6 Legends wild die only"),
-        (
-            "8d6l",
-            true,
-            Some("success"),
-            "D6 Legends 7 regular + 1 wild",
-        ),
-        (
-            "12d6l",
-            true,
-            Some("success"),
-            "D6 Legends 11 regular + 1 wild",
-        ),
-        ("0d6l", false, None, "Invalid D6 Legends zero dice"),
-        // VTM5 - Vampire: The Masquerade 5th Edition
-        ("vtm5h2", true, Some("success"), "VTM5 5 dice, 2 hunger"),
-        ("vtm7h2", true, Some("success"), "VTM5 7 dice, 2 hunger"),
-        ("vtm8h0", true, Some("success"), "VTM5 8 dice, no hunger"),
-        ("vtm10h3", true, Some("success"), "VTM5 10 dice, 3 hunger"),
-        (
-            "vtm1h1",
-            true,
-            Some("success"),
-            "VTM5 minimum pool, all hunger",
-        ),
-        ("vtm8h5", true, Some("success"), "VTM5 8 dice, max hunger"),
-        // Lasers & Feelings
-        ("2lf4l", true, Some("success"), "Lasers & Feelings Lasers"),
-        ("2lf4f", true, Some("success"), "Lasers & Feelings Feelings"),
-        ("3lf3", true, Some("success"), "Lasers & Feelings generic"),
-        // Daggerheart RPG
-        (
-            "dheart",
-            true,
-            Some("total"),
-            "Daggerheart player roll (Hope/Fear)",
-        ),
-        ("dheartgm", true, Some("total"), "Daggerheart GM roll (d20)"),
-        // A5E (Level Up Advanced 5th Edition)
-        ("a5e +5 ex1", true, Some("total"), "A5E expertise level 1"),
-        ("a5e +7 ex2", true, Some("total"), "A5E expertise level 2"),
-        ("a5e +3 ex3", true, Some("total"), "A5E expertise level 3"),
-        ("+a5e +5 ex1", true, Some("total"), "A5E with advantage"),
-        ("-a5e +5 ex1", true, Some("total"), "A5E with disadvantage"),
-        // Plotweaver/Cosmere RPG
-        ("dp", true, Some("total"), "Plotweaver, plain plot die roll"),
-        ("4dp", true, Some("total"), "Plotweaver, 4 plot dice"),
-    ];
-
-    for (system, should_parse, expected_feature, description) in game_systems {
-        let result = parse_and_roll(system);
-
-        if should_parse {
-            assert!(
-                result.is_ok(),
-                "Game system '{}' should parse successfully: {}",
-                system,
-                description
-            );
-
-            let results = result.unwrap();
-            assert!(!results.is_empty(), "No results for: '{}'", system);
-
-            // Check expected features
-            if let Some(feature) = expected_feature {
-                match feature {
-                    "success" => assert!(
-                        results[0].successes.is_some(),
-                        "Game system '{}' should have success counting",
-                        system
-                    ),
-                    "fudge" => assert!(
-                        results[0].fudge_symbols.is_some(),
-                        "Game system '{}' should have fudge symbols",
-                        system
-                    ),
-                    "damage" => assert!(
-                        results[0].godbound_damage.is_some() || results[0].total > 0,
-                        "Game system '{}' should have damage calculation",
-                        system
-                    ),
-                    _ => {}
-                }
-            }
-        } else {
-            assert!(
-                result.is_err(),
-                "Game system '{}' should fail to parse: {}",
-                system,
-                description
-            );
-        }
-    }
-}
-
 // ============================================================================
 // ALIAS EXPANSION TESTS
 // ============================================================================
@@ -2366,76 +2138,6 @@ fn test_conan_combat_dice_are_damage_not_successes() {
 }
 
 #[test]
-fn test_missing_game_systems() {
-    // Test the remaining game systems mentioned in roll_syntax.md but not yet tested
-    let missing_systems = vec![
-        // Dark Heresy 2nd Edition
-        ("dh 4d10", "Dark Heresy 4d10 righteous fury"),
-        ("dh 6d10", "Dark Heresy 6d10 righteous fury"),
-        // Exalted variants
-        ("ex5", "Exalted 5d10 t7 t10"),
-        ("ex5t8", "Exalted 5d10 t8 t10"),
-        ("ex10", "Exalted 10d10"),
-        ("ex3t6", "Exalted 3d10 t6 t10"),
-        ("ex7d8", "Exalted 7d10 t7ds8"),
-        ("ex5t8d9", "Exalted 5d10 t8ds9"),
-        ("ex10d8t6", "Exalted 10d10 t6ds8"),
-        // Year Zero Engine
-        ("6yz", "Year Zero 6d6 t6"),
-        ("4yz", "Year Zero 4d6 t6"),
-        ("8yz", "Year Zero 8d6 t6"),
-        // Warhammer 40k/Age of Sigmar
-        ("3wh4+", "Warhammer 3d6 t4"),
-        ("5wh3+", "Warhammer 5d6 t3"),
-        ("2wh5+", "Warhammer 2d6 t5"),
-        // Earthdawn 4th Edition
-        ("ed4e15", "Earthdawn 4e step 15"),
-        ("ed4e20", "Earthdawn 4e step 20"),
-        ("ed4e50", "Earthdawn 4e step 50"),
-        // Double Digit dice
-        ("dd34", "1d3*10 + 1d4 (d66-style)"),
-        ("dd26", "1d2*10 + 1d6"),
-        ("dd46", "1d4*10 + 1d6"),
-        // Storypath System
-        ("sp4", "Storypath 4d10 t8 ie10"),
-        ("sp6", "Storypath 6d10 t8 ie10"),
-        ("sp8", "Storypath 8d10 t8 ie10"),
-        // Sunsails New Millennium
-        ("snm5", "Sunsails 5d6 ie6 t4"),
-        ("snm3", "Sunsails 3d6 ie6 t4"),
-        ("snm8", "Sunsails 8d6 ie6 t4"),
-    ];
-
-    for (expression, description) in missing_systems {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Missing system '{}' should parse: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        assert!(
-            !results.is_empty(),
-            "Should have results for '{}': {}",
-            expression,
-            description
-        );
-
-        // Basic sanity check - should have reasonable output
-        assert!(
-            results[0].total >= 0
-                || results[0].successes.is_some()
-                || !results[0].individual_rolls.is_empty(),
-            "Should have meaningful results for '{}': {}",
-            expression,
-            description
-        );
-    }
-}
-
-#[test]
 fn test_complex_system_combinations() {
     // Test complex system combinations mentioned in roll_syntax.md
     let complex_combinations = vec![
@@ -3266,11 +2968,17 @@ fn test_wrath_glory_special_modes_comprehensive() {
     let wng_special_modes = vec![
         ("wng 4d6 !soak", "Basic soak test"),
         ("wng w2 5d6 !soak", "Soak ignores a wrath count"),
+        (
+            "wng w1 dn6 4d6 !soak",
+            "Soak ignores a wrath count and difficulty",
+        ),
         ("wng dn3 4d6 !soak", "Soak with difficulty"),
         ("wng 6d6 !exempt", "Basic exempt test"),
         ("wng dn2 4d6 !exempt", "Exempt with difficulty"),
+        ("wng w3 dn1 5d6 !exempt", "Exempt ignores a wrath count"),
         ("wng 5d6 !dmg", "Basic damage test"),
         ("wng w2 6d6 !dmg", "Damage ignores a wrath count"),
+        ("wng w5 6d6 !dmg", "Damage ignores the largest wrath count"),
     ];
 
     for (expression, description) in wng_special_modes {
@@ -3287,112 +2995,69 @@ fn test_wrath_glory_special_modes_comprehensive() {
         );
     }
 
-    // Test that standard W&G (without special modes) still works normally
+    // Skill and Attribute Tests roll exactly the Wrath Dice asked for, one by
+    // default, none for `w0` (Initiative, p.178). (expression, wrath dice)
     let standard_wng_tests = vec![
-        ("wng 4d6", false, "Standard W&G test"),
-        ("wng w2 4d6", false, "Standard W&G with multiple wrath"),
-        ("wng dn3 5d6", false, "Standard W&G with difficulty"),
+        ("wng 4d6", 1),
+        ("wng w1 4d6", 1),
+        ("wng w2 6d6", 2),
+        ("wng w5 6d6", 5),
+        ("wng dn3 5d6", 1),
+        ("wng w3 dn1 5d6", 3),
+        ("wng w0 4d6", 0),
     ];
 
-    for (expression, _, description) in standard_wng_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Standard W&G '{}' should still work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        let roll = &results[0];
-
-        // Standard W&G should have success counting, not total-based
-        assert!(
-            roll.successes.is_some(),
-            "Standard W&G should have success counting for '{}'",
-            expression
-        );
-
-        // Should have wrath dice tracking
-        assert!(
-            roll.wng_wrath_die.is_some() || roll.wng_wrath_dice.is_some(),
-            "Should have wrath dice information for '{}'",
-            expression
-        );
-    }
-}
-
-#[test]
-fn test_wrath_glory_complications_and_glory() {
-    // Test that wrath dice complications and glory are properly tracked
-    // Note: This test may be probabilistic, so we run multiple iterations
-    for _ in 0..10 {
-        let result = parse_and_roll("wng w2 6d6");
-        assert!(result.is_ok(), "W&G wrath dice test should work");
-
-        let results = result.unwrap();
-        let roll = &results[0];
-
-        // Should have wrath dice information
-        assert!(
-            roll.wng_wrath_dice.is_some() || roll.wng_wrath_die.is_some(),
-            "Should track wrath dice"
-        );
-
-        // Check for complication/glory notes if applicable
-        let has_complication = roll
-            .notes
-            .iter()
-            .any(|note| note.to_lowercase().contains("complication") || note.contains("rolled 1"));
-
-        let has_glory = roll.notes.iter().any(|note| {
-            note.to_lowercase().contains("glory")
-                || note.to_lowercase().contains("critical")
-                || note.contains("rolled 6")
-        });
-
-        // If we have wrath dice results, check for appropriate mechanics
-        if let Some(ref wrath_dice) = roll.wng_wrath_dice {
-            let has_ones = wrath_dice.contains(&1);
-            let has_sixes = wrath_dice.contains(&6);
-
-            if has_ones && !has_complication {
-                println!("Note: Complication (1) detected but no complication note found");
-            }
-
-            if has_sixes && !has_glory {
-                println!("Note: Glory (6) detected but no glory note found");
-            }
+    for (expression, wrath_dice) in standard_wng_tests {
+        for roll in roll_across_seeds(expression, 4) {
+            assert!(
+                roll.successes.is_some(),
+                "'{expression}' should count successes"
+            );
+            assert_eq!(
+                roll.wng_wrath_dice.as_ref().map_or(0, Vec::len),
+                wrath_dice,
+                "'{expression}' should roll {wrath_dice} Wrath Dice"
+            );
         }
     }
 }
 
 #[test]
-fn test_wrath_glory_special_modes_with_modifiers() {
-    // Test W&G special modes with mathematical modifiers
-    let wng_modifier_tests = vec![
-        ("wng 4d6 !soak + 2", "Soak with bonus"),
-        ("wng 5d6 !dmg - 1", "Damage with penalty"),
-        ("wng w2 4d6 !exempt * 2", "Exempt with multiplier"),
-        ("wng dn3 6d6 !soak / 2", "Soak with division"),
-    ];
+fn test_wrath_glory_complications_and_glory() {
+    // A Wrath Die showing 1 is a Complication and a 6 is Glory, each noted
+    // exactly when it happens. Seeds are swept so both branches are reached.
+    let mut seen = (false, false);
 
-    for (expression, description) in wng_modifier_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "W&G special mode with modifier '{}' should work: {}",
-            expression,
-            description
+    for roll in roll_across_seeds("wng w2 6d6", 60) {
+        let wrath_dice = roll
+            .wng_wrath_dice
+            .as_ref()
+            .expect("a standard test rolls Wrath Dice");
+        let has_note = |needle: &str| roll.notes.iter().any(|note| note.contains(needle));
+
+        let complication = wrath_dice.contains(&1);
+        let glory = wrath_dice.contains(&6);
+        seen = (seen.0 || complication, seen.1 || glory);
+
+        assert_eq!(
+            has_note("Complication"),
+            complication,
+            "Wrath Dice {wrath_dice:?}, notes {:?}",
+            roll.notes
         );
-
-        let results = result.unwrap();
-        assert!(
-            !results.is_empty(),
-            "Should have results for modifier test '{}'",
-            expression
+        assert_eq!(
+            has_note("Glory"),
+            glory,
+            "Wrath Dice {wrath_dice:?}, notes {:?}",
+            roll.notes
         );
     }
+
+    assert_eq!(
+        seen,
+        (true, true),
+        "the sweep should reach both a Complication and Glory"
+    );
 }
 
 #[test]
@@ -3406,59 +3071,6 @@ fn test_wrath_glory_special_modes_with_roll_sets() {
 
     for (expression, description) in wng_roll_set_tests {
         assert_labelled_roll_sets(expression, description);
-    }
-}
-
-#[test]
-fn test_wrath_glory_edge_case_wrath_dice_counts() {
-    // Test edge cases for wrath dice counts in special modes
-    let wrath_dice_edge_cases = vec![
-        ("wng w1 4d6 !soak", 1, "Minimum wrath dice with soak"),
-        ("wng w5 6d6 !dmg", 5, "Maximum wrath dice with damage"),
-        (
-            "wng w3 dn1 5d6 !exempt",
-            3,
-            "Multiple wrath with easy difficulty",
-        ),
-        (
-            "wng w1 dn6 4d6 !soak",
-            1,
-            "Single wrath with hard difficulty",
-        ),
-    ];
-
-    for (expression, expected_wrath_count, description) in wrath_dice_edge_cases {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "W&G edge case '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        let roll = &results[0];
-
-        // Check wrath dice count if trackable
-        if let Some(ref wrath_dice) = roll.wng_wrath_dice {
-            assert_eq!(
-                wrath_dice.len(),
-                expected_wrath_count,
-                "Should have {} wrath dice for '{}'",
-                expected_wrath_count,
-                expression
-            );
-        } else if roll.wng_wrath_die.is_some() {
-            // Legacy single wrath die tracking
-            if expected_wrath_count == 1 {
-                // This is fine for single wrath die
-            } else {
-                println!(
-                    "Note: Multiple wrath dice tracking may need enhancement for '{}'",
-                    expression
-                );
-            }
-        }
     }
 }
 
@@ -3590,34 +3202,6 @@ fn test_vtm5_alias_expansion() {
 }
 
 #[test]
-fn test_vtm5_with_modifiers() {
-    // Test VTM5 system works with mathematical modifiers
-    let vtm5_modifier_tests = vec![
-        ("vtm6h2 + 2", "VTM5 with positive modifier"),
-        ("vtm5h1 - 1", "VTM5 with negative modifier"),
-        ("vtm4h0 * 2", "VTM5 with multiplication"),
-        ("vtm8h3 + 1d6", "VTM5 with additional dice"),
-    ];
-
-    for (expression, description) in vtm5_modifier_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "VTM5 modifier test '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        assert!(
-            results[0].successes.is_some(),
-            "VTM5 with modifiers should have success counting: {}",
-            description
-        );
-    }
-}
-
-#[test]
 fn test_vtm5_with_roll_sets() {
     // Test VTM5 system works with roll sets
     let vtm5_roll_set_tests = vec![
@@ -3650,14 +3234,10 @@ fn test_vtm5_invalid_cases() {
     ];
 
     for (invalid_test, description) in invalid_vtm5 {
-        let result = parse_and_roll(invalid_test);
-        // These should either fail to parse or fail validation
-        if result.is_ok() {
-            println!(
-                "VTM5 invalid case '{}' unexpectedly parsed: {}",
-                invalid_test, description
-            );
-        }
+        assert!(
+            parse_and_roll(invalid_test).is_err(),
+            "'{invalid_test}' should be rejected: {description}"
+        );
     }
 }
 
@@ -4013,42 +3593,6 @@ fn test_alien_rpg_push_mechanics() {
             description,
             result.err()
         );
-    }
-}
-
-#[test]
-fn test_alien_rpg_panic_mechanics() {
-    // Test that panic rolls are generated when stress dice show 1s
-    // We can't control randomness, so we test the structure
-
-    for _ in 0..10 {
-        let result = parse_and_roll("alien4s3").unwrap();
-
-        // Should always have success counting
-        assert!(result[0].successes.is_some());
-
-        // Note: We can't reliably test stress level tracking in unit tests
-        // because it depends on which specific dice have the alien vs aliens modifiers.
-        // This would be better tested in integration tests.
-
-        // If panic roll exists, it should be reasonable
-        if let Some(panic_roll) = result[0].alien_panic_roll {
-            assert!(
-                (4..=9).contains(&panic_roll), // 1d6(1-6) + 3 stress = 4-9
-                "Panic roll should be in range 4-9 for stress level 3, got {}",
-                panic_roll
-            );
-
-            // Should have panic roll note
-            let has_panic_note = result[0]
-                .notes
-                .iter()
-                .any(|note| note.contains("PANIC ROLL"));
-            assert!(
-                has_panic_note,
-                "Should have panic roll note when panic occurs"
-            );
-        }
     }
 }
 
@@ -4658,29 +4202,22 @@ fn test_fitd_unique_namespace() {
 
 #[test]
 fn test_fitd_clean_output() {
-    // Test that regular FitD rolls have clean output with no redundant notes
-    for _ in 0..10 {
-        let result = parse_and_roll("fitd3");
-        if let Ok(results) = result {
-            let roll = &results[0];
-            let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
-
-            if six_count <= 1 {
-                // Regular success, partial success, or failure should have no notes
-                assert!(
-                    roll.notes.is_empty(),
-                    "Regular FitD rolls should have no notes for clean output. Got: {:?}",
-                    roll.notes
-                );
-            }
-
-            // Should still have proper FitD mechanics
-            assert!(roll.fitd_outcome.is_some(), "Should have FitD outcome");
+    // Only a critical earns a note; a success, partial or failure stays clean
+    for roll in roll_across_seeds("fitd3", 30) {
+        let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
+        if six_count <= 1 {
             assert!(
-                roll.fitd_highest_die.is_some(),
-                "Should have highest die recorded"
+                roll.notes.is_empty(),
+                "fitd3 rolled {:?} and should have no notes: {:?}",
+                roll.kept_rolls,
+                roll.notes
             );
         }
+        assert!(roll.fitd_outcome.is_some(), "Should have FitD outcome");
+        assert!(
+            roll.fitd_highest_die.is_some(),
+            "Should have highest die recorded"
+        );
     }
 }
 
@@ -5429,43 +4966,6 @@ fn test_mothership_case_insensitive() {
             Some(expected.to_string()),
             "Case variant '{}' should expand correctly",
             input
-        );
-    }
-}
-
-#[test]
-fn test_mothership_with_labels_and_comments() {
-    // Test Mothership works with labels and comments
-    let label_comment_tests = vec![
-        ("(Strength Check) ms45", "Label syntax"),
-        ("ms45 ! Trying to open the airlock", "Comment syntax"),
-        (
-            "(Combat Roll) +ms50 ! Attacking the alien",
-            "Label and comment with advantage",
-        ),
-        (
-            "-ms35 ! Sneaking past the crew",
-            "Disadvantage with comment",
-        ),
-    ];
-
-    for (expression, description) in label_comment_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Mothership with labels/comments '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        let roll = &results[0];
-
-        // Verify Mothership mechanics still work
-        assert!(
-            roll.successes.is_some() || roll.failures.is_some(),
-            "Mothership mechanics should work with labels/comments for '{}'",
-            expression
         );
     }
 }
