@@ -2766,3 +2766,52 @@ wng 4d6 k3
 Ms20 - 30
 3 ms20 - 30
 ms45 + 99999999999999999999
+1wh6+
+4wh2+
+8wh3+
+ex5 + 2
+ex6 * 2
+ex8 - 1
+snm3 - 1
+snm4
+snm4 * 2
+snm5 + 2
+snm6
+sp10
+sp4 + 2
+sp4t7 + 2
+sp5
+sp5 * 2
+sp6 - 1
+wfrp1
+wfrp100
+wfrp100 + 40
+wfrp10 - 30
+wfrp0
+wfrp101
+wfrp100 + 500
+1d20 conan2 tbe60
+1d6 cd1 tbe60
+1d100 tbe60 ms60
+1d100 tbe60 cpr
+1d100 tbe60 wit
+1d100 tbe60 mnm
+1d100 tbe60 alien
+1d100 tbe60 fitd
+sw2
+sw5
+sil1
+2lf2
+2lf5
+2lf1
+2lf6
+0lf4
+25lf4
+ex0
+ex5t0
+ex5t11
+2lf4x
+1lf2
+20lf5
+ms0
+ms999

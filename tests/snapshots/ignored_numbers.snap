@@ -110,3 +110,6 @@ wfrp67 - 30	trailing
 4d1 + 1 b1	trailing
 4d1 f1 + 1d1	leading
 4d1 f1 + 1d1	trailing
+wfrp100 + 40	trailing
+wfrp10 - 30	trailing
+wfrp100 + 500	trailing
