@@ -439,71 +439,6 @@ fn test_game_systems_comprehensive() {
     }
 }
 
-#[test]
-fn test_game_system_modifiers() {
-    // Test game systems with mathematical modifiers
-    let system_modifiers = vec![
-        ("cpr + 10", "Cyberpunk Red with bonus"),
-        ("cpr - 4", "Cyberpunk Red with penalty"),
-        ("cpr * 3", "Cyberpunk Red multiplied"),
-        ("cpr / 2", "Cyberpunk Red divided"),
-        ("wit + 5", "Witcher with bonus"),
-        ("wit - 3", "Witcher with penalty"),
-        ("wit * 2", "Witcher multiplied"),
-        ("wit / 2", "Witcher divided"),
-        ("cs 3 + 2", "Cypher System with modifier"),
-        ("gb + 5", "Godbound with bonus"),
-        ("gbs - 2", "Godbound straight with penalty"),
-        ("sw8 + 3", "Savage Worlds with bonus"),
-        ("sw10 * 2", "Savage Worlds multiplied"),
-        ("vtm6h2 + 2", "VTM5 with positive modifier"),
-        ("vtm5h1 - 1", "VTM5 with negative modifier"),
-        ("vtm4h0 * 2", "VTM5 with multiplication"),
-        ("vtm8h3 / 2", "VTM5 with division"),
-    ];
-
-    for (expression, description) in system_modifiers {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "System with modifier '{}' should work: {}",
-            expression,
-            description
-        );
-    }
-}
-
-#[test]
-fn test_game_system_cross_compatibility() {
-    // Ensure game systems don't interfere with each other
-    let mixed_tests = vec![
-        ("4cod", "cpr", "CoD and CPR should both work"),
-        ("sw8", "sr6", "Savage Worlds and Shadowrun should both work"),
-        ("gb", "4df", "Godbound and Fudge should both work"),
-        ("wit", "conan", "Witcher and Conan should both work"),
-        ("mm", "wng 4d6", "Marvel and W&G should both work"),
-    ];
-
-    for (system1, system2, description) in mixed_tests {
-        let result1 = parse_and_roll(system1);
-        let result2 = parse_and_roll(system2);
-
-        assert!(result1.is_ok() && result2.is_ok(), "{}", description);
-
-        // Each should have rolled dice. Not `total != 0`: a Cyberpunk Red
-        // critical failure (`[1] - [1]`) legitimately totals 0, about 1 roll in
-        // 110, which made this test fail at random.
-        for (system, result) in [(system1, result1), (system2, result2)] {
-            let rolls = result.unwrap();
-            assert!(
-                !rolls[0].individual_rolls.is_empty(),
-                "System '{}' should produce valid results",
-                system
-            );
-        }
-    }
-}
-
 // ============================================================================
 // ALIAS EXPANSION TESTS
 // ============================================================================
@@ -545,6 +480,19 @@ fn test_alias_expansions() {
         ("+a5e +5 ex1", Some("2d20 k1+5 + 1d4")),
         ("-a5e +5 ex1", Some("2d20 kl1+5 + 1d4")),
         ("a5e ex1", Some("1d20 + 1d4")),
+        ("attack", Some("1d20")),
+        ("skill", Some("1d20")),
+        ("save", Some("1d20")),
+        ("gb", Some("1d20 gb")),
+        ("gbs", Some("1d20 gbs")),
+        ("4df", Some("4d3 fudge")),
+        ("dh", Some("1d10 dh")),
+        ("hsn", Some("1d6 hsn")),
+        ("hsk", Some("1d6 hsk")),
+        ("hsh", Some("3d6 hsh")),
+        ("sw8", Some("2d1 sw8")),
+        ("cs 5", Some("1d20 cs5")),
+        ("alien4", Some("4d6 alien")),
     ];
 
     for (alias, expected) in alias_tests {
@@ -2560,48 +2508,6 @@ fn test_complex_system_combinations() {
 }
 
 #[test]
-fn test_system_edge_cases_and_boundaries() {
-    // Test boundary conditions for systems that might not be fully covered
-    let boundary_tests = vec![
-        // Marvel Multiverse boundaries
-        ("mm 5e", "Marvel with maximum practical edges"),
-        ("mm 5t", "Marvel with maximum practical troubles"),
-        // Cypher System boundaries
-        ("cs 1", "Cypher minimum level"),
-        ("cs 10", "Cypher maximum level"),
-        // Wrath & Glory boundaries
-        ("wng w1 1d6", "W&G minimum wrath dice"),
-        ("wng w5 5d6", "W&G maximum wrath dice"),
-        // Earthdawn boundaries
-        ("ed1", "Earthdawn minimum step"),
-        ("ed50", "Earthdawn maximum step (1e)"),
-        ("ed4e1", "Earthdawn 4e minimum step"),
-        ("ed4e100", "Earthdawn 4e maximum step"),
-        // Hero System edge cases
-        ("0.5hsk", "Hero System half die (if supported)"),
-        ("10hsk", "Hero System large dice count"),
-    ];
-
-    for (expression, description) in boundary_tests {
-        let result = parse_and_roll(expression);
-        // Some of these might be invalid, but they shouldn't crash
-        if let Ok(results) = result {
-            assert!(
-                !results.is_empty(),
-                "Should have results for '{}': {}",
-                expression,
-                description
-            );
-        } else {
-            println!(
-                "Boundary test '{}' failed as expected: {}",
-                expression, description
-            );
-        }
-    }
-}
-
-#[test]
 fn test_storypath_system_comprehensive() {
     // Test Storypath System (spX -> Xd10 t8 ie10)
     let storypath_tests = vec![
@@ -3145,39 +3051,6 @@ fn test_missing_systems_with_roll_sets() {
 }
 
 #[test]
-fn test_missing_systems_with_complex_modifiers() {
-    // Test complex modifier combinations with missing systems
-    let complex_modifier_tests = vec![
-        // Storypath
-        ("sp4 + 2d6", "Storypath with additional dice"),
-        ("sp6 * 2 - 3", "Storypath with math operations"),
-        // Double Digit
-        ("dd66 / 10", "Double digit division"),
-        // SNM
-        ("snm4 * 3", "SNM with multiplication"),
-        // Year Zero
-        ("8yz - 2", "Year Zero with subtraction"),
-    ];
-
-    for (expression, description) in complex_modifier_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Complex modifier '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        assert!(
-            !results.is_empty(),
-            "Should have results for complex modifier '{}'",
-            expression
-        );
-    }
-}
-
-#[test]
 fn test_missing_systems_alias_expansion() {
     // Verify that alias expansion works correctly for missing systems
     let alias_expansion_tests = vec![
@@ -3537,44 +3410,6 @@ fn test_wrath_glory_special_modes_with_roll_sets() {
 }
 
 #[test]
-fn test_wrath_glory_invalid_special_modes() {
-    // Test invalid W&G special mode syntax
-    let invalid_wng_modes = vec![
-        "wng 4d6 !invalid",      // Invalid special mode
-        "wng 4d6 !",             // Empty special mode
-        "wng 4d6 !soak invalid", // Extra text after mode
-        "wng 4d6 !SOAK",         // Wrong case (if case-sensitive)
-        "wng 4d6 ! soak",        // Space in special mode
-    ];
-
-    for invalid_test in invalid_wng_modes {
-        let result = parse_and_roll(invalid_test);
-
-        // These might parse but should either work correctly or fail gracefully
-        match result {
-            Ok(results) => {
-                println!(
-                    "W&G mode '{}' parsed successfully (behavior may vary): {} results",
-                    invalid_test,
-                    results.len()
-                );
-                // If it parses, it should at least have some meaningful result
-                assert!(
-                    !results.is_empty(),
-                    "Should have some result if parsing succeeds"
-                );
-            }
-            Err(error) => {
-                println!("W&G mode '{}' failed as expected: {}", invalid_test, error);
-                // Error message should be reasonable
-                let error_str = error.to_string();
-                assert!(!error_str.is_empty(), "Should have error message");
-            }
-        }
-    }
-}
-
-#[test]
 fn test_wrath_glory_edge_case_wrath_dice_counts() {
     // Test edge cases for wrath dice counts in special modes
     let wrath_dice_edge_cases = vec![
@@ -3628,247 +3463,6 @@ fn test_wrath_glory_edge_case_wrath_dice_counts() {
 }
 
 #[test]
-fn test_advanced_percentile_edge_cases() {
-    // Test complex percentile advantage/disadvantage scenarios
-    let advanced_percentile_tests = vec![
-        // Complex mathematical operations with percentile advantage/disadvantage
-        ("+d% + 25", "Percentile advantage with large bonus"),
-        ("-d% - 15", "Percentile disadvantage with penalty"),
-        ("+d% * 2", "Percentile advantage with multiplication"),
-        ("-d% / 2", "Percentile disadvantage with division"),
-        ("+d% + 1d6", "Percentile advantage with additional dice"),
-        ("-d% - 2d4", "Percentile disadvantage with dice subtraction"),
-        // Edge case values
-        ("+d% + 100", "Advantage with maximum bonus"),
-        ("-d% - 50", "Disadvantage with large penalty"),
-        ("+d% * 0", "Advantage multiplied by zero"),
-        ("-d% + 200", "Disadvantage with large positive modifier"),
-    ];
-
-    for (expression, description) in advanced_percentile_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Advanced percentile '{}' should parse: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        assert_eq!(
-            results.len(),
-            1,
-            "Should have one result for '{}'",
-            expression
-        );
-
-        let roll = &results[0];
-
-        // Should have multiple dice for advantage/disadvantage mechanism
-        assert!(
-            roll.individual_rolls.len() >= 2,
-            "Percentile advantage/disadvantage should have multiple dice for '{}': got {} dice",
-            expression,
-            roll.individual_rolls.len()
-        );
-
-        // For percentile dice, all individual rolls should be in range 1-10 or 1-100 depending on implementation
-        for &die_roll in &roll.individual_rolls {
-            assert!(
-                (1..=10).contains(&die_roll) || (1..=100).contains(&die_roll),
-                "Percentile die roll should be 1-10 or 1-100, got {} for '{}'",
-                die_roll,
-                expression
-            );
-        }
-
-        // Total should be reasonable (considering modifiers)
-        assert!(
-            roll.total >= -200 && roll.total <= 400,
-            "Total {} should be reasonable for percentile expression '{}'",
-            roll.total,
-            expression
-        );
-
-        println!(
-            "Advanced percentile test '{}': {} dice, total {} - {}",
-            expression,
-            roll.individual_rolls.len(),
-            roll.total,
-            description
-        );
-    }
-}
-
-#[test]
-fn test_percentile_advantage_mechanics_detailed() {
-    // Test the specific mechanics of percentile advantage/disadvantage
-
-    // Run multiple tests to verify statistical behavior
-    let mut advantage_totals = Vec::new();
-    let mut disadvantage_totals = Vec::new();
-    let mut regular_totals = Vec::new();
-
-    for _ in 0..20 {
-        // Test advantage
-        let adv_result = parse_and_roll("+d%").unwrap();
-        advantage_totals.push(adv_result[0].total);
-
-        // Test disadvantage
-        let dis_result = parse_and_roll("-d%").unwrap();
-        disadvantage_totals.push(dis_result[0].total);
-
-        // Test regular percentile for comparison
-        let reg_result = parse_and_roll("d%").unwrap();
-        regular_totals.push(reg_result[0].total);
-    }
-
-    // All results should be in valid percentile range
-    for &total in &advantage_totals {
-        assert!(
-            (1..=100).contains(&total),
-            "Advantage total {} should be 1-100",
-            total
-        );
-    }
-
-    for &total in &disadvantage_totals {
-        assert!(
-            (1..=100).contains(&total),
-            "Disadvantage total {} should be 1-100",
-            total
-        );
-    }
-
-    for &total in &regular_totals {
-        assert!(
-            (1..=100).contains(&total),
-            "Regular total {} should be 1-100",
-            total
-        );
-    }
-
-    // Statistical validation (advantage should tend higher, disadvantage lower)
-    let avg_advantage: f64 =
-        advantage_totals.iter().sum::<i32>() as f64 / advantage_totals.len() as f64;
-    let avg_disadvantage: f64 =
-        disadvantage_totals.iter().sum::<i32>() as f64 / disadvantage_totals.len() as f64;
-    let avg_regular: f64 = regular_totals.iter().sum::<i32>() as f64 / regular_totals.len() as f64;
-
-    println!(
-        "Percentile averages - Advantage: {:.1}, Regular: {:.1}, Disadvantage: {:.1}",
-        avg_advantage, avg_regular, avg_disadvantage
-    );
-
-    // With a reasonable sample size, advantage should generally be higher than disadvantage
-    // (This is probabilistic, so we don't enforce strict ordering, just log the results)
-    if avg_advantage > avg_disadvantage {
-        println!("✓ Advantage performed better than disadvantage as expected");
-    } else {
-        println!("Note: Advantage average not higher than disadvantage (random variation)");
-    }
-}
-
-#[test]
-fn test_percentile_with_complex_game_systems() {
-    // Test percentile dice with various game system combinations
-    let percentile_system_combos = vec![
-        ("+d% + 4cod", "Percentile advantage with CoD roll"),
-        ("-d% + sw8", "Percentile disadvantage with Savage Worlds"),
-        ("+d% + cpr", "Percentile advantage with Cyberpunk Red"),
-        ("-d% + wit", "Percentile disadvantage with Witcher"),
-        ("+d% + 3df", "Percentile advantage with Fudge dice"),
-        ("-d% + gb", "Percentile disadvantage with Godbound"),
-    ];
-
-    for (expression, description) in percentile_system_combos {
-        let result = parse_and_roll(expression);
-
-        // These are complex combinations that may or may not be supported
-        match result {
-            Ok(results) => {
-                println!(
-                    "Complex percentile combo '{}' worked: {} results - {}",
-                    expression,
-                    results.len(),
-                    description
-                );
-
-                assert!(
-                    !results.is_empty(),
-                    "Should have results if parsing succeeds"
-                );
-
-                // Should have meaningful output
-                for roll in &results {
-                    assert!(
-                        roll.total != 0
-                            || roll.successes.is_some()
-                            || !roll.individual_rolls.is_empty(),
-                        "Should have meaningful result for '{}'",
-                        expression
-                    );
-                }
-            }
-            Err(error) => {
-                println!(
-                    "Complex percentile combo '{}' failed: {} - {}",
-                    expression, error, description
-                );
-
-                // Should fail gracefully with meaningful error
-                assert!(!error.to_string().is_empty(), "Should have error message");
-            }
-        }
-    }
-}
-
-#[test]
-fn test_percentile_edge_case_mathematics() {
-    // Test edge cases in percentile mathematics
-    let percentile_math_edge_cases = vec![
-        ("+d% + 0", "Advantage with zero modifier"),
-        ("-d% - 0", "Disadvantage with zero modifier"),
-        ("+d% * 1", "Advantage with identity multiplication"),
-        ("-d% / 1", "Disadvantage with identity division"),
-        ("0 + +d%", "Zero plus advantage"),
-        ("100 - -d%", "100 minus disadvantage"),
-        ("+d% + +d%", "Double advantage (if supported)"),
-        ("-d% + -d%", "Double disadvantage (if supported)"),
-    ];
-
-    for (expression, description) in percentile_math_edge_cases {
-        let result = parse_and_roll(expression);
-
-        match result {
-            Ok(results) => {
-                println!(
-                    "Percentile math edge case '{}' worked: total {} - {}",
-                    expression, results[0].total, description
-                );
-
-                // Should produce reasonable results
-                assert!(
-                    results[0].total >= -100 && results[0].total <= 200,
-                    "Total {} should be reasonable for '{}'",
-                    results[0].total,
-                    expression
-                );
-            }
-            Err(error) => {
-                println!(
-                    "Percentile math edge case '{}' failed: {} - {}",
-                    expression, error, description
-                );
-
-                // Some complex cases may legitimately fail
-                assert!(!error.to_string().is_empty(), "Should have error message");
-            }
-        }
-    }
-}
-
-#[test]
 fn test_percentile_with_roll_sets() {
     // Test percentile advantage/disadvantage with roll sets
     let percentile_roll_sets = vec![
@@ -3890,218 +3484,6 @@ fn test_percentile_with_roll_sets() {
         }
     }
 }
-
-#[test]
-fn test_unicode_handling_in_percentile_expressions() {
-    // Test Unicode characters in comments and labels with percentile dice
-    let unicode_tests = vec![
-        ("(⚔️ Attack) +d%", "Unicode sword in label with advantage"),
-        (
-            "+d% ! 🔥 Fire damage",
-            "Advantage with Unicode fire comment",
-        ),
-        ("(🎯 Skill) -d% ! 🎲 Roll", "Unicode target and dice"),
-        ("(Test \"Quotes\") +d%", "Quotes in label with advantage"),
-        (
-            "(Test 'Apostrophe') -d%",
-            "Apostrophe in label with disadvantage",
-        ),
-    ];
-
-    for (expression, description) in unicode_tests {
-        let result = parse_and_roll(expression);
-
-        match result {
-            Ok(results) => {
-                println!(
-                    "Unicode test '{}' worked: {} - {}",
-                    expression, results[0].total, description
-                );
-
-                // Should preserve Unicode in labels/comments
-                let roll = &results[0];
-                if let Some(ref label) = roll.label {
-                    println!("  Label preserved: '{}'", label);
-                }
-                if let Some(ref comment) = roll.comment {
-                    println!("  Comment preserved: '{}'", comment);
-                }
-
-                // Should still produce valid percentile results
-                assert!(
-                    roll.total >= 1 && roll.total <= 100,
-                    "Unicode test should still produce valid percentile result"
-                );
-            }
-            Err(error) => {
-                println!(
-                    "Unicode test '{}' failed: {} - {}",
-                    expression, error, description
-                );
-
-                // Should fail gracefully if Unicode not supported
-                assert!(!error.to_string().is_empty(), "Should have error message");
-            }
-        }
-    }
-}
-
-#[test]
-fn test_world_of_darkness_cancel_mechanics() {
-    // Test WOD cancel aliases
-    let wod_cancel_tests = vec![
-        ("4wod8c", "WOD difficulty 8 with cancel"),
-        ("5wod6c", "WOD difficulty 6 with cancel"),
-        ("6wod7c", "WOD difficulty 7 with cancel"),
-        ("3wod9c + 2", "WOD with cancel and modifier"),
-    ];
-
-    for (expression, description) in wod_cancel_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "WOD cancel test '{}' should parse: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        assert!(
-            !results.is_empty(),
-            "Should have results for '{}': {}",
-            expression,
-            description
-        );
-
-        // Should have both success and failure tracking for WOD
-        assert!(
-            results[0].successes.is_some(),
-            "WOD should track successes for '{}'",
-            expression
-        );
-        assert!(
-            results[0].failures.is_some(),
-            "WOD should track failures for '{}'",
-            expression
-        );
-    }
-}
-
-#[test]
-fn test_cancel_modifier_parsing() {
-    // Test manual cancel modifier usage
-    let cancel_tests = vec![
-        ("4d10 f1 t8 c", "Manual WOD with cancel"),
-        ("5d10 f1 t6 c", "Different difficulty with cancel"),
-        ("6d10 t7 f1 c", "Different order with cancel"),
-        ("3d10 c f1 t8", "Cancel first, then failure/target"),
-        ("4d10 f1 c t8 + 2", "Cancel with modifiers"),
-    ];
-
-    for (expression, description) in cancel_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Cancel modifier test '{}' should parse: {}",
-            expression,
-            description
-        );
-    }
-}
-
-#[test]
-fn test_cancel_without_failure_tracking() {
-    // Test that cancel gracefully handles missing failure tracking
-    let result = parse_and_roll("4d10 t8 c"); // No f1
-    assert!(
-        result.is_ok(),
-        "Should parse cancel without failure tracking"
-    );
-
-    if let Ok(results) = result {
-        // Should have some kind of note about needing failure tracking
-        let has_relevant_note = results[0].notes.iter().any(|note| {
-            note.contains("Cancel") || note.contains("failure") || note.contains("requires")
-        });
-
-        // We expect either a warning or the cancel to simply not activate
-        assert!(
-            has_relevant_note || results[0].notes.len() <= 2,
-            "Should handle cancel without failures gracefully"
-        );
-    }
-}
-
-#[test]
-fn test_wod_cancel_vs_regular_wod() {
-    // Test that WOD with and without cancel work correctly
-    let wod_comparison_tests = vec![
-        ("4wod8", "4wod8c", "Difficulty 8 comparison"),
-        ("5wod6", "5wod6c", "Difficulty 6 comparison"),
-        ("3wod9 + 2", "3wod9c + 2", "With modifier comparison"),
-    ];
-
-    for (regular, cancel, description) in wod_comparison_tests {
-        let regular_result = parse_and_roll(regular);
-        let cancel_result = parse_and_roll(cancel);
-
-        assert!(
-            regular_result.is_ok() && cancel_result.is_ok(),
-            "Both regular and cancel WOD should work: {}",
-            description
-        );
-
-        let regular_roll = regular_result.unwrap();
-        let cancel_roll = cancel_result.unwrap();
-
-        // Both should have success/failure tracking
-        assert_eq!(
-            regular_roll[0].successes.is_some(),
-            cancel_roll[0].successes.is_some(),
-            "Success tracking should be consistent: {}",
-            description
-        );
-
-        assert_eq!(
-            regular_roll[0].failures.is_some(),
-            cancel_roll[0].failures.is_some(),
-            "Failure tracking should be consistent: {}",
-            description
-        );
-    }
-}
-
-#[test]
-fn test_cancel_mechanics_validation() {
-    // Test specific cancel scenarios to ensure correct behavior
-    // Note: These tests are probabilistic but help validate the logic
-
-    for _ in 0..20 {
-        let result = parse_and_roll("4wod8c");
-        if let Ok(results) = result {
-            let roll = &results[0];
-
-            // Basic validation that the mechanics are working
-            assert!(roll.successes.is_some(), "Should track successes");
-            assert!(roll.failures.is_some(), "Should track failures");
-
-            // Check for cancel notes when appropriate
-            let has_cancel_note = roll.notes.iter().any(|note| note.contains("CANCELLED"));
-            let has_tens = roll.kept_rolls.contains(&10);
-            let has_ones = roll.kept_rolls.contains(&1);
-
-            // If we have both 10s and 1s, we might see a cancel note
-            if has_tens && has_ones {
-                // This is probabilistic, so we can't assert it always happens
-                if has_cancel_note {
-                    println!("Cancel note found: {:?}", roll.notes);
-                }
-            }
-        }
-    }
-}
-
-// Add these tests to tests/game_systems_tests.rs
 
 #[test]
 fn test_vtm5_system_comprehensive() {
@@ -4489,87 +3871,45 @@ fn test_lasers_feelings_success_counting() {
 }
 
 #[test]
-fn test_a5e_system_integration() {
-    use dicemaiden_rs::parse_and_roll;
-
-    // Test A5E expertise levels through full parsing
-    let result = parse_and_roll("a5e +5 ex1").expect("A5E should parse");
-    assert_eq!(result.len(), 1);
-    assert!(result[0].total >= 7 && result[0].total <= 29); // 1d20+5 + 1d4 range
-
-    let result = parse_and_roll("a5e +5 ex2").expect("A5E ed2 should parse");
-    assert!(result[0].total >= 7 && result[0].total <= 31); // 1d20+5 + 1d6 range
-
-    let result = parse_and_roll("a5e +5 ex3").expect("A5E ed3 should parse");
-    assert!(result[0].total >= 7 && result[0].total <= 33); // 1d20+5 + 1d8 range
-}
-
-#[test]
-fn test_a5e_advantage_disadvantage_integration() {
-    use dicemaiden_rs::parse_and_roll;
-
-    // Test advantage
-    let result = parse_and_roll("+a5e +5 ex1").expect("A5E advantage should parse");
-    assert_eq!(result.len(), 1);
-
-    // Test disadvantage
-    let result = parse_and_roll("-a5e +5 ex1").expect("A5E disadvantage should parse");
-    assert_eq!(result.len(), 1);
-}
-
-#[test]
-fn test_a5e_with_roll_sets() {
-    use dicemaiden_rs::parse_and_roll;
-
-    // Test A5E with roll sets
-    let result = parse_and_roll("3 a5e +5 ex1").expect("A5E roll sets should work");
-    assert_eq!(result.len(), 3);
-
-    for (i, roll) in result.iter().enumerate() {
-        assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
-        assert!(roll.total >= 7 && roll.total <= 29);
-    }
-}
-
-#[test]
-fn test_a5e_compared_to_manual_equivalents() {
-    use dicemaiden_rs::parse_and_roll;
-
-    // Test that A5E aliases produce equivalent results to manual rolls
-    for _ in 0..10 {
-        let a5e_result = parse_and_roll("a5e +5 ex1").expect("A5E should work");
-        let manual_result = parse_and_roll("1d20+5 + 1d4").expect("Manual should work");
-
-        // Should have same structure
-        assert_eq!(a5e_result.len(), manual_result.len());
-
-        // Both should be in same range (though different random results)
-        assert!(a5e_result[0].total >= 7 && a5e_result[0].total <= 29);
-        assert!(manual_result[0].total >= 7 && manual_result[0].total <= 29);
-    }
-}
-
-#[test]
-fn test_a5e_alias_expansion_in_game_systems() {
-    use dicemaiden_rs::dice::aliases;
-
-    // Test A5E aliases expand correctly compared to other game systems
+fn test_a5e_alias_expansion() {
+    // `ex1`-`ex3` are expertise levels (d4, d6, d8); larger numbers name the
+    // die directly, as house rules do. (alias, expansion, or None)
     let a5e_expansions = vec![
-        ("a5e +5 ex1", "1d20+5 + 1d4"),
-        ("a5e +7 ex2", "1d20+7 + 1d6"),
-        ("a5e +3 ex3", "1d20+3 + 1d8"),
-        ("+a5e +5 ex1", "2d20 k1+5 + 1d4"),
-        ("-a5e +5 ex1", "2d20 kl1+5 + 1d4"),
+        ("a5e +5 ex1", Some("1d20+5 + 1d4")),
+        ("a5e +7 ex2", Some("1d20+7 + 1d6")),
+        ("a5e +3 ex3", Some("1d20+3 + 1d8")),
+        ("a5e ex1", Some("1d20 + 1d4")),
+        ("a5e -2 ex1", Some("1d20-2 + 1d4")),
+        ("a5e +0 ex2", Some("1d20+0 + 1d6")),
+        ("a5e +15 ex3", Some("1d20+15 + 1d8")),
+        // Advantage and disadvantage
+        ("+a5e +5 ex1", Some("2d20 k1+5 + 1d4")),
+        ("-a5e +5 ex1", Some("2d20 kl1+5 + 1d4")),
+        // Explicit dice sizes
+        ("a5e +3 ex4", Some("1d20+3 + 1d4")),
+        ("a5e +3 ex6", Some("1d20+3 + 1d6")),
+        ("a5e +3 ex8", Some("1d20+3 + 1d8")),
+        ("a5e +1 ex10", Some("1d20+1 + 1d10")),
+        ("a5e +1 ex12", Some("1d20+1 + 1d12")),
+        ("a5e +1 ex20", Some("1d20+1 + 1d20")),
+        ("a5e +1 ex100", Some("1d20+1 + 1d100")),
+        // Case-insensitive
+        ("A5E +5 EX1", Some("1d20+5 + 1d4")),
+        ("a5E +5 Ex1", Some("1d20+5 + 1d4")),
+        ("+A5E +5 EX2", Some("2d20 k1+5 + 1d6")),
+        ("-A5E +5 EX3", Some("2d20 kl1+5 + 1d8")),
+        // Not A5E rolls
+        ("a5e +5 ex0", None),
+        ("a5e +5 ex5", None),
+        ("a5e +5", None),
+        ("1d20+5 ex1", None),
     ];
 
-    for (alias, expected_expansion) in a5e_expansions {
-        let expanded = aliases::expand_alias(alias);
+    for (alias, expected) in a5e_expansions {
         assert_eq!(
-            expanded,
-            Some(expected_expansion.to_string()),
-            "A5E alias '{}' should expand to '{}'",
-            alias,
-            expected_expansion
+            aliases::expand_alias(alias),
+            expected.map(str::to_string),
+            "A5E alias '{alias}'"
         );
     }
 }
@@ -5066,53 +4406,42 @@ fn test_fitd_zero_dice_mechanics() {
 
 #[test]
 fn test_fitd_critical_success_detection() {
-    // This test is probabilistic, so we'll run it multiple times
-    // to try to get a critical success (multiple 6s)
-    let mut found_critical = false;
+    // A critical is two or more sixes, and nothing else. Sweeping seeds makes
+    // sure the critical branch is actually reached rather than hoped for.
+    let rolls = roll_across_seeds("fitd6", 100);
+    let mut criticals = 0;
 
-    for _ in 0..50 {
-        let result = parse_and_roll("fitd6"); // 6 dice gives good chance for multiple 6s
-        if let Ok(results) = result {
-            let roll = &results[0];
-            if let Some(outcome) = &roll.fitd_outcome
-                && outcome == "CRITICAL SUCCESS"
-            {
-                found_critical = true;
+    for roll in &rolls {
+        let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
+        let is_critical = roll.fitd_outcome.as_deref() == Some("CRITICAL SUCCESS");
+        assert_eq!(
+            is_critical,
+            six_count >= 2,
+            "fitd6 rolled {:?} but reported {:?}",
+            roll.kept_rolls,
+            roll.fitd_outcome
+        );
 
-                // Verify that we actually have multiple 6s
-                let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
-                assert!(
-                    six_count >= 2,
-                    "Critical success should have multiple 6s, found {} sixes",
-                    six_count
-                );
-
-                // UPDATED: Should have exactly one note (critical note)
-                assert_eq!(
-                    roll.notes.len(),
-                    1,
-                    "Critical success should have exactly one note"
-                );
-
-                // Should have critical note
-                let has_critical_note = roll.notes.iter().any(|note| note.contains("CRITICAL"));
-                assert!(
-                    has_critical_note,
-                    "Critical success should have critical note"
-                );
-
-                break;
-            }
+        if is_critical {
+            criticals += 1;
+            assert_eq!(
+                roll.notes.len(),
+                1,
+                "A critical should have exactly one note: {:?}",
+                roll.notes
+            );
+            assert!(
+                roll.notes[0].contains("CRITICAL"),
+                "A critical should say so: {:?}",
+                roll.notes
+            );
         }
     }
 
-    // Note: This test might occasionally fail due to randomness, but with 6d6 over 50 trials,
-    // the probability of getting at least one critical is very high
-    if !found_critical {
-        println!(
-            "Warning: No critical success found in 50 trials (this can happen due to randomness)"
-        );
-    }
+    assert!(
+        criticals > 0,
+        "100 seeds of fitd6 should include a critical"
+    );
 }
 
 #[test]
@@ -5127,32 +4456,6 @@ fn test_fitd_with_roll_sets() {
             roll.fitd_highest_die.is_some(),
             "Each set should record highest die"
         );
-    }
-}
-
-#[test]
-fn test_fitd_with_modifiers_rejection() {
-    // FitD shouldn't work with mathematical modifiers since it's about the highest die, not total
-    let invalid_tests = vec![
-        "fitd3 + 2", // Math modifiers don't make sense
-        "fitd4 * 2", // Math modifiers don't make sense
-        "fitd2 k1",  // Keep modifiers don't make sense (already takes highest)
-        "fitd3 d1",  // Drop modifiers don't make sense
-    ];
-
-    for test in invalid_tests {
-        let result = parse_and_roll(test);
-        // These should either fail or ignore the incompatible modifiers
-        if let Ok(results) = result {
-            let roll = &results[0];
-            // If it succeeds, should still have FitD mechanics
-            if roll.fitd_outcome.is_some() {
-                println!(
-                    "Note: '{}' succeeded with FitD mechanics - modifiers may have been ignored",
-                    test
-                );
-            }
-        }
     }
 }
 
@@ -5332,160 +4635,6 @@ fn test_fitd_semicolon_separated() {
 }
 
 #[test]
-fn test_fitd_edge_cases() {
-    // Test various edge cases that could cause issues
-    let edge_cases = vec![
-        "FITD3",   // Uppercase (should work with case-insensitive regex)
-        "fitd1",   // Minimum dice
-        "fitd10",  // Maximum parameterized dice
-        "3 fitd0", // Zero dice with roll sets
-    ];
-
-    for test in edge_cases {
-        let result = parse_and_roll(test);
-        match result {
-            Ok(results) => {
-                for roll in &results {
-                    if roll.fitd_outcome.is_some() {
-                        // If FitD mechanics applied, validate they're correct
-                        assert!(
-                            roll.fitd_highest_die.is_some(),
-                            "FitD edge case '{}' should record key die",
-                            test
-                        );
-                    }
-                }
-            }
-            Err(e) => {
-                println!("Edge case '{}' failed (may be expected): {}", test, e);
-            }
-        }
-    }
-}
-
-#[test]
-fn test_no_alias_conflicts_with_fitd() {
-    // Test that all existing aliases still work after FitD addition
-    let existing_aliases = vec![
-        // D&D/Pathfinder
-        ("attack", "1d20"),
-        ("skill", "1d20"),
-        ("save", "1d20"),
-        ("dndstats", "6 4d6 k3"),
-        ("+d20", "2d20 k1"),
-        ("-d20", "2d20 kl1"),
-        // Game systems
-        ("age", "2d6 + 1d6"),
-        ("gb", "1d20 gb"),
-        ("gbs", "1d20 gbs"),
-        ("3df", "3d3 fudge"),
-        ("4df", "4d3 fudge"),
-        ("dh", "1d10 dh"),
-        // Hero System
-        ("hsn", "1d6 hsn"),
-        ("hsk", "1d6 hsk"),
-        ("hsh", "3d6 hsh"),
-        // Complex game systems
-        ("4cod", "4d10 t8 ie10"),
-        ("4wod8", "4d10 f1 t8"),
-        ("sw8", "2d1 sw8"),
-        ("vtm5h2", "5d10 vtm5p5h2"),
-        ("2lf4", "2d6 lf4"),
-        ("cs 5", "1d20 cs5"),
-        ("alien4", "4d6 alien"),
-    ];
-
-    for (alias, expected_expansion) in existing_aliases {
-        let expanded = aliases::expand_alias(alias);
-        assert_eq!(
-            expanded,
-            Some(expected_expansion.to_string()),
-            "Existing alias '{}' should still expand to '{}' after FitD addition",
-            alias,
-            expected_expansion
-        );
-
-        // Verify the alias still works end-to-end
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Existing alias '{}' should still work after FitD addition",
-            alias
-        );
-    }
-}
-
-#[test]
-fn test_mixed_fitd_and_existing_systems() {
-    // Test that FitD can be mixed with existing systems without conflicts
-    let mixed_expressions = vec![
-        // Semicolon separated
-        ("fitd3 ; 4cod ; sw8", 3, "FitD with CoD and Savage Worlds"),
-        (
-            "2lf4 ; fitd0 ; gb",
-            3,
-            "Lasers & Feelings with FitD zero and Godbound",
-        ),
-        ("vtm5h2 ; fitd4 ; age", 3, "VTM5 with FitD and AGE system"),
-        // Roll sets don't mix systems, but test compatibility
-        ("3 fitd4", 3, "FitD roll sets"),
-        ("2 4cod", 2, "Existing CoD roll sets still work"),
-        ("4 sw8", 4, "Existing Savage Worlds roll sets still work"),
-    ];
-
-    for (expression, expected_count, description) in mixed_expressions {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Mixed expression '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        assert_eq!(
-            results.len(),
-            expected_count,
-            "Mixed expression '{}' should have {} results: {}",
-            expression,
-            expected_count,
-            description
-        );
-    }
-}
-
-#[test]
-fn test_fitd_doesnt_break_existing_modifiers() {
-    // Test that existing modifier parsing still works correctly
-    let existing_modifier_tests = vec![
-        // Basic modifiers
-        ("4d6 k3", "Keep highest still works"),
-        ("6d10 d2", "Drop lowest still works"),
-        ("3d8 e6", "Exploding dice still works"),
-        ("5d6 t4", "Target counting still works"),
-        // Game system modifiers
-        ("4cod", "CoD alias expansion still works"), // <-- CORRECTED
-        ("6d6 alien", "Alien modifier parsing still works"),
-        ("1d20 gb", "Godbound modifier parsing still works"),
-        ("3df", "Fudge modifier parsing still works"),
-        // Complex combinations
-        ("4d6 k3 + 2", "Keep with math still works"),
-        ("6d10 t7 ie10", "Target with explode still works"),
-        ("5d6 e6 k4", "Explode with keep still works"),
-    ];
-
-    for (expression, description) in existing_modifier_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Existing modifier test '{}' should still work after FitD: {}",
-            expression,
-            description
-        );
-    }
-}
-
-#[test]
 fn test_fitd_unique_namespace() {
     // Verify FitD uses completely unique namespace
     let fitd_patterns = vec![
@@ -5493,196 +4642,6 @@ fn test_fitd_unique_namespace() {
     ];
 
     assert_no_prefix_conflicts("FitD", &fitd_patterns, EXISTING_ALIAS_PATTERNS);
-}
-
-#[test]
-fn test_fitd_with_all_existing_flags() {
-    // Test FitD works with all existing flags
-    let flag_tests = vec![
-        ("p fitd3", "Private flag"),
-        ("s fitd4", "Simple flag"),
-        ("nr fitd2", "No results flag"),
-        ("ul fitd5", "Unsorted flag"),
-        ("p s fitd3", "Multiple flags"),
-        ("ul nr fitd4", "Multiple flags combination"),
-    ];
-
-    for (expression, description) in flag_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "FitD with flags '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        let roll = &results[0];
-
-        // Verify FitD mechanics still work
-        assert!(
-            roll.fitd_outcome.is_some(),
-            "FitD outcome should work with flags for '{}'",
-            expression
-        );
-
-        // Verify flags are applied
-        if expression.contains('p') {
-            assert!(
-                roll.private,
-                "Private flag should be set for '{}'",
-                expression
-            );
-        }
-        if expression.contains('s') {
-            assert!(
-                roll.simple,
-                "Simple flag should be set for '{}'",
-                expression
-            );
-        }
-    }
-}
-
-#[test]
-fn test_fitd_with_existing_label_comment_patterns() {
-    // Test FitD works with existing label and comment patterns
-    let label_comment_tests = vec![
-        ("(Attack) fitd4", "Label syntax"),
-        ("fitd3 ! Sneaking past guards", "Comment syntax"),
-        (
-            "(Action Roll) fitd3 ! Rolling for stealth",
-            "Label and comment",
-        ),
-        ("fitd0 ! Desperate situation", "Inline description"),
-    ];
-
-    for (expression, description) in label_comment_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "FitD with labels/comments '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        let roll = &results[0];
-
-        // Verify FitD mechanics still work
-        assert!(
-            roll.fitd_outcome.is_some(),
-            "FitD mechanics should work with labels/comments for '{}'",
-            expression
-        );
-    }
-}
-
-#[test]
-fn test_existing_roll_sets_unchanged() {
-    // Verify existing roll set functionality is unchanged
-    let existing_roll_set_tests = vec![
-        ("3 4cod", 3, "CoD roll sets"),
-        ("2 sw8", 2, "Savage Worlds roll sets"),
-        ("4 2lf4", 4, "Lasers & Feelings roll sets"),
-        ("5 gb", 5, "Godbound roll sets"),
-        ("6 4d6 k3", 6, "Standard dice roll sets"),
-    ];
-
-    for (expression, expected_count, description) in existing_roll_set_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Existing roll set '{}' should still work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        assert_eq!(
-            results.len(),
-            expected_count,
-            "Existing roll set '{}' should have {} results: {}",
-            expression,
-            expected_count,
-            description
-        );
-
-        // Verify set labels still work
-        for (i, roll) in results.iter().enumerate() {
-            assert_eq!(
-                roll.label,
-                Some(format!("Set {}", i + 1)),
-                "Set labels should still work for '{}'",
-                expression
-            );
-        }
-    }
-}
-
-#[test]
-fn test_fitd_error_isolation() {
-    // Test that FitD errors don't affect other systems
-    let error_isolation_tests = vec![
-        // Invalid FitD followed by valid existing system
-        ("fitd100 ; 4cod", "Invalid FitD shouldn't break valid CoD"),
-        (
-            "invalid_fitd ; sw8",
-            "Invalid FitD shouldn't break valid SW",
-        ),
-        // Valid existing system followed by invalid FitD
-        (
-            "4cod ; fitd100",
-            "Valid CoD shouldn't be affected by invalid FitD",
-        ),
-        (
-            "sw8 ; invalid_fitd",
-            "Valid SW shouldn't be affected by invalid FitD",
-        ),
-    ];
-
-    for (expression, description) in error_isolation_tests {
-        let result = parse_and_roll(expression);
-        // These might fail (which is OK), but should not crash or cause parsing issues
-        // The key is that the error handling is clean and isolated
-        match result {
-            Ok(_) => {
-                // If it succeeds, that's fine
-            }
-            Err(e) => {
-                // If it fails, the error should be clean and specific
-                let error_msg = e.to_string();
-                assert!(
-                    !error_msg.contains("panic") && !error_msg.contains("unwrap"),
-                    "Error should be clean for '{}': {} - {}",
-                    expression,
-                    description,
-                    error_msg
-                );
-            }
-        }
-    }
-}
-
-#[test]
-fn test_backward_compatibility_complete() {
-    // Comprehensive test of all documented game systems from roll_syntax.md
-    let all_documented_systems = vec![
-        // From the actual documentation
-        "sw8", "4cod", "4codr", "4wod8", "4wod8c", "attack", "skill", "save", "+d20", "-d20",
-        "dndstats", "2hsn", "3hsk", "3hsh", "gb", "gbs", "3df", "4df", "sr6", "ex5", "6yz", "age",
-        "3wh4+", "dd34", "ed15", "cs 3", "cpr", "conan3", "sil3", "alien4", "alien4s2", "vtm5h2",
-        "2lf4", "sp4", "snm5", "wit", "mm", "bnw3", "cpd3", "wfrp67",
-    ];
-
-    for system in all_documented_systems {
-        let result = parse_and_roll(system);
-        assert!(
-            result.is_ok(),
-            "Documented system '{}' must continue to work after FitD addition",
-            system
-        );
-    }
 }
 
 #[test]
@@ -5710,60 +4669,6 @@ fn test_fitd_clean_output() {
                 "Should have highest die recorded"
             );
         }
-    }
-}
-
-#[test]
-fn test_wod_modifier_order_consistency() {
-    // Test World of Darkness modifier order consistency
-    // This is important because WOD commonly uses f1 t8 patterns
-
-    let wod_order_tests = vec![
-        ("4wod8", "4d10 f1 t8", "WOD alias vs manual equivalent"),
-        (
-            "5d10 f1 t8 c",
-            "5d10 t8 f1 c",
-            "WOD with cancel - different order",
-        ),
-        ("6d10 f1 t7", "6d10 t7 f1", "Basic WOD different order"),
-        (
-            "4d10 f1 t8 + 2",
-            "4d10 t8 f1 + 2",
-            "WOD with post-target modifier",
-        ),
-    ];
-
-    for (expr1, expr2, description) in wod_order_tests {
-        let result1 = parse_and_roll(expr1);
-        let result2 = parse_and_roll(expr2);
-
-        assert!(
-            result1.is_ok() && result2.is_ok(),
-            "Both WOD expressions should parse: {} - {}",
-            expr1,
-            expr2
-        );
-
-        let roll1 = result1.unwrap();
-        let roll2 = result2.unwrap();
-
-        // For statistical consistency, just verify both have same structure
-        assert_eq!(
-            roll1[0].successes.is_some(),
-            roll2[0].successes.is_some(),
-            "Success counting should be consistent: {} vs {} ({})",
-            expr1,
-            expr2,
-            description
-        );
-        assert_eq!(
-            roll1[0].failures.is_some(),
-            roll2[0].failures.is_some(),
-            "Failure counting should be consistent: {} vs {} ({})",
-            expr1,
-            expr2,
-            description
-        );
     }
 }
 
@@ -5844,43 +4749,6 @@ fn test_wod_cancel_bug_fix() {
 }
 
 #[test]
-fn test_daggerheart_comprehensive() {
-    let daggerheart_tests = vec![
-        // Basic functionality
-        ("dheart", true, "Daggerheart Hope & Fear dice"),
-        ("dheartgm", true, "Daggerheart GM d20 roll"),
-    ];
-
-    for (system, should_parse, description) in daggerheart_tests {
-        let result = parse_and_roll(system);
-        if should_parse {
-            assert!(
-                result.is_ok(),
-                "Daggerheart '{}' should parse: {}",
-                system,
-                description
-            );
-
-            let results = result.unwrap();
-            assert!(!results.is_empty(), "Should have results for '{}'", system);
-
-            // Basic validation that it produces reasonable output
-            assert!(
-                results[0].total >= 0,
-                "Should have non-negative result for '{}'",
-                system
-            );
-        } else {
-            assert!(
-                result.is_err(),
-                "Invalid daggerheart '{}' should fail",
-                system
-            );
-        }
-    }
-}
-
-#[test]
 fn test_daggerheart_keeps_math_modifiers() {
     // Hope vs Fear is decided by the bare d12s, but the total a player acts on
     // is 2d12 + trait + experience. Regression test for issue #255, where the
@@ -5917,51 +4785,6 @@ fn test_daggerheart_keeps_math_modifiers() {
                     result.total
                 );
             }
-        }
-    }
-}
-
-#[test]
-fn test_dh_dheart_no_conflict() {
-    // Test that Dark Heresy (dh) and Daggerheart (dheart) don't conflict
-    let conflict_tests = vec![
-        // Dark Heresy should still work
-        ("dh", true, "Dark Heresy basic should work"),
-        ("dh 4d10", true, "Dark Heresy with dice should work"),
-        ("dh 6d10", true, "Dark Heresy 6 dice should work"),
-        // Daggerheart should work independently
-        ("dheart", true, "Daggerheart Hope & Fear should work"),
-        ("dheartgm", true, "Daggerheart GM should work"),
-        // Edge cases - these should NOT be confused
-        ("dh1", false, "Invalid Dark Heresy should fail"),
-        ("dheartx", false, "Invalid Daggerheart variant should fail"),
-    ];
-
-    for (expression, should_succeed, description) in conflict_tests {
-        let result = parse_and_roll(expression);
-
-        if should_succeed {
-            assert!(
-                result.is_ok(),
-                "CONFLICT: '{}' should work - {}",
-                expression,
-                description
-            );
-
-            // Verify we get results
-            let results = result.unwrap();
-            assert!(
-                !results.is_empty(),
-                "Should have results for '{}'",
-                expression
-            );
-        } else {
-            assert!(
-                result.is_err(),
-                "CONFLICT: '{}' should fail - {}",
-                expression,
-                description
-            );
         }
     }
 }
@@ -6342,28 +5165,6 @@ fn test_mutants_masterminds_semicolon_separated() {
 }
 
 #[test]
-fn test_mutants_masterminds_doesnt_break_existing() {
-    // Test that adding MnM doesn't break existing systems
-    let existing_systems = vec![
-        ("4cod", "Chronicles of Darkness"),
-        ("sw8", "Savage Worlds"),
-        ("1d20 gb", "Godbound"),
-        ("3df", "Fudge dice"),
-        ("cpr", "Cyberpunk Red"),
-    ];
-
-    for (expression, description) in existing_systems {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Existing system '{}' should still work after MnM addition: {}",
-            expression,
-            description
-        );
-    }
-}
-
-#[test]
 fn test_mothership_basic_rolls() {
     // Test basic Mothership alias expansion
     use dicemaiden_rs::dice::aliases;
@@ -6590,32 +5391,6 @@ fn test_mothership_with_roll_sets() {
             rolled_dice(&roll).len(),
             2,
             "Each advantage set should roll 2 dice"
-        );
-    }
-}
-
-#[test]
-fn test_mothership_doesnt_break_existing() {
-    // Test that adding Mothership doesn't break existing systems
-    let existing_systems = vec![
-        ("mm", "Marvel Multiverse"),
-        ("mnm", "Mutants & Masterminds"),
-        ("4cod", "Chronicles of Darkness"),
-        ("sw8", "Savage Worlds"),
-        ("1d20 gb", "Godbound"),
-        ("3df", "Fudge dice"),
-        ("cpr", "Cyberpunk Red"),
-        ("+d%", "Percentile advantage"),
-        ("-d%", "Percentile disadvantage"),
-    ];
-
-    for (expression, description) in existing_systems {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Existing system '{}' should still work after Mothership addition: {}",
-            expression,
-            description
         );
     }
 }
@@ -6894,21 +5669,6 @@ fn test_plotweaver_alias_expansion() {
     // Ndp expands to Nd6 plot
     assert_eq!(aliases::expand_alias("3dp"), Some("3d6 plot".to_string()));
     assert_eq!(aliases::expand_alias("10dp"), Some("10d6 plot".to_string()));
-}
-
-#[test]
-fn test_plotweaver_doesnt_break_existing() {
-    // Ensure dp alias doesn't shadow other d-prefixed patterns
-    let cases = [
-        ("dh", true, "Dark Heresy unchanged"),
-        ("dndstats", true, "DnD stats unchanged"),
-        ("1d6", true, "Plain d6 unchanged"),
-        ("2d6 t4", true, "Target roll unchanged"),
-    ];
-    for (input, should_work, desc) in cases {
-        let result = parse_and_roll(input);
-        assert_eq!(result.is_ok(), should_work, "{desc}: {input}");
-    }
 }
 
 // ============================================================================
@@ -7203,29 +5963,9 @@ fn test_advantage_disadvantage_limits() {
 
 #[test]
 fn test_open_legend_doesnt_break_existing_syntax() {
-    // `adv`/`dis` must not shadow the d-prefixed and e-prefixed tokens they sit near
-    let cases = [
-        ("4d6 d1", "drop lowest unchanged"),
-        ("4d6 e6", "explode unchanged"),
-        ("dh 4d10", "Dark Heresy unchanged"),
-        ("d6s4", "D6 System unchanged"),
-        ("3df", "Fudge unchanged"),
-        ("4d3 fudge", "Fudge modifier unchanged"),
-        ("+d20", "d20 advantage alias unchanged"),
-        ("-d20", "d20 disadvantage alias unchanged"),
-        ("dndstats", "DnD stats unchanged"),
-        ("alien4", "Alien unchanged"),
-        ("ms45", "Mothership unchanged"),
-    ];
-
-    for (input, description) in cases {
-        assert!(
-            parse_and_roll(input).is_ok(),
-            "{description}: '{input}' should still parse"
-        );
-    }
-
-    // Drop after explode is still the behaviour for d#/k#
+    // `adv`/`dis` sit next to the d-prefixed and e-prefixed tokens; the snapshot
+    // corpus pins that those still parse as before. Drop after explode is still
+    // the behaviour for d#/k#.
     let results = parse_and_roll("2d6 ie6 d1").expect("should roll");
     assert_eq!(
         results[0].dropped_rolls.len(),
@@ -7522,27 +6262,8 @@ fn test_essence20_with_comments_sets_and_flags() {
 #[test]
 fn test_essence20_doesnt_break_existing_syntax() {
     // `ess` sits in front of the single-character explode prefix and next to
-    // the `ex`/`ed` aliases, none of which may change behaviour
-    let cases = [
-        ("4d6 e", "explode on max unchanged"),
-        ("4d6 e6", "explode on 6 unchanged"),
-        ("4d6 ie6", "indefinite explode unchanged"),
-        ("ex5", "Exalted unchanged"),
-        ("ex5t8", "Exalted with target unchanged"),
-        ("ed15", "Earthdawn unchanged"),
-        ("ed4e20", "Earthdawn 4E unchanged"),
-        ("a5e +5 ex1", "A5E unchanged"),
-        ("2d6 e6 k1", "combined modifiers unchanged"),
-    ];
-
-    for (input, description) in cases {
-        assert!(
-            parse_and_roll(input).is_ok(),
-            "{description}: '{input}' should still parse"
-        );
-    }
-
-    // Exalted still expands to its own syntax, not an Essence20 skill die
+    // the `ex`/`ed` aliases; the snapshot corpus pins how those parse. Exalted
+    // still expands to its own syntax, not an Essence20 skill die.
     assert_eq!(
         aliases::expand_alias("ex5"),
         Some("5d10 t7 t10".to_string())
@@ -7808,28 +6529,8 @@ fn test_darkest_house_with_comments_sets_and_flags() {
 
 #[test]
 fn test_darkest_house_doesnt_break_existing_syntax() {
-    // `tdh` is matched ahead of the target and drop prefixes, none of which
-    // may change behaviour
-    let cases = [
-        ("4d6 t4", "target unchanged"),
-        ("4d6 tl3", "target lower unchanged"),
-        ("4d6 t7ds10", "double success unchanged"),
-        ("4d6 d1", "drop unchanged"),
-        ("dh", "Dark Heresy unchanged"),
-        ("dh 2d10", "Dark Heresy dice unchanged"),
-        ("dheart", "Daggerheart unchanged"),
-        ("4d6 t4f1", "combined modifiers unchanged"),
-        ("2d6 adv1", "advantage unchanged"),
-        ("2d6 dis1", "disadvantage unchanged"),
-    ];
-
-    for (input, description) in cases {
-        assert!(
-            parse_and_roll(input).is_ok(),
-            "{description}: '{input}' should still parse"
-        );
-    }
-
-    // Dark Heresy still expands to its own syntax, not a Darkest House check
+    // `tdh` is matched ahead of the target and drop prefixes; the snapshot
+    // corpus pins how those parse. Dark Heresy still expands to its own
+    // syntax, not a Darkest House check.
     assert_eq!(aliases::expand_alias("dh"), Some("1d10 dh".to_string()));
 }

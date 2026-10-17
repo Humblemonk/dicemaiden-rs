@@ -1,4 +1,6 @@
   2d6  +  3  
+(  ) 1d20
+( Attack ) 1d20
 ( Stealth Check ) 1d20
 () 2d6
 (Action Roll) fitd3 ! Rolling for stealth
@@ -10,15 +12,21 @@
 (Attack) 1d20 + 5 ! With sword
 (Attack) 1d20 ie20 + 2d6 ie6 adv1
 (Attack) fitd4
+(Bad) sw15
 (Complex) 1d20 * / 2
 (Damage) 2d6
 (Damage) 2d6 ! Fire
 (Damage) 3d6 + 2d6 ! Sneak attack damage
 (Damage) 4d6 i1
+(Error) cpr / 0
+(Fighting) sw8 ! Savage Worlds combat
 (Fire Damage) 8d6
 (Fireball) 8d6 ! 3rd level spell
+(Hack) cpr + 6 ! Cyberpunk Red netrunning
 (Initiative) 1d20
+(Initiative) 1d20 ! Combat
 (Initiative) 1d20 + 3; (Attack) 1d20 + 5; (Damage) 1d8 + 3
+(Investigation) 4cod ! Looking for clues
 (Label) 4d1
 (Label) 4d1 ! comment text
 (Label) 4d1 + 2
@@ -41,15 +49,20 @@
 (Melee Attack) 6wod7c ! Using claws
 (Resistance) fitd0 ! Taking stress damage
 (Save) 1d20 !
+(Spell) wit + 4 ! Witcher magic attempt
 (Stealth Check) 1d20 - 2
 (Strength) 4d6 k3 ! Primary stat
+(Test "Quotes") +d%
+(Test "Quotes") 1d20 ! Comment with 'quotes'
 (Test 'Apostrophe') -d%
 (Test) 4cod99
 (Unclosed 1d20 + 5 ! Should fail
+(Very Long Label Name) 1d20
 (WoD Attack) 4wod8c + 1 ! Supernatural strength
 (attack) 1d20+5 ! with sword
 (roll to hit) 1d20+2
 (⚔️ Attack) +d%
+(⚔️ Attack) 1d20 ! 🔥 Fire damage
 (🎯 Skill) -d% ! 🎲 Roll
 +2d6
 +a5e +5 ex1
@@ -76,7 +89,9 @@
 +d20 + something
 +d20+5
 +d20+5 ! comment
++d20+5 ! testing
 +d20-1
++d20-2 ! attack
 +ess1d8
 +ess2d8 + 1
 +ess3d6s
@@ -102,6 +117,7 @@
 -d% / 2
 -d20
 -d20 - 2
+-d20+3 ! disadvantage roll
 -d20-3
 -ess1d10s
 -ess1d8
@@ -118,6 +134,7 @@
 /roll d100
 0 + +d%
 0 d6
+0.5hsk
 0d1
 0d6
 0d6l
@@ -129,6 +146,7 @@
 10 / 1d1
 10 / 2d1
 10 1d12+6 t8
+10 alien4s3
 100 - -d%
 100 / 2d1
 100 1d6
@@ -137,6 +155,7 @@
 100/2d1+5
 100/2d4
 100/d%
+1000d1000
 100d1
 100d100
 100d6 e6 ie k50 r1 t4 +10
@@ -198,11 +217,13 @@
 10d6 plot
 10d6 target 4+
 10d6 ww
+10hsk
 10yz
 11d6 t4 + 1d6 t4f1ie6
 12d6l
 12yz
 15yz
+1d
 1d0
 1d1
 1d1 * 2 * 3
@@ -542,6 +563,7 @@ tbe65 e4
 1d4e4
 1d6
 1d6 !
+1d6 ! 
 1d6 * 2
 1d6 + 
 1d6 + + 5
@@ -585,7 +607,9 @@ tbe65 e4
 1d6;1d6
 1d6;1d6;1d6;1d6
 1d6;1d6;1d6;1d6;1d6
+1d6;1d6;1d6;1d6;1d6;1d6;1d6;1d6;1d6;1d6
 1d6l
+1d6xyz
 1d8
 1d8 ie
 1d8 ie + 1d6 ie
@@ -597,6 +621,7 @@ tbe65 e4
 2 -d20 + 3
 2 1d6
 2 1d6l
+2 4cod
 2 4d1
 2 4d1 + 2
 2 4d1 adv1
@@ -609,6 +634,7 @@ tbe65 e4
 2 d6
 2 dd34
 2 ess1d8s ! Stealth
+2 sw8
 2 wng w2 5d6 !dmg
 20 / 2d1
 20 10d10
@@ -625,6 +651,7 @@ tbe65 e4
 20 4d1 t1
 20 4wod8c
 20 50d6
+20 alien3s2
 20 d20+3
 20 d6
 20/2d1
@@ -642,11 +669,15 @@ tbe65 e4
 21 d20+3
 21 d6
 22 d6
+2d%
+2d% k1
 2d1
 2d1 ! comment
 2d1 * 2d1
 2d1 *0
 2d1*0+6
+2d6 !    
+2d6 ! Multi word comment
 3d1*0+5+2
 3d1*0-5
 3d1*2*0
@@ -701,6 +732,7 @@ tbe65 e4
 1d1 ; 10 + 2 + 2d1
 10 + 2 + 2d1 ! fire
 (Hit) 10 + 2 + 2d1
+1d6 ! This is a very long comment that might cause formatting issues when combined with complex dice expressions and multiple modifiers
 p 10 + 2 + 2d1
 5 + 1d1 + 2
 4 + 4d1 + 2
@@ -713,6 +745,7 @@ p 10 + 2 + 2d1
 5 + 1d1 + 2 ! fire
 3 5 + 1d1 + 2
 1d1 ; 5 + 1d1 + 2
+20 (Set) 10d6 e6 k5 ! Large roll set with exploding dice
 5 + 1d1 + 2147483641
 5 + 1d1 + 2147483642
 4 + 4d1t1
@@ -1009,6 +1042,7 @@ p 10 + 2 + 2d1
 2d8-2d6 d1
 2hsk1
 2.5hsk
+2dp + 2
 3hsk
 2lf4
 2lf4 ; fitd0 ; gb
@@ -1080,6 +1114,7 @@ p 10 + 2 + 2d1
 3 cpd6
 3 cpr
 3 cs 5
+3 dheart
 3 ess1d10
 3 ess1d8
 3 ex5
@@ -1089,6 +1124,7 @@ p 10 + 2 + 2d1
 3 mm
 3 mnm +2
 3 ol5
+3 sw8 + 5
 3 tdh4
 3 tbe45
 3 tbe60 hard
@@ -1169,6 +1205,8 @@ p 10 + 2 + 2d1
 3d6e6
 3d8 e6
 3df
+3lf3f k2
+3lf5
 3wh4+
 3wod9 + 2
 3wod9c + 2
@@ -1179,6 +1217,9 @@ p 10 + 2 + 2d1
 4 +d% + 10
 4 10d6l
 4 20/2d1
+4 2lf4
+4 4cod
+4 sw8
 4 wng dn2 4d6 !exempt
 499d6 adv1
 4cod
@@ -1187,6 +1228,7 @@ p 10 + 2 + 2d1
 4cod ; fitd100
 4cod8
 4cod9
+4codr
 4d1
 4d1 ! c ; 2d1 + 1
 4d1 ! comment
@@ -1502,6 +1544,7 @@ p 10 + 2 + 2d1
 4yz
 4yz - 1
 5 - 2d1
+5 alien3s1
 5 cpd6
 5 gb
 500 / d%
@@ -1766,6 +1809,7 @@ p 10 + 2 + 2d1
 6d6 target 6+
 6d6 tl4ds
 6d6 tl4ds1
+6d6 wngt + 2
 6d6 ww
 6d6 wwc1
 6d6 wwc2
@@ -1840,6 +1884,7 @@ Exalted 6d10 t9 t10
 Exalted 7d10 t7ds8
 Exalted 8d10 t7 t10
 Explicit d100
+FITD3
 Godbound 3d8 with penalty
 Godbound straight 2d10 with bonus
 Hero System to-hit roll (3d6 roll-under)
@@ -1899,20 +1944,38 @@ a5e +7 ex2
 a5e -2 ex1
 a5e ex1
 a5e ex2
+abc
 adv1
 adv2 dis1
 age
 alien
+alien10s1
+alien10s10
+alien2s3
+alien3s1; 4cod
+alien3s1p
 alien3s2 + 2d10
 alien3s2p
 alien4
 alien4 + 1d6
 alien4; 1d20 + 5
+alien4s1
+alien4s1p
+alien4s2
+alien4s2; sr6
+alien4s3 ! variable penalty
 alien4s3 - 2d4
+alien4s5
+alien5
 alien5s1
 alien5s2
+alien5s3p
+alien6
+alien6s2
 alien6s3p
+alien6s4
 alien6s4 + 1d6
+alien7s4
 attack
 attack +10
 attack +5
@@ -1954,6 +2017,7 @@ conan tn3f5
 conan1
 conan10
 conan2tn12f3
+conan3
 conan3cd5 tn12f3
 conan4 tn14f5
 conan5
@@ -1997,6 +2061,7 @@ cs 3
 cs 3 + 2
 cs 5
 cs 6
+d
 d%
 d% * 2
 d% + 10
@@ -2036,6 +2101,7 @@ dd36
 dd44
 dd46
 dd46 / 2
+dd6
 dd66
 dd66 - 10
 dd66 / 10
@@ -2045,12 +2111,16 @@ dh
 dh 2d10
 dh 4d10
 dh 6d10
+dh1
 dheart
 dheart + 1d6
 dheart + 3 ! trait plus experience
 dheart - 1d6
 dheart - 2
+dheartgm
+dheartx
 dis1
+dndstats
 ed
 ed1
 ed15
@@ -2141,12 +2211,15 @@ gb + 5
 gb 1d8
 gb 3d8
 gb 3d8 - 2
+gbs - 2
 gbs 1d20 * 2
 gbs 2d10
 gbs 2d10 + 5
 gbs 2d10 +5
 hs
 ie6
+invalid
+invalid_fitd ; sw8
 ir2
 irg2
 kl2
@@ -2180,6 +2253,7 @@ nr (Concentration) 1d20 + 5 ! Maintaining spell
 nr 2d6
 nr 3d10 e10
 nr 3d10 t7
+nr 4cod
 nr 4d1
 nr 4d1 + 2
 nr 4d1 adv1
@@ -2193,6 +2267,7 @@ nr 6 2d6
 nr fitd2
 nr p 1d20
 nr s 2d6
+nr sw8
 nr ul 2d6
 ol
 ol0
@@ -2282,6 +2357,7 @@ skill +3
 skill -4
 skill -5
 snm
+snm4 * 3
 snm5
 snm6 + 1d4
 sp
@@ -2289,13 +2365,20 @@ sp3 + 1d6
 sp4
 sp4 + 2d6
 sp4t6
+sp6 * 2 - 3
+sr12
 sr6
+sr6 * 2
 sw
 sw10
+sw10 * 2
+sw10 + 2
 sw12
 sw4
 sw6
 sw8
+sw8 + 3
+sw8 ; invalid_fitd
 tdh4
 tdh4 ! Pick the lock
 tdh4 +1
@@ -2554,6 +2637,11 @@ dh 2d10 - 1
 dh 2d10+1
 dh 3d10 * 2
 dh 2d10 + 1d6
+vtm4h0 * 2
+vtm5h1 - 1
+vtm5h2
+vtm6h2 + 2
+vtm8h3 / 2
 wng 4d6 + 1
 wng dn3 5d6 - 1
 wng 4d6 + 2 !soak

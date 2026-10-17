@@ -1,4 +1,6 @@
   2d6  +  3  	always-ok n=Some(1)
+(  ) 1d20	always-ok n=Some(1)
+( Attack ) 1d20	always-ok n=Some(1)
 ( Stealth Check ) 1d20	always-ok n=Some(1)
 () 2d6	always-ok n=Some(1)
 (Action Roll) fitd3 ! Rolling for stealth	always-ok n=Some(1)
@@ -10,15 +12,21 @@
 (Attack) 1d20 + 5 ! With sword	always-ok n=Some(1)
 (Attack) 1d20 ie20 + 2d6 ie6 adv1	always-ok n=Some(1)
 (Attack) fitd4	always-ok n=Some(1)
+(Bad) sw15	always-err {"Invalid dice expression: sw15"}
 (Complex) 1d20 * / 2	always-err {"Invalid modifier '*' - contains operator"}
 (Damage) 2d6	always-ok n=Some(1)
 (Damage) 2d6 ! Fire	always-ok n=Some(1)
 (Damage) 3d6 + 2d6 ! Sneak attack damage	always-ok n=Some(1)
 (Damage) 4d6 i1	always-ok n=Some(1)
+(Error) cpr / 0	always-err {"Cannot divide by zero"}
+(Fighting) sw8 ! Savage Worlds combat	always-ok n=Some(1)
 (Fire Damage) 8d6	always-ok n=Some(1)
 (Fireball) 8d6 ! 3rd level spell	always-ok n=Some(1)
+(Hack) cpr + 6 ! Cyberpunk Red netrunning	always-ok n=Some(1)
 (Initiative) 1d20	always-ok n=Some(1)
+(Initiative) 1d20 ! Combat	always-ok n=Some(1)
 (Initiative) 1d20 + 3; (Attack) 1d20 + 5; (Damage) 1d8 + 3	always-ok n=Some(3)
+(Investigation) 4cod ! Looking for clues	always-ok n=Some(1)
 (Label) 4d1	always-ok n=Some(1)
 (Label) 4d1 ! comment text	always-ok n=Some(1)
 (Label) 4d1 + 2	always-ok n=Some(1)
@@ -41,15 +49,20 @@
 (Melee Attack) 6wod7c ! Using claws	always-ok n=Some(1)
 (Resistance) fitd0 ! Taking stress damage	always-ok n=Some(1)
 (Save) 1d20 !	always-ok n=Some(1)
+(Spell) wit + 4 ! Witcher magic attempt	always-ok n=Some(1)
 (Stealth Check) 1d20 - 2	always-ok n=Some(1)
 (Strength) 4d6 k3 ! Primary stat	always-ok n=Some(1)
+(Test "Quotes") +d%	always-ok n=Some(1)
+(Test "Quotes") 1d20 ! Comment with 'quotes'	always-ok n=Some(1)
 (Test 'Apostrophe') -d%	always-ok n=Some(1)
 (Test) 4cod99	always-err {"Invalid dice expression: 4cod99"}
 (Unclosed 1d20 + 5 ! Should fail	always-err {"Invalid dice expression: (Unclosed"}
+(Very Long Label Name) 1d20	always-ok n=Some(1)
 (WoD Attack) 4wod8c + 1 ! Supernatural strength	always-ok n=Some(1)
 (attack) 1d20+5 ! with sword	always-ok n=Some(1)
 (roll to hit) 1d20+2	always-ok n=Some(1)
 (⚔️ Attack) +d%	always-ok n=Some(1)
+(⚔️ Attack) 1d20 ! 🔥 Fire damage	always-ok n=Some(1)
 (🎯 Skill) -d% ! 🎲 Roll	always-ok n=Some(1)
 +2d6	always-err {"Invalid dice expression: +"}
 +a5e +5 ex1	always-ok n=Some(1)
@@ -76,7 +89,9 @@
 +d20 + something	always-err {"Invalid modifier '+' - contains operator"}
 +d20+5	always-ok n=Some(1)
 +d20+5 ! comment	always-ok n=Some(1)
++d20+5 ! testing	always-ok n=Some(1)
 +d20-1	always-ok n=Some(1)
++d20-2 ! attack	always-ok n=Some(1)
 +ess1d8	always-ok n=Some(1)
 +ess2d8 + 1	always-ok n=Some(1)
 +ess3d6s	always-ok n=Some(1)
@@ -102,6 +117,7 @@
 -d% / 2	always-ok n=Some(1)
 -d20	always-ok n=Some(1)
 -d20 - 2	always-ok n=Some(1)
+-d20+3 ! disadvantage roll	always-ok n=Some(1)
 -d20-3	always-ok n=Some(1)
 -ess1d10s	always-ok n=Some(1)
 -ess1d8	always-ok n=Some(1)
@@ -118,6 +134,7 @@
 /roll d100	always-err {"Invalid dice expression: /"}
 0 + +d%	always-err {"Unexpected `+ +` between `0` and the dice"}
 0 d6	always-err {"Set count must be between 2 and 20"}
+0.5hsk	always-ok n=Some(1)
 0d1	always-err {"Cannot roll 0 dice"}
 0d6	always-err {"Cannot roll 0 dice"}
 0d6l	always-err {"Unable to parse combined modifier: 'l' at position: 'l'. Expected valid modifier pattern."}
@@ -129,6 +146,7 @@
 10 / 1d1	always-ok n=Some(1)
 10 / 2d1	always-ok n=Some(1)
 10 1d12+6 t8	always-ok n=Some(10)
+10 alien4s3	always-ok n=Some(10)
 100 - -d%	always-err {"Unexpected `- -` between `100` and the dice"}
 100 / 2d1	always-ok n=Some(1)
 100 1d6	always-err {"Set count must be between 2 and 20"}
@@ -137,6 +155,7 @@
 100/2d1+5	always-ok n=Some(1)
 100/2d4	always-ok n=Some(1)
 100/d%	always-ok n=Some(1)
+1000d1000	always-err {"Maximum 500 dice allowed"}
 100d1	always-ok n=Some(1)
 100d100	always-ok n=Some(1)
 100d6 e6 ie k50 r1 t4 +10	always-ok n=Some(1)
@@ -198,11 +217,13 @@
 10d6 plot	always-ok n=Some(1)
 10d6 target 4+	always-err {"Invalid target value in 'target'"}
 10d6 ww	always-ok n=Some(1)
+10hsk	always-ok n=Some(1)
 10yz	always-ok n=Some(1)
 11d6 t4 + 1d6 t4f1ie6	always-ok n=Some(1)
 12d6l	always-ok n=Some(1)
 12yz	always-ok n=Some(1)
 15yz	always-ok n=Some(1)
+1d	always-err {"Invalid dice expression: 1d"}
 1d0	always-err {"Dice must have at least 1 side"}
 1d1	always-ok n=Some(1)
 1d1 * 2 * 3	always-ok n=Some(1)
@@ -542,6 +563,7 @@ tbe65 e4	always-err {"The Broken Empires skill test only supports difficulty, +N
 1d4e4	always-ok n=Some(1)
 1d6	always-ok n=Some(1)
 1d6 !	always-ok n=Some(1)
+1d6 ! 	always-ok n=Some(1)
 1d6 * 2	always-ok n=Some(1)
 1d6 + 	always-err {"Invalid modifier '+' - contains operator"}
 1d6 + + 5	always-err {"Invalid modifier '+' - contains operator"}
@@ -585,7 +607,9 @@ tbe65 e4	always-err {"The Broken Empires skill test only supports difficulty, +N
 1d6;1d6	always-ok n=Some(2)
 1d6;1d6;1d6;1d6	always-ok n=Some(4)
 1d6;1d6;1d6;1d6;1d6	always-err {"Maximum of 4 separate rolls allowed"}
+1d6;1d6;1d6;1d6;1d6;1d6;1d6;1d6;1d6;1d6	always-err {"Maximum of 4 separate rolls allowed"}
 1d6l	always-ok n=Some(1)
+1d6xyz	always-err {"Unable to parse combined modifier: 'xyz' at position: 'xyz'. Expected valid modifier pattern."}
 1d8	always-ok n=Some(1)
 1d8 ie	always-ok n=Some(1)
 1d8 ie + 1d6 ie	always-ok n=Some(1)
@@ -597,6 +621,7 @@ tbe65 e4	always-err {"The Broken Empires skill test only supports difficulty, +N
 2 -d20 + 3	always-ok n=Some(2)
 2 1d6	always-ok n=Some(2)
 2 1d6l	always-ok n=Some(2)
+2 4cod	always-ok n=Some(2)
 2 4d1	always-ok n=Some(2)
 2 4d1 + 2	always-ok n=Some(2)
 2 4d1 adv1	always-ok n=Some(2)
@@ -609,6 +634,7 @@ tbe65 e4	always-err {"The Broken Empires skill test only supports difficulty, +N
 2 d6	always-ok n=Some(2)
 2 dd34	always-ok n=Some(2)
 2 ess1d8s ! Stealth	always-ok n=Some(2)
+2 sw8	always-ok n=Some(2)
 2 wng w2 5d6 !dmg	always-ok n=Some(2)
 20 / 2d1	always-ok n=Some(1)
 20 10d10	always-ok n=Some(20)
@@ -625,6 +651,7 @@ tbe65 e4	always-err {"The Broken Empires skill test only supports difficulty, +N
 20 4d1 t1	always-ok n=Some(20)
 20 4wod8c	always-ok n=Some(20)
 20 50d6	always-ok n=Some(20)
+20 alien3s2	always-ok n=Some(20)
 20 d20+3	always-ok n=Some(20)
 20 d6	always-ok n=Some(20)
 20/2d1	always-ok n=Some(1)
@@ -642,11 +669,15 @@ tbe65 e4	always-err {"The Broken Empires skill test only supports difficulty, +N
 21 d20+3	always-err {"Set count must be between 2 and 20"}
 21 d6	always-err {"Set count must be between 2 and 20"}
 22 d6	always-err {"Set count must be between 2 and 20"}
+2d%	always-ok n=Some(1)
+2d% k1	always-ok n=Some(1)
 2d1	always-ok n=Some(1)
 2d1 ! comment	always-ok n=Some(1)
 2d1 * 2d1	always-ok n=Some(1)
 2d1 *0	always-ok n=Some(1)
 2d1*0+6	always-ok n=Some(1)
+2d6 !    	always-ok n=Some(1)
+2d6 ! Multi word comment	always-ok n=Some(1)
 3d1*0+5+2	always-ok n=Some(1)
 3d1*0-5	always-ok n=Some(1)
 3d1*2*0	always-ok n=Some(1)
@@ -701,6 +732,7 @@ tbe65 e4	always-err {"The Broken Empires skill test only supports difficulty, +N
 1d1 ; 10 + 2 + 2d1	always-ok n=Some(2)
 10 + 2 + 2d1 ! fire	always-ok n=Some(1)
 (Hit) 10 + 2 + 2d1	always-ok n=Some(1)
+1d6 ! This is a very long comment that might cause formatting issues when combined with complex dice expressions and multiple modifiers	always-ok n=Some(1)
 p 10 + 2 + 2d1	always-ok n=Some(1)
 5 + 1d1 + 2	always-ok n=Some(1)
 4 + 4d1 + 2	always-ok n=Some(1)
@@ -713,6 +745,7 @@ p 10 + 2 + 2d1	always-ok n=Some(1)
 5 + 1d1 + 2 ! fire	always-ok n=Some(1)
 3 5 + 1d1 + 2	always-ok n=Some(3)
 1d1 ; 5 + 1d1 + 2	always-ok n=Some(2)
+20 (Set) 10d6 e6 k5 ! Large roll set with exploding dice	always-ok n=Some(20)
 5 + 1d1 + 2147483641	always-ok n=Some(1)
 5 + 1d1 + 2147483642	always-err {"Result is too large"}
 4 + 4d1t1	always-ok n=Some(1)
@@ -1009,6 +1042,7 @@ p 10 + 2 + 2d1	always-ok n=Some(1)
 2d8-2d6 d1	always-ok n=Some(1)
 2hsk1	always-ok n=Some(1)
 2.5hsk	always-ok n=Some(1)
+2dp + 2	always-ok n=Some(1)
 3hsk	always-ok n=Some(1)
 2lf4	always-ok n=Some(1)
 2lf4 ; fitd0 ; gb	always-ok n=Some(3)
@@ -1080,6 +1114,7 @@ p 10 + 2 + 2d1	always-ok n=Some(1)
 3 cpd6	always-ok n=Some(3)
 3 cpr	always-ok n=Some(3)
 3 cs 5	always-ok n=Some(3)
+3 dheart	always-ok n=Some(3)
 3 ess1d10	always-ok n=Some(3)
 3 ess1d8	always-ok n=Some(3)
 3 ex5	always-ok n=Some(3)
@@ -1089,6 +1124,7 @@ p 10 + 2 + 2d1	always-ok n=Some(1)
 3 mm	always-ok n=Some(3)
 3 mnm +2	always-ok n=Some(3)
 3 ol5	always-ok n=Some(3)
+3 sw8 + 5	always-ok n=Some(3)
 3 tdh4	always-ok n=Some(3)
 3 tbe45	always-ok n=Some(3)
 3 tbe60 hard	always-ok n=Some(3)
@@ -1169,6 +1205,8 @@ p 10 + 2 + 2d1	always-ok n=Some(1)
 3d6e6	always-ok n=Some(1)
 3d8 e6	always-ok n=Some(1)
 3df	always-ok n=Some(1)
+3lf3f k2	always-ok n=Some(1)
+3lf5	always-ok n=Some(1)
 3wh4+	always-ok n=Some(1)
 3wod9 + 2	always-ok n=Some(1)
 3wod9c + 2	always-ok n=Some(1)
@@ -1179,6 +1217,9 @@ p 10 + 2 + 2d1	always-ok n=Some(1)
 4 +d% + 10	always-ok n=Some(4)
 4 10d6l	always-ok n=Some(4)
 4 20/2d1	always-ok n=Some(4)
+4 2lf4	always-ok n=Some(4)
+4 4cod	always-ok n=Some(4)
+4 sw8	always-ok n=Some(4)
 4 wng dn2 4d6 !exempt	always-ok n=Some(4)
 499d6 adv1	always-ok n=Some(1)
 4cod	always-ok n=Some(1)
@@ -1187,6 +1228,7 @@ p 10 + 2 + 2d1	always-ok n=Some(1)
 4cod ; fitd100	always-err {"Invalid dice expression: fitd100"}
 4cod8	always-ok n=Some(1)
 4cod9	always-ok n=Some(1)
+4codr	always-ok n=Some(1)
 4d1	always-ok n=Some(1)
 4d1 ! c ; 2d1 + 1	always-ok n=Some(2)
 4d1 ! comment	always-ok n=Some(1)
@@ -1502,6 +1544,7 @@ p 10 + 2 + 2d1	always-ok n=Some(1)
 4yz	always-ok n=Some(1)
 4yz - 1	always-ok n=Some(1)
 5 - 2d1	always-ok n=Some(1)
+5 alien3s1	always-ok n=Some(5)
 5 cpd6	always-ok n=Some(5)
 5 gb	always-ok n=Some(5)
 500 / d%	always-ok n=Some(1)
@@ -1766,6 +1809,7 @@ p 10 + 2 + 2d1	always-ok n=Some(1)
 6d6 target 6+	always-err {"Invalid target value in 'target'"}
 6d6 tl4ds	always-ok n=Some(1)
 6d6 tl4ds1	always-ok n=Some(1)
+6d6 wngt + 2	always-ok n=Some(1)
 6d6 ww	always-ok n=Some(1)
 6d6 wwc1	always-ok n=Some(1)
 6d6 wwc2	always-ok n=Some(1)
@@ -1840,6 +1884,7 @@ Exalted 6d10 t9 t10	always-err {"Invalid dice expression: Exalted"}
 Exalted 7d10 t7ds8	always-err {"Invalid dice expression: Exalted"}
 Exalted 8d10 t7 t10	always-err {"Invalid dice expression: Exalted"}
 Explicit d100	always-err {"Invalid dice expression: Explicit"}
+FITD3	always-ok n=Some(1)
 Godbound 3d8 with penalty	always-err {"Invalid dice expression: Godbound"}
 Godbound straight 2d10 with bonus	always-err {"Invalid dice expression: Godbound"}
 Hero System to-hit roll (3d6 roll-under)	always-err {"Invalid dice expression: Hero"}
@@ -1899,20 +1944,38 @@ a5e +7 ex2	always-ok n=Some(1)
 a5e -2 ex1	always-ok n=Some(1)
 a5e ex1	always-ok n=Some(1)
 a5e ex2	always-ok n=Some(1)
+abc	always-err {"Invalid dice expression: abc"}
 adv1	always-err {"Invalid dice expression: adv1"}
 adv2 dis1	always-err {"Invalid dice expression: adv2"}
 age	always-ok n=Some(1)
 alien	always-err {"Invalid dice expression: alien"}
+alien10s1	always-ok n=Some(1)
+alien10s10	always-ok n=Some(1)
+alien2s3	always-ok n=Some(1)
+alien3s1; 4cod	always-ok n=Some(2)
+alien3s1p	always-ok n=Some(1)
 alien3s2 + 2d10	always-ok n=Some(1)
 alien3s2p	always-ok n=Some(1)
 alien4	always-ok n=Some(1)
 alien4 + 1d6	always-ok n=Some(1)
 alien4; 1d20 + 5	always-ok n=Some(2)
+alien4s1	always-ok n=Some(1)
+alien4s1p	always-ok n=Some(1)
+alien4s2	always-ok n=Some(1)
+alien4s2; sr6	always-ok n=Some(2)
+alien4s3 ! variable penalty	always-ok n=Some(1)
 alien4s3 - 2d4	always-err {"Alien counts sixes, so math doesn't apply; add dice (`+ 1d6`) or roll fewer instead"}
+alien4s5	always-ok n=Some(1)
+alien5	always-ok n=Some(1)
 alien5s1	always-ok n=Some(1)
 alien5s2	always-ok n=Some(1)
+alien5s3p	always-ok n=Some(1)
+alien6	always-ok n=Some(1)
+alien6s2	always-ok n=Some(1)
 alien6s3p	always-ok n=Some(1)
+alien6s4	always-ok n=Some(1)
 alien6s4 + 1d6	always-ok n=Some(1)
+alien7s4	always-ok n=Some(1)
 attack	always-ok n=Some(1)
 attack +10	always-ok n=Some(1)
 attack +5	always-ok n=Some(1)
@@ -1954,6 +2017,7 @@ conan tn3f5	always-err {"Focus 5 cannot exceed target number 3"}
 conan1	always-ok n=Some(1)
 conan10	always-err {"Invalid dice expression: conan10"}
 conan2tn12f3	always-ok n=Some(1)
+conan3	always-ok n=Some(1)
 conan3cd5 tn12f3	always-ok n=Some(1)
 conan4 tn14f5	always-ok n=Some(1)
 conan5	always-ok n=Some(1)
@@ -1997,6 +2061,7 @@ cs 3	always-ok n=Some(1)
 cs 3 + 2	always-ok n=Some(1)
 cs 5	always-ok n=Some(1)
 cs 6	always-ok n=Some(1)
+d	always-err {"Invalid dice expression: d"}
 d%	always-ok n=Some(1)
 d% * 2	always-ok n=Some(1)
 d% + 10	always-ok n=Some(1)
@@ -2036,6 +2101,7 @@ dd36	always-ok n=Some(1)
 dd44	always-ok n=Some(1)
 dd46	always-ok n=Some(1)
 dd46 / 2	always-ok n=Some(1)
+dd6	always-err {"Invalid dice expression: dd6"}
 dd66	always-ok n=Some(1)
 dd66 - 10	always-ok n=Some(1)
 dd66 / 10	always-ok n=Some(1)
@@ -2045,12 +2111,16 @@ dh	always-ok n=Some(1)
 dh 2d10	always-ok n=Some(1)
 dh 4d10	always-ok n=Some(1)
 dh 6d10	always-ok n=Some(1)
+dh1	always-err {"Invalid dice expression: dh1"}
 dheart	always-ok n=Some(1)
 dheart + 1d6	always-ok n=Some(1)
 dheart + 3 ! trait plus experience	always-ok n=Some(1)
 dheart - 1d6	always-ok n=Some(1)
 dheart - 2	always-ok n=Some(1)
+dheartgm	always-ok n=Some(1)
+dheartx	always-err {"Invalid dice expression: dheartx"}
 dis1	always-err {"Invalid dice expression: dis1"}
+dndstats	always-ok n=Some(6)
 ed	always-err {"Invalid dice expression: ed"}
 ed1	always-ok n=Some(1)
 ed15	always-ok n=Some(1)
@@ -2141,12 +2211,15 @@ gb + 5	always-ok n=Some(1)
 gb 1d8	always-ok n=Some(1)
 gb 3d8	always-ok n=Some(1)
 gb 3d8 - 2	always-ok n=Some(1)
+gbs - 2	always-ok n=Some(1)
 gbs 1d20 * 2	always-ok n=Some(1)
 gbs 2d10	always-ok n=Some(1)
 gbs 2d10 + 5	always-ok n=Some(1)
 gbs 2d10 +5	always-ok n=Some(1)
 hs	always-err {"Invalid dice expression: hs"}
 ie6	always-err {"Invalid dice expression: ie6"}
+invalid	always-err {"Invalid dice expression: invalid"}
+invalid_fitd ; sw8	always-err {"Invalid dice expression: invalid_fitd"}
 ir2	always-err {"Invalid dice expression: ir2"}
 irg2	always-err {"Invalid dice expression: irg2"}
 kl2	always-err {"Invalid dice expression: kl2"}
@@ -2180,6 +2253,7 @@ nr (Concentration) 1d20 + 5 ! Maintaining spell	always-ok n=Some(1)
 nr 2d6	always-ok n=Some(1)
 nr 3d10 e10	always-ok n=Some(1)
 nr 3d10 t7	always-ok n=Some(1)
+nr 4cod	always-ok n=Some(1)
 nr 4d1	always-ok n=Some(1)
 nr 4d1 + 2	always-ok n=Some(1)
 nr 4d1 adv1	always-ok n=Some(1)
@@ -2193,6 +2267,7 @@ nr 6 2d6	always-ok n=Some(6)
 nr fitd2	always-ok n=Some(1)
 nr p 1d20	always-ok n=Some(1)
 nr s 2d6	always-ok n=Some(1)
+nr sw8	always-ok n=Some(1)
 nr ul 2d6	always-ok n=Some(1)
 ol	always-err {"Invalid dice expression: ol"}
 ol0	always-ok n=Some(1)
@@ -2282,6 +2357,7 @@ skill +3	always-ok n=Some(1)
 skill -4	always-ok n=Some(1)
 skill -5	always-ok n=Some(1)
 snm	always-err {"Invalid dice expression: snm"}
+snm4 * 3	always-ok n=Some(1)
 snm5	always-ok n=Some(1)
 snm6 + 1d4	always-ok n=Some(1)
 sp	always-err {"Invalid dice expression: sp"}
@@ -2289,13 +2365,20 @@ sp3 + 1d6	always-ok n=Some(1)
 sp4	always-ok n=Some(1)
 sp4 + 2d6	always-ok n=Some(1)
 sp4t6	always-ok n=Some(1)
+sp6 * 2 - 3	always-ok n=Some(1)
+sr12	always-ok n=Some(1)
 sr6	always-ok n=Some(1)
+sr6 * 2	always-ok n=Some(1)
 sw	always-err {"Invalid dice expression: sw"}
 sw10	always-ok n=Some(1)
+sw10 * 2	always-ok n=Some(1)
+sw10 + 2	always-ok n=Some(1)
 sw12	always-ok n=Some(1)
 sw4	always-ok n=Some(1)
 sw6	always-ok n=Some(1)
 sw8	always-ok n=Some(1)
+sw8 + 3	always-ok n=Some(1)
+sw8 ; invalid_fitd	always-err {"Invalid dice expression: invalid_fitd"}
 tdh4	always-ok n=Some(1)
 tdh4 ! Pick the lock	always-ok n=Some(1)
 tdh4 +1	always-ok n=Some(1)
@@ -2554,6 +2637,11 @@ dh 2d10 - 1	always-ok n=Some(1)
 dh 2d10+1	always-ok n=Some(1)
 dh 3d10 * 2	always-ok n=Some(1)
 dh 2d10 + 1d6	always-ok n=Some(1)
+vtm4h0 * 2	always-ok n=Some(1)
+vtm5h1 - 1	always-ok n=Some(1)
+vtm5h2	always-ok n=Some(1)
+vtm6h2 + 2	always-ok n=Some(1)
+vtm8h3 / 2	always-ok n=Some(1)
 wng 4d6 + 1	always-err {"Wrath & Glory counts Icons, so `+ 1` doesn't apply; add dice instead (`+ 1d6`)"}
 wng dn3 5d6 - 1	always-err {"Wrath & Glory counts Icons, so math doesn't apply; add dice (`+ 1d6`) or roll fewer instead"}
 wng 4d6 + 2 !soak	always-err {"Wrath & Glory counts Icons, so `+ 2` doesn't apply; add dice instead (`+ 2d6`)"}

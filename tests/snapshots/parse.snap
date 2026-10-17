@@ -1,4 +1,6 @@
   2d6  +  3  	OK	[2d6 mods=[Add(3)] label=None comment=None flags=----]
+(  ) 1d20	OK	[1d20 mods=[] label=Some("") comment=None flags=----]
+( Attack ) 1d20	OK	[1d20 mods=[] label=Some("Attack") comment=None flags=----]
 ( Stealth Check ) 1d20	OK	[1d20 mods=[] label=Some("Stealth Check") comment=None flags=----]
 () 2d6	OK	[2d6 mods=[] label=Some("") comment=None flags=----]
 (Action Roll) fitd3 ! Rolling for stealth	OK	[3d6 mods=[ForgedDark] label=Some("Action Roll") comment=Some("Rolling for stealth") flags=----]
@@ -10,15 +12,21 @@
 (Attack) 1d20 + 5 ! With sword	OK	[1d20 mods=[Add(5)] label=Some("Attack") comment=Some("With sword") flags=----]
 (Attack) 1d20 ie20 + 2d6 ie6 adv1	OK	[1d20 mods=[ExplodeIndefinite(Some(20)), AddDice(DiceRoll { count: 2, sides: 6, modifiers: [ExplodeIndefinite(Some(6)), Advantage(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Attack") comment=None flags=----]
 (Attack) fitd4	OK	[4d6 mods=[ForgedDark] label=Some("Attack") comment=None flags=----]
+(Bad) sw15	ERR	Invalid dice expression: sw15
 (Complex) 1d20 * / 2	ERR	Invalid modifier '*' - contains operator
 (Damage) 2d6	OK	[2d6 mods=[] label=Some("Damage") comment=None flags=----]
 (Damage) 2d6 ! Fire	OK	[2d6 mods=[] label=Some("Damage") comment=Some("Fire") flags=----]
 (Damage) 3d6 + 2d6 ! Sneak attack damage	OK	[3d6 mods=[AddDice(DiceRoll { count: 2, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Damage") comment=Some("Sneak attack damage") flags=----]
 (Damage) 4d6 i1	OK	[4d6 mods=[Implode(Some(1))] label=Some("Damage") comment=None flags=----]
+(Error) cpr / 0	ERR	Cannot divide by zero
+(Fighting) sw8 ! Savage Worlds combat	OK	[2d1 mods=[SavageWorlds(8)] label=Some("Fighting") comment=Some("Savage Worlds combat") flags=----]
 (Fire Damage) 8d6	OK	[8d6 mods=[] label=Some("Fire Damage") comment=None flags=----]
 (Fireball) 8d6 ! 3rd level spell	OK	[8d6 mods=[] label=Some("Fireball") comment=Some("3rd level spell") flags=----]
+(Hack) cpr + 6 ! Cyberpunk Red netrunning	OK	[1d10 mods=[CyberpunkRed, Add(6)] label=Some("Hack") comment=Some("Cyberpunk Red netrunning") flags=----]
 (Initiative) 1d20	OK	[1d20 mods=[] label=Some("Initiative") comment=None flags=----]
+(Initiative) 1d20 ! Combat	OK	[1d20 mods=[] label=Some("Initiative") comment=Some("Combat") flags=----]
 (Initiative) 1d20 + 3; (Attack) 1d20 + 5; (Damage) 1d8 + 3	OK	[1d20 mods=[Add(3)] label=Some("Initiative") comment=None flags=---- | 1d20 mods=[Add(5)] label=Some("Attack") comment=None flags=---- | 1d8 mods=[Add(3)] label=Some("Damage") comment=None flags=----]
+(Investigation) 4cod ! Looking for clues	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=Some("Investigation") comment=Some("Looking for clues") flags=----]
 (Label) 4d1	OK	[4d1 mods=[] label=Some("Label") comment=None flags=----]
 (Label) 4d1 ! comment text	OK	[4d1 mods=[] label=Some("Label") comment=Some("comment text") flags=----]
 (Label) 4d1 + 2	OK	[4d1 mods=[Add(2)] label=Some("Label") comment=None flags=----]
@@ -41,15 +49,20 @@
 (Melee Attack) 6wod7c ! Using claws	OK	[6d10 mods=[Failure(1), Target(7), Cancel] label=Some("Melee Attack") comment=Some("Using claws") flags=----]
 (Resistance) fitd0 ! Taking stress damage	OK	[2d6 mods=[ForgedDarkZero] label=Some("Resistance") comment=Some("Taking stress damage") flags=----]
 (Save) 1d20 !	OK	[1d20 mods=[] label=Some("Save") comment=Some("") flags=----]
+(Spell) wit + 4 ! Witcher magic attempt	OK	[1d10 mods=[Witcher, Add(4)] label=Some("Spell") comment=Some("Witcher magic attempt") flags=----]
 (Stealth Check) 1d20 - 2	OK	[1d20 mods=[Subtract(2)] label=Some("Stealth Check") comment=None flags=----]
 (Strength) 4d6 k3 ! Primary stat	OK	[4d6 mods=[KeepHigh(3)] label=Some("Strength") comment=Some("Primary stat") flags=----]
+(Test "Quotes") +d%	OK	[2d10 mods=[KeepLow(1), Multiply(10), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Subtract(10)] label=Some("Test \"Quotes\"") comment=None flags=----]
+(Test "Quotes") 1d20 ! Comment with 'quotes'	OK	[1d20 mods=[] label=Some("Test \"Quotes\"") comment=Some("Comment with 'quotes'") flags=----]
 (Test 'Apostrophe') -d%	OK	[2d10 mods=[KeepHigh(1), Multiply(10), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Subtract(10)] label=Some("Test 'Apostrophe'") comment=None flags=----]
 (Test) 4cod99	ERR	Invalid dice expression: 4cod99
 (Unclosed 1d20 + 5 ! Should fail	ERR	Invalid dice expression: (Unclosed
+(Very Long Label Name) 1d20	OK	[1d20 mods=[] label=Some("Very Long Label Name") comment=None flags=----]
 (WoD Attack) 4wod8c + 1 ! Supernatural strength	OK	[4d10 mods=[Failure(1), Target(8), Cancel, Add(1)] label=Some("WoD Attack") comment=Some("Supernatural strength") flags=----]
 (attack) 1d20+5 ! with sword	OK	[1d20 mods=[Add(5)] label=Some("attack") comment=Some("with sword") flags=----]
 (roll to hit) 1d20+2	OK	[1d20 mods=[Add(2)] label=Some("roll to hit") comment=None flags=----]
 (⚔️ Attack) +d%	OK	[2d10 mods=[KeepLow(1), Multiply(10), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Subtract(10)] label=Some("⚔\u{fe0f} Attack") comment=None flags=----]
+(⚔️ Attack) 1d20 ! 🔥 Fire damage	OK	[1d20 mods=[] label=Some("⚔\u{fe0f} Attack") comment=Some("🔥 Fire damage") flags=----]
 (🎯 Skill) -d% ! 🎲 Roll	OK	[2d10 mods=[KeepHigh(1), Multiply(10), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Subtract(10)] label=Some("🎯 Skill") comment=Some("🎲 Roll") flags=----]
 +2d6	ERR	Invalid dice expression: +
 +a5e +5 ex1	OK	[2d20 mods=[KeepHigh(1), Add(5), AddDice(DiceRoll { count: 1, sides: 4, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
@@ -76,7 +89,9 @@
 +d20 + something	ERR	Invalid modifier '+' - contains operator
 +d20+5	OK	[2d20 mods=[KeepHigh(1), Add(5)] label=None comment=None flags=----]
 +d20+5 ! comment	OK	[2d20 mods=[KeepHigh(1), Add(5)] label=None comment=Some("comment") flags=----]
++d20+5 ! testing	OK	[2d20 mods=[KeepHigh(1), Add(5)] label=None comment=Some("testing") flags=----]
 +d20-1	OK	[2d20 mods=[KeepHigh(1), Subtract(1)] label=None comment=None flags=----]
++d20-2 ! attack	OK	[2d20 mods=[KeepHigh(1), Subtract(2)] label=None comment=Some("attack") flags=----]
 +ess1d8	OK	[2d20 mods=[KeepHigh(1), Essence20(4, false)] label=None comment=None flags=----]
 +ess2d8 + 1	OK	[2d20 mods=[KeepHigh(1), Essence20(7, false), Add(1)] label=None comment=None flags=----]
 +ess3d6s	OK	[2d20 mods=[KeepHigh(1), Essence20(8, true)] label=None comment=None flags=----]
@@ -102,6 +117,7 @@
 -d% / 2	OK	[2d10 mods=[KeepHigh(1), Multiply(10), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Subtract(10), Divide(2)] label=None comment=None flags=----]
 -d20	OK	[2d20 mods=[KeepLow(1)] label=None comment=None flags=----]
 -d20 - 2	OK	[2d20 mods=[KeepLow(1), Subtract(2)] label=None comment=None flags=----]
+-d20+3 ! disadvantage roll	OK	[2d20 mods=[KeepLow(1), Add(3)] label=None comment=Some("disadvantage roll") flags=----]
 -d20-3	OK	[2d20 mods=[KeepLow(1), Subtract(3)] label=None comment=None flags=----]
 -ess1d10s	OK	[2d20 mods=[KeepLow(1), Essence20(5, true)] label=None comment=None flags=----]
 -ess1d8	OK	[2d20 mods=[KeepLow(1), Essence20(4, false)] label=None comment=None flags=----]
@@ -118,6 +134,7 @@
 /roll d100	ERR	Invalid dice expression: /
 0 + +d%	ERR	Unexpected `+ +` between `0` and the dice
 0 d6	ERR	Set count must be between 2 and 20
+0.5hsk	OK	[1d3 mods=[HeroSystem(Killing)] label=None comment=None flags=----]
 0d1	ERR	Cannot roll 0 dice
 0d6	ERR	Cannot roll 0 dice
 0d6l	ERR	Unable to parse combined modifier: 'l' at position: 'l'. Expected valid modifier pattern.
@@ -129,6 +146,7 @@
 10 / 1d1	OK	[1d1 mods=[NumberDividedByRoll(10)] label=None comment=None flags=----]
 10 / 2d1	OK	[2d1 mods=[NumberDividedByRoll(10)] label=None comment=None flags=----]
 10 1d12+6 t8	OK	[1d12 mods=[Add(6), Target(8)] label=Some("Set 1") comment=None flags=---- | 1d12 mods=[Add(6), Target(8)] label=Some("Set 2") comment=None flags=---- | 1d12 mods=[Add(6), Target(8)] label=Some("Set 3") comment=None flags=---- | 1d12 mods=[Add(6), Target(8)] label=Some("Set 4") comment=None flags=---- | 1d12 mods=[Add(6), Target(8)] label=Some("Set 5") comment=None flags=---- | 1d12 mods=[Add(6), Target(8)] label=Some("Set 6") comment=None flags=---- | 1d12 mods=[Add(6), Target(8)] label=Some("Set 7") comment=None flags=---- | 1d12 mods=[Add(6), Target(8)] label=Some("Set 8") comment=None flags=---- | 1d12 mods=[Add(6), Target(8)] label=Some("Set 9") comment=None flags=---- | 1d12 mods=[Add(6), Target(8)] label=Some("Set 10") comment=None flags=----]
+10 alien4s3	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 1") comment=None flags=---- | 4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 2") comment=None flags=---- | 4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 3") comment=None flags=---- | 4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 4") comment=None flags=---- | 4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 5") comment=None flags=---- | 4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 6") comment=None flags=---- | 4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 7") comment=None flags=---- | 4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 8") comment=None flags=---- | 4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 9") comment=None flags=---- | 4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 10") comment=None flags=----]
 100 - -d%	ERR	Unexpected `- -` between `100` and the dice
 100 / 2d1	OK	[2d1 mods=[NumberDividedByRoll(100)] label=None comment=None flags=----]
 100 1d6	ERR	Set count must be between 2 and 20
@@ -137,6 +155,7 @@
 100/2d1+5	OK	[2d1 mods=[NumberDividedByRoll(100), Add(5)] label=None comment=None flags=----]
 100/2d4	OK	[2d4 mods=[NumberDividedByRoll(100)] label=None comment=None flags=----]
 100/d%	OK	[1d100 mods=[NumberDividedByRoll(100)] label=None comment=None flags=----]
+1000d1000	ERR	Maximum 500 dice allowed
 100d1	OK	[100d1 mods=[] label=None comment=None flags=----]
 100d100	OK	[100d100 mods=[] label=None comment=None flags=----]
 100d6 e6 ie k50 r1 t4 +10	OK	[100d6 mods=[Explode(Some(6)), ExplodeIndefinite(None), KeepHigh(50), Reroll(1), Target(4), Add(10)] label=None comment=None flags=----]
@@ -198,11 +217,13 @@
 10d6 plot	OK	[10d6 mods=[PlotDie] label=None comment=None flags=----]
 10d6 target 4+	ERR	Invalid target value in 'target'
 10d6 ww	OK	[10d6 mods=[WildWords(None)] label=None comment=None flags=----]
+10hsk	OK	[10d6 mods=[HeroSystem(Killing)] label=None comment=None flags=----]
 10yz	OK	[10d6 mods=[Target(6)] label=None comment=None flags=----]
 11d6 t4 + 1d6 t4f1ie6	OK	[11d6 mods=[Target(4), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [Target(4), Failure(1), ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 12d6l	OK	[11d6 mods=[Target(4), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [Target(4), Failure(1), ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 12yz	OK	[12d6 mods=[Target(6)] label=None comment=None flags=----]
 15yz	OK	[15d6 mods=[Target(6)] label=None comment=None flags=----]
+1d	ERR	Invalid dice expression: 1d
 1d0	ERR	Dice must have at least 1 side
 1d1	OK	[1d1 mods=[] label=None comment=None flags=----]
 1d1 * 2 * 3	OK	[1d1 mods=[Multiply(2), Multiply(3)] label=None comment=None flags=----]
@@ -542,6 +563,7 @@ tbe65 e4	OK	[1d100 mods=[BrokenEmpires(65, 0), Explode(Some(4))] label=None comm
 1d4e4	OK	[1d4 mods=[Explode(Some(4))] label=None comment=None flags=----]
 1d6	OK	[1d6 mods=[] label=None comment=None flags=----]
 1d6 !	OK	[1d6 mods=[] label=None comment=Some("") flags=----]
+1d6 ! 	OK	[1d6 mods=[] label=None comment=Some("") flags=----]
 1d6 * 2	OK	[1d6 mods=[Multiply(2)] label=None comment=None flags=----]
 1d6 + 	ERR	Invalid modifier '+' - contains operator
 1d6 + + 5	ERR	Invalid modifier '+' - contains operator
@@ -585,7 +607,9 @@ tbe65 e4	OK	[1d100 mods=[BrokenEmpires(65, 0), Explode(Some(4))] label=None comm
 1d6;1d6	OK	[1d6 mods=[] label=None comment=None flags=---- | 1d6 mods=[] label=None comment=None flags=----]
 1d6;1d6;1d6;1d6	OK	[1d6 mods=[] label=None comment=None flags=---- | 1d6 mods=[] label=None comment=None flags=---- | 1d6 mods=[] label=None comment=None flags=---- | 1d6 mods=[] label=None comment=None flags=----]
 1d6;1d6;1d6;1d6;1d6	ERR	Maximum of 4 separate rolls allowed
+1d6;1d6;1d6;1d6;1d6;1d6;1d6;1d6;1d6;1d6	ERR	Maximum of 4 separate rolls allowed
 1d6l	OK	[1d6 mods=[Target(4), Failure(1), ExplodeIndefinite(Some(6))] label=None comment=None flags=----]
+1d6xyz	ERR	Unable to parse combined modifier: 'xyz' at position: 'xyz'. Expected valid modifier pattern.
 1d8	OK	[1d8 mods=[] label=None comment=None flags=----]
 1d8 ie	OK	[1d8 mods=[ExplodeIndefinite(None)] label=None comment=None flags=----]
 1d8 ie + 1d6 ie	OK	[1d8 mods=[ExplodeIndefinite(None), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [ExplodeIndefinite(None)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
@@ -597,6 +621,7 @@ tbe65 e4	OK	[1d100 mods=[BrokenEmpires(65, 0), Explode(Some(4))] label=None comm
 2 -d20 + 3	OK	[2d20 mods=[KeepLow(1), Add(3)] label=Some("Set 1") comment=None flags=---- | 2d20 mods=[KeepLow(1), Add(3)] label=Some("Set 2") comment=None flags=----]
 2 1d6	OK	[1d6 mods=[] label=Some("Set 1") comment=None flags=---- | 1d6 mods=[] label=Some("Set 2") comment=None flags=----]
 2 1d6l	OK	[1d6 mods=[Target(4), Failure(1), ExplodeIndefinite(Some(6))] label=Some("Set 1") comment=None flags=---- | 1d6 mods=[Target(4), Failure(1), ExplodeIndefinite(Some(6))] label=Some("Set 2") comment=None flags=----]
+2 4cod	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=Some("Set 1") comment=None flags=---- | 4d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=Some("Set 2") comment=None flags=----]
 2 4d1	OK	[4d1 mods=[] label=Some("Set 1") comment=None flags=---- | 4d1 mods=[] label=Some("Set 2") comment=None flags=----]
 2 4d1 + 2	OK	[4d1 mods=[Add(2)] label=Some("Set 1") comment=None flags=---- | 4d1 mods=[Add(2)] label=Some("Set 2") comment=None flags=----]
 2 4d1 adv1	OK	[4d1 mods=[Advantage(1)] label=Some("Set 1") comment=None flags=---- | 4d1 mods=[Advantage(1)] label=Some("Set 2") comment=None flags=----]
@@ -609,6 +634,7 @@ tbe65 e4	OK	[1d100 mods=[BrokenEmpires(65, 0), Explode(Some(4))] label=None comm
 2 d6	OK	[1d6 mods=[] label=Some("Set 1") comment=None flags=---- | 1d6 mods=[] label=Some("Set 2") comment=None flags=----]
 2 dd34	OK	[1d3 mods=[Multiply(10), AddDice(DiceRoll { count: 1, sides: 4, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 1") comment=None flags=---- | 1d3 mods=[Multiply(10), AddDice(DiceRoll { count: 1, sides: 4, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 2") comment=None flags=----]
 2 ess1d8s ! Stealth	OK	[1d20 mods=[Essence20(4, true)] label=Some("Set 1") comment=Some("Stealth") flags=---- | 1d20 mods=[Essence20(4, true)] label=Some("Set 2") comment=Some("Stealth") flags=----]
+2 sw8	OK	[2d1 mods=[SavageWorlds(8)] label=Some("Set 1") comment=None flags=---- | 2d1 mods=[SavageWorlds(8)] label=Some("Set 2") comment=None flags=----]
 2 wng w2 5d6 !dmg	OK	[5d6 mods=[WrathGlory(None, false, 0)] label=Some("Set 1") comment=None flags=---- | 5d6 mods=[WrathGlory(None, false, 0)] label=Some("Set 2") comment=None flags=----]
 20 / 2d1	OK	[2d1 mods=[NumberDividedByRoll(20)] label=None comment=None flags=----]
 20 10d10	OK	[10d10 mods=[] label=Some("Set 1") comment=None flags=---- | 10d10 mods=[] label=Some("Set 2") comment=None flags=---- | 10d10 mods=[] label=Some("Set 3") comment=None flags=---- | 10d10 mods=[] label=Some("Set 4") comment=None flags=---- | 10d10 mods=[] label=Some("Set 5") comment=None flags=---- | 10d10 mods=[] label=Some("Set 6") comment=None flags=---- | 10d10 mods=[] label=Some("Set 7") comment=None flags=---- | 10d10 mods=[] label=Some("Set 8") comment=None flags=---- | 10d10 mods=[] label=Some("Set 9") comment=None flags=---- | 10d10 mods=[] label=Some("Set 10") comment=None flags=---- | 10d10 mods=[] label=Some("Set 11") comment=None flags=---- | 10d10 mods=[] label=Some("Set 12") comment=None flags=---- | 10d10 mods=[] label=Some("Set 13") comment=None flags=---- | 10d10 mods=[] label=Some("Set 14") comment=None flags=---- | 10d10 mods=[] label=Some("Set 15") comment=None flags=---- | 10d10 mods=[] label=Some("Set 16") comment=None flags=---- | 10d10 mods=[] label=Some("Set 17") comment=None flags=---- | 10d10 mods=[] label=Some("Set 18") comment=None flags=---- | 10d10 mods=[] label=Some("Set 19") comment=None flags=---- | 10d10 mods=[] label=Some("Set 20") comment=None flags=----]
@@ -625,6 +651,7 @@ tbe65 e4	OK	[1d100 mods=[BrokenEmpires(65, 0), Explode(Some(4))] label=None comm
 20 4d1 t1	OK	[4d1 mods=[Target(1)] label=Some("Set 1") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 2") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 3") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 4") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 5") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 6") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 7") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 8") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 9") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 10") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 11") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 12") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 13") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 14") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 15") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 16") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 17") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 18") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 19") comment=None flags=---- | 4d1 mods=[Target(1)] label=Some("Set 20") comment=None flags=----]
 20 4wod8c	OK	[4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 1") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 2") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 3") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 4") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 5") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 6") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 7") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 8") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 9") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 10") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 11") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 12") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 13") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 14") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 15") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 16") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 17") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 18") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 19") comment=None flags=---- | 4d10 mods=[Failure(1), Target(8), Cancel] label=Some("Set 20") comment=None flags=----]
 20 50d6	OK	[50d6 mods=[] label=Some("Set 1") comment=None flags=---- | 50d6 mods=[] label=Some("Set 2") comment=None flags=---- | 50d6 mods=[] label=Some("Set 3") comment=None flags=---- | 50d6 mods=[] label=Some("Set 4") comment=None flags=---- | 50d6 mods=[] label=Some("Set 5") comment=None flags=---- | 50d6 mods=[] label=Some("Set 6") comment=None flags=---- | 50d6 mods=[] label=Some("Set 7") comment=None flags=---- | 50d6 mods=[] label=Some("Set 8") comment=None flags=---- | 50d6 mods=[] label=Some("Set 9") comment=None flags=---- | 50d6 mods=[] label=Some("Set 10") comment=None flags=---- | 50d6 mods=[] label=Some("Set 11") comment=None flags=---- | 50d6 mods=[] label=Some("Set 12") comment=None flags=---- | 50d6 mods=[] label=Some("Set 13") comment=None flags=---- | 50d6 mods=[] label=Some("Set 14") comment=None flags=---- | 50d6 mods=[] label=Some("Set 15") comment=None flags=---- | 50d6 mods=[] label=Some("Set 16") comment=None flags=---- | 50d6 mods=[] label=Some("Set 17") comment=None flags=---- | 50d6 mods=[] label=Some("Set 18") comment=None flags=---- | 50d6 mods=[] label=Some("Set 19") comment=None flags=---- | 50d6 mods=[] label=Some("Set 20") comment=None flags=----]
+20 alien3s2	OK	[3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 1") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 2") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 3") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 4") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 5") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 6") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 7") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 8") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 9") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 10") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 11") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 12") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 13") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 14") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 15") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 16") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 17") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 18") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 19") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 20") comment=None flags=----]
 20 d20+3	OK	[1d20 mods=[Add(3)] label=Some("Set 1") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 2") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 3") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 4") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 5") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 6") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 7") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 8") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 9") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 10") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 11") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 12") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 13") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 14") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 15") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 16") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 17") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 18") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 19") comment=None flags=---- | 1d20 mods=[Add(3)] label=Some("Set 20") comment=None flags=----]
 20 d6	OK	[1d6 mods=[] label=Some("Set 1") comment=None flags=---- | 1d6 mods=[] label=Some("Set 2") comment=None flags=---- | 1d6 mods=[] label=Some("Set 3") comment=None flags=---- | 1d6 mods=[] label=Some("Set 4") comment=None flags=---- | 1d6 mods=[] label=Some("Set 5") comment=None flags=---- | 1d6 mods=[] label=Some("Set 6") comment=None flags=---- | 1d6 mods=[] label=Some("Set 7") comment=None flags=---- | 1d6 mods=[] label=Some("Set 8") comment=None flags=---- | 1d6 mods=[] label=Some("Set 9") comment=None flags=---- | 1d6 mods=[] label=Some("Set 10") comment=None flags=---- | 1d6 mods=[] label=Some("Set 11") comment=None flags=---- | 1d6 mods=[] label=Some("Set 12") comment=None flags=---- | 1d6 mods=[] label=Some("Set 13") comment=None flags=---- | 1d6 mods=[] label=Some("Set 14") comment=None flags=---- | 1d6 mods=[] label=Some("Set 15") comment=None flags=---- | 1d6 mods=[] label=Some("Set 16") comment=None flags=---- | 1d6 mods=[] label=Some("Set 17") comment=None flags=---- | 1d6 mods=[] label=Some("Set 18") comment=None flags=---- | 1d6 mods=[] label=Some("Set 19") comment=None flags=---- | 1d6 mods=[] label=Some("Set 20") comment=None flags=----]
 20/2d1	OK	[2d1 mods=[NumberDividedByRoll(20)] label=None comment=None flags=----]
@@ -642,11 +669,15 @@ tbe65 e4	OK	[1d100 mods=[BrokenEmpires(65, 0), Explode(Some(4))] label=None comm
 21 d20+3	ERR	Set count must be between 2 and 20
 21 d6	ERR	Set count must be between 2 and 20
 22 d6	ERR	Set count must be between 2 and 20
+2d%	OK	[2d100 mods=[] label=None comment=None flags=----]
+2d% k1	OK	[2d100 mods=[KeepHigh(1)] label=None comment=None flags=----]
 2d1	OK	[2d1 mods=[] label=None comment=None flags=----]
 2d1 ! comment	OK	[2d1 mods=[] label=None comment=Some("comment") flags=----]
 2d1 * 2d1	OK	[2d1 mods=[MultiplyDice(DiceRoll { count: 2, sides: 1, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 2d1 *0	OK	[2d1 mods=[Multiply(0)] label=None comment=None flags=----]
 2d1*0+6	OK	[2d1 mods=[Multiply(0), Add(6)] label=None comment=None flags=----]
+2d6 !    	OK	[2d6 mods=[] label=None comment=Some("") flags=----]
+2d6 ! Multi word comment	OK	[2d6 mods=[] label=None comment=Some("Multi word comment") flags=----]
 3d1*0+5+2	OK	[3d1 mods=[Multiply(0), Add(5), Add(2)] label=None comment=None flags=----]
 3d1*0-5	OK	[3d1 mods=[Multiply(0), Subtract(5)] label=None comment=None flags=----]
 3d1*2*0	OK	[3d1 mods=[Multiply(2), Multiply(0)] label=None comment=None flags=----]
@@ -701,6 +732,7 @@ tbe65 e4	OK	[1d100 mods=[BrokenEmpires(65, 0), Explode(Some(4))] label=None comm
 1d1 ; 10 + 2 + 2d1	OK	[1d1 mods=[] label=None comment=None flags=---- | 2d1 mods=[Add(12)] label=None comment=None flags=----]
 10 + 2 + 2d1 ! fire	OK	[2d1 mods=[Add(12)] label=None comment=Some("fire") flags=----]
 (Hit) 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=Some("Hit") comment=None flags=----]
+1d6 ! This is a very long comment that might cause formatting issues when combined with complex dice expressions and multiple modifiers	OK	[1d6 mods=[] label=None comment=Some("This is a very long comment that might cause formatting issues when combined with complex dice expressions and multiple modifiers") flags=----]
 p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 5 + 1d1 + 2	OK	[1d1 mods=[Add(5), Add(2)] label=None comment=None flags=----]
 4 + 4d1 + 2	OK	[4d1 mods=[Add(4), Add(2)] label=None comment=None flags=----]
@@ -713,6 +745,7 @@ p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 5 + 1d1 + 2 ! fire	OK	[1d1 mods=[Add(5), Add(2)] label=None comment=Some("fire") flags=----]
 3 5 + 1d1 + 2	OK	[1d1 mods=[Add(5), Add(2)] label=Some("Set 1") comment=None flags=---- | 1d1 mods=[Add(5), Add(2)] label=Some("Set 2") comment=None flags=---- | 1d1 mods=[Add(5), Add(2)] label=Some("Set 3") comment=None flags=----]
 1d1 ; 5 + 1d1 + 2	OK	[1d1 mods=[] label=None comment=None flags=---- | 1d1 mods=[Add(5), Add(2)] label=None comment=None flags=----]
+20 (Set) 10d6 e6 k5 ! Large roll set with exploding dice	OK	[10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 1") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 2") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 3") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 4") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 5") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 6") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 7") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 8") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 9") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 10") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 11") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 12") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 13") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 14") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 15") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 16") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 17") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 18") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 19") comment=Some("Large roll set with exploding dice") flags=---- | 10d6 mods=[Explode(Some(6)), KeepHigh(5)] label=Some("Set 20") comment=Some("Large roll set with exploding dice") flags=----]
 5 + 1d1 + 2147483641	OK	[1d1 mods=[Add(5), Add(2147483641)] label=None comment=None flags=----]
 5 + 1d1 + 2147483642	OK	[1d1 mods=[Add(5), Add(2147483642)] label=None comment=None flags=----]
 4 + 4d1t1	OK	[4d1 mods=[Target(1), Add(4)] label=None comment=None flags=----]
@@ -1009,6 +1042,7 @@ p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 2d8-2d6 d1	OK	[2d8 mods=[SubtractDice(DiceRoll { count: 2, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Drop(1)] label=None comment=None flags=----]
 2hsk1	OK	[2d6 mods=[HeroSystem(Killing), AddDice(DiceRoll { count: 1, sides: 3, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 2.5hsk	OK	[2d6 mods=[HeroSystem(Killing), AddDice(DiceRoll { count: 1, sides: 3, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+2dp + 2	OK	[2d6 mods=[PlotDie, Add(2)] label=None comment=None flags=----]
 3hsk	OK	[3d6 mods=[HeroSystem(Killing)] label=None comment=None flags=----]
 2lf4	OK	[2d6 mods=[LaserFeelings(0, 4, Lasers)] label=None comment=None flags=----]
 2lf4 ; fitd0 ; gb	OK	[2d6 mods=[LaserFeelings(0, 4, Lasers)] label=None comment=None flags=---- | 2d6 mods=[ForgedDarkZero] label=None comment=None flags=---- | 1d20 mods=[Godbound(false)] label=None comment=None flags=----]
@@ -1080,6 +1114,7 @@ p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 3 cpd6	OK	[6d6 mods=[CyberpunkRedDamage] label=Some("Set 1") comment=None flags=---- | 6d6 mods=[CyberpunkRedDamage] label=Some("Set 2") comment=None flags=---- | 6d6 mods=[CyberpunkRedDamage] label=Some("Set 3") comment=None flags=----]
 3 cpr	OK	[1d10 mods=[CyberpunkRed] label=Some("Set 1") comment=None flags=---- | 1d10 mods=[CyberpunkRed] label=Some("Set 2") comment=None flags=---- | 1d10 mods=[CyberpunkRed] label=Some("Set 3") comment=None flags=----]
 3 cs 5	OK	[1d20 mods=[CypherSystem(5)] label=Some("Set 1") comment=None flags=---- | 1d20 mods=[CypherSystem(5)] label=Some("Set 2") comment=None flags=---- | 1d20 mods=[CypherSystem(5)] label=Some("Set 3") comment=None flags=----]
+3 dheart	OK	[2d12 mods=[Daggerheart] label=Some("Set 1") comment=None flags=---- | 2d12 mods=[Daggerheart] label=Some("Set 2") comment=None flags=---- | 2d12 mods=[Daggerheart] label=Some("Set 3") comment=None flags=----]
 3 ess1d10	OK	[1d20 mods=[Essence20(5, false)] label=Some("Set 1") comment=None flags=---- | 1d20 mods=[Essence20(5, false)] label=Some("Set 2") comment=None flags=---- | 1d20 mods=[Essence20(5, false)] label=Some("Set 3") comment=None flags=----]
 3 ess1d8	OK	[1d20 mods=[Essence20(4, false)] label=Some("Set 1") comment=None flags=---- | 1d20 mods=[Essence20(4, false)] label=Some("Set 2") comment=None flags=---- | 1d20 mods=[Essence20(4, false)] label=Some("Set 3") comment=None flags=----]
 3 ex5	OK	[5d10 mods=[Target(7), Target(10)] label=Some("Set 1") comment=None flags=---- | 5d10 mods=[Target(7), Target(10)] label=Some("Set 2") comment=None flags=---- | 5d10 mods=[Target(7), Target(10)] label=Some("Set 3") comment=None flags=----]
@@ -1089,6 +1124,7 @@ p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 3 mm	OK	[3d6 mods=[MarvelMultiverse(0, 0)] label=Some("Set 1") comment=None flags=---- | 3d6 mods=[MarvelMultiverse(0, 0)] label=Some("Set 2") comment=None flags=---- | 3d6 mods=[MarvelMultiverse(0, 0)] label=Some("Set 3") comment=None flags=----]
 3 mnm +2	OK	[1d20 mods=[Add(2), MutantsMasterminds] label=Some("Set 1") comment=None flags=---- | 1d20 mods=[Add(2), MutantsMasterminds] label=Some("Set 2") comment=None flags=---- | 1d20 mods=[Add(2), MutantsMasterminds] label=Some("Set 3") comment=None flags=----]
 3 ol5	OK	[1d20 mods=[ExplodeIndefinite(Some(20)), AddDice(DiceRoll { count: 2, sides: 6, modifiers: [ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 1") comment=None flags=---- | 1d20 mods=[ExplodeIndefinite(Some(20)), AddDice(DiceRoll { count: 2, sides: 6, modifiers: [ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 2") comment=None flags=---- | 1d20 mods=[ExplodeIndefinite(Some(20)), AddDice(DiceRoll { count: 2, sides: 6, modifiers: [ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 3") comment=None flags=----]
+3 sw8 + 5	OK	[2d1 mods=[SavageWorlds(8), Add(5)] label=Some("Set 1") comment=None flags=---- | 2d1 mods=[SavageWorlds(8), Add(5)] label=Some("Set 2") comment=None flags=---- | 2d1 mods=[SavageWorlds(8), Add(5)] label=Some("Set 3") comment=None flags=----]
 3 tdh4	OK	[2d6 mods=[DarkestHouse(false), Add(4)] label=Some("Set 1") comment=None flags=---- | 2d6 mods=[DarkestHouse(false), Add(4)] label=Some("Set 2") comment=None flags=---- | 2d6 mods=[DarkestHouse(false), Add(4)] label=Some("Set 3") comment=None flags=----]
 3 tbe45	OK	[1d100 mods=[BrokenEmpires(45, 0)] label=Some("Set 1") comment=None flags=---- | 1d100 mods=[BrokenEmpires(45, 0)] label=Some("Set 2") comment=None flags=---- | 1d100 mods=[BrokenEmpires(45, 0)] label=Some("Set 3") comment=None flags=----]
 3 tbe60 hard	OK	[1d100 mods=[BrokenEmpires(60, 0), Subtract(20)] label=Some("Set 1") comment=None flags=---- | 1d100 mods=[BrokenEmpires(60, 0), Subtract(20)] label=Some("Set 2") comment=None flags=---- | 1d100 mods=[BrokenEmpires(60, 0), Subtract(20)] label=Some("Set 3") comment=None flags=----]
@@ -1169,6 +1205,8 @@ p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 3d6e6	OK	[3d6 mods=[Explode(Some(6))] label=None comment=None flags=----]
 3d8 e6	OK	[3d8 mods=[Explode(Some(6))] label=None comment=None flags=----]
 3df	OK	[3d3 mods=[Fudge] label=None comment=None flags=----]
+3lf3f k2	OK	[3d6 mods=[LaserFeelings(0, 3, Feelings), KeepHigh(2)] label=None comment=None flags=----]
+3lf5	OK	[3d6 mods=[LaserFeelings(0, 5, Lasers)] label=None comment=None flags=----]
 3wh4+	OK	[3d6 mods=[Target(4)] label=None comment=None flags=----]
 3wod9 + 2	OK	[3d10 mods=[Failure(1), Target(9), Add(2)] label=None comment=None flags=----]
 3wod9c + 2	OK	[3d10 mods=[Failure(1), Target(9), Cancel, Add(2)] label=None comment=None flags=----]
@@ -1179,6 +1217,9 @@ p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 4 +d% + 10	OK	[2d10 mods=[KeepLow(1), Multiply(10), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Subtract(10), Add(10)] label=Some("Set 1") comment=None flags=---- | 2d10 mods=[KeepLow(1), Multiply(10), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Subtract(10), Add(10)] label=Some("Set 2") comment=None flags=---- | 2d10 mods=[KeepLow(1), Multiply(10), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Subtract(10), Add(10)] label=Some("Set 3") comment=None flags=---- | 2d10 mods=[KeepLow(1), Multiply(10), AddDice(DiceRoll { count: 1, sides: 10, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Subtract(10), Add(10)] label=Some("Set 4") comment=None flags=----]
 4 10d6l	OK	[9d6 mods=[Target(4), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [Target(4), Failure(1), ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 1") comment=None flags=---- | 9d6 mods=[Target(4), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [Target(4), Failure(1), ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 2") comment=None flags=---- | 9d6 mods=[Target(4), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [Target(4), Failure(1), ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 3") comment=None flags=---- | 9d6 mods=[Target(4), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [Target(4), Failure(1), ExplodeIndefinite(Some(6))], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 4") comment=None flags=----]
 4 20/2d1	OK	[2d1 mods=[NumberDividedByRoll(20)] label=Some("Set 1") comment=None flags=---- | 2d1 mods=[NumberDividedByRoll(20)] label=Some("Set 2") comment=None flags=---- | 2d1 mods=[NumberDividedByRoll(20)] label=Some("Set 3") comment=None flags=---- | 2d1 mods=[NumberDividedByRoll(20)] label=Some("Set 4") comment=None flags=----]
+4 2lf4	OK	[2d6 mods=[LaserFeelings(0, 4, Lasers)] label=Some("Set 1") comment=None flags=---- | 2d6 mods=[LaserFeelings(0, 4, Lasers)] label=Some("Set 2") comment=None flags=---- | 2d6 mods=[LaserFeelings(0, 4, Lasers)] label=Some("Set 3") comment=None flags=---- | 2d6 mods=[LaserFeelings(0, 4, Lasers)] label=Some("Set 4") comment=None flags=----]
+4 4cod	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=Some("Set 1") comment=None flags=---- | 4d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=Some("Set 2") comment=None flags=---- | 4d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=Some("Set 3") comment=None flags=---- | 4d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=Some("Set 4") comment=None flags=----]
+4 sw8	OK	[2d1 mods=[SavageWorlds(8)] label=Some("Set 1") comment=None flags=---- | 2d1 mods=[SavageWorlds(8)] label=Some("Set 2") comment=None flags=---- | 2d1 mods=[SavageWorlds(8)] label=Some("Set 3") comment=None flags=---- | 2d1 mods=[SavageWorlds(8)] label=Some("Set 4") comment=None flags=----]
 4 wng dn2 4d6 !exempt	OK	[4d6 mods=[WrathGlory(Some(2), false, 0)] label=Some("Set 1") comment=None flags=---- | 4d6 mods=[WrathGlory(Some(2), false, 0)] label=Some("Set 2") comment=None flags=---- | 4d6 mods=[WrathGlory(Some(2), false, 0)] label=Some("Set 3") comment=None flags=---- | 4d6 mods=[WrathGlory(Some(2), false, 0)] label=Some("Set 4") comment=None flags=----]
 499d6 adv1	OK	[499d6 mods=[Advantage(1)] label=None comment=None flags=----]
 4cod	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
@@ -1187,6 +1228,7 @@ p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 4cod ; fitd100	ERR	Invalid dice expression: fitd100
 4cod8	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(8))] label=None comment=None flags=----]
 4cod9	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(9))] label=None comment=None flags=----]
+4codr	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(10)), Reroll(7)] label=None comment=None flags=----]
 4d1	OK	[4d1 mods=[] label=None comment=None flags=----]
 4d1 ! c ; 2d1 + 1	OK	[4d1 mods=[] label=None comment=Some("c") flags=---- | 2d1 mods=[Add(1)] label=None comment=None flags=----]
 4d1 ! comment	OK	[4d1 mods=[] label=None comment=Some("comment") flags=----]
@@ -1502,6 +1544,7 @@ p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 4yz	OK	[4d6 mods=[Target(6)] label=None comment=None flags=----]
 4yz - 1	OK	[4d6 mods=[Target(6), Subtract(1)] label=None comment=None flags=----]
 5 - 2d1	OK	[2d1 mods=[Multiply(-1), Add(5)] label=None comment=None flags=----]
+5 alien3s1	OK	[3d6 mods=[Alien, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [AlienStress(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 1") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [AlienStress(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 2") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [AlienStress(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 3") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [AlienStress(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 4") comment=None flags=---- | 3d6 mods=[Alien, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [AlienStress(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=Some("Set 5") comment=None flags=----]
 5 cpd6	OK	[6d6 mods=[CyberpunkRedDamage] label=Some("Set 1") comment=None flags=---- | 6d6 mods=[CyberpunkRedDamage] label=Some("Set 2") comment=None flags=---- | 6d6 mods=[CyberpunkRedDamage] label=Some("Set 3") comment=None flags=---- | 6d6 mods=[CyberpunkRedDamage] label=Some("Set 4") comment=None flags=---- | 6d6 mods=[CyberpunkRedDamage] label=Some("Set 5") comment=None flags=----]
 5 gb	OK	[1d20 mods=[Godbound(false)] label=Some("Set 1") comment=None flags=---- | 1d20 mods=[Godbound(false)] label=Some("Set 2") comment=None flags=---- | 1d20 mods=[Godbound(false)] label=Some("Set 3") comment=None flags=---- | 1d20 mods=[Godbound(false)] label=Some("Set 4") comment=None flags=---- | 1d20 mods=[Godbound(false)] label=Some("Set 5") comment=None flags=----]
 500 / d%	OK	[1d100 mods=[NumberDividedByRoll(500)] label=None comment=None flags=----]
@@ -1766,6 +1809,7 @@ p 10 + 2 + 2d1	OK	[2d1 mods=[Add(12)] label=None comment=None flags=p---]
 6d6 target 6+	ERR	Invalid target value in 'target'
 6d6 tl4ds	OK	[6d6 mods=[TargetLowerWithDoubleSuccess(4, 4)] label=None comment=None flags=----]
 6d6 tl4ds1	OK	[6d6 mods=[TargetLowerWithDoubleSuccess(4, 1)] label=None comment=None flags=----]
+6d6 wngt + 2	OK	[6d6 mods=[WrathGlory(None, true, 1), Add(2)] label=None comment=None flags=----]
 6d6 ww	OK	[6d6 mods=[WildWords(None)] label=None comment=None flags=----]
 6d6 wwc1	OK	[6d6 mods=[WildWords(Some(1))] label=None comment=None flags=----]
 6d6 wwc2	OK	[6d6 mods=[WildWords(Some(2))] label=None comment=None flags=----]
@@ -1840,6 +1884,7 @@ Exalted 6d10 t9 t10	ERR	Invalid dice expression: Exalted
 Exalted 7d10 t7ds8	ERR	Invalid dice expression: Exalted
 Exalted 8d10 t7 t10	ERR	Invalid dice expression: Exalted
 Explicit d100	ERR	Invalid dice expression: Explicit
+FITD3	OK	[3d6 mods=[ForgedDark] label=None comment=None flags=----]
 Godbound 3d8 with penalty	ERR	Invalid dice expression: Godbound
 Godbound straight 2d10 with bonus	ERR	Invalid dice expression: Godbound
 Hero System to-hit roll (3d6 roll-under)	ERR	Invalid dice expression: Hero
@@ -1899,20 +1944,38 @@ a5e +7 ex2	OK	[1d20 mods=[Add(7), AddDice(DiceRoll { count: 1, sides: 6, modifie
 a5e -2 ex1	OK	[1d20 mods=[Subtract(2), AddDice(DiceRoll { count: 1, sides: 4, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 a5e ex1	OK	[1d20 mods=[AddDice(DiceRoll { count: 1, sides: 4, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 a5e ex2	OK	[1d20 mods=[AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+abc	ERR	Invalid dice expression: abc
 adv1	ERR	Invalid dice expression: adv1
 adv2 dis1	ERR	Invalid dice expression: adv2
 age	OK	[2d6 mods=[AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 alien	ERR	Invalid dice expression: alien
+alien10s1	OK	[10d6 mods=[Alien, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [AlienStress(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+alien10s10	OK	[10d6 mods=[Alien, AddDice(DiceRoll { count: 10, sides: 6, modifiers: [AlienStress(10)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+alien2s3	OK	[2d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+alien3s1; 4cod	OK	[3d6 mods=[Alien, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [AlienStress(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=---- | 4d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
+alien3s1p	OK	[3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 alien3s2 + 2d10	OK	[3d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), AddDice(DiceRoll { count: 2, sides: 10, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 alien3s2p	OK	[3d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 alien4	OK	[4d6 mods=[Alien] label=None comment=None flags=----]
 alien4 + 1d6	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 alien4; 1d20 + 5	OK	[4d6 mods=[Alien] label=None comment=None flags=---- | 1d20 mods=[Add(5)] label=None comment=None flags=----]
+alien4s1	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [AlienStress(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+alien4s1p	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+alien4s2	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+alien4s2; sr6	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=---- | 6d6 mods=[Target(5), Shadowrun(6)] label=None comment=None flags=----]
+alien4s3 ! variable penalty	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 3, sides: 6, modifiers: [AlienStress(3)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=Some("variable penalty") flags=----]
 alien4s3 - 2d4	ERR	Alien counts sixes, so math doesn't apply; add dice (`+ 1d6`) or roll fewer instead
+alien4s5	OK	[4d6 mods=[Alien, AddDice(DiceRoll { count: 5, sides: 6, modifiers: [AlienStress(5)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+alien5	OK	[5d6 mods=[Alien] label=None comment=None flags=----]
 alien5s1	OK	[5d6 mods=[Alien, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [AlienStress(1)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 alien5s2	OK	[5d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+alien5s3p	OK	[5d6 mods=[Alien, AddDice(DiceRoll { count: 4, sides: 6, modifiers: [AlienStress(4)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+alien6	OK	[6d6 mods=[Alien] label=None comment=None flags=----]
+alien6s2	OK	[6d6 mods=[Alien, AddDice(DiceRoll { count: 2, sides: 6, modifiers: [AlienStress(2)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 alien6s3p	OK	[6d6 mods=[Alien, AddDice(DiceRoll { count: 4, sides: 6, modifiers: [AlienStress(4)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+alien6s4	OK	[6d6 mods=[Alien, AddDice(DiceRoll { count: 4, sides: 6, modifiers: [AlienStress(4)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 alien6s4 + 1d6	OK	[6d6 mods=[Alien, AddDice(DiceRoll { count: 4, sides: 6, modifiers: [AlienStress(4)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+alien7s4	OK	[7d6 mods=[Alien, AddDice(DiceRoll { count: 4, sides: 6, modifiers: [AlienStress(4)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 attack	OK	[1d20 mods=[] label=None comment=None flags=----]
 attack +10	OK	[1d20 mods=[Add(10)] label=None comment=None flags=----]
 attack +5	OK	[1d20 mods=[Add(5)] label=None comment=None flags=----]
@@ -1954,6 +2017,7 @@ conan tn3f5	ERR	Focus 5 cannot exceed target number 3
 conan1	OK	[1d20 mods=[ConanSkill(1)] label=None comment=None flags=----]
 conan10	ERR	Invalid dice expression: conan10
 conan2tn12f3	OK	[2d20 mods=[ConanSkill(2), TwoD20Test { target: 12, focus: 3, complication: 20 }] label=None comment=None flags=----]
+conan3	OK	[3d20 mods=[ConanSkill(3)] label=None comment=None flags=----]
 conan3cd5 tn12f3	OK	[3d20 mods=[ConanSkill(3), AddDice(DiceRoll { count: 5, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), ConanCombat(5), TwoD20Test { target: 12, focus: 3, complication: 20 }] label=None comment=None flags=----]
 conan4 tn14f5	OK	[4d20 mods=[ConanSkill(4), TwoD20Test { target: 14, focus: 5, complication: 20 }] label=None comment=None flags=----]
 conan5	OK	[5d20 mods=[ConanSkill(5)] label=None comment=None flags=----]
@@ -1997,6 +2061,7 @@ cs 3	OK	[1d20 mods=[CypherSystem(3)] label=None comment=None flags=----]
 cs 3 + 2	OK	[1d20 mods=[CypherSystem(3), Add(2)] label=None comment=None flags=----]
 cs 5	OK	[1d20 mods=[CypherSystem(5)] label=None comment=None flags=----]
 cs 6	OK	[1d20 mods=[CypherSystem(6)] label=None comment=None flags=----]
+d	ERR	Invalid dice expression: d
 d%	OK	[1d100 mods=[] label=None comment=None flags=----]
 d% * 2	OK	[1d100 mods=[Multiply(2)] label=None comment=None flags=----]
 d% + 10	OK	[1d100 mods=[Add(10)] label=None comment=None flags=----]
@@ -2036,6 +2101,7 @@ dd36	OK	[1d3 mods=[Multiply(10), AddDice(DiceRoll { count: 1, sides: 6, modifier
 dd44	OK	[1d4 mods=[Multiply(10), AddDice(DiceRoll { count: 1, sides: 4, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 dd46	OK	[1d4 mods=[Multiply(10), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 dd46 / 2	OK	[1d4 mods=[Multiply(10), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Divide(2)] label=None comment=None flags=----]
+dd6	ERR	Invalid dice expression: dd6
 dd66	OK	[1d6 mods=[Multiply(10), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 dd66 - 10	OK	[1d6 mods=[Multiply(10), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Subtract(10)] label=None comment=None flags=----]
 dd66 / 10	OK	[1d6 mods=[Multiply(10), AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Divide(10)] label=None comment=None flags=----]
@@ -2045,12 +2111,16 @@ dh	OK	[1d10 mods=[DarkHeresy] label=None comment=None flags=----]
 dh 2d10	OK	[2d10 mods=[ExplodeIndefinite(Some(10)), DarkHeresy] label=None comment=None flags=----]
 dh 4d10	OK	[4d10 mods=[ExplodeIndefinite(Some(10)), DarkHeresy] label=None comment=None flags=----]
 dh 6d10	OK	[6d10 mods=[ExplodeIndefinite(Some(10)), DarkHeresy] label=None comment=None flags=----]
+dh1	ERR	Invalid dice expression: dh1
 dheart	OK	[2d12 mods=[Daggerheart] label=None comment=None flags=----]
 dheart + 1d6	OK	[2d12 mods=[Daggerheart, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 dheart + 3 ! trait plus experience	OK	[2d12 mods=[Daggerheart, Add(3)] label=None comment=Some("trait plus experience") flags=----]
 dheart - 1d6	OK	[2d12 mods=[Daggerheart, SubtractDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 dheart - 2	OK	[2d12 mods=[Daggerheart, Subtract(2)] label=None comment=None flags=----]
+dheartgm	OK	[1d20 mods=[] label=None comment=None flags=----]
+dheartx	ERR	Invalid dice expression: dheartx
 dis1	ERR	Invalid dice expression: dis1
+dndstats	OK	[4d6 mods=[KeepHigh(3)] label=Some("Set 1") comment=None flags=---- | 4d6 mods=[KeepHigh(3)] label=Some("Set 2") comment=None flags=---- | 4d6 mods=[KeepHigh(3)] label=Some("Set 3") comment=None flags=---- | 4d6 mods=[KeepHigh(3)] label=Some("Set 4") comment=None flags=---- | 4d6 mods=[KeepHigh(3)] label=Some("Set 5") comment=None flags=---- | 4d6 mods=[KeepHigh(3)] label=Some("Set 6") comment=None flags=----]
 ed	ERR	Invalid dice expression: ed
 ed1	OK	[1d4 mods=[ExplodeIndefinite(None), Subtract(2)] label=None comment=None flags=----]
 ed15	OK	[1d12 mods=[ExplodeIndefinite(None), AddDice(DiceRoll { count: 2, sides: 6, modifiers: [ExplodeIndefinite(None)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
@@ -2141,12 +2211,15 @@ gb + 5	OK	[1d20 mods=[Godbound(false), Add(5)] label=None comment=None flags=---
 gb 1d8	OK	[1d8 mods=[Godbound(false)] label=None comment=None flags=----]
 gb 3d8	OK	[3d8 mods=[Godbound(false)] label=None comment=None flags=----]
 gb 3d8 - 2	OK	[3d8 mods=[Godbound(false), Subtract(2)] label=None comment=None flags=----]
+gbs - 2	OK	[1d20 mods=[Godbound(true), Subtract(2)] label=None comment=None flags=----]
 gbs 1d20 * 2	OK	[1d20 mods=[Godbound(true), AddDice(DiceRoll { count: 1, sides: 20, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None }), Multiply(2)] label=None comment=None flags=----]
 gbs 2d10	OK	[2d10 mods=[Godbound(true)] label=None comment=None flags=----]
 gbs 2d10 + 5	OK	[2d10 mods=[Godbound(true), Add(5)] label=None comment=None flags=----]
 gbs 2d10 +5	OK	[2d10 mods=[Godbound(true), Add(5)] label=None comment=None flags=----]
 hs	ERR	Invalid dice expression: hs
 ie6	ERR	Invalid dice expression: ie6
+invalid	ERR	Invalid dice expression: invalid
+invalid_fitd ; sw8	ERR	Invalid dice expression: invalid_fitd
 ir2	ERR	Invalid dice expression: ir2
 irg2	ERR	Invalid dice expression: irg2
 kl2	ERR	Invalid dice expression: kl2
@@ -2180,6 +2253,7 @@ nr (Concentration) 1d20 + 5 ! Maintaining spell	OK	[1d20 mods=[Add(5)] label=Som
 nr 2d6	OK	[2d6 mods=[] label=None comment=None flags=--n-]
 nr 3d10 e10	OK	[3d10 mods=[Explode(Some(10))] label=None comment=None flags=--n-]
 nr 3d10 t7	OK	[3d10 mods=[Target(7)] label=None comment=None flags=--n-]
+nr 4cod	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=None comment=None flags=--n-]
 nr 4d1	OK	[4d1 mods=[] label=None comment=None flags=--n-]
 nr 4d1 + 2	OK	[4d1 mods=[Add(2)] label=None comment=None flags=--n-]
 nr 4d1 adv1	OK	[4d1 mods=[Advantage(1)] label=None comment=None flags=--n-]
@@ -2193,6 +2267,7 @@ nr 6 2d6	OK	[2d6 mods=[] label=Some("Set 1") comment=None flags=--n- | 2d6 mods=
 nr fitd2	OK	[2d6 mods=[ForgedDark] label=None comment=None flags=--n-]
 nr p 1d20	OK	[1d20 mods=[] label=None comment=None flags=p-n-]
 nr s 2d6	OK	[2d6 mods=[] label=None comment=None flags=-sn-]
+nr sw8	OK	[2d1 mods=[SavageWorlds(8)] label=None comment=None flags=--n-]
 nr ul 2d6	OK	[2d6 mods=[] label=None comment=None flags=--nu]
 ol	ERR	Invalid dice expression: ol
 ol0	OK	[1d20 mods=[ExplodeIndefinite(Some(20))] label=None comment=None flags=----]
@@ -2282,6 +2357,7 @@ skill +3	OK	[1d20 mods=[Add(3)] label=None comment=None flags=----]
 skill -4	OK	[1d20 mods=[Subtract(4)] label=None comment=None flags=----]
 skill -5	OK	[1d20 mods=[Subtract(5)] label=None comment=None flags=----]
 snm	ERR	Invalid dice expression: snm
+snm4 * 3	OK	[4d6 mods=[ExplodeIndefinite(Some(6)), Target(4), Multiply(3)] label=None comment=None flags=----]
 snm5	OK	[5d6 mods=[ExplodeIndefinite(Some(6)), Target(4)] label=None comment=None flags=----]
 snm6 + 1d4	OK	[6d6 mods=[ExplodeIndefinite(Some(6)), Target(4), AddDice(DiceRoll { count: 1, sides: 4, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 sp	ERR	Invalid dice expression: sp
@@ -2289,13 +2365,20 @@ sp3 + 1d6	OK	[3d10 mods=[Target(8), ExplodeIndefinite(Some(10)), AddDice(DiceRol
 sp4	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
 sp4 + 2d6	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(10)), AddDice(DiceRoll { count: 2, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
 sp4t6	OK	[4d10 mods=[Target(6), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
+sp6 * 2 - 3	OK	[6d10 mods=[Target(8), ExplodeIndefinite(Some(10)), Multiply(2), Subtract(3)] label=None comment=None flags=----]
+sr12	OK	[12d6 mods=[Target(5), Shadowrun(12)] label=None comment=None flags=----]
 sr6	OK	[6d6 mods=[Target(5), Shadowrun(6)] label=None comment=None flags=----]
+sr6 * 2	OK	[6d6 mods=[Target(5), Shadowrun(6), Multiply(2)] label=None comment=None flags=----]
 sw	ERR	Invalid dice expression: sw
 sw10	OK	[2d1 mods=[SavageWorlds(10)] label=None comment=None flags=----]
+sw10 * 2	OK	[2d1 mods=[SavageWorlds(10), Multiply(2)] label=None comment=None flags=----]
+sw10 + 2	OK	[2d1 mods=[SavageWorlds(10), Add(2)] label=None comment=None flags=----]
 sw12	OK	[2d1 mods=[SavageWorlds(12)] label=None comment=None flags=----]
 sw4	OK	[2d1 mods=[SavageWorlds(4)] label=None comment=None flags=----]
 sw6	OK	[2d1 mods=[SavageWorlds(6)] label=None comment=None flags=----]
 sw8	OK	[2d1 mods=[SavageWorlds(8)] label=None comment=None flags=----]
+sw8 + 3	OK	[2d1 mods=[SavageWorlds(8), Add(3)] label=None comment=None flags=----]
+sw8 ; invalid_fitd	ERR	Invalid dice expression: invalid_fitd
 tdh4	OK	[2d6 mods=[DarkestHouse(false), Add(4)] label=None comment=None flags=----]
 tdh4 ! Pick the lock	OK	[2d6 mods=[DarkestHouse(false), Add(4)] label=None comment=Some("Pick the lock") flags=----]
 tdh4 +1	OK	[2d6 mods=[DarkestHouse(false), Add(5)] label=None comment=None flags=----]
@@ -2554,6 +2637,11 @@ dh 2d10 - 1	OK	[2d10 mods=[ExplodeIndefinite(Some(10)), DarkHeresy, Subtract(1)]
 dh 2d10+1	OK	[2d10 mods=[ExplodeIndefinite(Some(10)), DarkHeresy, Add(1)] label=None comment=None flags=----]
 dh 3d10 * 2	OK	[3d10 mods=[ExplodeIndefinite(Some(10)), DarkHeresy, Multiply(2)] label=None comment=None flags=----]
 dh 2d10 + 1d6	OK	[2d10 mods=[ExplodeIndefinite(Some(10)), DarkHeresy, AddDice(DiceRoll { count: 1, sides: 6, modifiers: [], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+vtm4h0 * 2	OK	[4d10 mods=[VampireMasquerade5(4, 0), Multiply(2)] label=None comment=None flags=----]
+vtm5h1 - 1	OK	[5d10 mods=[VampireMasquerade5(5, 1), Subtract(1)] label=None comment=None flags=----]
+vtm5h2	OK	[5d10 mods=[VampireMasquerade5(5, 2)] label=None comment=None flags=----]
+vtm6h2 + 2	OK	[6d10 mods=[VampireMasquerade5(6, 2), Add(2)] label=None comment=None flags=----]
+vtm8h3 / 2	OK	[8d10 mods=[VampireMasquerade5(8, 3), Divide(2)] label=None comment=None flags=----]
 wng 4d6 + 1	ERR	Wrath & Glory counts Icons, so `+ 1` doesn't apply; add dice instead (`+ 1d6`)
 wng dn3 5d6 - 1	ERR	Wrath & Glory counts Icons, so math doesn't apply; add dice (`+ 1d6`) or roll fewer instead
 wng 4d6 + 2 !soak	ERR	Wrath & Glory counts Icons, so `+ 2` doesn't apply; add dice instead (`+ 2d6`)
