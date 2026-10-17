@@ -148,6 +148,10 @@ Behavioral variants belong in a parameter, never a twin function (see `RerollDir
   instead of pasting assertion loops.
 - New syntax needs cases for: happy path, common modifiers, comments (`! text`), roll sets,
   and boundary values. Write tests alongside the implementation.
+- A roll that only has to parse, error, or give a result is a **corpus line, not a test**:
+  the snapshots already pin it exactly. Write a test for a rule the corpus can't state.
+- A test on random dice rolls at fixed seeds (`roll_across_seeds`, `create_seeded_rng`) and
+  asserts on every outcome. Never `if let Ok`, a print, or a check that runs only on lucky dice.
 - Game-system mechanics are tested in `game_systems_tests.rs` **only**. Repeating them in
   another test file creates a cross-file clone that no local helper can fix.
 

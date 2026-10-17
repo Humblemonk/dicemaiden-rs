@@ -254,6 +254,11 @@ New syntax or game systems need cases for **all** of the following:
 
 **Bugfixes must include a regression test** reproducing the original bug, added alongside the fix.
 
+### Every test must be able to fail
+
+- If all you want to check is that an expression parses, fails, or produces a result, add it to `tests/corpus/expressions.txt` instead of writing a test. The snapshots pin that more precisely than an `is_ok()` ever could. Tests are for rules the corpus cannot express: an exact total, an order that must not matter, a note that must appear.
+- Random dice make for tests that pass by luck. Roll at fixed seeds (`roll_across_seeds` in `game_systems_tests.rs`, `create_seeded_rng` elsewhere), assert on every result, and when a branch matters, assert the sweep reached it. A test that wraps its check in `if let Ok`, only prints, or asserts inside a branch the dice may never take checks nothing.
+
 ### Keep test loops out of the clone detector
 
 The table changes between tests; the loop body usually does not. A pasted assertion loop is the most common source of JSCPD clones in this repository.

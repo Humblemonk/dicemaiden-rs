@@ -4222,79 +4222,58 @@ fn test_fitd_clean_output() {
 }
 
 #[test]
-fn test_wod_cancel_bug_fix() {
-    // Test the actual WoD cancel behavior using the real parser and roller
-    // This replaces the broken test that tried to call non-existent functions
+fn test_wod_cancel_mechanics() {
+    // With `c`, each 10 cancels one 1 before failures come off the successes,
+    // so the roll scores exactly one more success per cancelled pair than the
+    // same dice without it. (cancel roll, same roll without cancel, target)
+    let cases = [
+        ("4wod8c", "4wod8", 8),
+        ("5wod6c", "5wod6", 6),
+        ("6d10 f1 t7 c", "6d10 f1 t7", 7),
+    ];
+    let mut reached_cancel = false;
 
-    // Test WOD8 with cancel modifier - this should work with the actual implementation
-    let result = parse_and_roll("4wod8c").unwrap();
-    assert_eq!(result.len(), 1);
+    for (with_cancel, without_cancel, target) in cases {
+        for seed in 0..40 {
+            let roll = roll_at_seed(with_cancel, seed);
+            let plain = roll_at_seed(without_cancel, seed);
+            assert_eq!(
+                roll.kept_rolls, plain.kept_rolls,
+                "'{with_cancel}' and '{without_cancel}' should roll the same dice at seed {seed}"
+            );
 
-    let roll = &result[0];
+            let count = |matches: &dyn Fn(i32) -> bool| {
+                roll.kept_rolls.iter().filter(|&&die| matches(die)).count() as i32
+            };
+            let hits = count(&|die| die >= target);
+            let ones = count(&|die| die == 1);
+            let pairs = count(&|die| die == 10).min(ones);
+            reached_cancel |= pairs > 0;
 
-    // Should have success/failure tracking for WoD system
-    assert!(
-        roll.successes.is_some(),
-        "WoD cancel should have success tracking"
-    );
-    assert!(
-        roll.failures.is_some(),
-        "WoD cancel should have failure tracking"
-    );
-
-    // Test that the roll was processed correctly
-    assert!(!roll.kept_rolls.is_empty(), "Should have dice results");
-    assert_eq!(roll.kept_rolls.len(), 4, "Should have 4 dice for 4wod8c");
-
-    // Test that cancel modifier was applied (if any 10s and 1s exist)
-    let tens_count = roll.kept_rolls.iter().filter(|&&die| die == 10).count();
-    let ones_count = roll.kept_rolls.iter().filter(|&&die| die == 1).count();
-
-    if tens_count > 0 && ones_count > 0 {
-        // If we have both 10s and 1s, check for cancel notes
-        let has_cancel_note = roll.notes.iter().any(|note| note.contains("CANCELLED"));
-        assert!(
-            has_cancel_note,
-            "Should have cancellation note when 10s and 1s are present"
-        );
+            let context = format!(
+                "'{with_cancel}' rolled {:?} at seed {seed}",
+                roll.kept_rolls
+            );
+            assert_eq!(roll.failures, Some(ones - pairs), "failures: {context}");
+            assert_eq!(
+                roll.successes,
+                Some(hits - (ones - pairs)),
+                "successes: {context}"
+            );
+            assert_eq!(
+                roll.successes,
+                plain.successes.map(|successes| successes + pairs),
+                "one success back per cancelled pair: {context}"
+            );
+            assert_eq!(
+                roll.notes.iter().any(|note| note.contains("CANCELLED")),
+                pairs > 0,
+                "cancel note: {context}"
+            );
+        }
     }
 
-    // Test that the final success count is reasonable
-    let success_count = roll.successes.unwrap();
-    assert!(
-        (-4..=4).contains(&success_count),
-        "Success count should be reasonable: got {}",
-        success_count
-    );
-
-    // Test the specific bug scenario: ensure successes are calculated correctly after cancellation
-    // This tests the fix for the WoD cancellation calculation
-    let result2 = parse_and_roll("5wod6c").unwrap();
-    let roll2 = &result2[0];
-
-    assert!(
-        roll2.successes.is_some(),
-        "WoD6 cancel should have success tracking"
-    );
-    assert!(
-        roll2.failures.is_some(),
-        "WoD6 cancel should have failure tracking"
-    );
-
-    // Verify that both successes and failures are properly tracked and cancel logic works
-    let success_count2 = roll2.successes.unwrap();
-    let failure_count2 = roll2.failures.unwrap();
-
-    assert!(
-        (-5..=5).contains(&success_count2),
-        "WoD6 success count should be reasonable: got {}",
-        success_count2
-    );
-    assert!(
-        (0..=5).contains(&failure_count2),
-        "WoD6 failure count should be reasonable: got {}",
-        failure_count2
-    );
+    assert!(reached_cancel, "the sweep should reach a 10 cancelling a 1");
 }
 
 #[test]
