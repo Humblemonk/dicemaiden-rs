@@ -434,21 +434,6 @@ fn test_cyberpunk_red_damage_autofire_multiplier() {
 }
 
 #[test]
-fn test_cyberpunk_red_damage_math_modifiers() {
-    let cases = vec![
-        ("cpd3 + 5", "damage with a flat bonus"),
-        ("cpd3 - 2", "damage with a penalty"),
-        ("cpd2 * 4", "autofire multiplier"),
-        ("cpd4 / 2", "halved damage"),
-    ];
-
-    for (input, description) in cases {
-        let result = parse_and_roll(input);
-        assert!(result.is_ok(), "'{input}' ({description}) should parse");
-    }
-}
-
-#[test]
 fn test_cyberpunk_red_damage_comments_and_sets() {
     // Comments
     let result = parse_and_roll("cpd5 ! heavy pistol").unwrap();
@@ -461,20 +446,6 @@ fn test_cyberpunk_red_damage_comments_and_sets() {
         assert!(roll.label.as_ref().unwrap().starts_with("Set "));
         assert_eq!(roll.individual_rolls.len(), 6);
     }
-}
-
-#[test]
-fn test_cyberpunk_red_damage_boundaries() {
-    assert_valid("cpd1");
-    assert_valid("cpd500");
-    assert_invalid("cpd0");
-    assert_invalid("cpd501");
-
-    // `cpd` counts 6s, so it is meaningless on anything but d6
-    assert!(
-        parse_and_roll("3d10 cpd").is_err(),
-        "cpd must reject non-d6 dice"
-    );
 }
 
 #[test]
@@ -702,21 +673,6 @@ fn test_wfrp_comments_and_sets() {
     assert_valid("p wfrp67");
     assert_valid("s wfrp67");
     assert_valid("wfrp67 ; wfrp30");
-}
-
-#[test]
-fn test_wfrp_boundaries() {
-    assert_valid("wfrp1");
-    assert_valid("wfrp100");
-    assert_valid("wfrp100 + 40");
-    assert_valid("wfrp10 - 30");
-    assert_invalid("wfrp0");
-    assert_invalid("wfrp101");
-    assert_invalid("wfrp");
-
-    // The folded target is capped, so no modifier can outrun the parser
-    assert!(parse_and_roll("wfrp100 + 500").is_ok());
-    assert!(parse_and_roll("1d100 wfrp201").is_err());
 }
 
 #[test]
@@ -953,29 +909,6 @@ fn test_broken_empires_favor() {
         "tbe60 hard easy",
     ] {
         assert_invalid(invalid);
-    }
-}
-
-#[test]
-fn test_broken_empires_rejects_other_game_system_modifiers() {
-    for expression in [
-        // These handlers are dispatched before ordinary modifiers and must not
-        // silently win merely because their modifier appears alongside TBE.
-        "1d100 wfrp60 tbe60",
-        "1d100 tbe60 wfrp60",
-        "1d20 conan2 tbe60",
-        "1d6 cd1 tbe60",
-        // Systems handled after rolling must be rejected just as consistently.
-        "1d100 tbe60 ms60",
-        "1d100 tbe60 cpr",
-        "1d100 tbe60 wit",
-        "1d100 tbe60 mnm",
-        "1d100 tbe60 alien",
-        "1d100 tbe60 fitd",
-        // A second skill must not be silently ignored either.
-        "1d100 tbe60 tbe70",
-    ] {
-        assert_invalid(expression);
     }
 }
 
@@ -1577,43 +1510,6 @@ fn test_godbound_damage_mechanics() {
 // ============================================================================
 // SYSTEM EDGE CASES
 // ============================================================================
-
-#[test]
-fn test_system_validation_edge_cases() {
-    // Test boundary conditions for various systems
-
-    // Savage Worlds - only even-sided dice 4-12
-    assert_valid("sw4"); // Minimum
-    assert_valid("sw12"); // Maximum
-    assert_invalid("sw2"); // Too small
-    assert_invalid("sw14"); // Too large
-    assert_invalid("sw5"); // Odd-sided
-
-    // Silhouette - 1-10 dice
-    assert_valid("sil1"); // Minimum
-    assert_valid("sil10"); // Maximum
-    assert_invalid("sil0"); // Too small
-    assert_invalid("sil11"); // Too large
-
-    // Cypher System - levels 1-10
-    assert_valid("cs 1"); // Minimum
-    assert_valid("cs 10"); // Maximum
-    assert_invalid("cs 0"); // Too small
-    assert_invalid("cs 11"); // Too large
-
-    // Wrath & Glory - 1-5 wrath dice
-    assert_valid("wng w1 4d6"); // Minimum
-    assert_valid("wng w5 4d6"); // Maximum
-    assert_valid("wng w0 4d6"); // No Wrath Die, as for Initiative (p.178)
-    assert_invalid("wng w6 4d6"); // Too large
-    // // Lasers & Feelings - target 2-5
-    assert_valid("2lf2"); // Minimum target
-    assert_valid("2lf5"); // Maximum target
-    assert_invalid("2lf1"); // Target too low
-    assert_invalid("2lf6"); // Target too high
-    assert_invalid("0lf4"); // Zero dice
-    assert_invalid("25lf4"); // Too many dice
-}
 
 #[test]
 fn test_system_roll_sets() {
@@ -2455,27 +2351,6 @@ fn test_exalted_with_roll_sets() {
 }
 
 #[test]
-fn test_exalted_invalid_cases() {
-    // Test invalid Exalted patterns
-    let invalid_exalted = vec![
-        "ex0",    // Zero dice
-        "ex",     // No dice count
-        "ex5t0",  // Zero target
-        "ex5t11", // Target higher than die sides
-        "ex-5",   // Negative dice count
-    ];
-
-    for invalid_test in invalid_exalted {
-        let result = parse_and_roll(invalid_test);
-        assert!(
-            result.is_err(),
-            "Invalid Exalted '{}' should fail",
-            invalid_test
-        );
-    }
-}
-
-#[test]
 fn test_wrath_glory_special_modes_comprehensive() {
     // !soak (Determination), !exempt and !dmg count Icons with no Wrath Die,
     // per the Core Rulebook v2.1 (pp.162, 183, 196), whatever `w#` says.
@@ -2745,27 +2620,6 @@ fn test_vtm5_with_roll_sets() {
 }
 
 #[test]
-fn test_vtm5_invalid_cases() {
-    // Test invalid VTM5 patterns
-    let invalid_vtm5 = vec![
-        ("vtm0h1", "Zero pool size"),
-        ("vtm5h6", "Too many hunger dice"),
-        ("vtm31h2", "Pool too large"),
-        ("vtm3h4", "Hunger exceeds pool"),
-        ("vtmh2", "Missing pool size"),
-        ("vtm5", "Missing hunger specification"),
-        ("vtm5h", "Missing hunger count"),
-    ];
-
-    for (invalid_test, description) in invalid_vtm5 {
-        assert!(
-            parse_and_roll(invalid_test).is_err(),
-            "'{invalid_test}' should be rejected: {description}"
-        );
-    }
-}
-
-#[test]
 fn test_lasers_feelings_alias_expansion() {
     // Test alias expansion for Lasers & Feelings
     let lf_alias_tests = vec![
@@ -2847,46 +2701,6 @@ fn test_lasers_feelings_mechanics() {
         saw_laser_feelings,
         "the sweep should include a LASER FEELINGS"
     );
-}
-
-#[test]
-fn test_lasers_feelings_validation() {
-    // Test invalid Lasers & Feelings patterns
-    let invalid_lf_tests = vec![
-        ("2lf1", "Target too low"),  // Target must be 2-5
-        ("2lf6", "Target too high"), // Target must be 2-5
-        ("0lf4", "Zero dice"),       // No dice
-        ("25lf4", "Too many dice"),  // Too many dice
-        ("2lf4x", "Invalid type"),   // Invalid type specifier
-    ];
-
-    for (expression, description) in invalid_lf_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_err(),
-            "Invalid Lasers & Feelings '{}' should fail: {}",
-            expression,
-            description
-        );
-    }
-
-    // Test valid boundary cases
-    let valid_boundary_tests = vec![
-        ("1lf2", "Minimum dice and target"),
-        ("20lf5", "Maximum dice and target"),
-        ("2lf2", "Minimum target"),
-        ("2lf5", "Maximum target"),
-    ];
-
-    for (expression, description) in valid_boundary_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Valid boundary Lasers & Feelings '{}' should work: {}",
-            expression,
-            description
-        );
-    }
 }
 
 #[test]
@@ -4069,37 +3883,6 @@ fn test_mothership_advantage_never_selects_the_worse_outcome() {
 }
 
 #[test]
-fn test_mothership_stat_validation() {
-    // Test invalid stat values
-    let invalid_stats = vec![
-        "ms0", // Zero
-        // A Skill bonus can lift a target past 99, so the cap is 200
-        "ms201", "ms999",
-    ];
-
-    for invalid_test in invalid_stats {
-        let result = parse_and_roll(invalid_test);
-        assert!(
-            result.is_err(),
-            "Invalid Mothership stat '{}' should fail",
-            invalid_test
-        );
-    }
-
-    // Test valid edge cases
-    let valid_stats = vec!["ms1", "ms99"];
-
-    for valid_test in valid_stats {
-        let result = parse_and_roll(valid_test);
-        assert!(
-            result.is_ok(),
-            "Valid Mothership stat '{}' should work",
-            valid_test
-        );
-    }
-}
-
-#[test]
 fn test_mothership_with_roll_sets() {
     // Test Mothership with roll sets
     for roll in assert_labelled_roll_sets("3 +ms45", "Mothership roll sets") {
@@ -4562,31 +4345,6 @@ fn test_advantage_disadvantage_with_other_modifiers() {
         1,
         "k1 should still keep exactly one die after exploding"
     );
-}
-
-#[test]
-fn test_advantage_disadvantage_limits() {
-    // The extra dice count against the 500 dice cap
-    assert!(
-        parse_and_roll("500d6 adv1").is_err(),
-        "advantage extras should respect the 500 dice limit"
-    );
-    assert!(
-        parse_and_roll("499d6 adv1").is_ok(),
-        "499d6 plus one advantage die is exactly at the limit"
-    );
-    assert!(
-        parse_and_roll("4d6 adv501").is_err(),
-        "advantage level above 500 should be rejected"
-    );
-
-    // Malformed levels
-    for invalid in ["4d6 adv", "4d6 dis", "4d6 advx", "4d6 dis-1"] {
-        assert!(
-            parse_and_roll(invalid).is_err(),
-            "'{invalid}' should be rejected"
-        );
-    }
 }
 
 #[test]

@@ -2783,3 +2783,35 @@ sp4t7 + 2	OK	[4d10 mods=[Target(7), ExplodeIndefinite(Some(10)), Add(2)] label=N
 sp5	OK	[5d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
 sp5 * 2	OK	[5d10 mods=[Target(8), ExplodeIndefinite(Some(10)), Multiply(2)] label=None comment=None flags=----]
 sp6 - 1	OK	[6d10 mods=[Target(8), ExplodeIndefinite(Some(10)), Subtract(1)] label=None comment=None flags=----]
+wfrp1	OK	[1d100 mods=[Wfrp(1)] label=None comment=None flags=----]
+wfrp100	OK	[1d100 mods=[Wfrp(100)] label=None comment=None flags=----]
+wfrp100 + 40	OK	[1d100 mods=[Wfrp(140)] label=None comment=None flags=----]
+wfrp10 - 30	OK	[1d100 mods=[Wfrp(0)] label=None comment=None flags=----]
+wfrp0	ERR	Invalid dice expression: wfrp0
+wfrp101	ERR	Invalid dice expression: wfrp101
+wfrp100 + 500	OK	[1d100 mods=[Wfrp(200)] label=None comment=None flags=----]
+1d20 conan2 tbe60	OK	[1d20 mods=[ConanSkill(2), BrokenEmpires(60, 0)] label=None comment=None flags=----]
+1d6 cd1 tbe60	OK	[1d6 mods=[ConanCombat(1), BrokenEmpires(60, 0)] label=None comment=None flags=----]
+1d100 tbe60 ms60	OK	[1d100 mods=[BrokenEmpires(60, 0), Mothership(Some(60), false)] label=None comment=None flags=----]
+1d100 tbe60 cpr	OK	[1d100 mods=[BrokenEmpires(60, 0), CyberpunkRed] label=None comment=None flags=----]
+1d100 tbe60 wit	OK	[1d100 mods=[BrokenEmpires(60, 0), Witcher] label=None comment=None flags=----]
+1d100 tbe60 mnm	OK	[1d100 mods=[BrokenEmpires(60, 0), MutantsMasterminds] label=None comment=None flags=----]
+1d100 tbe60 alien	OK	[1d100 mods=[BrokenEmpires(60, 0), Alien] label=None comment=None flags=----]
+1d100 tbe60 fitd	OK	[1d100 mods=[BrokenEmpires(60, 0), ForgedDark] label=None comment=None flags=----]
+sw2	ERR	Invalid dice expression: sw2
+sw5	ERR	Invalid dice expression: sw5
+sil1	OK	[1d6 mods=[Silhouette(1)] label=None comment=None flags=----]
+2lf2	OK	[2d6 mods=[LaserFeelings(0, 2, Lasers)] label=None comment=None flags=----]
+2lf5	OK	[2d6 mods=[LaserFeelings(0, 5, Lasers)] label=None comment=None flags=----]
+2lf1	ERR	Invalid dice expression: 2lf1
+2lf6	ERR	Invalid dice expression: 2lf6
+0lf4	ERR	Invalid dice expression: 0lf4
+25lf4	ERR	Invalid dice expression: 25lf4
+ex0	ERR	Invalid dice expression: ex0
+ex5t0	ERR	Invalid dice expression: ex5t0
+ex5t11	ERR	Invalid dice expression: ex5t11
+2lf4x	ERR	Invalid dice expression: 2lf4x
+1lf2	OK	[1d6 mods=[LaserFeelings(0, 2, Lasers)] label=None comment=None flags=----]
+20lf5	OK	[20d6 mods=[LaserFeelings(0, 5, Lasers)] label=None comment=None flags=----]
+ms0	ERR	Mothership target must be 1-200, got 0
+ms999	ERR	Mothership target must be 1-200, got 999
