@@ -118,11 +118,13 @@ fn test_blank_input_is_rejected() {
 // ============================================================================
 
 #[test]
-fn test_leading_number_ignores_spacing() {
+fn test_spacing_does_not_change_the_roll() {
     // A leading number lands after the dice's own modifiers whether or not
     // they are written as one token. `4 + 4d10t7` has always added 4 to the
-    // success count, so the spaced form must too.
+    // success count, so the spaced form must too. Tabs are spacing as well;
+    // the snapshot corpus is tab-separated, so it cannot hold them.
     let same_roll = vec![
+        ("\t2d6\t+\t3\t", "2d6 + 3"),
         ("4 + 4d10t7", "4 + 4d10 t7"),
         ("4 + 4d10t7+1", "4 + 4d10 t7 + 1"),
         ("5 - 3d10t7", "5 - 3d10 t7"),
@@ -229,8 +231,8 @@ fn test_add_dice_modifier_attachment() {
 fn test_imploding_dice_mechanics() {
     // `i` implodes on the minimum face only; every imploded die subtracts a
     // fresh die from the total, so the result can drop below the dice sum.
-    for _ in 0..200 {
-        let result = parse_and_roll("4d6 i1").unwrap();
+    for seed in 0..200 {
+        let result = parse_and_roll_with_rng("4d6 i1", &mut create_seeded_rng(seed)).unwrap();
         let roll = &result[0];
 
         let kept_sum: i32 = roll.kept_rolls.iter().sum();
@@ -254,35 +256,38 @@ fn test_imploding_dice_mechanics() {
     }
 
     // `i#` implodes on anything at or below the threshold
-    for _ in 0..200 {
-        let result = parse_and_roll("6d10 i3").unwrap();
+    for seed in 0..200 {
+        let result = parse_and_roll_with_rng("6d10 i3", &mut create_seeded_rng(seed)).unwrap();
         let roll = &result[0];
         let low_dice = roll.kept_rolls.iter().filter(|&&d| d <= 3).count();
         assert_eq!(roll.implosion_rolls.len(), low_dice);
     }
 
     // i10 on a d10 implodes every die, exactly once each (no chaining)
-    for _ in 0..50 {
-        let result = parse_and_roll("5d10 i10").unwrap();
+    for seed in 0..50 {
+        let result = parse_and_roll_with_rng("5d10 i10", &mut create_seeded_rng(seed)).unwrap();
         assert_eq!(result[0].implosion_rolls.len(), 5);
     }
 
     // Dice that never meet the threshold never implode
-    for _ in 0..50 {
-        let result = parse_and_roll("5d10 i1").unwrap();
+    let mut saw_no_ones = false;
+    for seed in 0..50 {
+        let result = parse_and_roll_with_rng("5d10 i1", &mut create_seeded_rng(seed)).unwrap();
         let roll = &result[0];
         if !roll.kept_rolls.contains(&1) {
+            saw_no_ones = true;
             assert!(roll.implosion_rolls.is_empty());
             assert_eq!(roll.total, roll.kept_rolls.iter().sum::<i32>());
         }
     }
+    assert!(saw_no_ones, "the sweep should include a roll with no 1s");
 }
 
 #[test]
 fn test_imploding_dice_combinations() {
     // Implosion is applied to the dice total before mathematical modifiers
-    for _ in 0..100 {
-        let result = parse_and_roll("4d6 i1 + 5").unwrap();
+    for seed in 0..100 {
+        let result = parse_and_roll_with_rng("4d6 i1 + 5", &mut create_seeded_rng(seed)).unwrap();
         let roll = &result[0];
         let implosion_sum: i32 = roll.implosion_rolls.iter().sum();
         assert_eq!(
@@ -292,8 +297,8 @@ fn test_imploding_dice_combinations() {
     }
 
     // Imploded dice are not droppable or keepable - the penalty survives k/d
-    for _ in 0..200 {
-        let result = parse_and_roll("4d6 i1 k2").unwrap();
+    for seed in 0..200 {
+        let result = parse_and_roll_with_rng("4d6 i1 k2", &mut create_seeded_rng(seed)).unwrap();
         let roll = &result[0];
         assert_eq!(roll.kept_rolls.len(), 2);
         assert_eq!(
@@ -305,8 +310,8 @@ fn test_imploding_dice_combinations() {
     // Only dice rolled from the expression implode - dice gained from an
     // explosion never do, whichever order the two modifiers are written in
     for expression in ["1d10 i1 e10", "1d10 e10 i1"] {
-        for _ in 0..300 {
-            let result = parse_and_roll(expression).unwrap();
+        for seed in 0..300 {
+            let result = parse_and_roll_with_rng(expression, &mut create_seeded_rng(seed)).unwrap();
             let roll = &result[0];
             assert!(
                 roll.implosion_rolls.len() <= 1,
@@ -319,8 +324,8 @@ fn test_imploding_dice_combinations() {
 
     // With target counting the roll reports successes; imploded dice are not
     // dice in the pool, so they neither add nor remove successes
-    for _ in 0..200 {
-        let result = parse_and_roll("6d10 i1 t7").unwrap();
+    for seed in 0..200 {
+        let result = parse_and_roll_with_rng("6d10 i1 t7", &mut create_seeded_rng(seed)).unwrap();
         let roll = &result[0];
         let hits = roll.kept_rolls.iter().filter(|&&d| d >= 7).count() as i32;
         assert_eq!(roll.successes, Some(hits));
@@ -340,17 +345,20 @@ fn test_imploding_dice_combinations() {
 #[test]
 fn test_imploding_dice_display() {
     // Imploded dice render as a subtracted group, never as a negative value
-    for _ in 0..300 {
-        let result = parse_and_roll("6d6 i2").unwrap();
+    let (mut saw_implosion, mut saw_none) = (false, false);
+    for seed in 0..300 {
+        let result = parse_and_roll_with_rng("6d6 i2", &mut create_seeded_rng(seed)).unwrap();
         let roll = &result[0];
         let output = roll.to_string();
 
         if roll.implosion_rolls.is_empty() {
+            saw_none = true;
             assert!(
                 !output.contains(" - `["),
                 "Unexpected subtraction: {output}"
             );
         } else {
+            saw_implosion = true;
             assert!(
                 output.contains(" - `["),
                 "Imploded dice should display as a subtracted group: {output}"
@@ -375,6 +383,10 @@ fn test_imploding_dice_display() {
             );
         }
     }
+    assert!(
+        saw_implosion && saw_none,
+        "the sweep should include rolls with and without implosions"
+    );
 }
 
 #[test]
@@ -642,42 +654,39 @@ fn test_double_success_notes() {
 
 #[cfg(test)]
 mod test_issue_94_minimal {
-    use dicemaiden_rs::parse_and_roll;
+    use dicemaiden_rs::dice::{parse_and_roll_with_rng, rng::create_seeded_rng};
 
     #[test]
     fn test_issue_94_exact_cases() {
-        // Test the exact cases reported in Issue #94
+        // Issue #94: math before a target is added to each die once. It was
+        // applied twice, so `1d12+2 t8` scored 2-3 successes on one die. At
+        // the same seed, each die must show the plain d12 plus the math.
+        // (expression, the same dice with no math, math)
+        let cases = vec![("1d12+2 t8", "1d12", 2), ("10 1d12+6 t8", "10 1d12", 6)];
 
-        // Case 1: 1d12+2 t8
-        // Before fix: showed 2-3 successes (bug)
-        // After fix: should show 0-1 successes (correct)
-        let result = parse_and_roll("1d12+2 t8").unwrap();
-        let roll = &result[0];
+        for (expression, plain, math) in cases {
+            let mut saw_success = false;
+            for seed in 0..40 {
+                let results =
+                    parse_and_roll_with_rng(expression, &mut create_seeded_rng(seed)).unwrap();
+                let plain_results =
+                    parse_and_roll_with_rng(plain, &mut create_seeded_rng(seed)).unwrap();
+                assert_eq!(results.len(), plain_results.len(), "'{expression}' sets");
 
-        assert!(roll.successes.is_some(), "Should have success counting");
-        let success_count = roll.successes.unwrap();
-        assert!(
-            (0..=1).contains(&success_count),
-            "1d12+2 t8 should have 0-1 successes, got {}",
-            success_count
-        );
-
-        // Case 2: 10 1d12+6 t8 (roll sets)
-        let result = parse_and_roll("10 1d12+6 t8").unwrap();
-        assert_eq!(result.len(), 10, "Should have 10 roll sets");
-
-        for (i, roll) in result.iter().enumerate() {
+                for (roll, plain_roll) in results.iter().zip(&plain_results) {
+                    let die = plain_roll.kept_rolls[0] + math;
+                    assert_eq!(roll.kept_rolls, vec![die], "'{expression}' at seed {seed}");
+                    assert_eq!(
+                        roll.successes,
+                        Some(i32::from(die >= 8)),
+                        "'{expression}' at seed {seed} shows {die}"
+                    );
+                    saw_success |= die >= 8;
+                }
+            }
             assert!(
-                roll.successes.is_some(),
-                "Roll set {} should have success counting",
-                i
-            );
-            let success_count = roll.successes.unwrap();
-            assert!(
-                (0..=1).contains(&success_count),
-                "Roll set {} should have 0-1 successes, got {}",
-                i,
-                success_count
+                saw_success,
+                "the sweep of '{expression}' should include a success"
             );
         }
     }
@@ -789,8 +798,8 @@ fn test_explosion_count_accuracy() {
     ];
 
     for (expression, original_count, explode_threshold) in test_cases {
-        for _ in 0..50 {
-            let result = parse_and_roll(expression).unwrap();
+        for seed in 0..50 {
+            let result = parse_and_roll_with_rng(expression, &mut create_seeded_rng(seed)).unwrap();
             let roll = &result[0];
 
             // Count exploding dice in original dice only

@@ -2766,3 +2766,20 @@ wng 4d6 k3	OK	[1d6 mods=[WrathGlory(None, false, 1), AddDice(DiceRoll { count: 4
 Ms20 - 30	ERR	Mothership target can't be below 1, got -10
 3 ms20 - 30	ERR	Mothership target can't be below 1, got -10
 ms45 + 99999999999999999999	ERR	Invalid modifier '+' - contains operator
+1wh6+	OK	[1d6 mods=[Target(6)] label=None comment=None flags=----]
+4wh2+	OK	[4d6 mods=[Target(2)] label=None comment=None flags=----]
+8wh3+	OK	[8d6 mods=[Target(3)] label=None comment=None flags=----]
+ex5 + 2	OK	[5d10 mods=[Target(7), Target(10), Add(2)] label=None comment=None flags=----]
+ex6 * 2	OK	[6d10 mods=[Target(7), Target(10), Multiply(2)] label=None comment=None flags=----]
+ex8 - 1	OK	[8d10 mods=[Target(7), Target(10), Subtract(1)] label=None comment=None flags=----]
+snm3 - 1	OK	[3d6 mods=[ExplodeIndefinite(Some(6)), Target(4), Subtract(1)] label=None comment=None flags=----]
+snm4	OK	[4d6 mods=[ExplodeIndefinite(Some(6)), Target(4)] label=None comment=None flags=----]
+snm4 * 2	OK	[4d6 mods=[ExplodeIndefinite(Some(6)), Target(4), Multiply(2)] label=None comment=None flags=----]
+snm5 + 2	OK	[5d6 mods=[ExplodeIndefinite(Some(6)), Target(4), Add(2)] label=None comment=None flags=----]
+snm6	OK	[6d6 mods=[ExplodeIndefinite(Some(6)), Target(4)] label=None comment=None flags=----]
+sp10	OK	[10d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
+sp4 + 2	OK	[4d10 mods=[Target(8), ExplodeIndefinite(Some(10)), Add(2)] label=None comment=None flags=----]
+sp4t7 + 2	OK	[4d10 mods=[Target(7), ExplodeIndefinite(Some(10)), Add(2)] label=None comment=None flags=----]
+sp5	OK	[5d10 mods=[Target(8), ExplodeIndefinite(Some(10))] label=None comment=None flags=----]
+sp5 * 2	OK	[5d10 mods=[Target(8), ExplodeIndefinite(Some(10)), Multiply(2)] label=None comment=None flags=----]
+sp6 - 1	OK	[6d10 mods=[Target(8), ExplodeIndefinite(Some(10)), Subtract(1)] label=None comment=None flags=----]

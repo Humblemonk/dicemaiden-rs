@@ -311,21 +311,6 @@ fn test_savage_worlds_mechanics() {
 }
 
 #[test]
-fn test_cyberpunk_red_mechanics() {
-    // Test CPR critical success/failure mechanics
-    for _ in 0..10 {
-        let result = parse_and_roll("cpr").unwrap();
-        assert_eq!(result.len(), 1);
-
-        // Should not have success counting (total-based system)
-        assert!(result[0].successes.is_none());
-
-        // Should be in valid range (-9 to 20 with explosions)
-        assert!(result[0].total >= -9 && result[0].total <= 20);
-    }
-}
-
-#[test]
 fn test_cyberpunk_red_damage_expansion() {
     // `cpd` is the damage roll: Nd6 summed straight, with no explosion.
     let cases = vec![
@@ -352,11 +337,7 @@ fn test_cyberpunk_red_damage_mechanics() {
     // Critical Injury's 5 bonus damage (which ignores armor) is never added in.
     let mut saw_critical_injury = false;
 
-    for _ in 0..60 {
-        let result = parse_and_roll("cpd6").unwrap();
-        assert_eq!(result.len(), 1);
-        let roll = &result[0];
-
+    for roll in &roll_across_seeds("cpd6", 60) {
         assert_eq!(roll.individual_rolls.len(), 6);
         assert!(
             roll.individual_rolls
@@ -402,22 +383,20 @@ fn test_cyberpunk_red_damage_mechanics() {
 
     assert!(
         saw_critical_injury,
-        "6d6 should produce a Critical Injury within 60 rolls"
+        "60 seeds of 6d6 should include a Critical Injury"
     );
 }
 
 #[test]
 fn test_cyberpunk_red_damage_single_die_never_crits() {
     // One die cannot show two 6s, so `cpd1` can never inflict a Critical Injury.
-    for _ in 0..30 {
-        let result = parse_and_roll("cpd1").unwrap();
+    for roll in roll_across_seeds("cpd1", 30) {
         assert!(
-            !result[0]
+            !roll
                 .notes
                 .iter()
                 .any(|note| note.contains("CRITICAL INJURY")),
-            "1d6 cannot crit: {:?}",
-            result[0]
+            "1d6 cannot crit: {roll:?}"
         );
     }
 }
@@ -426,10 +405,9 @@ fn test_cyberpunk_red_damage_single_die_never_crits() {
 fn test_cyberpunk_red_damage_autofire_multiplier() {
     // Autofire is 2d6 x multiplier, and RAW checks the raw 2d6 for double 6s
     // before multiplying - so the crit check must not see the multiplied total.
-    for _ in 0..60 {
-        let result = parse_and_roll("cpd2 * 3").unwrap();
-        let roll = &result[0];
+    let mut saw_double_six = false;
 
+    for roll in &roll_across_seeds("cpd2 * 3", 120) {
         let sum: i32 = roll.individual_rolls.iter().sum();
         assert_eq!(
             roll.total,
@@ -449,7 +427,10 @@ fn test_cyberpunk_red_damage_autofire_multiplier() {
                 .any(|note| note.contains("CRITICAL INJURY")),
             "double 6s crit regardless of the multiplier: {roll:?}"
         );
+        saw_double_six |= sixes == 2;
     }
+
+    assert!(saw_double_six, "120 seeds of 2d6 should include double 6s");
 }
 
 #[test]
@@ -665,11 +646,9 @@ fn test_wfrp_alias_expansion() {
 
 #[test]
 fn test_wfrp_roll_behavior() {
-    for _ in 0..25 {
-        let result = parse_and_roll("wfrp67").unwrap();
-        assert_eq!(result.len(), 1);
-        let roll = &result[0];
+    let (mut saw_success, mut saw_failure, mut saw_double) = (false, false, false);
 
+    for roll in &roll_across_seeds("wfrp67", 120) {
         assert_eq!(roll.individual_rolls.len(), 1);
         let die = roll.individual_rolls[0];
         assert!((1..=100).contains(&die), "d100 out of range: {die}");
@@ -696,7 +675,16 @@ fn test_wfrp_roll_behavior() {
             roll.notes.iter().any(|note| note.contains("ASTOUNDING")),
             "doubles note should track the die: {die}"
         );
+
+        saw_success |= outcome.success;
+        saw_failure |= !outcome.success;
+        saw_double |= outcome.is_double;
     }
+
+    assert!(
+        saw_success && saw_failure && saw_double,
+        "120 seeds of wfrp67 should include a success, a failure and a double"
+    );
 }
 
 #[test]
@@ -1061,59 +1049,88 @@ fn test_broken_empires_comments_sets_and_prefixes() {
 }
 
 #[test]
-fn test_witcher_mechanics() {
-    // Test Witcher indefinite explosion mechanics
-    for _ in 0..10 {
-        let result = parse_and_roll("wit").unwrap();
-        assert_eq!(result.len(), 1);
-
-        // Should not have success counting (total-based system)
-        assert!(result[0].successes.is_none());
-
-        // Should be in reasonable range (allowing for explosions)
-        assert!(result[0].total >= -100 && result[0].total <= 110);
-    }
-}
-
-#[test]
-fn test_critical_failure_subtraction_display() {
+fn test_d10_critical_tails() {
+    // Cyberpunk Red and Witcher roll 1d10: a 10 adds another d10 and a 1
+    // subtracts one. Witcher keeps adding while the added die shows 10;
+    // Cyberpunk Red adds once. (expression, whether a critical success chains)
+    //
     // A critical failure subtracts its die via a "subtract" dice group, which
     // already renders the minus sign. The subtracted die must therefore be
     // stored positive: a negative printed "- [-3]", and a subtracted 1 hit the
     // `-1` Marvel-logo sentinel in format_dice_groups and printed "**M**".
-    for expression in ["cpr", "wit"] {
-        let mut saw_critical_failure = false;
+    for (expression, chains) in [("cpr", false), ("wit", true)] {
+        let (mut saw_success, mut saw_failure, mut saw_chain) = (false, false, false);
 
-        for _ in 0..500 {
-            let result = parse_and_roll(expression).unwrap();
-            let roll = &result[0];
+        for roll in roll_across_seeds(expression, 400) {
             let output = roll.to_string();
-
             assert!(
-                !output.contains("**M**"),
-                "'{expression}' printed the Marvel logo: {output}"
+                !output.contains("**M**") && !output.contains("`[-"),
+                "'{expression}' printed a negative die or the Marvel logo: {output}"
             );
             assert!(
-                !output.contains("`[-"),
-                "'{expression}' printed a negative die: {output}"
+                roll.individual_rolls.iter().all(|&d| (1..=10).contains(&d)),
+                "'{expression}' individual rolls should be d10 faces: {roll:?}"
+            );
+            assert!(
+                roll.successes.is_none(),
+                "'{expression}' is a total, not a pool"
             );
 
-            if roll.notes.iter().any(|n| n.contains("CRITICAL FAILURE")) {
-                saw_critical_failure = true;
-                assert!(
-                    output.contains(" - `["),
-                    "'{expression}' critical failure should subtract a group: {output}"
-                );
-                assert!(
-                    roll.individual_rolls.iter().all(|&d| (1..=10).contains(&d)),
-                    "'{expression}' individual rolls should be d10 faces: {roll:?}"
-                );
+            let (&first, tail) = roll
+                .individual_rolls
+                .split_first()
+                .expect("a d10 was rolled");
+            let tail_sum: i32 = tail.iter().sum();
+            let has_note = |needle: &str| roll.notes.iter().any(|n| n.contains(needle));
+
+            match first {
+                10 => {
+                    saw_success = true;
+                    assert_eq!(roll.total, 10 + tail_sum, "'{expression}': {roll:?}");
+                    assert!(has_note("CRITICAL SUCCESS"), "'{expression}': {roll:?}");
+                    let (&last, chained) = tail.split_last().expect("a 10 adds a die");
+                    if chains {
+                        // The chain stops on the first added die that is not a 10
+                        assert!(
+                            last != 10 && chained.iter().all(|&d| d == 10),
+                            "'{expression}' stopped adding at the wrong die: {roll:?}"
+                        );
+                        saw_chain |= !chained.is_empty();
+                    } else {
+                        assert!(chained.is_empty(), "'{expression}' adds once: {roll:?}");
+                    }
+                }
+                1 => {
+                    saw_failure = true;
+                    assert_eq!(roll.total, 1 - tail_sum, "'{expression}': {roll:?}");
+                    assert!(has_note("CRITICAL FAILURE"), "'{expression}': {roll:?}");
+                    assert!(
+                        output.contains(" - `["),
+                        "'{expression}' critical failure should subtract a group: {output}"
+                    );
+                    assert!(!tail.is_empty(), "a 1 subtracts a die: {roll:?}");
+                    if !chains {
+                        assert_eq!(tail.len(), 1, "'{expression}' subtracts once: {roll:?}");
+                    }
+                }
+                _ => {
+                    assert!(
+                        tail.is_empty(),
+                        "'{expression}' rolled extra dice: {roll:?}"
+                    );
+                    assert_eq!(roll.total, first, "'{expression}': {roll:?}");
+                    assert!(roll.notes.is_empty(), "'{expression}': {roll:?}");
+                }
             }
         }
 
         assert!(
-            saw_critical_failure,
-            "'{expression}' never rolled a critical failure in 500 attempts"
+            saw_success && saw_failure,
+            "400 seeds of '{expression}' should include both criticals"
+        );
+        assert_eq!(
+            saw_chain, chains,
+            "400 seeds of '{expression}' should show whether a 10 chains"
         );
     }
 }
@@ -1145,18 +1162,32 @@ fn test_wrath_glory_mechanics() {
 
 #[test]
 fn test_marvel_multiverse_mechanics() {
-    // Test Marvel Multiverse edge/trouble mechanics
-    let result = parse_and_roll("mm").unwrap();
-    assert_eq!(result.len(), 1);
-    assert!(result[0].total >= 3 && result[0].total <= 18); // 3d6 range
+    // Whatever the edges and troubles reroll, the total is the three final
+    // dice with the Marvel logo (shown as -1) counted as 6, and the logo shows
+    // exactly when the roll is Fantastic.
+    let mut saw_fantastic = false;
 
-    // Test with edges
-    let result = parse_and_roll("mm e").unwrap();
-    assert!(result[0].total >= 3 && result[0].total <= 18);
+    for expression in ["mm", "mm e", "mm t", "mm 2e", "mm 3t", "mm 2e 3t", "mm e t"] {
+        for roll in roll_across_seeds(expression, 60) {
+            let final_dice = &roll.dice_groups[1].rolls;
+            let shows_m = final_dice[1] == -1;
+            let sum: i32 = final_dice
+                .iter()
+                .map(|&d| if d == -1 { 6 } else { d })
+                .sum();
 
-    // Test with troubles
-    let result = parse_and_roll("mm t").unwrap();
-    assert!(result[0].total >= 3 && result[0].total <= 18);
+            assert_eq!(roll.total, sum, "'{expression}' final dice {final_dice:?}");
+            assert_eq!(
+                roll.notes.iter().any(|n| n.contains("Fantastic")),
+                shows_m,
+                "'{expression}' final dice {final_dice:?}: {:?}",
+                roll.notes
+            );
+            saw_fantastic |= shows_m;
+        }
+    }
+
+    assert!(saw_fantastic, "the sweep should include a Fantastic roll");
 }
 
 #[test]
@@ -1475,50 +1506,72 @@ fn test_no_math_on_dice_count_systems() {
 
 #[test]
 fn test_fudge_dice_mechanics() {
-    // Test Fudge dice symbols and ranges
-    let result = parse_and_roll("4df").unwrap();
-    assert_eq!(result.len(), 1);
+    // A fudge die is a d3 read as -, blank, +, so the total is the pluses
+    // minus the minuses.
+    for roll in roll_across_seeds("4df", 40) {
+        let expected: Vec<&str> = roll
+            .individual_rolls
+            .iter()
+            .map(|&die| match die {
+                1 => "-",
+                2 => " ",
+                3 => "+",
+                other => panic!("a fudge die rolled {other}"),
+            })
+            .collect();
+        let symbols = roll.fudge_symbols.as_ref().expect("fudge symbols");
+        assert_eq!(symbols, &expected, "4df rolled {:?}", roll.individual_rolls);
 
-    // Should have fudge symbols
-    assert!(result[0].fudge_symbols.is_some());
-
-    // Should be in valid range (-4 to +4 for 4dF)
-    assert!(result[0].total >= -4 && result[0].total <= 4);
-
-    let symbols = result[0].fudge_symbols.as_ref().unwrap();
-    assert_eq!(symbols.len(), 4);
-
-    // Each symbol should be +, -, or blank
-    for symbol in symbols {
-        assert!(symbol == "+" || symbol == "-" || symbol == " ");
+        let count = |face: i32| roll.individual_rolls.iter().filter(|&&d| d == face).count() as i32;
+        assert_eq!(roll.total, count(3) - count(1), "4df symbols {symbols:?}");
     }
 }
 
 #[test]
 fn test_godbound_damage_mechanics() {
-    // Test Godbound damage chart conversion
-    let result = parse_and_roll("gb").unwrap();
-    assert_eq!(result.len(), 1);
+    // `gb` reads the d20 off the damage chart (1-=0, 2-5=1, 6-9=2, 10+=4);
+    // `gbs` is straight damage, the roll itself.
+    let chart = |roll: i32| match roll {
+        ..=1 => 0,
+        2..=5 => 1,
+        6..=9 => 2,
+        _ => 4,
+    };
+    let mut chart_results = std::collections::BTreeSet::new();
 
-    // Should have godbound damage calculation
-    assert!(result[0].godbound_damage.is_some());
+    for roll in roll_across_seeds("gb", 200) {
+        let damage = chart(roll.total);
+        assert_eq!(
+            roll.godbound_damage,
+            Some(damage),
+            "gb rolled {}",
+            roll.total
+        );
+        assert!(
+            roll.notes
+                .contains(&format!("Damage chart: {} → {damage}", roll.total)),
+            "gb rolled {}: {:?}",
+            roll.total,
+            roll.notes
+        );
+        chart_results.insert(damage);
+    }
+    assert_eq!(
+        chart_results.into_iter().collect::<Vec<_>>(),
+        vec![0, 1, 2, 4],
+        "the sweep should reach every row of the chart"
+    );
 
-    // Should have damage chart note
-    let has_chart_note = result[0]
-        .notes
-        .iter()
-        .any(|note| note.contains("damage chart") || note.contains("Godbound"));
-    assert!(has_chart_note, "Should have Godbound damage chart note");
-
-    // Test straight damage
-    let result = parse_and_roll("gbs").unwrap();
-    assert!(result[0].godbound_damage.is_some());
-
-    let has_straight_note = result[0]
-        .notes
-        .iter()
-        .any(|note| note.contains("Straight damage"));
-    assert!(has_straight_note, "Should have straight damage note");
+    for roll in roll_across_seeds("gbs", 40) {
+        assert_eq!(roll.godbound_damage, Some(roll.total), "{:?}", roll.notes);
+        assert!(
+            roll.notes
+                .iter()
+                .any(|note| note.contains("Straight damage")),
+            "gbs should note straight damage: {:?}",
+            roll.notes
+        );
+    }
 }
 
 // ============================================================================
@@ -2112,29 +2165,50 @@ fn test_conan_without_target_number_counts_nothing() {
 #[test]
 fn test_conan_combat_dice_are_damage_not_successes() {
     // Combat dice deal damage. Damage must never be added to, or reported as,
-    // the success count of the d20s it accompanies.
-    let result = roll_one("conan2cd4 tn12", "combined attack");
-    let successes = result.successes.expect("a target number was given");
-    assert!(
-        (0..=4).contains(&successes),
-        "successes must come from 2d20 alone, got {successes}"
-    );
-    assert!(
-        result.notes.iter().any(|note| note.contains(" damage")),
-        "damage should be reported separately: {:?}",
-        result.notes
-    );
+    // the success count of the d20s it accompanies. A combat die deals
+    // 1=1, 2=2, 3-4=0, 5-6=1.
+    let damage = |dice: &[i32]| -> i32 {
+        dice.iter()
+            .map(|&die| match die {
+                1 | 5 | 6 => 1,
+                2 => 2,
+                _ => 0,
+            })
+            .sum()
+    };
 
-    let standalone = roll_one("cd4", "combat dice alone");
-    assert_eq!(
-        standalone.successes, None,
-        "combat dice alone are damage, not successes"
-    );
-    assert!(
-        (0..=8).contains(&standalone.total),
-        "4 combat dice deal 0-8 damage, got {}",
-        standalone.total
-    );
+    for result in roll_across_seeds("conan2cd4 tn12", 40) {
+        let d20s = &result.dice_groups[0].rolls;
+        let combat_dice = &result.dice_groups[1].rolls;
+        assert_eq!(
+            result.successes,
+            Some(d20s.iter().filter(|&&d| d <= 12).count() as i32),
+            "successes must come from the d20s {d20s:?} alone"
+        );
+
+        let expected = damage(combat_dice).to_string();
+        assert!(
+            result
+                .notes
+                .iter()
+                .any(|note| note.split_once(" damage").map(|(n, _)| n) == Some(&*expected)),
+            "{combat_dice:?} should be reported as {expected} damage: {:?}",
+            result.notes
+        );
+    }
+
+    for standalone in roll_across_seeds("cd4", 40) {
+        assert_eq!(
+            standalone.successes, None,
+            "combat dice alone are damage, not successes"
+        );
+        assert_eq!(
+            standalone.total,
+            damage(&standalone.individual_rolls),
+            "cd4 rolled {:?}",
+            standalone.individual_rolls
+        );
+    }
 }
 
 #[test]
@@ -2149,11 +2223,6 @@ fn test_complex_system_combinations() {
         ("bnw4 + 2", "BNW 4-die pool with modifier"),
         ("bnw5 - 1", "BNW 5-die pool with penalty"),
         ("bnw3 * 2", "BNW 3-die pool with multiplier"),
-        // Marvel Multiverse complex combinations
-        ("mm 2e", "Marvel with 2 edges"),
-        ("mm 3t", "Marvel with 3 troubles"),
-        ("mm 2e 3t", "Marvel with 2 edges and 3 troubles"),
-        ("mm e t", "Marvel with 1 edge and 1 trouble"),
         // Complex Cypher System tests
         ("cs 1 + 5", "Cypher level 1 with modifier"),
         ("cs 10 - 3", "Cypher level 10 with penalty"),
@@ -2188,13 +2257,6 @@ fn test_complex_system_combinations() {
                     expr
                 );
             }
-            expr if expr.contains("mm") => {
-                assert!(
-                    results[0].total >= 3 && results[0].total <= 18,
-                    "Marvel should have 3d6 range for '{}'",
-                    expr
-                );
-            }
             expr if expr.contains("cs") => {
                 // Cypher system should have appropriate notes
                 let has_cypher_note = results[0].notes.iter().any(|note| note.contains("Cypher"));
@@ -2210,528 +2272,116 @@ fn test_complex_system_combinations() {
 }
 
 #[test]
-fn test_storypath_system_comprehensive() {
-    // Test Storypath System (spX -> Xd10 t8 ie10)
-    let storypath_tests = vec![
-        // (alias, expected_dice_count, description)
-        ("sp3", 3, "Storypath 3 dice"),
-        ("sp4", 4, "Storypath 4 dice"),
-        ("sp5", 5, "Storypath 5 dice"),
-        ("sp6", 6, "Storypath 6 dice"),
-        ("sp8", 8, "Storypath 8 dice"),
-        ("sp10", 10, "Storypath 10 dice"),
-        ("sp12", 12, "Storypath 12 dice"),
-        ("sp4t7", 4, "Storypath 4 dice custom target 7"),
-        ("sp3t6", 3, "Storypath 3 dice custom target 6"),
-        ("sp5t9", 5, "Storypath 5 dice custom target 9"),
+fn test_success_pools_score_every_die() {
+    // Each die at or above the target is a success, and a die showing the
+    // double-success face scores a second one. An exploding die adds one more
+    // die per explosion face rolled, and that die scores and explodes too.
+    // (expression, base dice, target, explodes on, scores double on)
+    let pools = vec![
+        // Storypath: Xd10 t8 ie10
+        ("sp1", 1, 8, Some(10), None),
+        ("sp3", 3, 8, Some(10), None),
+        ("sp12", 12, 8, Some(10), None),
+        ("sp15", 15, 8, Some(10), None),
+        ("sp4t7", 4, 7, Some(10), None),
+        ("sp3t6", 3, 6, Some(10), None),
+        ("sp5t9", 5, 9, Some(10), None),
+        // Sunsails New Millennium: Xd6 ie6 t4
+        ("snm1", 1, 4, Some(6), None),
+        ("snm3", 3, 4, Some(6), None),
+        ("snm10", 10, 4, Some(6), None),
+        ("snm12", 12, 4, Some(6), None),
+        // Year Zero: Xd6 t6
+        ("1yz", 1, 6, None, None),
+        ("6yz", 6, 6, None, None),
+        ("15yz", 15, 6, None, None),
+        // Warhammer 40k / Age of Sigmar: XdY+ is Xd6 tY
+        ("1wh2+", 1, 2, None, None),
+        ("2wh3+", 2, 3, None, None),
+        ("6wh6+", 6, 6, None, None),
+        ("10wh4+", 10, 4, None, None),
+        ("12wh2+", 12, 2, None, None),
+        ("3wh1+", 3, 1, None, None),
+        // Exalted: Xd10 t7 t10, or a custom target with exXtY
+        ("ex1", 1, 7, None, Some(10)),
+        ("ex5", 5, 7, None, Some(10)),
+        ("ex15", 15, 7, None, Some(10)),
+        ("ex5t8", 5, 8, None, Some(10)),
+        ("ex3t6", 3, 6, None, Some(10)),
+        ("ex6t9", 6, 9, None, Some(10)),
+        ("ex12t5", 12, 5, None, Some(10)),
+        ("ex1t10", 1, 10, None, Some(10)),
+        ("ex20t4", 20, 4, None, Some(10)),
     ];
-
-    for (alias, expected_dice, description) in storypath_tests {
-        let roll = roll_one(alias, description);
-
-        // Should have success counting (target system)
-        assert!(
-            roll.successes.is_some(),
-            "Storypath should have success counting for '{}'",
-            alias
-        );
-
-        // Should have exploding dice (individual_rolls may be more than expected due to explosions)
-        assert!(
-            roll.individual_rolls.len() >= expected_dice,
-            "Should have at least {} dice for '{}', got {}",
-            expected_dice,
-            alias,
-            roll.individual_rolls.len()
-        );
-
-        // Success count should be reasonable (0 to dice count + explosions)
-        let success_count = roll.successes.unwrap();
-        assert!(
-            success_count >= 0 && success_count <= roll.individual_rolls.len() as i32,
-            "Success count {} should be reasonable for '{}' with {} dice",
-            success_count,
-            alias,
-            roll.individual_rolls.len()
-        );
-
-        // Should be using d10s (all rolls 1-10)
-        for &die_roll in &roll.individual_rolls {
-            assert!(
-                (1..=10).contains(&die_roll),
-                "Storypath should use d10s, got {} for '{}'",
-                die_roll,
-                alias
-            );
-        }
-    }
-
-    // Test Storypath with modifiers
-    let storypath_modifier_tests = vec!["sp4 + 2", "sp6 - 1", "sp5 * 2", "sp3 + 1d6", "sp4t7 + 2"];
-
-    for test in storypath_modifier_tests {
-        let result = parse_and_roll(test);
-        assert!(
-            result.is_ok(),
-            "Storypath modifier test '{}' should parse",
-            test
-        );
-    }
-
-    // Test edge cases
-    let storypath_edge_cases = vec![
-        ("sp1", 1, "Minimum Storypath dice"),
-        ("sp15", 15, "Large Storypath pool"),
-    ];
-
-    for (alias, expected_dice, description) in storypath_edge_cases {
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Storypath edge case '{}' should work: {}",
-            alias,
-            description
-        );
-
-        let results = result.unwrap();
-        let roll = &results[0];
-        assert!(
-            roll.individual_rolls.len() >= expected_dice,
-            "Should have at least {} dice for edge case '{}'",
-            expected_dice,
-            alias
-        );
-    }
-}
-
-#[test]
-fn test_double_digit_dice_comprehensive() {
-    // Test Double Digit Dice System (ddXY -> 1dX * 10 + 1dY)
-    let double_digit_tests = vec![
-        // (alias, tens_sides, ones_sides, description)
-        ("dd34", 3, 4, "d3 tens + d4 ones"),
-        ("dd26", 2, 6, "d2 tens + d6 ones"),
-        ("dd46", 4, 6, "d4 tens + d6 ones"),
-        ("dd66", 6, 6, "d6 tens + d6 ones (d66)"),
-        ("dd36", 3, 6, "d3 tens + d6 ones"),
-        ("dd23", 2, 3, "d2 tens + d3 ones"),
-        ("dd44", 4, 4, "d4 tens + d4 ones"),
-        ("dd88", 8, 8, "d8 tens + d8 ones"),
-    ];
-
-    for (alias, tens_sides, ones_sides, description) in double_digit_tests {
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Double digit '{}' should parse: {}",
-            alias,
-            description
-        );
-
-        let results = result.unwrap();
-        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
-
-        let roll = &results[0];
-
-        // Should have exactly 2 dice (tens and ones)
-        assert_eq!(
-            roll.individual_rolls.len(),
-            2,
-            "Double digit should have exactly 2 dice for '{}'",
-            alias
-        );
-
-        // Should not have success counting (it's a total-based system)
-        assert!(
-            roll.successes.is_none(),
-            "Double digit should not have success counting for '{}'",
-            alias
-        );
-
-        // Calculate expected range
-        let min_total = 10 + 1; // Minimum: 1 on tens die * 10 + 1 on ones die
-        let max_total = tens_sides * 10 + ones_sides; // Maximum possible
-
-        assert!(
-            roll.total >= min_total && roll.total <= max_total,
-            "Double digit total {} should be between {} and {} for '{}': {}",
-            roll.total,
-            min_total,
-            max_total,
-            alias,
-            description
-        );
-
-        // Validate individual dice are in correct ranges
-        // Note: We can't easily separate tens vs ones dice from individual_rolls
-        // but we can verify they're all in reasonable ranges
-        for &die_roll in &roll.individual_rolls {
-            assert!(
-                (1..=8).contains(&die_roll), // Max of our test cases
-                "Double digit die roll {} should be reasonable for '{}'",
-                die_roll,
-                alias
-            );
-        }
-    }
-
-    // Test double digit with modifiers
-    let double_digit_modifier_tests = vec!["dd34 + 5", "dd66 - 10", "dd26 * 2", "dd46 / 2"];
-
-    for test in double_digit_modifier_tests {
-        let result = parse_and_roll(test);
-        assert!(
-            result.is_ok(),
-            "Double digit modifier test '{}' should parse",
-            test
-        );
-    }
-
-    // Test mathematical validation for specific cases
-    let dd34_result = parse_and_roll("dd34").unwrap();
-    let dd34_roll = &dd34_result[0];
-    // dd34 should be between 11 (1*10+1) and 34 (3*10+4)
-    assert!(
-        dd34_roll.total >= 11 && dd34_roll.total <= 34,
-        "dd34 should be between 11-34, got {}",
-        dd34_roll.total
-    );
-
-    let dd66_result = parse_and_roll("dd66").unwrap();
-    let dd66_roll = &dd66_result[0];
-    // dd66 should be between 11 (1*10+1) and 66 (6*10+6)
-    assert!(
-        dd66_roll.total >= 11 && dd66_roll.total <= 66,
-        "dd66 should be between 11-66, got {}",
-        dd66_roll.total
-    );
-}
-
-#[test]
-fn test_sunsails_new_millennium_comprehensive() {
-    // Test Sunsails New Millennium (snmX -> Xd6 ie6 t4)
-    let snm_tests = vec![
-        // (alias, expected_dice_count, description)
-        ("snm3", 3, "SNM 3 dice"),
-        ("snm4", 4, "SNM 4 dice"),
-        ("snm5", 5, "SNM 5 dice"),
-        ("snm6", 6, "SNM 6 dice"),
-        ("snm8", 8, "SNM 8 dice"),
-        ("snm10", 10, "SNM 10 dice"),
-    ];
-
-    for (alias, expected_dice, description) in snm_tests {
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "SNM '{}' should parse: {}",
-            alias,
-            description
-        );
-
-        let results = result.unwrap();
-        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
-
-        let roll = &results[0];
-
-        // Should have success counting (target 4+)
-        assert!(
-            roll.successes.is_some(),
-            "SNM should have success counting for '{}'",
-            alias
-        );
-
-        // Should have exploding dice (ie6), so may have more than expected dice
-        assert!(
-            roll.individual_rolls.len() >= expected_dice,
-            "Should have at least {} dice for '{}', got {} (explosions expected)",
-            expected_dice,
-            alias,
-            roll.individual_rolls.len()
-        );
-
-        // Success count should be reasonable
-        let success_count = roll.successes.unwrap();
-        assert!(
-            success_count >= 0 && success_count <= roll.individual_rolls.len() as i32,
-            "Success count {} should be reasonable for '{}' with {} dice",
-            success_count,
-            alias,
-            roll.individual_rolls.len()
-        );
-
-        // Should be using d6s (all rolls 1-6)
-        for &die_roll in &roll.individual_rolls {
-            assert!(
-                (1..=6).contains(&die_roll),
-                "SNM should use d6s, got {} for '{}'",
-                die_roll,
-                alias
-            );
-        }
-
-        // Should have notes about explosions if any 6s were rolled
-        let has_sixes = roll.individual_rolls.contains(&6);
-        if has_sixes && roll.individual_rolls.len() > expected_dice {
-            let has_explosion_note = roll
-                .notes
-                .iter()
-                .any(|note| note.contains("exploded") || note.contains("explosion"));
-            assert!(
-                has_explosion_note,
-                "Should have explosion note for '{}' when 6s are rolled",
-                alias
-            );
-        }
-    }
-
-    // Test SNM with modifiers
-    let snm_modifier_tests = vec!["snm5 + 2", "snm3 - 1", "snm4 * 2", "snm6 + 1d4"];
-
-    for test in snm_modifier_tests {
-        let result = parse_and_roll(test);
-        assert!(result.is_ok(), "SNM modifier test '{}' should parse", test);
-    }
-
-    // Test edge cases
-    let snm_edge_cases = vec![
-        ("snm1", 1, "Minimum SNM dice"),
-        ("snm12", 12, "Large SNM pool"),
-    ];
-
-    for (alias, _expected_dice, description) in snm_edge_cases {
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "SNM edge case '{}' should work: {}",
-            alias,
-            description
-        );
-    }
-}
-
-#[test]
-fn test_year_zero_engine_comprehensive() {
-    // Test Year Zero Engine (XYZ -> Xd6 t6)
-    let year_zero_tests = vec![
-        // (alias, expected_dice_count, description)
-        ("3yz", 3, "Year Zero 3 dice"),
-        ("4yz", 4, "Year Zero 4 dice"),
-        ("5yz", 5, "Year Zero 5 dice"),
-        ("6yz", 6, "Year Zero 6 dice"),
-        ("8yz", 8, "Year Zero 8 dice"),
-        ("10yz", 10, "Year Zero 10 dice"),
-        ("12yz", 12, "Year Zero 12 dice"),
-    ];
-
-    for (alias, expected_dice, description) in year_zero_tests {
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Year Zero '{}' should parse: {}",
-            alias,
-            description
-        );
-
-        let results = result.unwrap();
-        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
-
-        let roll = &results[0];
-
-        // Should have success counting (target 6)
-        assert!(
-            roll.successes.is_some(),
-            "Year Zero should have success counting for '{}'",
-            alias
-        );
-
-        // Should have exactly the expected number of dice (no exploding in basic YZ)
-        assert_eq!(
-            roll.individual_rolls.len(),
-            expected_dice,
-            "Should have exactly {} dice for '{}'",
-            expected_dice,
-            alias
-        );
-
-        // Success count should be reasonable (number of 6s)
-        let success_count = roll.successes.unwrap();
-        let actual_sixes = roll.individual_rolls.iter().filter(|&&r| r == 6).count();
-        assert_eq!(
-            success_count, actual_sixes as i32,
-            "Success count should equal number of 6s for '{}': {} vs {}",
-            alias, success_count, actual_sixes
-        );
-
-        // Should be using d6s (all rolls 1-6)
-        for &die_roll in &roll.individual_rolls {
-            assert!(
-                (1..=6).contains(&die_roll),
-                "Year Zero should use d6s, got {} for '{}'",
-                die_roll,
-                alias
-            );
-        }
-    }
-
-    // Test Year Zero with modifiers
-    let yz_modifier_tests = vec!["6yz + 2", "4yz - 1", "5yz * 2", "8yz + 1d6"];
-
-    for test in yz_modifier_tests {
-        let result = parse_and_roll(test);
-        assert!(
-            result.is_ok(),
-            "Year Zero modifier test '{}' should parse",
-            test
-        );
-    }
-
-    // Test edge cases
-    let yz_edge_cases = vec![
-        ("1yz", 1, "Minimum Year Zero dice"),
-        ("15yz", 15, "Large Year Zero pool"),
-    ];
-
-    for (alias, expected_dice, description) in yz_edge_cases {
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Year Zero edge case '{}' should work: {}",
-            alias,
-            description
-        );
-
-        let results = result.unwrap();
-        let roll = &results[0];
-        assert_eq!(
-            roll.individual_rolls.len(),
-            expected_dice,
-            "Should have exactly {} dice for edge case '{}'",
-            expected_dice,
-            alias
-        );
-    }
-}
-
-#[test]
-fn test_warhammer_40k_aos_comprehensive() {
-    // Test Warhammer 40k/Age of Sigmar (XwhY+ -> Xd6 tY)
-    let warhammer_tests = vec![
-        // (alias, expected_dice, target, description)
-        ("2wh3+", 2, 3, "2d6 target 3+"),
-        ("3wh4+", 3, 4, "3d6 target 4+"),
-        ("4wh2+", 4, 2, "4d6 target 2+"),
-        ("5wh5+", 5, 5, "5d6 target 5+"),
-        ("6wh6+", 6, 6, "6d6 target 6+"),
-        ("8wh3+", 8, 3, "8d6 target 3+"),
-        ("10wh4+", 10, 4, "10d6 target 4+"),
-        ("1wh2+", 1, 2, "1d6 target 2+"),
-    ];
-
-    for (alias, expected_dice, target, description) in warhammer_tests {
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Warhammer '{}' should parse: {}",
-            alias,
-            description
-        );
-
-        let results = result.unwrap();
-        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
-
-        let roll = &results[0];
-
-        // Should have success counting
-        assert!(
-            roll.successes.is_some(),
-            "Warhammer should have success counting for '{}'",
-            alias
-        );
-
-        // Should have exactly the expected number of dice
-        assert_eq!(
-            roll.individual_rolls.len(),
-            expected_dice,
-            "Should have exactly {} dice for '{}'",
-            expected_dice,
-            alias
-        );
-
-        // Success count should match number of dice >= target
-        let success_count = roll.successes.unwrap();
-        let actual_successes = roll
-            .individual_rolls
-            .iter()
-            .filter(|&&r| r >= target)
-            .count();
-        assert_eq!(
-            success_count, actual_successes as i32,
-            "Success count should equal dice >= {} for '{}': {} vs {}",
-            target, alias, success_count, actual_successes
-        );
-
-        // Should be using d6s (all rolls 1-6)
-        for &die_roll in &roll.individual_rolls {
-            assert!(
-                (1..=6).contains(&die_roll),
-                "Warhammer should use d6s, got {} for '{}'",
-                die_roll,
-                alias
-            );
-        }
-
-        // Success count should be reasonable (0 to dice count)
-        assert!(
-            success_count >= 0 && success_count <= expected_dice as i32,
-            "Success count {} should be 0-{} for '{}'",
-            success_count,
-            expected_dice,
-            alias
-        );
-    }
-
-    // Test edge cases and target variations
-    let warhammer_edge_cases = vec![
-        ("1wh6+", 1, 6, "Single die, hard target"),
-        ("12wh2+", 12, 2, "Many dice, easy target"),
-        ("3wh1+", 3, 1, "Impossible to fail (1+ target)"),
-    ];
-
-    for (alias, expected_dice, target, description) in warhammer_edge_cases {
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Warhammer edge case '{}' should work: {}",
-            alias,
-            description
-        );
-
-        let results = result.unwrap();
-        let roll = &results[0];
-
-        // Validate success logic for edge cases
-        let success_count = roll.successes.unwrap();
-        let actual_successes = roll
-            .individual_rolls
-            .iter()
-            .filter(|&&r| r >= target)
-            .count();
-
-        assert_eq!(
-            success_count, actual_successes as i32,
-            "Edge case '{}' success count should be correct",
-            alias
-        );
-
-        // Special case: 1+ target should always succeed on d6
-        if target == 1 {
+    let (mut saw_explosion, mut saw_double) = (false, false);
+
+    for (expression, base_dice, target, explodes_on, doubles_on) in pools {
+        for roll in roll_across_seeds(expression, 30) {
+            let dice = &roll.individual_rolls;
+            let showing = |face: Option<i32>| {
+                face.map_or(0, |face| dice.iter().filter(|&&d| d == face).count())
+            };
+
+            let explosions = showing(explodes_on);
             assert_eq!(
-                success_count, expected_dice,
-                "1+ target should always succeed all dice for '{}'",
-                alias
+                dice.len(),
+                base_dice + explosions,
+                "'{expression}' should roll {base_dice} dice plus one per explosion: {dice:?}"
             );
+
+            let hits = dice.iter().filter(|&&d| d >= target).count();
+            let doubles = showing(doubles_on);
+            assert_eq!(
+                roll.successes,
+                Some((hits + doubles) as i32),
+                "'{expression}' scored {dice:?} against {target}+"
+            );
+
+            saw_explosion |= explosions > 0;
+            saw_double |= doubles > 0;
         }
+    }
+
+    assert!(saw_explosion, "the sweep should include an explosion");
+    assert!(saw_double, "the sweep should include a double success");
+}
+
+#[test]
+fn test_double_digit_dice() {
+    // ddXY is 1dX * 10 + 1dY: the first die gives the tens and the second the
+    // ones, and every face of each comes up.
+    for (alias, tens_sides, ones_sides) in [
+        ("dd23", 2, 3),
+        ("dd34", 3, 4),
+        ("dd66", 6, 6),
+        ("dd88", 8, 8),
+    ] {
+        let mut tens_seen = std::collections::BTreeSet::new();
+        let mut ones_seen = std::collections::BTreeSet::new();
+
+        for roll in roll_across_seeds(alias, 100) {
+            let tens = roll.dice_groups[0].rolls[0];
+            let ones = roll.dice_groups[1].rolls[0];
+            assert_eq!(
+                roll.total,
+                tens * 10 + ones,
+                "'{alias}' rolled {tens} and {ones}"
+            );
+            assert!(roll.successes.is_none(), "'{alias}' is a total, not a pool");
+            tens_seen.insert(tens);
+            ones_seen.insert(ones);
+        }
+
+        assert_eq!(
+            tens_seen.into_iter().collect::<Vec<_>>(),
+            (1..=tens_sides).collect::<Vec<_>>(),
+            "'{alias}' tens die faces"
+        );
+        assert_eq!(
+            ones_seen.into_iter().collect::<Vec<_>>(),
+            (1..=ones_sides).collect::<Vec<_>>(),
+            "'{alias}' ones die faces"
+        );
     }
 }
 
@@ -2766,142 +2416,6 @@ fn test_missing_systems_alias_expansion() {
 
     for (alias, expected_expansion) in alias_expansion_tests {
         assert_alias_matches_expansion(alias, expected_expansion);
-    }
-}
-
-#[test]
-fn test_exalted_system_comprehensive() {
-    // Test Exalted system (exX -> Xd10 t7 t10, exXtY -> Xd10 tY t10)
-    let exalted_tests = vec![
-        // (alias, expected_dice_count, expected_target, description)
-        ("ex5", 5, 7, "Exalted 5d10 t7 t10"),
-        ("ex5t8", 5, 8, "Exalted 5d10 t8 t10"),
-        ("ex10", 10, 7, "Exalted 10d10 t7 t10"),
-        ("ex3t6", 3, 6, "Exalted 3d10 t6 t10"),
-        ("ex8", 8, 7, "Exalted 8d10 t7 t10"),
-        ("ex6t9", 6, 9, "Exalted 6d10 t9 t10"),
-        ("ex12t5", 12, 5, "Exalted 12d10 t5 t10"),
-    ];
-
-    for (alias, expected_dice, expected_target, description) in exalted_tests {
-        let roll = roll_one(alias, description);
-
-        // Should have success counting (target system)
-        assert!(
-            roll.successes.is_some(),
-            "Exalted should have success counting for '{}'",
-            alias
-        );
-
-        // Should have exactly the expected number of dice
-        assert_eq!(
-            roll.individual_rolls.len(),
-            expected_dice,
-            "Should have exactly {} dice for '{}'",
-            expected_dice,
-            alias
-        );
-
-        // Should be using d10s (all rolls 1-10)
-        for &die_roll in &roll.individual_rolls {
-            assert!(
-                (1..=10).contains(&die_roll),
-                "Exalted should use d10s, got {} for '{}'",
-                die_roll,
-                alias
-            );
-        }
-
-        // Verify success counting logic for Exalted (7+ = 1 success, 10 = 2 successes)
-        let success_count = roll.successes.unwrap();
-        let manual_count = roll
-            .individual_rolls
-            .iter()
-            .map(|&r| {
-                if r >= expected_target && r < 10 {
-                    1 // Single success for target+ but less than 10
-                } else if r == 10 {
-                    2 // Double success for 10s
-                } else {
-                    0 // No success
-                }
-            })
-            .sum::<i32>();
-
-        assert_eq!(
-            success_count, manual_count,
-            "Success count should match Exalted rules for '{}': {} vs {} (dice: {:?})",
-            alias, success_count, manual_count, roll.individual_rolls
-        );
-
-        // Should be reasonable success count (0 to 2 * dice count)
-        assert!(
-            success_count >= 0 && success_count <= (expected_dice as i32 * 2),
-            "Success count {} should be 0-{} for '{}'",
-            success_count,
-            expected_dice * 2,
-            alias
-        );
-    }
-
-    // Test Exalted with modifiers
-    let exalted_modifier_tests = vec!["ex5 + 2", "ex8 - 1", "ex6 * 2", "ex4 + 1d6"];
-
-    for test in exalted_modifier_tests {
-        let result = parse_and_roll(test);
-        assert!(
-            result.is_ok(),
-            "Exalted modifier test '{}' should parse",
-            test
-        );
-    }
-
-    // Test edge cases
-    let exalted_edge_cases = vec![
-        ("ex1", 1, 7, "Minimum Exalted dice"),
-        ("ex15", 15, 7, "Large Exalted pool"),
-        ("ex1t10", 1, 10, "Single die, hard target"),
-        ("ex20t4", 20, 4, "Many dice, easy target"),
-    ];
-
-    for (alias, expected_dice, expected_target, description) in exalted_edge_cases {
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Exalted edge case '{}' should work: {}",
-            alias,
-            description
-        );
-
-        let results = result.unwrap();
-        let roll = &results[0];
-        assert_eq!(
-            roll.individual_rolls.len(),
-            expected_dice,
-            "Should have exactly {} dice for edge case '{}'",
-            expected_dice,
-            alias
-        );
-
-        // Verify double 10s rule still applies
-        if roll.individual_rolls.contains(&10) {
-            let tens_count = roll.individual_rolls.iter().filter(|&&r| r == 10).count();
-            let other_successes = roll
-                .individual_rolls
-                .iter()
-                .filter(|&&r| r >= expected_target && r < 10)
-                .count();
-            let expected_successes = (tens_count * 2) + other_successes;
-
-            assert_eq!(
-                roll.successes.unwrap() as usize,
-                expected_successes,
-                "10s should count double for '{}': expected {}, got {}",
-                alias,
-                expected_successes,
-                roll.successes.unwrap()
-            );
-        }
     }
 }
 
@@ -3076,113 +2590,123 @@ fn test_wrath_glory_special_modes_with_roll_sets() {
 
 #[test]
 fn test_percentile_with_roll_sets() {
-    // Test percentile advantage/disadvantage with roll sets
+    // `+d%` rolls two tens dice and keeps the lower, `-d%` keeps the higher;
+    // the ones die and any math follow. Every set rolls its own percentile.
+    // (expression, keeps the lower tens die, math after the roll)
     let percentile_roll_sets = vec![
-        ("3 +d%", "Advantage roll sets"),
-        ("2 -d%", "Disadvantage roll sets"),
-        ("4 +d% + 10", "Advantage sets with modifier"),
-        ("3 -d% - 5", "Disadvantage sets with penalty"),
+        ("3 +d%", true, 0),
+        ("2 -d%", false, 0),
+        ("4 +d% + 10", true, 10),
+        ("3 -d% - 5", false, -5),
     ];
 
-    for (expression, description) in percentile_roll_sets {
-        for roll in assert_labelled_roll_sets(expression, description) {
-            // Each roll should have percentile-like results
-            assert!(
-                (1..=200).contains(&roll.total), // Allowing for modifiers
-                "Percentile set total {} should be reasonable for '{}'",
-                roll.total,
-                expression
-            );
+    for (expression, keeps_lower, math) in percentile_roll_sets {
+        assert_labelled_roll_sets(expression, "percentile roll sets");
+
+        for seed in 0..20 {
+            let sets = parse_and_roll_with_rng(expression, &mut create_seeded_rng(seed))
+                .unwrap_or_else(|e| panic!("'{expression}' should roll: {e}"));
+            for set in sets {
+                let tens_dice = &set.dice_groups[0].rolls;
+                let tens = if keeps_lower {
+                    tens_dice.iter().min()
+                } else {
+                    tens_dice.iter().max()
+                }
+                .expect("two tens dice");
+                let ones = set.dice_groups[1].rolls[0];
+                let percentile = tens * 10 + ones - 10;
+
+                assert!(
+                    (1..=100).contains(&percentile),
+                    "'{expression}' read {tens_dice:?} and {ones} as {percentile}"
+                );
+                assert_eq!(
+                    set.total,
+                    percentile + math,
+                    "'{expression}' at seed {seed}: tens {tens_dice:?}, ones {ones}"
+                );
+            }
         }
     }
 }
 
 #[test]
-fn test_vtm5_system_comprehensive() {
-    // Test VTM5 (Vampire: The Masquerade 5th Edition) system
+fn test_vtm5_scores_every_die() {
+    // Every die at 6+ is a success, and each pair of 10s adds two more: a
+    // critical. The hunger dice are the last ones rolled, in their own group.
+    // A critical with a 10 on a hunger die is messy, and no successes with a 1
+    // on a hunger die is a bestial failure.
+    // (alias, pool, hunger)
     let vtm5_tests = vec![
-        // (alias, expected_pool, expected_hunger, description)
-        ("vtm3h1", 3, 1, "VTM5 3 dice pool, 1 hunger"),
-        ("vtm7h2", 7, 2, "VTM5 7 dice pool, 2 hunger"),
-        ("vtm5h0", 5, 0, "VTM5 5 dice pool, no hunger"),
-        ("vtm10h3", 10, 3, "VTM5 10 dice pool, 3 hunger"),
-        ("vtm1h1", 1, 1, "VTM5 minimum pool, all hunger"),
-        ("vtm8h5", 8, 5, "VTM5 8 dice pool, max hunger"),
+        ("vtm3h1", 3, 1),
+        ("vtm7h2", 7, 2),
+        ("vtm5h0", 5, 0),
+        ("vtm10h3", 10, 3),
+        ("vtm1h1", 1, 1),
+        ("vtm8h5", 8, 5),
     ];
+    let outcome_notes = [
+        "**MESSY CRITICAL**",
+        "**CRITICAL SUCCESS**",
+        "**BESTIAL FAILURE**",
+        "**FAILURE**",
+    ];
+    let mut outcomes_seen = std::collections::BTreeSet::new();
 
-    for (alias, expected_pool, expected_hunger, description) in vtm5_tests {
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "VTM5 test '{}' should work: {}",
-            alias,
-            description
-        );
+    for (alias, pool, hunger) in vtm5_tests {
+        for roll in roll_across_seeds(alias, 60) {
+            let dice = &roll.individual_rolls;
+            assert_eq!(dice.len(), pool, "'{alias}' pool: {dice:?}");
 
-        let results = result.unwrap();
-        let roll = &results[0];
+            // Each group displays sorted; the dice keep the order they were rolled
+            let (regular, hunger_dice) = dice.split_at(pool - hunger);
+            let sorted = |dice: &[i32]| {
+                let mut dice = dice.to_vec();
+                dice.sort_unstable();
+                dice
+            };
+            let groups: Vec<Vec<i32>> = roll.dice_groups.iter().map(|g| sorted(&g.rolls)).collect();
+            let expected_groups: Vec<Vec<i32>> = [regular, hunger_dice]
+                .into_iter()
+                .filter(|part| !part.is_empty())
+                .map(sorted)
+                .collect();
+            assert_eq!(groups, expected_groups, "'{alias}' dice groups");
 
-        // Should have correct total dice count
-        assert_eq!(
-            roll.individual_rolls.len(),
-            expected_pool as usize,
-            "Should have {} total dice for '{}': {}",
-            expected_pool,
-            alias,
-            description
-        );
+            let tens = dice.iter().filter(|&&d| d == 10).count();
+            let successes = (dice.iter().filter(|&&d| d >= 6).count() + tens / 2 * 2) as i32;
+            assert_eq!(roll.successes, Some(successes), "'{alias}' rolled {dice:?}");
+            assert_eq!(roll.total, successes, "'{alias}' total is the successes");
 
-        // Should have success counting enabled
-        assert!(
-            roll.successes.is_some(),
-            "VTM5 should have success counting for '{}': {}",
-            alias,
-            description
-        );
-
-        // Success count should be reasonable (0 to pool size * 2 max for crits)
-        let success_count = roll.successes.unwrap();
-        assert!(
-            success_count >= 0 && success_count <= (expected_pool * 2),
-            "Success count {} should be 0-{} for '{}': {}",
-            success_count,
-            expected_pool * 2,
-            alias,
-            description
-        );
-
-        // Should have appropriate dice groups
-        let regular_dice_count = expected_pool - expected_hunger;
-        if expected_hunger > 0 && regular_dice_count > 0 {
-            assert!(
-                roll.dice_groups.len() == 2,
-                "Should have regular and hunger dice groups for '{}': {}",
-                alias,
-                description
-            );
-        } else {
-            assert!(
-                roll.dice_groups.len() == 1,
-                "Should have single dice group for '{}': {} (regular: {}, hunger: {})",
-                alias,
-                description,
-                regular_dice_count,
-                expected_hunger
-            );
+            let expected = if tens >= 2 && hunger_dice.contains(&10) {
+                Some("**MESSY CRITICAL**")
+            } else if tens >= 2 {
+                Some("**CRITICAL SUCCESS**")
+            } else if successes == 0 && hunger_dice.contains(&1) {
+                Some("**BESTIAL FAILURE**")
+            } else if successes == 0 {
+                Some("**FAILURE**")
+            } else {
+                None
+            };
+            for note in outcome_notes {
+                assert_eq!(
+                    roll.notes.iter().any(|n| n.starts_with(note)),
+                    expected == Some(note),
+                    "'{alias}' rolled {regular:?} + hunger {hunger_dice:?}: {:?}",
+                    roll.notes
+                );
+            }
+            outcomes_seen.insert(expected);
         }
-
-        // Check for result type notes (probabilistic, so we don't assert on presence)
-        let _has_result_note = roll.notes.iter().any(|note| {
-            note.contains("CRITICAL")
-                || note.contains("MESSY")
-                || note.contains("BESTIAL")
-                || note.contains("FAILURE")
-                || note.contains("pairs of 10s")
-        });
-
-        // Note: Not every roll will have special results, so we just check the structure is right
-        // The presence of notes depends on the random roll results
     }
+
+    assert_eq!(
+        outcomes_seen.len(),
+        outcome_notes.len() + 1,
+        "the sweep should reach every outcome and a plain success: {outcomes_seen:?}"
+    );
 }
 
 #[test]
@@ -3242,36 +2766,6 @@ fn test_vtm5_invalid_cases() {
 }
 
 #[test]
-fn test_vtm5_mechanics_simulation() {
-    // Test to verify VTM5 mechanics work as expected
-    // Note: This is probabilistic, so we test structure rather than exact outcomes
-
-    let result = parse_and_roll("vtm10h3").unwrap();
-    let roll = &result[0];
-
-    // Should have exactly 10 dice
-    assert_eq!(roll.individual_rolls.len(), 10);
-
-    // Should have success counting
-    assert!(roll.successes.is_some());
-
-    // All dice should be d10s (1-10 range)
-    for &die_roll in &roll.individual_rolls {
-        assert!(
-            (1..=10).contains(&die_roll),
-            "VTM5 should use d10s, got {}",
-            die_roll
-        );
-    }
-
-    // Should have appropriate dice groups
-    assert!(!roll.dice_groups.is_empty() && roll.dice_groups.len() <= 2);
-
-    // Total successes should equal success count
-    assert_eq!(roll.total, roll.successes.unwrap());
-}
-
-#[test]
 fn test_lasers_feelings_alias_expansion() {
     // Test alias expansion for Lasers & Feelings
     let lf_alias_tests = vec![
@@ -3297,63 +2791,62 @@ fn test_lasers_feelings_alias_expansion() {
 
 #[test]
 fn test_lasers_feelings_mechanics() {
-    // Test Lasers & Feelings basic mechanics
+    // Lasers succeeds on a die at or under the number, Feelings at or over it;
+    // the total stays 0. A die showing the number exactly is LASER FEELINGS,
+    // and the note counts them. (expression, dice, number, rolling Lasers)
     let lf_tests = vec![
-        ("2lf4l", "Explicit Lasers"),
-        ("2lf4f", "Explicit Feelings"),
-        ("3lf3l", "3 dice Lasers"),
-        ("3lf3f", "3 dice Feelings"),
-        ("1lf2l", "Single die Lasers"),
-        ("1lf5f", "Single die Feelings"),
+        ("2lf4", 2, 4, true),
+        ("2lf4l", 2, 4, true),
+        ("2lf4f", 2, 4, false),
+        ("3lf3l", 3, 3, true),
+        ("3lf3f", 3, 3, false),
+        ("1lf2l", 1, 2, true),
+        ("1lf5f", 1, 5, false),
     ];
+    let mut saw_laser_feelings = false;
 
-    for (expression, description) in lf_tests {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Lasers & Feelings '{}' should work: {}",
-            expression,
-            description
-        );
+    for (expression, dice_count, number, lasers) in lf_tests {
+        let roll_type = if lasers { "Lasers" } else { "Feelings" };
 
-        let results = result.unwrap();
-        assert_eq!(results.len(), 1);
+        for roll in roll_across_seeds(expression, 40) {
+            let dice = &roll.individual_rolls;
+            assert_eq!(dice.len(), dice_count, "'{expression}': {dice:?}");
 
-        let roll = &results[0];
+            let successes = dice
+                .iter()
+                .filter(|&&d| if lasers { d <= number } else { d >= number })
+                .count() as i32;
+            assert_eq!(
+                roll.successes,
+                Some(successes),
+                "'{expression}' rolled {dice:?}"
+            );
+            assert_eq!(roll.total, 0, "'{expression}' counts successes only");
+            assert!(
+                roll.notes.contains(&format!(
+                    "Lasers & Feelings: {dice_count}d6 target {number} ({roll_type})"
+                )),
+                "'{expression}': {:?}",
+                roll.notes
+            );
 
-        // Should have success counting
-        assert!(
-            roll.successes.is_some(),
-            "Lasers & Feelings should have success counting for '{}'",
-            expression
-        );
-
-        // Should have descriptive notes
-        let has_lf_note = roll
-            .notes
-            .iter()
-            .any(|note| note.contains("Lasers & Feelings"));
-        assert!(
-            has_lf_note,
-            "Should have Lasers & Feelings note for '{}'",
-            expression
-        );
-
-        // Should use d6s only
-        let all_d6 = roll.individual_rolls.iter().all(|&r| (1..=6).contains(&r));
-        assert!(
-            all_d6,
-            "Lasers & Feelings should only use d6s for '{}'",
-            expression
-        );
-
-        // Total should be 0 (success-counting system)
-        assert_eq!(
-            roll.total, 0,
-            "Lasers & Feelings should have total=0 (success counting) for '{}'",
-            expression
-        );
+            let exact = dice.iter().filter(|&&d| d == number).count();
+            assert_eq!(
+                roll.notes
+                    .iter()
+                    .any(|n| n.contains(&format!("**{exact}** LASER FEELINGS"))),
+                exact > 0,
+                "'{expression}' rolled {dice:?}: {:?}",
+                roll.notes
+            );
+            saw_laser_feelings |= exact > 0;
+        }
     }
+
+    assert!(
+        saw_laser_feelings,
+        "the sweep should include a LASER FEELINGS"
+    );
 }
 
 #[test]
@@ -3419,34 +2912,6 @@ fn test_lasers_feelings_with_roll_sets() {
                 .any(|note| note.contains("Lasers & Feelings"));
             assert!(has_lf_note, "Each set should have Lasers & Feelings note");
         }
-    }
-}
-
-#[test]
-fn test_lasers_feelings_success_counting() {
-    // Test success counting logic with controlled results
-    // We can't control randomness directly, but we can verify the system works
-
-    for _ in 0..10 {
-        let result = parse_and_roll("2lf4l").unwrap(); // Lasers
-        let successes = result[0].successes.unwrap();
-
-        // Success count should be reasonable (0-2 for 2 dice)
-        assert!(
-            (0..=2).contains(&successes),
-            "Lasers success count should be 0-2, got {}",
-            successes
-        );
-
-        let result = parse_and_roll("2lf4f").unwrap(); // Feelings
-        let successes = result[0].successes.unwrap();
-
-        // Success count should be reasonable (0-2 for 2 dice)
-        assert!(
-            (0..=2).contains(&successes),
-            "Feelings success count should be 0-2, got {}",
-            successes
-        );
     }
 }
 
@@ -3826,177 +3291,97 @@ fn test_fitd_parameterized_expansion() {
 }
 
 #[test]
-fn test_fitd_basic_mechanics() {
-    // Test that FitD rolls work end-to-end
-    let fitd_tests = vec!["fitd1", "fitd2", "fitd3", "fitd4", "fitd5", "fitd6"];
+fn test_fitd_outcomes() {
+    // A pool reads its highest die: 1-3 a failure, 4-5 a partial success, 6 a
+    // success, and two or more 6s a critical. Zero dice rolls 2d6 and reads the
+    // lowest, which cannot crit. Only a critical or a zero-dice roll carries a
+    // note, and the output names the outcome and the die it was read from.
+    let mut outcomes_seen = std::collections::BTreeSet::new();
 
-    for test in fitd_tests {
-        let result = parse_and_roll(test);
-        assert!(
-            result.is_ok(),
-            "FitD test '{}' should parse and roll successfully",
-            test
-        );
+    for (expression, dice) in [
+        ("fitd0", 2),
+        ("fitd1", 1),
+        ("fitd2", 2),
+        ("fitd4", 4),
+        ("fitd6", 6),
+    ] {
+        let zero_dice = expression == "fitd0";
 
-        let results = result.unwrap();
-        assert_eq!(
-            results.len(),
-            1,
-            "Should have exactly one result for '{}'",
-            test
-        );
+        for roll in roll_across_seeds(expression, 200) {
+            let rolled = &roll.kept_rolls;
+            assert_eq!(rolled.len(), dice, "'{expression}' rolled {rolled:?}");
 
-        let roll = &results[0];
-
-        // Should have FitD outcome
-        assert!(
-            roll.fitd_outcome.is_some(),
-            "FitD roll '{}' should have outcome",
-            test
-        );
-
-        // Should have FitD result description
-        assert!(
-            roll.fitd_result.is_some(),
-            "FitD roll '{}' should have result description",
-            test
-        );
-
-        // Should have highest die recorded
-        assert!(
-            roll.fitd_highest_die.is_some(),
-            "FitD roll '{}' should record highest die",
-            test
-        );
-
-        let highest_die = roll.fitd_highest_die.unwrap();
-        assert!(
-            (1..=6).contains(&highest_die),
-            "Highest die should be 1-6, got {} for '{}'",
-            highest_die,
-            test
-        );
-
-        // Check that outcome matches the die result
-        let outcome = roll.fitd_outcome.as_ref().unwrap();
-        match highest_die {
-            1..=3 => assert_eq!(outcome, "FAILURE"),
-            4..=5 => assert_eq!(outcome, "PARTIAL SUCCESS"),
-            6 => {
-                // Could be SUCCESS or CRITICAL SUCCESS depending on multiple 6s
-                assert!(outcome == "SUCCESS" || outcome == "CRITICAL SUCCESS");
+            let key_die = if zero_dice {
+                rolled.iter().min()
+            } else {
+                rolled.iter().max()
             }
-            _ => panic!("Invalid die result: {}", highest_die),
-        }
-
-        // UPDATED: Notes are only present for special cases (critical/zero dice)
-        // Regular rolls should have no notes (clean output)
-        let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
-        if six_count > 1 {
-            // Critical success should have critical note
-            let has_critical_note = roll.notes.iter().any(|note| note.contains("CRITICAL"));
-            assert!(
-                has_critical_note,
-                "Critical success should have critical note for '{}'",
-                test
-            );
-        } else {
-            // Regular results should have no notes (clean output)
-            assert!(
-                roll.notes.is_empty(),
-                "Regular FitD roll '{}' should have no notes for clean output",
-                test
-            );
-        }
-    }
-}
-
-#[test]
-fn test_fitd_zero_dice_mechanics() {
-    let result = parse_and_roll("fitd0");
-    assert!(result.is_ok(), "FitD zero dice should parse successfully");
-
-    let results = result.unwrap();
-    assert_eq!(results.len(), 1, "Should have exactly one result");
-
-    let roll = &results[0];
-
-    // Should have exactly 2 dice rolled
-    assert_eq!(
-        roll.individual_rolls.len(),
-        2,
-        "Zero dice should roll exactly 2d6"
-    );
-
-    // Should have FitD outcome
-    assert!(roll.fitd_outcome.is_some(), "Zero dice should have outcome");
-
-    // Should have FitD result description
-    assert!(
-        roll.fitd_result.is_some(),
-        "Zero dice should have result description"
-    );
-
-    // Should have recorded the lowest die (not highest)
-    let recorded_die = roll.fitd_highest_die.unwrap(); // Still stored in highest_die field
-    let actual_lowest = *roll.individual_rolls.iter().min().unwrap();
-    assert_eq!(
-        recorded_die, actual_lowest,
-        "Zero dice should record the lowest die"
-    );
-
-    // UPDATED: Should have exactly one note (desperate position)
-    assert_eq!(
-        roll.notes.len(),
-        1,
-        "Zero dice should have exactly one note (desperate position)"
-    );
-
-    // Should have desperate position note
-    let has_desperate_note = roll.notes.iter().any(|note| note.contains("DESPERATE"));
-    assert!(
-        has_desperate_note,
-        "Zero dice should have desperate position note"
-    );
-}
-
-#[test]
-fn test_fitd_critical_success_detection() {
-    // A critical is two or more sixes, and nothing else. Sweeping seeds makes
-    // sure the critical branch is actually reached rather than hoped for.
-    let rolls = roll_across_seeds("fitd6", 100);
-    let mut criticals = 0;
-
-    for roll in &rolls {
-        let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
-        let is_critical = roll.fitd_outcome.as_deref() == Some("CRITICAL SUCCESS");
-        assert_eq!(
-            is_critical,
-            six_count >= 2,
-            "fitd6 rolled {:?} but reported {:?}",
-            roll.kept_rolls,
-            roll.fitd_outcome
-        );
-
-        if is_critical {
-            criticals += 1;
+            .copied()
+            .expect("dice were rolled");
             assert_eq!(
-                roll.notes.len(),
-                1,
-                "A critical should have exactly one note: {:?}",
-                roll.notes
+                roll.fitd_highest_die,
+                Some(key_die),
+                "'{expression}' rolled {rolled:?}"
+            );
+
+            let sixes = rolled.iter().filter(|&&d| d == 6).count();
+            let critical = !zero_dice && sixes >= 2;
+            // (outcome, a phrase of its result text)
+            let (outcome, result) = match (key_die, zero_dice) {
+                (1..=3, false) => ("FAILURE", "Bad outcome"),
+                (4..=5, false) => ("PARTIAL SUCCESS", "with consequences"),
+                (6, false) if critical => ("CRITICAL SUCCESS", "extra advantage"),
+                (6, false) => ("SUCCESS", "You do it well"),
+                (1..=3, true) => ("FAILURE", "hard move"),
+                (4..=5, true) => ("PARTIAL SUCCESS", "serious consequences"),
+                (6, true) => ("SUCCESS", "costly"),
+                _ => panic!("'{expression}' read a d6 as {key_die}"),
+            };
+            assert_eq!(
+                roll.fitd_outcome.as_deref(),
+                Some(outcome),
+                "'{expression}' rolled {rolled:?}"
             );
             assert!(
-                roll.notes[0].contains("CRITICAL"),
-                "A critical should say so: {:?}",
-                roll.notes
+                roll.fitd_result
+                    .as_deref()
+                    .is_some_and(|r| r.contains(result)),
+                "'{expression}' {outcome} should say '{result}': {:?}",
+                roll.fitd_result
             );
+
+            let note = if zero_dice {
+                Some("DESPERATE")
+            } else if critical {
+                Some("CRITICAL")
+            } else {
+                None
+            };
+            match note {
+                Some(note) => assert!(
+                    roll.notes.len() == 1 && roll.notes[0].contains(note),
+                    "'{expression}' should carry one {note} note: {:?}",
+                    roll.notes
+                ),
+                None => assert!(roll.notes.is_empty(), "'{expression}': {:?}", roll.notes),
+            }
+
+            let output = roll.to_string();
+            assert!(
+                output.contains("Roll: `[")
+                    && output.contains(outcome)
+                    && output.contains(&format!("die: `{key_die}`")),
+                "'{expression}' output should show the dice, {outcome} and die {key_die}: {output}"
+            );
+
+            outcomes_seen.insert((zero_dice, outcome));
         }
     }
 
-    assert!(
-        criticals > 0,
-        "100 seeds of fitd6 should include a critical"
+    assert_eq!(
+        outcomes_seen.len(),
+        7,
+        "the sweep should reach four pool outcomes and three zero-dice ones: {outcomes_seen:?}"
     );
 }
 
@@ -4012,112 +3397,6 @@ fn test_fitd_with_roll_sets() {
             roll.fitd_highest_die.is_some(),
             "Each set should record highest die"
         );
-    }
-}
-
-#[test]
-fn test_fitd_formatting() {
-    let result = parse_and_roll("fitd3");
-    assert!(result.is_ok(), "FitD should parse successfully");
-
-    let results = result.unwrap();
-    let roll = &results[0];
-    let formatted = roll.to_string();
-
-    // UPDATED: Should NOT contain redundant "Forged in the Dark" text
-    // The formatting is clean with just the outcome and die shown
-
-    // Should show the outcome in the result value
-    if let Some(outcome) = &roll.fitd_outcome {
-        assert!(
-            formatted.contains(outcome),
-            "Formatting should show outcome '{}': {}",
-            outcome,
-            formatted
-        );
-    }
-
-    // Should show the key die
-    if let Some(die) = roll.fitd_highest_die {
-        assert!(
-            formatted.contains(&format!("die: `{}`", die)),
-            "Formatting should show key die {}: {}",
-            die,
-            formatted
-        );
-    }
-
-    // Should show dice breakdown
-    assert!(
-        formatted.contains("Roll: `["),
-        "Should show dice breakdown: {}",
-        formatted
-    );
-
-    // Should have result formatting
-    assert!(
-        formatted.contains("**")
-            && (formatted.contains("SUCCESS")
-                || formatted.contains("PARTIAL SUCCESS")
-                || formatted.contains("FAILURE")),
-        "Should have proper result formatting: {}",
-        formatted
-    );
-}
-
-#[test]
-fn test_fitd_outcome_consistency() {
-    // Test all possible outcomes to ensure consistency
-    for _ in 0..20 {
-        let result = parse_and_roll("fitd4");
-        if let Ok(results) = result {
-            let roll = &results[0];
-            let outcome = roll.fitd_outcome.as_ref().unwrap();
-            let highest_die = roll.fitd_highest_die.unwrap();
-            let six_count = roll.kept_rolls.iter().filter(|&&die| die == 6).count();
-
-            match highest_die {
-                1..=3 => {
-                    assert_eq!(outcome, "FAILURE", "Die {} should be FAILURE", highest_die);
-                    let has_failure_result =
-                        roll.fitd_result.as_ref().unwrap().contains("Bad outcome");
-                    assert!(has_failure_result, "Failure should mention bad outcome");
-                }
-                4..=5 => {
-                    assert_eq!(
-                        outcome, "PARTIAL SUCCESS",
-                        "Die {} should be PARTIAL SUCCESS",
-                        highest_die
-                    );
-                    let has_partial_result =
-                        roll.fitd_result.as_ref().unwrap().contains("consequences");
-                    assert!(has_partial_result, "Partial should mention consequences");
-                }
-                6 => {
-                    if six_count >= 2 {
-                        assert_eq!(
-                            outcome, "CRITICAL SUCCESS",
-                            "Multiple 6s should be CRITICAL"
-                        );
-                        let has_critical_result = roll
-                            .fitd_result
-                            .as_ref()
-                            .unwrap()
-                            .contains("extra advantage");
-                        assert!(
-                            has_critical_result,
-                            "Critical should mention extra advantage"
-                        );
-                    } else {
-                        assert_eq!(outcome, "SUCCESS", "Single 6 should be SUCCESS");
-                        let has_success_result =
-                            roll.fitd_result.as_ref().unwrap().contains("do it well");
-                        assert!(has_success_result, "Success should mention doing it well");
-                    }
-                }
-                _ => panic!("Invalid die result: {}", highest_die),
-            }
-        }
     }
 }
 
@@ -4319,120 +3598,73 @@ fn test_daggerheart_keeps_math_modifiers() {
 
 #[test]
 fn test_wild_words_rpg_system() {
-    use dicemaiden_rs::{dice::aliases, parse_and_roll};
-
-    // Test basic Wild Words rolls
-    let basic_tests = vec![
-        ("ww3", "3d6 ww", "Basic 3 dice Wild Words roll"),
-        ("ww4", "4d6 ww", "Basic 4 dice Wild Words roll"),
-        ("ww6", "6d6 ww", "Basic 6 dice Wild Words roll"),
+    // Cutting removes the highest dice first; the highest die left is the
+    // result: 6 a Triumph, 4-5 a Conflict, 1-3 a Disaster. Any two dice left
+    // showing the same face add a Twist. (alias, expansion, dice cut)
+    let rolls = vec![
+        ("ww3", "3d6 ww", 0),
+        ("ww4", "4d6 ww", 0),
+        ("ww6", "6d6 ww", 0),
+        ("ww4c1", "4d6 wwc1", 1),
+        ("ww5c2", "5d6 wwc2", 2),
+        ("ww6c3", "6d6 wwc3", 3),
     ];
+    let mut readings_seen = std::collections::BTreeSet::new();
+    let mut saw_twist = false;
 
-    for (alias, expected_expansion, description) in basic_tests {
-        // Test alias expansion
-        let expanded = aliases::expand_alias(alias);
+    for (alias, expansion, cut) in rolls {
         assert_eq!(
-            expanded,
-            Some(expected_expansion.to_string()),
-            "Wild Words alias '{}' should expand to '{}': {}",
-            alias,
-            expected_expansion,
-            description
+            aliases::expand_alias(alias),
+            Some(expansion.to_string()),
+            "Wild Words alias '{alias}' should expand to '{expansion}'"
         );
 
-        // Test that the alias produces results
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Wild Words '{}' should parse successfully: {}",
-            alias,
-            description
-        );
+        for roll in roll_across_seeds(alias, 40) {
+            let mut left = roll.individual_rolls.clone();
+            left.sort_unstable_by(|a, b| b.cmp(a));
+            left.drain(..cut);
 
-        let results = result.unwrap();
-        assert_eq!(results.len(), 1, "Should have one result for '{}'", alias);
+            let highest = left[0];
+            let reading = match highest {
+                6 => "Triumph",
+                4 | 5 => "Conflict",
+                _ => "Disaster",
+            };
+            let twist = left.windows(2).any(|pair| pair[0] == pair[1]);
+            let expected = format!(
+                "Wild Words: {reading} ({highest}){}",
+                if twist { " + Twist" } else { "" }
+            );
 
-        let roll_result = &results[0];
+            assert_eq!(
+                roll.total, highest,
+                "'{alias}' rolled {:?}",
+                roll.individual_rolls
+            );
+            assert!(
+                roll.notes.contains(&expected),
+                "'{alias}' rolled {:?}, expected '{expected}': {:?}",
+                roll.individual_rolls,
+                roll.notes
+            );
+            assert_eq!(
+                roll.notes.contains(&format!("Cut {cut} highest dice")),
+                cut > 0,
+                "'{alias}': {:?}",
+                roll.notes
+            );
 
-        // Should have Wild Words interpretation
-        let has_wild_words_note = roll_result.notes.iter().any(|note| {
-            note.contains("Wild Words:")
-                && (note.contains("Triumph")
-                    || note.contains("Conflict")
-                    || note.contains("Disaster"))
-        });
-        assert!(
-            has_wild_words_note,
-            "Should have Wild Words interpretation note for '{}'",
-            alias
-        );
-
-        // Total should be between 1-6 (highest die value)
-        assert!(
-            roll_result.total >= 1 && roll_result.total <= 6,
-            "Wild Words result should be 1-6 for '{}': got {}",
-            alias,
-            roll_result.total
-        );
+            readings_seen.insert(reading);
+            saw_twist |= twist;
+        }
     }
 
-    // Test cutting dice mechanics
-    let cutting_tests = vec![
-        ("ww4c1", "4d6 wwc1", "Roll 4d6, cut 1 highest"),
-        ("ww5c2", "5d6 wwc2", "Roll 5d6, cut 2 highest"),
-        ("ww6c3", "6d6 wwc3", "Roll 6d6, cut 3 highest"),
-    ];
-
-    for (alias, expected_expansion, description) in cutting_tests {
-        // Test alias expansion
-        let expanded = aliases::expand_alias(alias);
-        assert_eq!(
-            expanded,
-            Some(expected_expansion.to_string()),
-            "Wild Words cutting alias '{}' should expand to '{}': {}",
-            alias,
-            expected_expansion,
-            description
-        );
-
-        // Test that cutting aliases work
-        let result = parse_and_roll(alias);
-        assert!(
-            result.is_ok(),
-            "Wild Words cutting '{}' should parse successfully: {}",
-            alias,
-            description
-        );
-
-        let results = result.unwrap();
-        let roll_result = &results[0];
-
-        // Should have cut note
-        let has_cut_note = roll_result
-            .notes
-            .iter()
-            .any(|note| note.contains("Cut") && note.contains("highest"));
-        assert!(has_cut_note, "Should have cutting note for '{}'", alias);
-
-        // Should have Wild Words interpretation
-        let has_interpretation = roll_result
-            .notes
-            .iter()
-            .any(|note| note.contains("Wild Words:"));
-        assert!(
-            has_interpretation,
-            "Should have Wild Words interpretation for '{}'",
-            alias
-        );
-
-        // Total should be between 1-6
-        assert!(
-            roll_result.total >= 1 && roll_result.total <= 6,
-            "Wild Words cutting result should be 1-6 for '{}': got {}",
-            alias,
-            roll_result.total
-        );
-    }
+    assert_eq!(
+        readings_seen.len(),
+        3,
+        "the sweep should reach every reading"
+    );
+    assert!(saw_twist, "the sweep should include a Twist");
 
     // Test error cases
     let error_tests = vec![
@@ -4459,34 +3691,13 @@ fn test_wild_words_rpg_system() {
 
 #[test]
 fn test_wild_words_roll_sets() {
-    use dicemaiden_rs::parse_and_roll;
-
-    // Test Wild Words with roll sets
-    let result = parse_and_roll("3 ww4");
-    assert!(result.is_ok(), "Wild Words roll sets should work");
-
-    let results = result.unwrap();
-    assert_eq!(results.len(), 3, "Should have 3 sets");
-
-    for (i, roll_result) in results.iter().enumerate() {
-        assert_eq!(
-            roll_result.label,
-            Some(format!("Set {}", i + 1)),
-            "Should have proper set labels"
-        );
-
-        let has_wild_words_note = roll_result
-            .notes
-            .iter()
-            .any(|note| note.contains("Wild Words:"));
+    for roll in assert_labelled_roll_sets("3 ww4", "Wild Words roll sets") {
         assert!(
-            has_wild_words_note,
-            "Each set should have Wild Words interpretation"
-        );
-
-        assert!(
-            roll_result.total >= 1 && roll_result.total <= 6,
-            "Each set should have valid Wild Words result"
+            roll.notes
+                .iter()
+                .any(|note| note.starts_with("Wild Words:")),
+            "Each set should have its own Wild Words reading: {:?}",
+            roll.notes
         );
     }
 }
@@ -4735,84 +3946,73 @@ fn test_mothership_basic_rolls() {
 }
 
 #[test]
-fn test_mothership_parsing() {
-    // Test that Mothership expressions parse correctly
-    let test_cases = vec![
-        ("ms", "Basic Mothership"),
-        ("ms45", "Mothership with stat 45"),
-        ("+ms", "Mothership advantage"),
-        ("-ms", "Mothership disadvantage"),
-        ("+ms45", "Mothership advantage with stat"),
-        ("-ms45", "Mothership disadvantage with stat"),
+fn test_mothership_rolls_under_the_stat() {
+    // A d100 against the Stat, 50 when none is given; `+` and `-` roll two
+    // and keep one (which one is tested above). The total is the die kept.
+    // Doubles make the result critical, success or failure alike.
+    // (expression, stat, dice rolled)
+    let cases = vec![
+        ("ms", 50, 1),
+        ("ms45", 45, 1),
+        ("ms1", 1, 1),
+        ("ms99", 99, 1),
+        ("+ms", 50, 2),
+        ("-ms", 50, 2),
+        ("+ms45", 45, 2),
+        ("-ms45", 45, 2),
+        ("+ms50", 50, 2),
+        ("-ms25", 25, 2),
+        ("+ms75", 75, 2),
     ];
+    let mut results_seen = std::collections::BTreeSet::new();
 
-    for (expression, description) in test_cases {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Mothership expression '{}' should parse: {}",
-            expression,
-            description
-        );
+    for (expression, stat, dice) in cases {
+        for roll in roll_across_seeds(expression, 40) {
+            assert_eq!(rolled_dice(&roll).len(), dice, "'{expression}': {roll:?}");
 
-        let results = result.unwrap();
-        assert_eq!(
-            results.len(),
-            1,
-            "Should have one result for '{}'",
-            expression
-        );
+            let kept = roll.kept_rolls[0];
+            assert!((1..=100).contains(&kept), "'{expression}' kept {kept}");
+            assert_eq!(roll.total, kept, "'{expression}' total is the die kept");
 
-        let roll = &results[0];
+            let succeeds = mothership_succeeds(kept, stat);
+            assert_eq!(
+                roll.successes,
+                succeeds.then_some(1),
+                "'{expression}' kept {kept}"
+            );
+            assert_eq!(
+                roll.failures,
+                (!succeeds).then_some(1),
+                "'{expression}' kept {kept}"
+            );
 
-        // Should have a total within valid percentile range
-        assert!(
-            roll.total >= 1 && roll.total <= 100,
-            "Total {} should be 1-100 for '{}'",
-            roll.total,
-            expression
-        );
-
-        // Should have appropriate success or failure marking
-        assert!(
-            roll.successes.is_some() || roll.failures.is_some(),
-            "Roll should have success or failure for '{}'",
-            expression
-        );
-
-        // Should have Mothership notes
-        let has_mothership_note = roll.notes.iter().any(|note| note.contains("Mothership"));
-        assert!(
-            has_mothership_note,
-            "Roll should have Mothership note for '{}'",
-            expression
-        );
+            let critical = kept == 100 || kept / 10 == kept % 10;
+            let result = match (succeeds, critical) {
+                (true, true) => "**CRITICAL SUCCESS**",
+                (true, false) => "**Success**",
+                (false, true) => "**CRITICAL FAILURE**",
+                (false, false) => "**Failure**",
+            };
+            assert!(
+                roll.notes[0].contains(&format!("(target ≤{stat})")) && roll.notes[1] == result,
+                "'{expression}' kept {kept}, expected {result}: {:?}",
+                roll.notes
+            );
+            results_seen.insert(result);
+        }
     }
+
+    assert_eq!(results_seen.len(), 4, "the sweep should reach every result");
 }
 
-#[test]
-fn test_mothership_advantage_disadvantage_mechanics() {
-    // Test that advantage/disadvantage roll 2 dice
-    let advantage_result = parse_and_roll("+ms45").unwrap();
-    assert_eq!(
-        rolled_dice(&advantage_result[0]).len(),
-        2,
-        "Advantage should roll 2 dice"
-    );
-
-    let disadvantage_result = parse_and_roll("-ms45").unwrap();
-    assert_eq!(
-        rolled_dice(&disadvantage_result[0]).len(),
-        2,
-        "Disadvantage should roll 2 dice"
-    );
-
-    let basic_result = parse_and_roll("ms45").unwrap();
-    assert_eq!(
-        basic_result[0].individual_rolls.len(),
-        1,
-        "Basic roll should roll 1 die"
-    );
+/// Whether a Mothership d100 roll succeeds against `stat`: at or under it,
+/// except that 00 (rolled as 100) always succeeds and 99 always fails (PSG §4.1).
+fn mothership_succeeds(roll: i32, stat: i32) -> bool {
+    match roll {
+        100 => true,
+        99 => false,
+        _ => roll <= stat,
+    }
 }
 
 #[test]
@@ -4826,13 +4026,7 @@ fn test_mothership_advantage_never_selects_the_worse_outcome() {
     // Ranked best (0) to worst (3)
     let rank = |roll: i32| -> u8 {
         let is_double = roll == 100 || (roll / 10) == (roll % 10);
-        // 00 (rolled as 100) always succeeds, 99 always fails (PSG §4.1)
-        let success = match roll {
-            100 => true,
-            99 => false,
-            _ => roll <= STAT,
-        };
-        match (success, is_double) {
+        match (mothership_succeeds(roll, STAT), is_double) {
             (true, true) => 0,  // crit success
             (true, false) => 1, // success
             (false, false) => 2,
@@ -5034,61 +4228,6 @@ fn test_mothership_semicolon_separated() {
 }
 
 #[test]
-fn test_mothership_default_stat() {
-    // Test that Mothership without stat defaults to 50
-    let result = parse_and_roll("ms").unwrap();
-    let roll = &result[0];
-
-    // Should have rolled and evaluated
-    assert!(
-        roll.total >= 1 && roll.total <= 100,
-        "Should have valid percentile roll"
-    );
-
-    // Check note mentions stat (should mention 50 as target)
-    let has_target_note = roll
-        .notes
-        .iter()
-        .any(|note| note.contains("≤50") || note.contains("target"));
-    assert!(
-        has_target_note,
-        "Should mention target stat in notes (default 50)"
-    );
-}
-
-#[test]
-fn test_mothership_edge_case_rolls() {
-    // Test specific edge case values
-    let edge_cases = vec![
-        ("ms1", "Minimum stat"),
-        ("ms99", "Maximum stat"),
-        ("+ms50", "Advantage with 50/50 stat"),
-        ("-ms25", "Disadvantage with low stat"),
-        ("+ms75", "Advantage with high stat"),
-    ];
-
-    for (expression, description) in edge_cases {
-        let result = parse_and_roll(expression);
-        assert!(
-            result.is_ok(),
-            "Mothership edge case '{}' should work: {}",
-            expression,
-            description
-        );
-
-        let results = result.unwrap();
-        let roll = &results[0];
-
-        assert!(
-            roll.total >= 1 && roll.total <= 100,
-            "Total should be valid percentile for '{}': {}",
-            expression,
-            description
-        );
-    }
-}
-
-#[test]
 fn test_exalted_with_custom_double_success() {
     // Test new syntax (if added)
     let tests = vec![
@@ -5122,35 +4261,41 @@ fn test_exalted_double_success_validation() {
 
 #[test]
 fn test_plotweaver_plot_dice_mechanics() {
-    let result = parse_and_roll("4dp").unwrap();
-    assert_eq!(result.len(), 1);
+    // A plot die is a d6: 1 is a complication worth 2, 2 one worth 4, 3-4
+    // blank and 5-6 an opportunity. The total is the complications' worth.
+    let mut symbols_seen = std::collections::BTreeSet::new();
 
-    // Should have plot symbols
-    assert!(result[0].plot_symbols.is_some());
+    for expression in ["dp", "4dp"] {
+        for roll in roll_across_seeds(expression, 40) {
+            let faces: Vec<(&str, i32)> = roll
+                .individual_rolls
+                .iter()
+                .map(|&die| match die {
+                    1 => ("C+2", 2),
+                    2 => ("C+4", 4),
+                    3 | 4 => ("_", 0),
+                    5 | 6 => ("Opp", 0),
+                    other => panic!("'{expression}' rolled {other} on a d6"),
+                })
+                .collect();
 
-    // Total should be in valid range: 0 to 16 for 4dp (max 4 × COMPLICATION +4)
-    assert!(result[0].total >= 0 && result[0].total <= 16);
-
-    let symbols = result[0].plot_symbols.as_ref().unwrap();
-    assert_eq!(symbols.len(), 4);
-
-    for symbol in symbols {
-        assert!(
-            symbol == "Opp" || symbol == "C+2" || symbol == "C+4" || symbol == "_",
-            "Unexpected plot die symbol: {}",
-            symbol
-        );
+            let symbols = roll.plot_symbols.as_ref().expect("plot symbols");
+            let expected: Vec<&str> = faces.iter().map(|(symbol, _)| *symbol).collect();
+            assert_eq!(
+                symbols, &expected,
+                "'{expression}' rolled {:?}",
+                roll.individual_rolls
+            );
+            assert_eq!(
+                roll.total,
+                faces.iter().map(|(_, worth)| worth).sum::<i32>(),
+                "'{expression}' symbols {symbols:?}"
+            );
+            symbols_seen.extend(expected);
+        }
     }
-}
 
-#[test]
-fn test_plotweaver_single_die() {
-    let result = parse_and_roll("dp").unwrap();
-    assert_eq!(result.len(), 1);
-    assert!(result[0].plot_symbols.is_some());
-    let symbols = result[0].plot_symbols.as_ref().unwrap();
-    assert_eq!(symbols.len(), 1);
-    assert!(result[0].total >= 0 && result[0].total <= 4);
+    assert_eq!(symbols_seen.len(), 4, "the sweep should show every symbol");
 }
 
 #[test]
@@ -5251,34 +4396,23 @@ fn total_dropped_dice(result: &dicemaiden_rs::dice::RollResult) -> usize {
 
 #[test]
 fn test_open_legend_roll_results() {
-    // ol5 = 1d20 + 2d6, so the minimum possible total is 3
-    for _ in 0..50 {
-        let results = parse_and_roll("ol5").expect("ol5 should roll");
-        assert_eq!(results.len(), 1, "ol5 should produce one result");
-        assert!(
-            results[0].total >= 3,
-            "ol5 total should be at least 3, got {}",
-            results[0].total
-        );
-    }
-
-    // Advantage rolls one extra attribute die and discards one
-    for _ in 0..50 {
-        let results = parse_and_roll("ol5a1").expect("ol5a1 should roll");
-        assert_eq!(
-            total_dropped_dice(&results[0]),
-            1,
-            "ol5a1 should drop exactly one die"
-        );
-    }
-
-    for _ in 0..50 {
-        let results = parse_and_roll("ol7d2").expect("ol7d2 should roll");
-        assert_eq!(
-            total_dropped_dice(&results[0]),
-            2,
-            "ol7d2 should drop exactly two dice"
-        );
+    // The total is every die kept: the d20 and the attribute dice, explosions
+    // included. Advantage rolls one extra attribute die per level and discards
+    // the lowest, disadvantage the highest. (alias, attribute dice discarded)
+    for (alias, discarded) in [("ol5", 0), ("ol5a1", 1), ("ol7d2", 2)] {
+        for roll in roll_across_seeds(alias, 50) {
+            assert_eq!(
+                roll.total,
+                roll.kept_rolls.iter().sum::<i32>(),
+                "'{alias}' total should be every die kept: {:?}",
+                roll.kept_rolls
+            );
+            assert_eq!(
+                total_dropped_dice(&roll),
+                discarded,
+                "'{alias}' should discard {discarded} dice"
+            );
+        }
     }
 }
 
@@ -5288,10 +4422,9 @@ fn test_advantage_disadvantage_drops_before_exploding() {
     // surviving die from the initial pool and everything after it came from
     // explosions. This is the mechanic requested in issue #148: the drop is
     // resolved against the initial pool only.
-    for _ in 0..500 {
-        let results = parse_and_roll("ul 1d6 ie6 adv1").expect("advantage should roll");
-        let result = &results[0];
+    let mut surviving_sixes = 0;
 
+    for result in &roll_across_seeds("ul 1d6 ie6 adv1", 500) {
         assert_eq!(
             result.dropped_rolls.len(),
             1,
@@ -5308,6 +4441,7 @@ fn test_advantage_disadvantage_drops_before_exploding() {
 
         // A surviving max roll still explodes — the drop happens first
         if survivor == 6 {
+            surviving_sixes += 1;
             assert!(
                 result.individual_rolls.len() > 1,
                 "a surviving 6 must explode after the drop"
@@ -5322,10 +4456,7 @@ fn test_advantage_disadvantage_drops_before_exploding() {
         );
     }
 
-    for _ in 0..500 {
-        let results = parse_and_roll("ul 1d6 ie6 dis1").expect("disadvantage should roll");
-        let result = &results[0];
-
+    for result in &roll_across_seeds("ul 1d6 ie6 dis1", 500) {
         assert_eq!(
             result.dropped_rolls.len(),
             1,
@@ -5341,12 +4472,18 @@ fn test_advantage_disadvantage_drops_before_exploding() {
         );
 
         if survivor == 6 {
+            surviving_sixes += 1;
             assert!(
                 result.individual_rolls.len() > 1,
                 "a surviving 6 must explode even though the highest die was dropped"
             );
         }
     }
+
+    assert!(
+        surviving_sixes > 0,
+        "the sweep should include a surviving 6"
+    );
 }
 
 #[test]
@@ -5599,10 +4736,7 @@ fn test_essence20_skill_dice_added_to_d20() {
     ];
 
     for (alias, expected_dice, max_skill_result) in cases {
-        for _ in 0..50 {
-            let results = parse_and_roll(alias).expect("Essence20 roll should parse");
-            let result = &results[0];
-
+        for result in &roll_across_seeds(alias, 50) {
             let skill_dice = essence20_skill_dice(result);
             assert_eq!(
                 skill_dice.len(),
@@ -5647,27 +4781,32 @@ fn test_essence20_critical_success_notes() {
     ];
 
     for (alias, rank_maximum) in single_rank_cases {
-        for _ in 0..200 {
-            let results = parse_and_roll(alias).expect("Essence20 roll should parse");
-            let result = &results[0];
+        let mut saw_critical = false;
 
+        for result in &roll_across_seeds(alias, 400) {
             let rank_total: i32 = essence20_skill_dice(result).iter().sum();
             assert_eq!(
                 essence20_has_note(result, "CRITICAL SUCCESS"),
                 rank_total == rank_maximum,
                 "'{alias}' crits exactly when the rank totals {rank_maximum}, got {rank_total}"
             );
+            saw_critical |= rank_total == rank_maximum;
         }
+
+        assert!(
+            saw_critical,
+            "400 seeds of '{alias}' should include a critical"
+        );
     }
 
     // A specialization crits off any rank on the ladder, including one that
     // lost. With `ess1d4s` (d4 + d2) a 4 can only have come from the d4, so the
     // crit must be reported and must name that die.
-    for _ in 0..300 {
-        let results = parse_and_roll("ess1d4s").expect("ess1d4s should roll");
-        let result = &results[0];
+    let mut saw_d4_maximum = false;
 
+    for result in &roll_across_seeds("ess1d4s", 300) {
         if essence20_skill_dice(result).contains(&4) {
+            saw_d4_maximum = true;
             assert!(
                 essence20_has_note(result, "Maximum rolled on d4"),
                 "a d4 showing its maximum is a critical success even when discarded: {:?}",
@@ -5675,24 +4814,25 @@ fn test_essence20_critical_success_notes() {
             );
         }
     }
+    assert!(saw_d4_maximum, "the sweep should include a d4 showing 4");
 
     // A natural 20 on the d20 is called out separately from a skill die crit
-    for _ in 0..200 {
-        let results = parse_and_roll("ess1d8").expect("ess1d8 should roll");
-        let result = &results[0];
+    let mut saw_natural_20 = false;
+
+    for result in &roll_across_seeds("ess1d8", 200) {
         assert_eq!(
             essence20_has_note(result, "Natural 20"),
             result.kept_rolls.contains(&20),
             "the natural 20 note must track the kept d20"
         );
+        saw_natural_20 |= result.kept_rolls.contains(&20);
     }
+    assert!(saw_natural_20, "the sweep should include a natural 20");
 }
 
 #[test]
 fn test_essence20_edge_and_snag() {
-    for _ in 0..100 {
-        let results = parse_and_roll("+ess1d8").expect("Edge should roll");
-        let result = &results[0];
+    for result in &roll_across_seeds("+ess1d8", 100) {
         assert_eq!(result.dropped_rolls.len(), 1, "Edge drops the lower d20");
         assert!(
             result.kept_rolls[0] >= result.dropped_rolls[0],
@@ -5700,9 +4840,7 @@ fn test_essence20_edge_and_snag() {
         );
     }
 
-    for _ in 0..100 {
-        let results = parse_and_roll("-ess1d8").expect("Snag should roll");
-        let result = &results[0];
+    for result in &roll_across_seeds("-ess1d8", 100) {
         assert_eq!(result.dropped_rolls.len(), 1, "Snag drops the higher d20");
         assert!(
             result.kept_rolls[0] <= result.dropped_rolls[0],
@@ -5741,9 +4879,7 @@ fn test_essence20_with_comments_sets_and_flags() {
     assert!(results[0].simple, "s flag should carry through the alias");
 
     // Flat modifiers reach the total
-    for _ in 0..50 {
-        let results = parse_and_roll("ess1d8 + 3").expect("modifier should parse");
-        let result = &results[0];
+    for result in &roll_across_seeds("ess1d8 + 3", 50) {
         let kept: i32 = result.dice_groups[1].rolls.iter().sum();
         let d20: i32 = result.kept_rolls.iter().sum();
         assert_eq!(result.total, d20 + kept + 3, "+3 should be added once");
@@ -5836,10 +4972,7 @@ fn test_darkest_house_die_does_not_affect_the_total() {
     // "The House Die has no effect on success or failure" - the total is the
     // two action dice plus the Rating, never the House Die.
     for alias in ["tdh4", "tdh4b", "tdh4n"] {
-        for _ in 0..40 {
-            let results = parse_and_roll(alias).expect("Darkest House roll should parse");
-            let result = &results[0];
-
+        for result in &roll_across_seeds(alias, 40) {
             let action_total: i32 = result.kept_rolls.iter().sum();
             assert_eq!(
                 result.total,
@@ -5865,10 +4998,7 @@ fn test_darkest_house_die_does_not_affect_the_total() {
 fn test_darkest_house_boon_and_bane() {
     // A Boon rolls an additional d6 and discards the lowest die; a Bane
     // discards the highest.  Never more than three action dice.
-    for _ in 0..40 {
-        let results = parse_and_roll("tdh4b").expect("Boon should parse");
-        let result = &results[0];
-
+    for result in &roll_across_seeds("tdh4b", 40) {
         assert_eq!(result.dropped_rolls.len(), 1, "a Boon discards one die");
         let lowest_kept = *result.kept_rolls.iter().min().expect("kept dice");
         assert!(
@@ -5877,10 +5007,9 @@ fn test_darkest_house_boon_and_bane() {
             result.kept_rolls,
             result.dropped_rolls
         );
+    }
 
-        let results = parse_and_roll("tdh4n").expect("Bane should parse");
-        let result = &results[0];
-
+    for result in &roll_across_seeds("tdh4n", 40) {
         assert_eq!(result.dropped_rolls.len(), 1, "a Bane discards one die");
         let highest_kept = *result.kept_rolls.iter().max().expect("kept dice");
         assert!(
@@ -5901,11 +5030,8 @@ fn test_darkest_house_acts_when_house_die_is_higher() {
     let mut saw_waits = false;
     let mut saw_tie = false;
 
-    for _ in 0..120 {
-        for alias in ["tdh4", "tdh4b", "tdh4n"] {
-            let results = parse_and_roll(alias).expect("Darkest House roll should parse");
-            let result = &results[0];
-
+    for alias in ["tdh4", "tdh4b", "tdh4n"] {
+        for result in &roll_across_seeds(alias, 120) {
             let house_die = darkest_house_die(result);
             let highest_action_die = *result.kept_rolls.iter().max().expect("action dice");
 
@@ -5938,10 +5064,7 @@ fn test_darkest_house_acts_when_house_die_is_higher() {
 fn test_darkest_house_calling_upon_the_house() {
     // Calling upon the house adds the House Die to the result; the house then
     // acts automatically and the character gains a Doom.
-    for _ in 0..60 {
-        let results = parse_and_roll("tdh4c").expect("call upon the house should parse");
-        let result = &results[0];
-
+    for result in &roll_across_seeds("tdh4c", 60) {
         let action_total: i32 = result.kept_rolls.iter().sum();
         let house_die = darkest_house_die(result);
 

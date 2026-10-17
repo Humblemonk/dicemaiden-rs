@@ -12,8 +12,10 @@
 // cannot see, such as truncation and how features combine in the output.
 
 use dicemaiden_rs::{
-    commands::roll::error_reply, dice::parser, format_multiple_results,
-    format_multiple_results_with_limit, help_text, parse_and_roll,
+    commands::roll::error_reply,
+    dice::{parser, rng::create_seeded_rng},
+    format_multiple_results, format_multiple_results_with_limit, help_text, parse_and_roll,
+    parse_and_roll_with_rng,
 };
 
 // ============================================================================
@@ -47,18 +49,26 @@ fn assert_roll_set_formatting(expression: &str, expected_sets: usize) -> String 
 
 #[test]
 fn test_roll_sets_comprehensive() {
-    // Test roll set creation and labeling
-    let result = parse_and_roll("6 4d6").unwrap();
-    assert_eq!(result.len(), 6);
+    // Each set rolls its own dice, is labelled in order, and totals its own dice
+    for seed in [1, 42, 1337] {
+        let result = parse_and_roll_with_rng("6 4d6", &mut create_seeded_rng(seed)).unwrap();
+        assert_eq!(result.len(), 6);
 
-    for (i, roll) in result.iter().enumerate() {
-        // Verify individual_rolls count since we can't access count directly
-        assert!(
-            roll.individual_rolls.len() >= 4,
-            "Should have at least 4 dice (some may have exploded)"
-        );
-        assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
-        assert!(roll.total >= 4 && roll.total <= 24); // 4d6 range
+        for (i, roll) in result.iter().enumerate() {
+            assert_eq!(
+                roll.individual_rolls.len(),
+                4,
+                "Set {} at seed {seed}",
+                i + 1
+            );
+            assert_eq!(
+                roll.total,
+                roll.individual_rolls.iter().sum::<i32>(),
+                "Set {} at seed {seed}",
+                i + 1
+            );
+            assert_eq!(roll.label, Some(format!("Set {}", i + 1)));
+        }
     }
 }
 
