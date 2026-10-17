@@ -3896,7 +3896,9 @@ fn test_a5e_alias_expansion() {
         // Case-insensitive
         ("A5E +5 EX1", Some("1d20+5 + 1d4")),
         ("a5E +5 Ex1", Some("1d20+5 + 1d4")),
+        ("+a5e +5 ex2", Some("2d20 k1+5 + 1d6")),
         ("+A5E +5 EX2", Some("2d20 k1+5 + 1d6")),
+        ("-a5e +5 ex3", Some("2d20 kl1+5 + 1d8")),
         ("-A5E +5 EX3", Some("2d20 kl1+5 + 1d8")),
         // Not A5E rolls
         ("a5e +5 ex0", None),
@@ -4093,6 +4095,16 @@ fn test_alien_panic_table_matches_the_rulebook() {
             assert!(
                 note.contains(&format!("1d6 + {stress} stress")),
                 "the panic note should show a single d6: {note}"
+            );
+
+            // A stress die showing 1 rules out pushing the roll
+            assert!(
+                result
+                    .notes
+                    .iter()
+                    .any(|note| note.contains("Cannot push this roll")),
+                "a roll that panics should forbid pushing: {:?}",
+                result.notes
             );
         }
     }
