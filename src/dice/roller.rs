@@ -30,19 +30,26 @@
 //! count can ever see them.
 //!
 //! # Specialised handlers
+//!
+//! Checked in this order, before the standard pipeline; the first match takes
+//! the whole roll.  Other game systems run inside the standard pipeline, at
+//! step 7.
+//!
 //! | Handler function                  | System                        |
 //! |-----------------------------------|-------------------------------|
+//! | `handle_broken_empires_roll`      | The Broken Empires skill test |
 //! | `handle_conan_skill_roll`         | Conan 2d20 skill checks       |
 //! | `handle_conan_combat_roll`        | Conan combat / hit location   |
+//! | `handle_wfrp_roll`                | Warhammer Fantasy Roleplay 4e |
 //! | `handle_d6_system_roll`           | D6 System (wild die)          |
 //! | `handle_marvel_multiverse_roll`   | Marvel Multiverse RPG         |
 //! | `handle_savage_worlds_roll`       | Savage Worlds (trait + wild)  |
 //! | `handle_brave_new_world_roll`     | Brave New World               |
 //! | `handle_silhouette_roll`          | Silhouette (count highest)    |
-//! | `handle_vtm5_roll`                | Vampire: the Masquerade 5e    |
 //! | `handle_mutants_masterminds_roll` | Mutants & Masterminds DC 10   |
 //! | `handle_mothership_roll`          | Mothership RPG (1d100 ≤ stat) |
-//! | `handle_broken_empires_roll`      | The Broken Empires skill test |
+//!
+//! `handle_vtm5_roll` (Vampire: the Masquerade 5e) is called from step 7.
 //!
 //! `roll_dice` obtains one RNG via `rng::get_dice_rng` (ChaCha20 / StdRng
 //! seeded with OS entropy + timestamp + thread/process/ASLR entropy) and
@@ -85,8 +92,8 @@ pub fn roll_dice(dice: DiceRoll) -> Result<RollResult> {
 /// Nested dice operands (`+2d6`) recurse through here with the *same* `rng`, so
 /// a caller that supplies a seeded generator gets a fully reproducible roll —
 /// which is what lets the test suite pin systems whose dice are fixed by the
-/// system rather than by notation. It also means one expression now builds one
-/// generator instead of one per operand.
+/// system rather than by notation. It also means one expression builds one
+/// generator, not one per operand.
 pub fn roll_dice_with_rng(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollResult> {
     // Validation check
     if dice.sides < 1 {
@@ -929,12 +936,10 @@ fn apply_special_system_modifiers(
                 has_special_system = true;
             }
             Modifier::ConanSkill(_) => {
-                // Conan skill rolls are handled in the main roll_dice function
-                // Don't process them here
+                // Dispatched to handle_conan_skill_roll in roll_dice_with_rng
             }
             Modifier::ConanCombat(_) => {
-                // Conan combat dice are handled in the main roll_dice function
-                // Don't process them here
+                // Dispatched to handle_conan_combat_roll in roll_dice_with_rng
             }
             Modifier::TwoD20Test {
                 target,
@@ -1444,7 +1449,8 @@ fn implode_dice(
     Ok(())
 }
 
-// Better drop dice with proper error handling
+// Drop the `count` lowest dice. Dropping every die keeps the highest one, unless
+// only one was rolled
 fn drop_dice(result: &mut RollResult, count: usize) -> Result<()> {
     let available_dice = result.individual_rolls.len();
 
@@ -1454,7 +1460,6 @@ fn drop_dice(result: &mut RollResult, count: usize) -> Result<()> {
     }
 
     // Don't drop ALL dice when count >= available
-    // The test expects some dice to remain
     if count >= available_dice {
         // Drop all but one die (or all if only one die)
         let to_drop = if available_dice > 1 {
@@ -1515,7 +1520,7 @@ fn drop_lowest_dice(result: &mut RollResult, sorted_rolls: &mut Vec<i32>, count:
     }
 }
 
-// Better keep dice with proper validation
+// Keep the `count` highest (or lowest) dice and drop the rest
 fn keep_dice(result: &mut RollResult, count: usize, keep_low: bool) -> Result<()> {
     if count >= result.individual_rolls.len() {
         return Ok(()); // Keep all dice

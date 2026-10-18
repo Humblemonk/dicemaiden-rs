@@ -22,13 +22,14 @@
 //! | Variable            | Required | Description                                      |
 //! |---------------------|----------|--------------------------------------------------|
 //! | `DISCORD_TOKEN`     | ✓        | Bot token from the Discord developer portal      |
-//! | `DATABASE_URL`      |          | SQLite URL; defaults to `./main.db`              |
+//! | `DATABASE_URL`      |          | SQLite URL; defaults to `main.db` (see database) |
 //! | `GUILD_ID`          |          | Register commands to one guild (dev/testing)     |
 //! | `SHARD_COUNT`       |          | Shards to run; multi-process: one less than that |
 //! | `SHARD_START`       |          | First shard ID in multi-process deployments      |
 //! | `TOTAL_SHARDS`      |          | Total shards across all processes                |
 //! | `USE_AUTOSHARDING`  |          | Let Discord decide the shard count (`true`)      |
 //! | `MAX_CONCURRENCY`   |          | Hint; overridden by Discord's reported value     |
+//! | `RUST_LOG`          |          | `tracing` filter; defaults to `info`             |
 //!
 //! # Event handler
 //!
@@ -40,8 +41,9 @@
 //! to `commands::roll`, `commands::help`, or `commands::purge`.
 //!
 //! A background task collects per-shard guild counts and process memory usage
-//! every 15 minutes and writes them to the database.  The task listens for
-//! SIGTERM/SIGINT/Ctrl-C and shuts down cleanly via a `broadcast` channel.
+//! every 15 minutes and writes them to the database.  On SIGTERM, SIGINT or
+//! Ctrl-C, `main` broadcasts a shutdown on a `broadcast` channel that both this
+//! task and the Discord client listen on.
 
 use anyhow::{Context as _, Result};
 use dicemaiden_rs::{
@@ -463,7 +465,7 @@ async fn main() -> Result<()> {
         .await
         .context("Error creating client")?;
 
-    // Configure sharding after client creation
+    // Share the shard manager, database and guild counts with the command handlers
     {
         let mut data = client.data.write().await;
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
@@ -519,7 +521,7 @@ async fn main() -> Result<()> {
         }
     });
 
-    // Wait for shutdown signal and provide accurate information
+    // Log how this process is running, then wait for a shutdown signal
     if use_autosharding {
         info!(
             "Dice Maiden using autosharding with {} recommended shards",
@@ -705,7 +707,9 @@ async fn setup_signal_handlers(shutdown_tx: broadcast::Sender<()>) {
     }
 }
 
-// Optimized statistics collection to support both single-process and multi-process sharding
+/// Every 15 minutes, write this process's server count and memory use to the
+/// database: one `process_stats` row in multi-process mode, one `shard_stats`
+/// row per connected shard otherwise. Runs until a shutdown is broadcast.
 async fn collect_shard_stats_with_shutdown(
     db: Arc<database::Database>,
     guild_counts: Arc<GuildCounts>,
@@ -836,7 +840,7 @@ async fn collect_shard_stats_with_shutdown(
             // In multi-process mode, we only use process_stats table
             // Individual shard stats are not needed since process_stats contains all the information
 
-            // Cleanup old process stats every hour
+            // Prune rows from processes that stopped writing (45 minutes unwritten)
             if let Err(e) = db.cleanup_old_process_stats().await {
                 warn!("Failed to cleanup old process stats: {}", e);
             }
@@ -871,7 +875,6 @@ async fn collect_shard_stats_with_shutdown(
                 // Only shard 0 reports memory usage to avoid duplication in database
                 let shard_memory = if shard_id.0 == 0 { memory_usage } else { 0.0 };
 
-                // Update stats with simplified error handling during shutdown
                 if let Err(e) = db
                     .update_shard_stats(shard_id.0 as i32, shard_guild_count, shard_memory)
                     .await

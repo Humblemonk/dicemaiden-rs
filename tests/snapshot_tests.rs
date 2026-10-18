@@ -5,30 +5,31 @@
 // every expression in `tests/corpus/expressions.txt` so that a refactor which
 // changes a result fails here instead of on 500,000 Discord servers.
 //
-// Three layers, cheapest and strictest first:
+// Four layers, cheapest and strictest first:
 //
-// 1. `parse_snapshot`   — parsing is fully deterministic, so the parsed form of
-//                         every expression (and every parse error) is pinned
-//                         exactly.
-// 2. `roll_snapshot`    — expressions whose dice cannot vary (`d1` pools and
-//                         friends) produce a fixed result, so the full roll
-//                         outcome *and* the formatted Discord output are pinned
-//                         exactly.
-// 3. `outcome_snapshot` — for expressions that do roll randomly, the parts that
-//                         genuinely cannot vary with the dice are pinned: how
-//                         many results come back, whether the expression
-//                         succeeds or fails, and the exact error text when it
-//                         always fails.
-// 4. `seeded_snapshot`  — every expression rolled from a fixed seed, pinning the
-//                         exact result of systems whose dice are fixed by the
-//                         system itself (Savage Worlds' d8 trait die, Wrath &
-//                         Glory's d6 pool) and so cannot be pinned by notation.
+// 1. `parse.snap` — parsing is fully deterministic, so the parsed form of
+//    every expression (and every parse error) is pinned exactly.
+// 2. `deterministic_rolls.snap` — expressions whose dice cannot vary (`d1`
+//    pools and friends) produce a fixed result, so the full roll outcome *and*
+//    the formatted Discord output are pinned exactly.
+// 3. `outcomes.snap` — for expressions that do roll randomly, the parts that
+//    genuinely cannot vary with the dice are pinned: how many results come
+//    back, whether the expression succeeds or fails, and the exact error text
+//    when it always fails.
+// 4. `seeded_rolls.snap` — every expression rolled from a fixed seed, pinning
+//    the exact result of systems whose dice are fixed by the system itself
+//    (Savage Worlds' d8 trait die, Wrath & Glory's d6 pool) and so cannot be
+//    pinned by notation.
 //
 // Layer 4 is kept in its own file on purpose. It is sensitive to the *order and
 // number* of values drawn from the generator, so an internal change that draws
 // dice in a different order rewrites all of it while changing nothing a user
 // sees. Layer 2 is immune to that, which is why both exist: if layer 4 moves and
 // layer 2 does not, the behavior is intact and only the draw order shifted.
+//
+// `ignored_numbers.snap` sits beside them: every expression where adding
+// `+ 0` or `+ 1000` (in front of the dice or after them) changes nothing. Those
+// are known gaps, so the list should only shrink.
 //
 // Note what layer 3 deliberately does NOT assert: which optional fields a result
 // populates is *not* an invariant of the expression. `4d6 i1` only grows a

@@ -1,6 +1,5 @@
-//! Static Discord-formatted help strings for the `/help` command.
-//! Kept in a separate module so the text can be shared without duplication
-//! if additional consumers are added (e.g. a web dashboard).
+//! Static Discord-formatted help strings, shared by `/help <topic>` and
+//! `/roll help <topic>` so the two never show different text.
 //!
 //! # Adding a help topic
 //!
@@ -86,7 +85,7 @@ pub fn generate_basic_help() -> String {
 **Special Flags:**
 • `p` - Private roll (only you see results)
 • `s` - Simple output (no dice breakdown)
-• `nr` - No results shown (just total)
+• `nr` - No results shown (dice only, no total)
 • `ul` - Unsorted dice results
 
 **Examples:**
@@ -149,7 +148,7 @@ pub fn generate_alias_help() -> String {
 • `cs 3` → Cypher System 1d20 cs3 (Level 3 task, target 9+)
 • `cpr`/`cpd3`, `wfrp67`, `tbe65` → `/help cpr`, `/help wfrp`, `/help tbe`
 • `conan tn12f3` → Conan (target 12, Focus 3)
-• `sil3` → Silhouette (`/help system`)
+• `sil3` → Silhouette (highest die, extra 6s +1)
 • `ol5` → Open Legend (`/help ol`)
 • `ess1d8` → Essence20 (`/help ess`)
 • `tdh4` → The Darkest House (`/help tdh`)
@@ -246,9 +245,9 @@ A5E uses expertise dice that add to d20 rolls. Multiple expertise sources don't 
 • `ex10`, `ex12`, `ex20`, `ex100` (house rules)
 
 **Advantage/Disadvantage (only d20 rolled twice):**
-• `+a5e +5 ex1` → 2d20 kh1+5 + 1d4 (advantage + expertise)
+• `+a5e +5 ex1` → 2d20 k1+5 + 1d4 (advantage + expertise)
 • `-a5e +5 ex1` → 2d20 kl1+5 + 1d4 (disadvantage + expertise)
-• `+a5e ex2` → 2d20 kh1 + 1d6 (advantage, no modifier)
+• `+a5e ex2` → 2d20 k1 + 1d6 (advantage, no modifier)
 
 **Common Usage Examples:**
 • `a5e +7 ex1` - Attack roll with proficiency bonus and one expertise source

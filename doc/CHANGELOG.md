@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.2] - 2026-10-18
+
+## Fixed
+
+- `/help` described the `nr` flag backwards: it shows the dice and hides the total.
+- `/help a5e` showed advantage as `2d20 kh1`; the roll is `2d20 k1`.
+- `/help alias` pointed Silhouette to `/help system`, which has no Silhouette section.
+- The README's `docker run` mounted the volume where the database is not kept, so
+  statistics were lost with the container, and its systemd unit could not write the
+  database at all.
+
 ## [2.0.1] - 2026-10-15
 
 ## Changed

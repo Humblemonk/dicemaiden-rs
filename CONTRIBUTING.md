@@ -79,6 +79,7 @@ src/
     ├── roll.rs         # Roll command + result formatting for Discord
     ├── help.rs         # Topic-based help
     └── purge.rs        # Message purge with permission checking
+tools/                  # Release diff, image build, and operator spot-check scripts
 ```
 
 Test files live in `tests/` — see [Testing](#testing) below.
@@ -102,7 +103,7 @@ When you review code, look for the serious bugs before anything else. The worst 
 ### Data flow
 
 ```text
-src/dice/parser.rs → src/dice/roller.rs → src/commands/roll.rs → Discord message
+src/dice/aliases.rs → src/dice/parser.rs → src/dice/roller.rs → src/commands/roll.rs → Discord message
 ```
 
 Alias expansion happens **before** parsing — `aliases.rs` output is an ordinary expression
@@ -140,7 +141,7 @@ Follow this sequence exactly — do not skip or reorder steps:
 
 1. **`src/dice/aliases.rs`** — add the alias expansion function
 2. **`src/dice/mod.rs`** — add the `Modifier` enum variant
-3. **`src/dice/parser.rs`** — add parsing logic in `split_combined_modifiers` and the modifier parser
+3. **`src/dice/parser.rs`** — add parsing logic in `split_combined_modifiers` and `parse_modifiers_from_part`
 4. **`src/dice/roller.rs`** — add roll execution logic
 5. **`src/commands/roll.rs`** — add display/formatting logic
 6. **`tests/game_systems_tests.rs`** — add tests following existing patterns
@@ -185,8 +186,12 @@ Tests live in `tests/`:
 | `unit_tests.rs` | Core dice logic, parsing, rolling |
 | `game_systems_tests.rs` | All game system tests |
 | `integration_tests.rs` | End-to-end functionality |
-| `performance_tests.rs` | Performance and limit testing |
+| `performance_tests.rs` | Performance and limit testing, and the regex-hoisting lint |
 | `snapshot_tests.rs` | Golden snapshots pinning observable behavior |
+| `database_tests.rs` | Statistics persistence |
+| `fuzz_tests.rs` | Mutation fuzzer, run on demand (`--ignored`) |
+| `release_diff.rs` | Roll dump used by `tools/diff-vs-release.sh` (`--ignored`) |
+| `common/mod.rs` | Helpers shared by `snapshot_tests.rs` and `release_diff.rs` |
 
 ### Snapshot tests
 
@@ -315,6 +320,7 @@ builds regexes, add it to the list in that test.
 - `roll_syntax.md` — update with any syntax change
 - `env.example` — update when adding or changing an environment variable
 - `README.md` — update if your change affects env vars, commands, or deployment
+- `AGENTS.md` — the same rules for coding agents; mirror any rule you change here
 
 ---
 

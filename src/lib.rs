@@ -13,23 +13,23 @@
 //! ├── database         SQLite statistics persistence
 //! ├── guild_counts     Server/member counts (replaces Serenity's guild cache)
 //! ├── dice/            Core dice engine
-//! │   ├── mod.rs       Types: DiceRoll, RollResult, Modifier, DiceGroup
+//! │   ├── mod.rs       Types (DiceRoll, RollResult, Modifier, DiceGroup) and
+//! │   │                RollResult → Discord message formatting
 //! │   ├── aliases.rs   Game-system alias expansion
 //! │   ├── parser.rs    Text → Vec<DiceRoll>
-//! │   ├── roller.rs    Vec<DiceRoll> → Vec<RollResult>
-//! │   ├── roll.rs      RollResult → Discord message string
+//! │   ├── roller.rs    DiceRoll → RollResult
 //! │   └── rng.rs       Enhanced RNG seeding
 //! └── help_text.rs     Static help message generators
 //! ```
 //!
 //! # Re-exports
 //!
-//! The most-used types (`DiceRoll`, `RollResult`, `Modifier`, `DiceGroup`,
-//! `parse_and_roll`, `format_multiple_results`) are re-exported from the crate
-//! root for convenience in tests and external consumers.
+//! The most-used types and functions (`DiceRoll`, `RollResult`, `Modifier`,
+//! `DiceGroup`, `parse_and_roll`, `format_multiple_results`, …) are re-exported
+//! from the crate root for convenience in tests and external consumers.
 //!
 //! [`ShardManagerContainer`], [`DatabaseContainer`] and [`GuildCountsContainer`] are Serenity
-//! [`TypeMapKey`] wrappers that allow the shard manager and database handles to
+//! [`TypeMapKey`] wrappers that let the shard manager, database and guild counts
 //! be stored in, and retrieved from, the Serenity shared data map.
 
 pub mod commands;
@@ -41,7 +41,7 @@ pub mod help_text;
 use serenity::prelude::*;
 use std::sync::Arc;
 
-// Move these type map keys from main.rs to lib.rs so they can be shared
+// Type map keys, here rather than in main.rs so the command handlers can read them
 pub struct ShardManagerContainer;
 
 impl TypeMapKey for ShardManagerContainer {

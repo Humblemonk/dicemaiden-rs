@@ -249,7 +249,8 @@ Modifiers apply in stages, not in the order you type them:
 - `2.5hsk` → 2d6 hsk + 1d3 (fractional killing damage)
 - `2hsk1` → 2d6 hsk + 1d3 (alternative fractional notation)
 - `3hsh` → 3d6 hsh (to-hit roll, roll-under)
-- `hsn`, `hsk`, `hsh` → Single die versions
+- `hsn`, `hsk` → 1d6 hsn, 1d6 hsk (single die versions)
+- `hsh` → 3d6 hsh (a to-hit roll is always 3d6)
 
 ### Godbound
 - `gb` → 1d20 gb (damage chart: 1-=0, 2-5=1, 6-9=2, 10+=4)
@@ -509,10 +510,10 @@ plain dice syntax — `1d6 + 4 - 2` — and `adv1` / `dis1` for a Boon or Bane o
 - **Selection Logic**: Advantage prioritizes Crit Success > Success > Failure > Crit Failure — a Critical Failure is an ordinary failure plus a Panic Check, so it is the worst outcome. Disadvantage reverses the order
 
 ### Exalted (White Wolf)
-- `ex5` → 5d10 t7ds10 (5 dice, target 7+, 10s count double)
-- `ex5t8` → 5d10 t8ds10 (5 dice, custom target 8+, 10s count double)
-- `ex10` → 10d10 t7ds10 (10 dice, default target 7+)
-- `ex3t6` → 3d10 t6ds10 (3 dice, easier target 6+)
+- `ex5` → 5d10 t7 t10 (5 dice, target 7+, 10s count double)
+- `ex5t8` → 5d10 t8 t10 (5 dice, custom target 8+, 10s count double)
+- `ex10` → 10d10 t7 t10 (10 dice, default target 7+)
+- `ex3t6` → 3d10 t6 t10 (3 dice, easier target 6+)
 
 **Exalted Success Mechanics:**
 - **Standard Target**: 7+ = 1 success (default for most rolls)
@@ -543,7 +544,7 @@ plain dice syntax — `1d6 + 4 - 2` — and `adv1` / `dis1` for a Boon or Bane o
 - **Double Digit**: `dd34` → 1d3*10 + 1d4 (d66-style)
 - **Storypath**: `sp4` → 4d10 t8 ie10, `sp4t6` → 4d10 t6 ie10 (custom target)
 - **Sunsails**: `snm5` → 5d6 ie6 t4
-- **D6 System**: `d6s4` → 4d6 + 1d6 ie
+- **D6 System**: `d6s4` → 4d6 + 1d6 ie6 (wild die)
 - **Plotweaver/Cosmere RPG**: `dp` → 1d6 plot die; `3dp` → 3d6 plot dice (faces: 1=COMPLICATION +2, 2=COMPLICATION +4, 3–4=_, 5–6=OPPORTUNITY)
 
 ## System-Specific Examples
@@ -614,5 +615,10 @@ plain dice syntax — `1d6 + 4 - 2` — and `adv1` / `dis1` for a Boon or Bane o
 - `/roll help aliens` or `/help aliens` - Alien RPG stress and panic
 - `/roll help mothership` or `/help mothership` - Mothership RPG stat checks
 - `/roll help ol` or `/help ol` - Open Legend advantage/disadvantage
+- `/roll help ess` or `/help ess` - Essence20 skill dice and specializations
+- `/roll help tdh` or `/help tdh` - The Darkest House and the House Die
+- `/roll help cpr` or `/help cpr` - Cyberpunk Red skill checks and damage
+- `/roll help wfrp` or `/help wfrp` - Warhammer Fantasy Roleplay 4e tests
+- `/roll help tbe` or `/help tbe` - The Broken Empires tests
 - `/roll donate` - Support information
-- `/purge X` - Purge recent messages in channel
+- `/purge X` - Purge the last X messages in the channel (2-100)

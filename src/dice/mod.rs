@@ -20,24 +20,22 @@
 //!
 //! 1. `aliases.rs`            — add alias expansion
 //! 2. **this file**           — add a `Modifier` variant
-//! 3. `parser.rs`             — add parsing in `split_combined_modifiers`
+//! 3. `parser.rs`             — add parsing in `split_combined_modifiers` and
+//!    `parse_modifiers_from_part`
 //! 4. `roller.rs`             — add roll execution logic
-//! 5. `roll.rs`               — add display / formatting logic
+//! 5. `commands/roll.rs`      — add display / formatting logic
 //! 6. `game_systems_tests.rs` — add table-driven tests
 //! 7. `roll_syntax.md`        — document the new syntax
 //!
 //! # Modifier ordering invariant
 //!
-//! **Drop before explode.**  Dropped dice are never reconsidered for explosion.
-//! This is intentional game-design behaviour and is covered by tests — do not
-//! change the ordering.
+//! **Drop before explode.**  [`Modifier::Advantage`] / [`Modifier::Disadvantage`]
+//! discard their surplus dice before any explosion runs, and a discarded die is
+//! never reconsidered for explosion.  Open Legend requires this.
 //!
-//! The one exception runs the *other* way round: `d#`/`k#` are applied *after*
-//! explosions, so exploded dice can themselves be dropped.  Open Legend needs
-//! the drop to happen against the initial pool only, so
-//! [`Modifier::Advantage`] / [`Modifier::Disadvantage`] are resolved in
-//! `roller::roll_dice` before any explosion runs.  Both orderings are covered
-//! by tests — do not merge them.
+//! `d#`/`k#` run the other way round: they are applied *after* explosions, so
+//! exploded dice can themselves be dropped.  Both orderings are intentional and
+//! covered by tests — do not change or merge them.
 
 pub mod aliases;
 pub mod parser;
@@ -62,7 +60,7 @@ pub struct DiceRoll {
     pub simple: bool,
     pub no_results: bool,
     pub unsorted: bool,
-    pub original_expression: Option<String>, // Store the original expression
+    pub original_expression: Option<String>, // The expression as the user typed it
 }
 
 #[derive(Debug, Clone)]
@@ -175,7 +173,7 @@ pub enum Modifier {
     SubtractDice(DiceRoll),                 // Subtract dice result
     MultiplyDice(DiceRoll),
     DivideDice(DiceRoll),
-    WrathGlory(Option<u32>, bool, u32), // Wrath & Glory: (difficulty, use_total_instead_of_successes)
+    WrathGlory(Option<u32>, bool, u32), // Wrath & Glory: (difficulty, use_total_instead_of_successes, wrath_dice)
     Godbound(bool),                     // gb (false) or gbs (true for straight damage)
     HeroSystem(HeroSystemType),         // Hero System damage/hit calculations
     Fudge,                              // df - Fudge dice with symbol display
@@ -192,7 +190,7 @@ pub enum Modifier {
     Witcher,
     CypherSystem(u32),
     BraveNewWorld(u32),
-    ConanSkill(u32),  // conan, conan3, conan4, conan5 - d20 skill rolls
+    ConanSkill(u32),  // conan, conan1-conan9 - d20 skill rolls
     ConanCombat(u32), // cd, cd4, cd5 - combat dice interpretation
     /// `tn#`, `tn#f#`, `tn#f#c#` - Conan / 2d20 skill test. Each d20 at or under
     /// `target` (Attribute + Expertise) scores one success, at or under `focus`
@@ -208,7 +206,7 @@ pub enum Modifier {
     },
     Silhouette(u32),
     VampireMasquerade5(u32, u32),
-    LaserFeelings(u32, u32, LaserFeelingsType), // (dice_count, target, roll_type)
+    LaserFeelings(u32, u32, LaserFeelingsType), // (unused, always 0; target; roll_type)
     Alien,                                      // Basic alien roll (count 6s as successes)
     AlienStress(u32), // Stress dice (count 6s, track 1s for panic, stress level)
     ForgedDark,
@@ -230,8 +228,6 @@ impl Modifier {
         self.sets_success_count() || matches!(self, Modifier::Failure(_) | Modifier::Botch(_))
     }
 
-    /// Targets that make the roller apply math after them to the success count.
-    /// `f#` and `b#` don't: with only those, math after them is not applied.
     /// Systems whose roller counts the pooled dice (Icons, sixes, the highest
     /// die) and applies no math to the result. An added dice operand joins the
     /// pool (apply_dice_operand puts its dice in kept_rolls, which these count),
@@ -253,6 +249,9 @@ impl Modifier {
         }
     }
 
+    /// Targets that make the roller apply math after them to the success count.
+    /// `f#` and `b#` don't: with only those, math after `f#` is ignored and math
+    /// after `b#` goes on the total.
     pub fn sets_success_count(&self) -> bool {
         matches!(
             self,
@@ -267,10 +266,10 @@ impl Modifier {
 
 #[derive(Debug, Clone)]
 pub struct DiceGroup {
-    pub _description: String, // Currently unused but kept for future debugging
+    pub _description: String, // Never displayed; kept for debugging
     pub rolls: Vec<i32>,
     pub dropped_rolls: Vec<i32>, // Dropped dice for strikethrough display
-    pub modifier_type: String,   // "base", "add", "subtract"
+    pub modifier_type: String,   // "base", "add", "subtract", "multiply", "divide", "result"
 }
 
 #[derive(Debug, Clone, Default)]
@@ -286,10 +285,10 @@ pub struct RollResult {
     pub label: Option<String>,
     pub notes: Vec<String>,
     pub dice_groups: Vec<DiceGroup>,
-    pub original_expression: Option<String>, // Store the original expression that generated this result
-    pub simple: bool,                        // Add simple flag to control output formatting
-    pub no_results: bool,                    // Add no_results flag
-    pub private: bool,                       // Add private flag for ephemeral responses
+    pub original_expression: Option<String>, // The expression that generated this result
+    pub simple: bool,                        // `s` flag: result only, no dice breakdown
+    pub no_results: bool,                    // `nr` flag: dice breakdown only, no result
+    pub private: bool,                       // `p` flag: ephemeral response
     pub godbound_damage: Option<i32>,        // Store converted Godbound damage
     pub fudge_symbols: Option<Vec<String>>,  // Store Fudge dice symbols
     // Wrath & Glory specific fields
@@ -341,8 +340,7 @@ impl RollResult {
             return format!("`[{}]`", symbols.join(", "));
         }
 
-        // When there are dropped dice, always prioritize showing all original dice
-        // This addresses the user's complaint that dice groups only show kept dice
+        // When there are dropped dice, show every original die, not only the kept ones
         if !self.dropped_rolls.is_empty() {
             if !self.dice_groups.is_empty() {
                 // For complex expressions with dice groups AND dropped dice:
