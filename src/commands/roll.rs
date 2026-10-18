@@ -13,13 +13,13 @@
 //! /roll <dice>
 //!   └─ dice::parse_and_roll(input)
 //!         ├─ parser::parse_dice_string  →  Vec<DiceRoll>
-//!         └─ roller::roll_dice (×N)     →  Vec<RollResult>
+//!         └─ roller::roll_dice_with_rng (×N) → Vec<RollResult>
 //!              └─ format_multiple_results_with_limit  →  String
 //!                   └─ CommandResponse { content, ephemeral }
 //! ```
 
 use crate::dice;
-use crate::help_text; // Import the shared help text module from src root
+use crate::help_text;
 use crate::{DatabaseContainer, GuildCountsContainer};
 use anyhow::Result;
 use once_cell::sync::Lazy;
@@ -31,7 +31,7 @@ use serenity::{
 };
 use sysinfo::{Pid, ProcessesToUpdate, System};
 
-// Custom response type to include privacy information
+/// A command's reply text and whether only the invoking user sees it.
 #[derive(Debug)]
 pub struct CommandResponse {
     pub content: String,
@@ -415,6 +415,9 @@ async fn get_database_stats(ctx: &Context) -> String {
     }
 }
 
+static LEADING_LABEL_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\s*\([^)]*\)\s*").expect("Failed to compile LEADING_LABEL_REGEX"));
+
 /// Strip both labels and comments from dice expression for clean request display
 ///
 /// This function removes:
@@ -425,9 +428,6 @@ async fn get_database_stats(ctx: &Context) -> String {
 /// - "(roll to hit) 1d20+2" -> "1d20+2"
 /// - "2d6 ! fire damage" -> "2d6"
 /// - "(attack) 1d20+5 ! with sword" -> "1d20+5"
-static LEADING_LABEL_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*\([^)]*\)\s*").expect("Failed to compile LEADING_LABEL_REGEX"));
-
 fn strip_label_and_comment_from_expression(expr: &str) -> String {
     // Remove labels in parentheses at the beginning: (label) dice_expression
     let cleaned = LEADING_LABEL_REGEX.replace(expr, "");

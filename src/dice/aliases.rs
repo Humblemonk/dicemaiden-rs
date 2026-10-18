@@ -5,45 +5,21 @@
 //! `NdS [modifiers]` expression (or a multi-roll expression for systems that
 //! need it) and parsing continues normally.
 //!
-//! # Supported aliases (summary)
-//!
-//! | Prefix / pattern | System                               |
-//! |------------------|--------------------------------------|
-//! | `alien`          | Alien RPG (Year Zero Engine)         |
-//! | `+d` / `-d`      | Advantage / disadvantage (d20, etc.) |
-//! | `Nwod` / `Ncod`  | World of Darkness / Chronicles       |
-//! | `wng`            | Warhammer: Age of Sigmar – Soulbound |
-//! | `sw`             | Savage Worlds trait dice             |
-//! | `gb` / `gbs`     | Godbound damage                      |
-//! | `df`             | Fate / Fudge dice                    |
-//! | `dh`             | Dark Heresy                          |
-//! | `sr`             | Shadowrun                            |
-//! | `sp`             | Storypath                            |
-//! | `yz`             | Year Zero Engine (generic)           |
-//! | `snm`            | Sunsails New Millennium              |
-//! | `d6s`            | D6 System                            |
-//! | `hs`             | Hero System                          |
-//! | `ex`             | Exalted                              |
-//! | `ms` / `ms2`     | Mothership RPG                       |
-//! | `ol5` / `ol5a2`  | Open Legend RPG                      |
-//! | `ola` / `old`    | Open Legend RPG                      |
-//! | `ess1d8`         | Essence20 (Renegade Game Studios)    |
-//! | `tdh`            | The Darkest House (Monte Cook Games) |
-//! | `cpr` / `cpd`    | Cyberpunk Red skill check / damage    |
-//! | `wfrp`           | Warhammer Fantasy Roleplay 4e         |
-//! | `tbe`            | The Broken Empires RPG                |
-//!
-//! See `roll_syntax.md` for the full syntax reference.  All regex patterns are
-//! compiled once at startup via `once_cell::Lazy`.
+//! Lookup order matters: Mothership's `+ms`/`-ms` are tried first, then the
+//! parameterized patterns in `expand_parameterized_alias` (in source order),
+//! then the fixed `STATIC_ALIASES` table.  `roll_syntax.md` is the full list
+//! of aliases and what each expands to.  Every pattern is a `Lazy<Regex>`,
+//! compiled once on first use.
 //!
 //! # Adding a new alias
 //!
 //! 1. Check `roll_syntax.md` — the new prefix must not be a prefix of, or
 //!    prefixed by, any existing identifier (prefix-matching conflicts are silent
 //!    and hard to debug).
-//! 2. Add a `Lazy<Regex>` constant near the top of this file.
-//! 3. Add a match arm in `expand_alias`.
-//! 4. Document the syntax in `roll_syntax.md`.
+//! 2. Add a `Lazy<Regex>` static near the top of this file.
+//! 3. Add the expansion where it belongs in the lookup order above.
+//! 4. A new game system then continues through the remaining steps in
+//!    `dice/mod.rs` ("Adding a new game system"), ending with `roll_syntax.md`.
 
 use super::ALIEN_MAX_STRESS;
 use once_cell::sync::Lazy;
@@ -51,7 +27,8 @@ use regex::Regex;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-// Pre-compile all regex patterns at startup to reduce memory allocations
+// Every pattern is compiled once, on first use. Never compile one per call:
+// see the regex note in AGENTS.md.
 static GB_DICE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(gbs?)\s+(\d+)d(\d+)(?:\s*([+-]\s*\d+))?$")
         .expect("Failed to compile GB_DICE_REGEX")
@@ -305,7 +282,7 @@ static TDH_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^tdh(\d+)([bn])?(c)?(?:\s*([+-]\s*\d+))?$").expect("Failed to compile TDH_REGEX")
 });
 
-// Use static storage for commonly used alias mappings
+// Aliases with no parameters, matched on the whole input
 static STATIC_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut aliases = HashMap::new();
     aliases.insert("age", "2d6 + 1d6");
@@ -564,7 +541,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         ));
     }
 
-    // World of Darkness (4wod8 -> 4d10 f1 ie10 t8)
+    // World of Darkness (4wod8 -> 4d10 f1 t8)
     if let Some(captures) = WOD_REGEX.captures(input) {
         let (count, difficulty) = (&captures[1], &captures[2]);
         return Some(format!(
@@ -638,7 +615,7 @@ fn expand_parameterized_alias(input: &str) -> Option<String> {
         return Some(format!("{count}d6 ie6 t4"));
     }
 
-    // D6 System (d6s4 -> use custom modifier instead of parsing)
+    // D6 System (d6s4 -> 1d1 d6s4: the D6System modifier rolls the real dice)
     if let Some(captures) = D6S_REGEX.captures(input) {
         let count = &captures[1];
         let pips = captures.get(2).map_or("", |m| m.as_str());
@@ -1428,7 +1405,7 @@ fn expand_wild_words_alias(input: &str) -> Option<String> {
         return Some(format!("{dice_count}d6 wwc{cut_count}"));
     }
 
-    // Check for basic wild worlds roll (ww4 -> 4d6 ww)
+    // Check for basic Wild Words roll (ww4 -> 4d6 ww)
     if let Some(captures) = WILD_WORLDS_BASIC_REGEX.captures(input) {
         let dice_count = &captures[1];
 

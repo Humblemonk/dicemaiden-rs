@@ -9,8 +9,8 @@
 //! there is no per-surface topic list that can drift.  An unrecognised topic
 //! falls back to the basic page.
 
-use crate::commands::CommandResponse; // Import CommandResponse
-use crate::help_text; // Import the shared help text module from src root
+use crate::commands::CommandResponse;
+use crate::help_text;
 use anyhow::Result;
 use serenity::{
     all::{CommandDataOptionValue, CommandInteraction, CommandOptionType},

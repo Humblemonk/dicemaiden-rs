@@ -17,21 +17,23 @@
 //!
 //! ## `process_stats` — multi-process deployments
 //!
-//! | Column         | Type      | Description                          |
-//! |----------------|-----------|--------------------------------------|
-//! | `process_id`   | TEXT PK   | `process_<shard_start>`              |
-//! | `shard_start`  | INT       | First shard owned by this process    |
-//! | `shard_count`  | INT       | Number of shards in this process     |
-//! | `total_shards` | INT       | Total shards across all processes    |
-//! | `server_count` | INT       | Guilds visible to this process       |
-//! | `memory_mb`    | REAL      | RSS memory for this process          |
-//! | `timestamp`    | DATETIME  | Last update time                     |
+//! | Column         | Type      | Description                                       |
+//! |----------------|-----------|---------------------------------------------------|
+//! | `process_id`   | TEXT PK   | `process_<shard_start>`                           |
+//! | `shard_start`  | INT       | First shard owned by this process                 |
+//! | `shard_count`  | INT       | `SHARD_COUNT`: one less than the shards it runs   |
+//! | `total_shards` | INT       | Total shards across all processes                 |
+//! | `server_count` | INT       | Guilds visible to this process                    |
+//! | `memory_mb`    | REAL      | RSS memory for this process, in MB                |
+//! | `timestamp`    | DATETIME  | Last update time                                  |
 //!
 //! Stats are written every 15 minutes by `main::collect_shard_stats_with_shutdown`.
 //! Old `process_stats` rows (45 minutes unwritten) are pruned by
 //! [`Database::cleanup_old_process_stats`].
 //! The database file location is controlled by the `DATABASE_URL` environment
-//! variable; it defaults to `main.db` in the project root.
+//! variable. Without it the file is `main.db` in the nearest directory, from the
+//! working directory up, that holds a `Cargo.toml` (the checkout root under
+//! `cargo run`), or in the working directory itself (`/app` in the container).
 
 use anyhow::Result;
 use sqlx::{Row, sqlite::SqliteConnectOptions, sqlite::SqlitePool};
@@ -39,7 +41,8 @@ use std::str::FromStr;
 use tracing::info;
 
 /// Walk up the directory tree from the current working directory until a
-/// directory containing `Cargo.toml` is found. Falls back to `current_dir()` when no `Cargo.toml` ancestor exists
+/// directory containing `Cargo.toml` is found. Falls back to `current_dir()`
+/// when no `Cargo.toml` ancestor exists.
 fn find_project_root() -> std::path::PathBuf {
     let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
     let mut dir = cwd.as_path();
@@ -140,7 +143,7 @@ impl Database {
         Ok(())
     }
 
-    // New function to update process stats for multi-process sharding
+    /// Insert or replace this process's `process_stats` row (multi-process mode).
     pub async fn update_process_stats(
         &self,
         process_id: &str,
@@ -209,7 +212,7 @@ impl Database {
         Ok(stats)
     }
 
-    // New function to get all process stats
+    /// Every `process_stats` row, most recently written first.
     pub async fn get_all_process_stats(&self) -> Result<Vec<ProcessStats>> {
         let rows = sqlx::query(
             r#"

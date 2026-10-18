@@ -29,9 +29,10 @@ To restrict the bot to specific channels, go to **Server Settings → Integratio
 | --- | --- |
 | `/roll <dice>` | Roll dice using RPG notation |
 | `/r <dice>` | Short alias for `/roll` |
-| `/help [topic]` | Help — topics include `basic`, `alias`, `system`, `a5e`, `aliens`, `tbe`, and `mothership` |
-| `/purge <count>` | Delete recent messages (requires Manage Messages) |
+| `/help [topic]` | Help — topics: `basic`, `alias`, `system`, `a5e`, `aliens`, `mothership`, `ol`, `ess`, `tdh`, `cpr`, `wfrp`, `tbe` |
+| `/purge <count>` | Delete the last 2–100 messages in the channel (requires Manage Messages) |
 | `/roll donate` | Support information |
+| `/roll bot-info` | Version, server count and memory use (requires Administrator) |
 
 ## Rolling Dice
 
@@ -71,7 +72,7 @@ See [`env.example`](env.example) for the full annotated list.
 | Variable | Required | Description |
 | --- | --- | --- |
 | `DISCORD_TOKEN` | ✓ | Bot token from the Discord developer portal |
-| `DATABASE_URL` | | SQLite path — defaults to `./main.db`, created if missing |
+| `DATABASE_URL` | | SQLite URL (`sqlite:path/to/main.db`) — defaults to `main.db` in the working directory (the checkout root under `cargo run`), created if missing |
 | `GUILD_ID` | | Register commands to one guild for instant testing |
 | `SHARD_COUNT` | | Shards for this process — defaults to 1 |
 | `USE_AUTOSHARDING` | | `true` lets Discord pick the shard count |
@@ -87,8 +88,12 @@ one out of these docs:
 
 ```bash
 docker build -t dicemaiden-rs .
-docker run --env-file .env -v dicemaiden-data:/app/data dicemaiden-rs
+docker run --env-file .env -v dicemaiden-data:/app dicemaiden-rs
 ```
+
+The image's working directory is `/app`, so the default database is `/app/main.db`; mount the
+volume there (as [`docker-compose.yml`](docker-compose.yml) does) or the statistics are lost
+with the container.
 
 <details>
 <summary><b>Systemd service</b></summary>
@@ -105,6 +110,9 @@ User=dicebot
 Group=dicebot
 WorkingDirectory=/opt/dicemaiden-rs
 Environment=RUST_LOG=info
+# ProtectSystem=strict leaves only ReadWritePaths writable, so the database must live there.
+# Create the directory before starting: systemd refuses to start if it is missing.
+Environment=DATABASE_URL=sqlite:/opt/dicemaiden-rs/data/main.db
 EnvironmentFile=/opt/dicemaiden-rs/.env
 ExecStart=/opt/dicemaiden-rs/target/release/dicemaiden-rs
 Restart=always

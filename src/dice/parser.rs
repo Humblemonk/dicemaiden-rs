@@ -22,7 +22,8 @@
 //!
 //! # Prefix-matching hazards
 //!
-//! Modifiers are matched in declaration order inside `split_combined_modifiers`.
+//! Modifiers are matched in the order of the `SPLIT_MODIFIER_PATTERNS`,
+//! `COMBINED_MODIFIER_PATTERNS` and `MODIFIER_START_PATTERNS` lists.
 //! **Multi-character prefixes must appear before their single-character
 //! counterparts** — e.g. `ie`/`irg`/`ir` before `e`/`r`, `km`/`kl` before
 //! `k`, `tl` before `t`.  Before adding a new modifier prefix, check
@@ -30,13 +31,15 @@
 //!
 //! # Limits
 //!
-//! | Constraint          | Value   |
-//! |---------------------|---------|
+//! | Constraint          | Value       |
+//! |---------------------|-------------|
 //! | Max input length    | 1 000 chars |
-//! | Roll-set count      | 2 – 20  |
-//! | Multi-roll segments | up to 4 |
+//! | Max dice per pool   | 500         |
+//! | Max sides per die   | 1 000       |
+//! | Roll-set count      | 2 – 20      |
+//! | Multi-roll segments | up to 4     |
 //!
-//! All regex patterns are compiled once at startup via `once_cell::Lazy`.
+//! All regex patterns are compiled once, on first use, via `once_cell::Lazy`.
 
 use super::{
     CONAN_MAX_FOCUS, CONAN_MAX_POOL, DiceRoll, ESSENCE20_RANKS, HeroSystemType, LaserFeelingsType,
@@ -49,7 +52,8 @@ use regex::Regex;
 const MAX_INPUT_LENGTH: usize = 1000;
 const MAX_SIDES: u32 = 1000;
 
-// Pre-compile all regex patterns at startup to reduce memory allocations
+// Every pattern is compiled once, on first use. Never compile one per call:
+// see the regex note in AGENTS.md.
 static SET_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\d+)\s+(.+)$").expect("Failed to compile SET_REGEX"));
 
@@ -62,7 +66,7 @@ static LABEL_REGEX: Lazy<Regex> =
 static COMMENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"!\s*(.*)$").expect("Failed to compile COMMENT_REGEX"));
 
-// Add regex for advantage/disadvantage patterns with modifiers
+// An advantage/disadvantage alias with one trailing number: `+d20+5`, `-d% * 2`
 static ADV_WITH_SIMPLE_MOD_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^([+-])d(\d+|%)\s*([+\-*/])\s*(\d+)$")
         .expect("Failed to compile ADV_WITH_SIMPLE_MOD_REGEX")
@@ -575,10 +579,8 @@ fn parse_rolls(input: &str) -> Result<Vec<DiceRoll>> {
     Ok(vec![result_dice])
 }
 
-// Enhanced is_valid_roll_set_expression function
-// Replace the is_valid_roll_set_expression function in src/dice/parser.rs
-// This fix addresses the three failing test cases
-
+/// Whether `expr`, the part after a roll set's count (`6 4d6 k3`), looks like a
+/// dice expression or alias rather than arithmetic such as `6 + 6`.
 fn is_valid_roll_set_expression(expr: &str) -> bool {
     let expr = expr.trim();
 
@@ -921,8 +923,8 @@ fn parse_expression_to_parts(input: &str) -> Result<Vec<String>> {
         }
     }
 
-    // REMOVE the aggressive advantage detection here - it's interfering with roll sets
-    // Only handle advantage patterns when they're part of complex expressions (multiple operators)
+    // No advantage detection here: it misread roll sets. Advantage patterns are
+    // handled only inside multi-operator expressions, below.
 
     // Special handling for expressions like "200 / 2d4" or "500 / d%" where number comes before dice
     if let Some(captures) = NUMBER_OP_DICE_REGEX.captures(&normalized) {
@@ -1023,7 +1025,7 @@ fn parse_expression_to_parts(input: &str) -> Result<Vec<String>> {
     Ok(parts)
 }
 
-// New struct to hold parsed dice and modifiers
+// A dice token split from the modifier tokens that follow it
 struct DiceAndModifiers {
     dice_part: String,
     additional_modifiers: Vec<String>,
@@ -1400,9 +1402,9 @@ static SPLIT_MODIFIER_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^(bnw)",                        // brave new world — bnw
         r"^(alien)",                      // alien base — alien (exact)
         r"^(aliens\d+)",                  // alien stress — aliens1, aliens2, etc.
-        r"^(wwc\d+)",                     // wild worlds cut — wwc2, wwc3, etc. (before basic ww)
+        r"^(wwc\d+)",                     // wild words cut — wwc2, wwc3, etc. (before basic ww)
         r"^(ms\d+[ad]?|ms[ad]?|ms)",      // mothership
-        r"^(ww)",                         // wild worlds — ww (basic)
+        r"^(ww)",                         // wild words — ww (basic)
         r"^(plot)",                       // plotweaver — plot
     ]
     .iter()
@@ -1489,7 +1491,6 @@ fn split_combined_modifiers(input: &str) -> Result<Vec<String>> {
     Ok(modifiers)
 }
 
-// Better flag parsing with proper whitespace handling
 /// True when `input`, or any `;`-separated part of it, starts with the `p`
 /// flag: the same rule that marks a roll private. A roll that fails to parse
 /// has no results to read the flag from, so its error uses this instead.
@@ -1729,7 +1730,6 @@ fn parse_all_modifiers(dice: &mut DiceRoll, parts: &[String]) -> Result<()> {
     Ok(())
 }
 
-// Helper function to check if a token is combined modifiers
 /// Modifier prefixes recognised by [`is_combined_modifiers_token`], in match order.
 ///
 /// **Order is load-bearing.** Multi-character prefixes (`ie`, `adv`, `dis`, `irg`,
@@ -1807,7 +1807,6 @@ fn is_combined_modifiers_token(input: &str) -> bool {
     false
 }
 
-// Check if a string starts with modifier patterns
 /// Modifier prefixes recognised by [`starts_with_modifier_pattern`], in match order.
 ///
 /// **Order is load-bearing** for the same reason as [`SPLIT_MODIFIER_PATTERNS`]:
@@ -2680,25 +2679,23 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
     if part == "ms" {
         return Ok(Modifier::Mothership(None, false));
     }
+    // `msa`/`msd` are what `+ms`/`-ms` expand to: a letter, since a trailing
+    // `+`/`-` would read as an operator
     if part == "msa" {
-        // Changed from ms+
         return Ok(Modifier::Mothership(None, true));
     }
     if part == "msd" {
-        // Changed from ms-
         return Ok(Modifier::Mothership(None, false));
     }
 
     // Mothership with stat value
     if let Some(stripped) = part.strip_prefix("ms") {
         if let Some(stat_str) = stripped.strip_suffix('a') {
-            // Changed from '+'
             return Ok(Modifier::Mothership(
                 Some(parse_mothership_stat(stat_str, part)?),
                 true,
             ));
         } else if let Some(stat_str) = stripped.strip_suffix('d') {
-            // Changed from '-'
             return Ok(Modifier::Mothership(
                 Some(parse_mothership_stat(stat_str, part)?),
                 false,
@@ -2791,11 +2788,8 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         let roll_type = match type_str.as_str() {
             "l" => LaserFeelingsType::Lasers,
             "f" => LaserFeelingsType::Feelings,
-            "" => {
-                // Generic - we'll need both types available, but for now default to Lasers
-                // In a real implementation, you might want to ask the user or handle differently
-                LaserFeelingsType::Lasers
-            }
+            // A bare `2lf4` rolls as Lasers, as roll_syntax.md documents
+            "" => LaserFeelingsType::Lasers,
             _ => {
                 return Err(anyhow!(
                     "Invalid Lasers & Feelings type '{}' in '{}'",
@@ -2805,8 +2799,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
             }
         };
 
-        // Note: dice_count will be extracted from the dice expression, not the modifier
-        // For now, we'll use 0 as a placeholder and let the roller extract the actual count
+        // The roller takes the dice count from the roll itself; the first field is unused
         return Ok(Modifier::LaserFeelings(0, target, roll_type));
     }
 
