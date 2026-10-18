@@ -251,7 +251,8 @@ impl Modifier {
 
     /// Targets that make the roller apply math after them to the success count.
     /// `f#` and `b#` don't: with only those, math after `f#` is ignored and math
-    /// after `b#` goes on the total.
+    /// after `b#` goes on the total, unless math also comes before `b#`, which
+    /// drops it (`4d1 + 1 b1 + 5` is 8).
     pub fn sets_success_count(&self) -> bool {
         matches!(
             self,
