@@ -41,7 +41,8 @@
 //! to `commands::roll`, `commands::help`, or `commands::purge`.
 //!
 //! A background task collects per-shard guild counts and process memory usage
-//! every 15 minutes and writes them to the database.  On SIGTERM, SIGINT or
+//! every 15 minutes, writes them to the database, and warns about any of this
+//! process's shards that are not connected.  On SIGTERM, SIGINT or
 //! Ctrl-C, `main` broadcasts a shutdown on a `broadcast` channel that both this
 //! task and the Discord client listen on.
 
@@ -479,6 +480,12 @@ async fn main() -> Result<()> {
     let shard_manager = Arc::clone(&client.shard_manager);
     let db_clone = Arc::clone(&db);
     let stats_shutdown_rx = shutdown_tx.subscribe();
+    // The shards start_client_with_shard_strategy boots in this process
+    let expected_shards = if shard_strategy == "multi_process" {
+        shard_start..shard_start.saturating_add(shard_count).saturating_add(1)
+    } else {
+        0..shard_count
+    };
 
     // Start the statistics collection task with graceful shutdown
     let stats_handle = tokio::spawn(async move {
@@ -486,6 +493,7 @@ async fn main() -> Result<()> {
             db_clone,
             guild_counts,
             shard_manager,
+            expected_shards,
             stats_shutdown_rx,
         )
         .await
@@ -709,11 +717,15 @@ async fn setup_signal_handlers(shutdown_tx: broadcast::Sender<()>) {
 
 /// Every 15 minutes, write this process's server count and memory use to the
 /// database: one `process_stats` row in multi-process mode, one `shard_stats`
-/// row per connected shard otherwise. Runs until a shutdown is broadcast.
+/// row per connected shard otherwise. Warns about every shard in
+/// `expected_shards` that is not connected: one dropped shard takes the bot
+/// offline in every server on it, and nothing else in the logs shows it.
+/// Runs until a shutdown is broadcast.
 async fn collect_shard_stats_with_shutdown(
     db: Arc<database::Database>,
     guild_counts: Arc<GuildCounts>,
     shard_manager: Arc<ShardManager>,
+    expected_shards: std::ops::Range<u32>,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<()> {
     let mut interval = interval(Duration::from_secs(900)); // 15 minutes
@@ -772,22 +784,38 @@ async fn collect_shard_stats_with_shutdown(
 
         // Copy what the stats need and release the runners lock before any
         // database await: the ShardManager and every `ready` handler wait on it.
-        let (total_shards_in_process, connected_shards) = {
+        let (total_shards_in_process, connected_shards, unhealthy_shards) = {
             let runners = shard_manager.runners.lock().await;
-            // Only single-process mode writes per-shard rows
-            let connected: Vec<ShardId> = if is_multi_process {
-                Vec::new()
-            } else {
-                runners
-                    .iter()
-                    .filter(|(_, runner)| {
-                        runner.stage == serenity::gateway::ConnectionStage::Connected
-                    })
-                    .map(|(&shard_id, _)| shard_id)
-                    .collect()
-            };
-            (runners.len(), connected)
+            let connected: Vec<ShardId> = runners
+                .iter()
+                .filter(|(_, runner)| runner.stage == serenity::gateway::ConnectionStage::Connected)
+                .map(|(&shard_id, _)| shard_id)
+                .collect();
+            // Serenity removes a shard from `runners` while it restarts it, and a
+            // shard that never came back stays missing, so check every expected ID
+            let unhealthy: Vec<String> = expected_shards
+                .clone()
+                .filter_map(|shard_id| match runners.get(&ShardId(shard_id)) {
+                    Some(runner)
+                        if runner.stage == serenity::gateway::ConnectionStage::Connected =>
+                    {
+                        None
+                    }
+                    Some(runner) => Some(format!("{shard_id} ({})", runner.stage)),
+                    None => Some(format!("{shard_id} (not running)")),
+                })
+                .collect();
+            (runners.len(), connected, unhealthy)
         };
+        // Before the empty-process skip below, so a process that lost every shard still warns
+        if !unhealthy_shards.is_empty() {
+            warn!(
+                "{} of {} shards not connected: {}",
+                unhealthy_shards.len(),
+                expected_shards.len(),
+                unhealthy_shards.join(", ")
+            );
+        }
         if total_shards_in_process == 0 {
             continue;
         }
@@ -847,7 +875,8 @@ async fn collect_shard_stats_with_shutdown(
 
             // Log summary for this process
             info!(
-                "Process stats: {} shards ({}-{}), {} servers, {:.2} MB memory",
+                "Process stats: {}/{} shards connected ({}-{}), {} servers, {:.2} MB memory",
+                connected_shards.len(),
                 shard_count + 1,
                 shard_start,
                 shard_start + shard_count,
@@ -863,7 +892,7 @@ async fn collect_shard_stats_with_shutdown(
             };
 
             // Process shards more efficiently
-            for shard_id in connected_shards {
+            for &shard_id in &connected_shards {
                 // Approximate guild distribution instead of expensive per-shard calculations
                 let shard_guild_count = if shard_id.0 == 0 {
                     // Shard 0 gets any remainder
@@ -885,8 +914,11 @@ async fn collect_shard_stats_with_shutdown(
 
             // Log summary every 15 minutes (same as stats collection interval)
             info!(
-                "Stats summary: {} shards, {} servers, {:.2} MB memory",
-                total_shards_in_process, total_guilds, memory_usage
+                "Stats summary: {}/{} shards connected, {} servers, {:.2} MB memory",
+                connected_shards.len(),
+                expected_shards.len(),
+                total_guilds,
+                memory_usage
             );
         }
     }
