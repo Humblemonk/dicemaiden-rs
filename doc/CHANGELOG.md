@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.3] - 2026-10-20
+
+## Added
+
+- The statistics task warns every 15 minutes about any shard in its process that is not
+  connected, naming each one. A dropped shard shows the bot offline in every server on it
+  and stops `/roll` there, but it never appeared in the logs. The stats summary line now
+  shows how many of the process's shards are connected (`15/16 shards connected`).
+
 ## [2.0.2] - 2026-10-18
 
 ## Fixed
