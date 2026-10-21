@@ -1,6 +1,6 @@
 [package]
 name = "dicemaiden-rs"
-version = "2.0.3"
+version = "2.0.4"
 edition = "2024"
 rust-version = "1.95.0"
 keywords = ["discord", "bot", "dice", "rpg", "tabletop"]
@@ -42,6 +42,15 @@ sysinfo = "0.39"
 
 # Security fix for CVE-2026-25727: Force safe version of time crate
 time = ">=0.3.47"
+
+[dev-dependencies]
+# Only for tests/tls_roots_tests.rs, which checks the patch below is in effect.
+webpki-roots = "1"
+
+# RUSTSEC-2026-0382: trust store without the emSign roots, for the gateway's rustls-webpki
+# 0.102.8, which has no fixed release. See vendor/webpki-roots/README.md.
+[patch.crates-io]
+webpki-roots = { path = "vendor/webpki-roots" }
 
 [profile.release]
 # Optimizations for production builds
