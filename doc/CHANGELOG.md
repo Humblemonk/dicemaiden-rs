@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.4] - 2026-10-21
+
+## Security
+
+- Fixed RUSTSEC-2026-0382: the private keys of some emSign intermediate certificates are
+  public, and the bot's TLS libraries accepted certificates signed through them. Someone
+  able to intercept the bot's traffic could have posed as Discord's gateway and captured
+  the bot token. The bot no longer trusts any emSign root certificate, and its HTTP
+  connections use the fixed rustls-webpki 0.103.16. The gateway library has no fixed
+  release yet, so the trust list is patched in this repository (`vendor/webpki-roots`);
+  self-hosters building from source need nothing extra.
+
 ## [2.0.3] - 2026-10-20
 
 ## Added
