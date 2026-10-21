@@ -15,7 +15,7 @@ the bot token, so a forged `gateway.discord.gg` certificate would expose it.
 
 With no emSign root in the trust store, no path through those intermediates can verify,
 whatever the rustls-webpki version. Discord's certificates don't chain to emSign. webpki-roots
-0.26.11 (which tokio-tungstenite uses) re-exports 1.x, so this one copy covers the gateway
+0.26.11 (which tokio-tungstenite uses) reexports 1.x, so this one copy covers the gateway
 and reqwest.
 
 `tests/tls_roots_tests.rs` fails if the patch stops applying.
