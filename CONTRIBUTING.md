@@ -100,6 +100,8 @@ Before you change how an input behaves, ask whether someone playing that game wo
 
 When you review code, look for the serious bugs before anything else. The worst kind can bring the bot down or be abused by a user: a roll that crashes or hangs, a startup that fails in one of the sharding modes, a reply that pings a whole server, or `/purge` deleting without permission. Next come rolls a player would really type that silently give the wrong result, and documented rolls that stop working. After those, minor bugs in rolls people do make, such as a misleading message, a wrong display or a stats figure that is off. Last of all are inputs nobody would type, tidying and documentation, unless such an input crashes or hangs the bot, which puts it back at the top. Mention the minor and last-place findings briefly, and agree on them before spending time on fixes.
 
+If your PR changes how rolls are parsed, rolled or displayed, or touches startup or `/purge`, paste the output of `tools/diff-vs-release.sh` into the PR description along with what you meant the change to do. The reviewer judges the code from that evidence and the diff, so there's no need to argue that it's correct.
+
 ### Data flow
 
 ```text

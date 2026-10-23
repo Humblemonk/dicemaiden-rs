@@ -87,6 +87,12 @@ rulebook modifies a roll (flat numbers, a bigger pool, rerolls).
   panics, hangs or overflows is still P0.
 - List P2 and P3 briefly; don't fix either without asking.
 
+**Independent review.** Review a change to `parser.rs`, `roller.rs`, `aliases.rs`, roll output
+in `commands/roll.rs`, `main.rs` startup, `/purge`, or a release in a session that didn't write
+it: give it the diff, the intent, and the evidence (`tools/diff-vs-release.sh` output, the
+snapshot diff, fuzz results), not the author's conclusions about whether the code is right.
+Docs- or test-only changes can skip this.
+
 ## Adding a Game System
 
 In order, no skipped steps: `aliases.rs` → `Modifier` variant in `dice/mod.rs` → `parser.rs`
