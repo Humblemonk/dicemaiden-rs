@@ -1,0 +1,8 @@
+services:
+  dicemaiden_rs:
+    build: .
+    image: dicemaiden-rs
+    container_name: dicemaiden-rs
+    restart: unless-stopped
+    volumes:
+      - /opt/dicemaiden-rs:/app

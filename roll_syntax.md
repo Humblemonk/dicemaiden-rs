@@ -35,7 +35,7 @@ Systems without a dedicated alias are listed under [Other Popular Systems](#othe
 - **Imploding**: `i` (implode on 1), `i3` (implode on 3 or lower) — subtracts an extra die instead of adding one
 - **Keep/Drop**: `k3` (keep 3 highest), `kl2` (keep 2 lowest), `km2` (keep 2 middle), `d1` (drop 1 lowest)
 - **Advantage/Disadvantage**: `adv1` (roll 1 extra die, drop 1 lowest, *then* explode), `dis1` (roll 1 extra die, drop 1 highest, *then* explode)
-- **Rerolls**: `r2` (reroll ≤2 once), `ir2` (reroll ≤2 indefinitely), `rg2` (reroll ≥ 2 once), `irg2` (reroll ≥ 2 indefinitely)
+- **Rerolls**: `r2` (reroll ≤2 once), `ir2` (reroll ≤2 indefinitely), `rg2` (reroll ≥ 2 once), `irg2` (reroll ≥ 2 indefinitely), `rx6` (reroll 6s once), `irx6` (reroll 6s until they stop coming up)
 - **Success Counting**: `t7` (count successes ≥7), `tl6` (count successes ≤6), `f1` (count failures ≤1)
 - **Double Success**: `t7ds10` (target 7+, double success on 10; defaults to target value), `tl6ds5` (target 6-, double success on 5)
 - **Botch Counting**: `b1` (count botches ≤1), `b` (count botches ≤1)
@@ -521,6 +521,7 @@ plain dice syntax — `1d6 + 4 - 2` — and `adv1` / `dis1` for a Boon or Bane o
 - **Custom Targets**: Use `exNtX` to set target number (e.g., `ex5t6` for easier rolls)
 - **Dice Pool**: N dice = Attribute + Ability + modifiers
 - **Specialty**: Use custom target for specific situations (e.g., `ex8t6` for specialty rolls)
+- **Rerolling a number until it stops appearing**: `ex10 irx6` rerolls every 6 until it lands on something else
 
 **Examples:**
 - `ex5` → Roll 5d10, each 7-9 = 1 success, each 10 = 2 successes

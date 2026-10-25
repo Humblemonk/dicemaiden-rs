@@ -306,6 +306,11 @@ fn apply_dice_modifying_modifiers(
     let original_dice_count = result.individual_rolls.len();
 
     for modifier in &dice.modifiers {
+        if let Some(rule) = RerollRule::from_modifier(modifier) {
+            reroll_dice(result, rng, rule, dice.sides)?;
+            update_base_group(result);
+            continue;
+        }
         match modifier {
             Modifier::Explode(threshold) => {
                 explode_dice(result, rng, *threshold, dice.sides, false, dice)?;
@@ -317,50 +322,6 @@ fn apply_dice_modifying_modifiers(
             }
             Modifier::Implode(threshold) => {
                 implode_dice(result, rng, *threshold, dice.sides, original_dice_count)?;
-            }
-            Modifier::Reroll(threshold) => {
-                reroll_dice(
-                    result,
-                    rng,
-                    *threshold,
-                    dice.sides,
-                    false,
-                    RerollDirection::AtOrBelow,
-                )?;
-                update_base_group(result);
-            }
-            Modifier::RerollIndefinite(threshold) => {
-                reroll_dice(
-                    result,
-                    rng,
-                    *threshold,
-                    dice.sides,
-                    true,
-                    RerollDirection::AtOrBelow,
-                )?;
-                update_base_group(result);
-            }
-            Modifier::RerollGreater(threshold) => {
-                reroll_dice(
-                    result,
-                    rng,
-                    *threshold,
-                    dice.sides,
-                    false,
-                    RerollDirection::AtOrAbove,
-                )?;
-                update_base_group(result);
-            }
-            Modifier::RerollGreaterIndefinite(threshold) => {
-                reroll_dice(
-                    result,
-                    rng,
-                    *threshold,
-                    dice.sides,
-                    true,
-                    RerollDirection::AtOrAbove,
-                )?;
-                update_base_group(result);
             }
             _ => {} // Handle other modifiers later
         }
@@ -1573,12 +1534,13 @@ fn partition_kept_dice(result: &mut RollResult, kept_indices: &[usize]) {
     result.individual_rolls = new_rolls;
 }
 
-/// Which side of the threshold triggers a reroll: `r`/`ir` reroll a die that is
-/// at or below it, `rg`/`irg` a die that is at or above it.
+/// Which dice trigger a reroll: `r`/`ir` reroll a die at or below the
+/// threshold, `rg`/`irg` one at or above it, `rx`/`irx` one showing exactly it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum RerollDirection {
     AtOrBelow,
     AtOrAbove,
+    Exactly,
 }
 
 impl RerollDirection {
@@ -1586,26 +1548,55 @@ impl RerollDirection {
         match self {
             Self::AtOrBelow => roll <= threshold as i32,
             Self::AtOrAbove => roll >= threshold as i32,
+            Self::Exactly => roll == threshold as i32,
         }
+    }
+}
+
+/// What a reroll modifier asks for. `indefinite` (the `i` forms) keeps
+/// rerolling a die until it stops triggering; otherwise each die rerolls once.
+#[derive(Debug, Clone, Copy)]
+struct RerollRule {
+    threshold: u32,
+    direction: RerollDirection,
+    indefinite: bool,
+}
+
+impl RerollRule {
+    fn from_modifier(modifier: &Modifier) -> Option<Self> {
+        let (threshold, direction, indefinite) = match modifier {
+            Modifier::Reroll(t) => (*t, RerollDirection::AtOrBelow, false),
+            Modifier::RerollIndefinite(t) => (*t, RerollDirection::AtOrBelow, true),
+            Modifier::RerollGreater(t) => (*t, RerollDirection::AtOrAbove, false),
+            Modifier::RerollGreaterIndefinite(t) => (*t, RerollDirection::AtOrAbove, true),
+            Modifier::RerollExact(t) => (*t, RerollDirection::Exactly, false),
+            Modifier::RerollExactIndefinite(t) => (*t, RerollDirection::Exactly, true),
+            _ => return None,
+        };
+        Some(Self {
+            threshold,
+            direction,
+            indefinite,
+        })
     }
 }
 
 fn reroll_dice(
     result: &mut RollResult,
     rng: &mut impl Rng,
-    threshold: u32,
+    rule: RerollRule,
     dice_sides: u32,
-    indefinite: bool,
-    direction: RerollDirection,
 ) -> Result<()> {
     let mut total_rerolls = 0;
     let max_total_rerolls = 100;
 
     for i in 0..result.individual_rolls.len() {
         let mut rerolls_for_this_die = 0;
-        let max_rerolls_per_die = if indefinite { 100 } else { 1 };
+        let max_rerolls_per_die = if rule.indefinite { 100 } else { 1 };
 
-        while direction.triggers(result.individual_rolls[i], threshold)
+        while rule
+            .direction
+            .triggers(result.individual_rolls[i], rule.threshold)
             && rerolls_for_this_die < max_rerolls_per_die
             && total_rerolls < max_total_rerolls
         {
@@ -1613,7 +1604,7 @@ fn reroll_dice(
             rerolls_for_this_die += 1;
             total_rerolls += 1;
 
-            if !indefinite {
+            if !rule.indefinite {
                 break;
             }
         }

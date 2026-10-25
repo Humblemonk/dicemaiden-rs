@@ -2243,6 +2243,58 @@ fn test_success_pools_score_every_die() {
 }
 
 #[test]
+fn test_reroll_exact_face_touches_only_that_face() {
+    // Exalted charms reroll one face (6s) "until it fails to appear": the new
+    // value replaces the die, so a 7+ then scores. The first ten draws are the
+    // dice themselves, so at the same seed an unsorted roll with and without
+    // the reroll agree on every die that did not show the face. `rx` rerolls
+    // each die showing the face exactly once; `irx` at least once.
+    let cases = vec![
+        // (expression, face, rerolls until the face is gone)
+        ("ul 10d10 rx6", 6, false),
+        ("ul 10d10 irx6", 6, true),
+        ("ul 10d10 irx1", 1, true),
+        ("ul 10d10 irx10", 10, true),
+    ];
+    let mut saw_reroll = false;
+
+    for (expression, face, indefinite) in cases {
+        for seed in 0..50 {
+            let before = roll_at_seed("ul 10d10", seed).individual_rolls;
+            let result = roll_at_seed(expression, seed);
+            let after = &result.individual_rolls;
+            assert_eq!(after.len(), before.len(), "'{expression}' seed {seed}");
+
+            let showing = before.iter().filter(|&&d| d == face).count() as i32;
+            let rerolls = note_with_number(&result, "rerolled", "", " d").map_or(0, |(_, n)| n);
+            if indefinite {
+                assert!(
+                    rerolls >= showing,
+                    "'{expression}' seed {seed}: {rerolls} rerolls"
+                );
+            } else {
+                assert_eq!(
+                    rerolls, showing,
+                    "'{expression}' seed {seed}: one reroll per {face}"
+                );
+            }
+
+            for (&old, &new) in before.iter().zip(after) {
+                if old != face {
+                    assert_eq!(new, old, "'{expression}' seed {seed} rerolled a {old}");
+                }
+                if indefinite {
+                    assert_ne!(new, face, "'{expression}' seed {seed} left a {face}");
+                }
+                saw_reroll |= old == face;
+            }
+        }
+    }
+
+    assert!(saw_reroll, "the sweep should include a reroll");
+}
+
+#[test]
 fn test_double_digit_dice() {
     // ddXY is 1dX * 10 + 1dY: the first die gives the tens and the second the
     // ones, and every face of each comes up.

@@ -25,7 +25,7 @@
 //! Modifiers are matched in the order of the `SPLIT_MODIFIER_PATTERNS`,
 //! `COMBINED_MODIFIER_PATTERNS` and `MODIFIER_START_PATTERNS` lists.
 //! **Multi-character prefixes must appear before their single-character
-//! counterparts** — e.g. `ie`/`irg`/`ir` before `e`/`r`, `km`/`kl` before
+//! counterparts** — e.g. `ie`/`irg`/`irx`/`ir` before `e`/`r`, `km`/`kl` before
 //! `k`, `tl` before `t`.  Before adding a new modifier prefix, check
 //! `roll_syntax.md` for conflicts.
 //!
@@ -444,7 +444,9 @@ pub(crate) fn modifier_kind(modifier: &Modifier) -> ModifierKind {
         | Modifier::Reroll(_)
         | Modifier::RerollIndefinite(_)
         | Modifier::RerollGreater(_)
-        | Modifier::RerollGreaterIndefinite(_) => ModifierKind::PlainDice,
+        | Modifier::RerollGreaterIndefinite(_)
+        | Modifier::RerollExact(_)
+        | Modifier::RerollExactIndefinite(_) => ModifierKind::PlainDice,
         Modifier::NumberDividedByRoll(_)
         | Modifier::Target(_)
         | Modifier::TargetLower(_)
@@ -1361,8 +1363,8 @@ fn split_dice_and_modifiers(input: &str) -> Option<(String, String)> {
 /// Modifier prefixes recognised by [`split_combined_modifiers`], in match order.
 ///
 /// **Order is load-bearing.** Multi-character prefixes must be tried before the
-/// single-character prefixes they shadow (`ie`/`irg`/`ir` before `i`, `km`/`kl`
-/// before `k`, `tl` before `t`, `rg` before `r`, `esss?` before `e`, `cpd` before
+/// single-character prefixes they shadow (`ie`/`irg`/`irx`/`ir` before `i`, `km`/`kl`
+/// before `k`, `tl` before `t`, `rg`/`rx` before `r`, `esss?` before `e`, `cpd` before
 /// `c`, `wwc` before `ww`), or a longer modifier is silently truncated into a
 /// shorter one. Do not reorder.
 static SPLIT_MODIFIER_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
@@ -1371,13 +1373,15 @@ static SPLIT_MODIFIER_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^(adv\d+)",                     // advantage — adv1 (BEFORE alien)
         r"^(dis\d+)",                     // disadvantage — dis1 (BEFORE drop and d6s)
         r"^(irg\d+)",                     // indefinite reroll greater — irg5 (BEFORE rg)
+        r"^(irx\d+)",                     // indefinite reroll exact — irx6 (BEFORE rx and i)
         r"^(ir\d+)",                      // indefinite reroll — ir1 (BEFORE regular reroll)
-        r"^(i\d*)",                       // implode — i, i2 (AFTER ie/irg/ir)
+        r"^(i\d*)",                       // implode — i, i2 (AFTER ie/irg/irx/ir)
         r"^(tdhc?)",                      // darkest house — tdhc, tdh (BEFORE target and drop)
         r"^(km\d+)",                      // keep middle — km3 (BEFORE regular keep)
         r"^(kl\d+)",                      // keep low — kl2 (BEFORE regular keep)
         r"^(tl\d+)",                      // target lower — tl5 (BEFORE regular target)
         r"^(rg\d+)",                      // reroll greater — rg5
+        r"^(rx\d+)",                      // reroll exact — rx6 (BEFORE regular reroll)
         r"^(k\d+)",                       // keep high — k3
         r"^(d\d+)",                       // drop — d1
         r"^(r\d+)",                       // reroll — r1
@@ -1733,7 +1737,7 @@ fn parse_all_modifiers(dice: &mut DiceRoll, parts: &[String]) -> Result<()> {
 /// Modifier prefixes recognised by [`is_combined_modifiers_token`], in match order.
 ///
 /// **Order is load-bearing.** Multi-character prefixes (`ie`, `adv`, `dis`, `irg`,
-/// `ir`, `km`, `kl`, `tl`, `rg`) must be tried before the single-character prefixes
+/// `irx`, `ir`, `km`, `kl`, `tl`, `rg`, `rx`) must be tried before the single-character prefixes
 /// they shadow (`i`, `e`, `k`, `t`, `r`, `d`), or a longer modifier is silently
 /// truncated into a shorter one. Do not reorder.
 static COMBINED_MODIFIER_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
@@ -1742,12 +1746,14 @@ static COMBINED_MODIFIER_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^(adv\d+)",   // Advantage (before explode)
         r"^(dis\d+)",   // Disadvantage (before drop)
         r"^(irg\d+)",   // Indefinite reroll greater
+        r"^(irx\d+)",   // Indefinite reroll exact
         r"^(ir\d+)",    // Indefinite reroll
-        r"^(i\d*)",     // Implode (AFTER ie/irg/ir)
+        r"^(i\d*)",     // Implode (AFTER ie/irg/irx/ir)
         r"^(km\d+)",    // Keep middle
         r"^(kl\d+)",    // Keep low
         r"^(tl\d+)",    // Target lower (must come before regular target)
         r"^(rg\d+)",    // Reroll greater
+        r"^(rx\d+)",    // Reroll exact
         r"^(e\d*)",     // Explode
         r"^(k\d+)",     // Keep high
         r"^(d\d+)",     // Drop
@@ -1817,13 +1823,15 @@ static MODIFIER_START_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         r"^adv\d+",   // Advantage: adv1 (before explode)
         r"^dis\d+",   // Disadvantage: dis1 (before drop)
         r"^irg\d+",   // Indefinite reroll greater: irg5
+        r"^irx\d+",   // Indefinite reroll exact: irx6
         r"^ir\d+",    // Indefinite reroll: ir1
-        r"^i\d*",     // Implode: i, i2 (AFTER ie/irg/ir)
+        r"^i\d*",     // Implode: i, i2 (AFTER ie/irg/irx/ir)
         r"^km\d+",    // Keep middle: km3
         r"^kl\d+",    // Keep low: kl2
         r"^tl\d+",    // Target lower: tl5
         r"^tn\d+",    // Conan 2d20 target number: tn12, tn12f3c19 (before t)
         r"^rg\d+",    // Reroll greater: rg5
+        r"^rx\d+",    // Reroll exact: rx6
         r"^k\d+",     // Keep high: k3
         r"^d\d+",     // Drop: d1
         r"^r\d+",     // Reroll: r1
@@ -2364,6 +2372,27 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::RerollGreater(num));
     }
 
+    // Exact rerolls (irx, rx) BEFORE `ir` and `r`, which would reject the `x`
+    if let Some(stripped) = part.strip_prefix("irx") {
+        let num = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid indefinite reroll exact value in '{}'", part))?;
+        if num == 0 {
+            return Err(anyhow!("Cannot reroll 0s - no die shows 0"));
+        }
+        return Ok(Modifier::RerollExactIndefinite(num));
+    }
+
+    if let Some(stripped) = part.strip_prefix("rx") {
+        let num = stripped
+            .parse()
+            .map_err(|_| anyhow!("Invalid reroll exact value in '{}'", part))?;
+        if num == 0 {
+            return Err(anyhow!("Cannot reroll 0s - no die shows 0"));
+        }
+        return Ok(Modifier::RerollExact(num));
+    }
+
     // Continue with other modifiers...
     if let Some(stripped) = part.strip_prefix("ir") {
         let num = stripped
@@ -2385,7 +2414,7 @@ fn parse_single_modifier(part: &str) -> Result<Modifier> {
         return Ok(Modifier::Reroll(num));
     }
 
-    // Imploding dice - MUST stay after `ie`, `irg` and `ir`, which all start
+    // Imploding dice - MUST stay after `ie`, `irg`, `irx` and `ir`, which all start
     // with the same 'i' prefix and would otherwise be claimed here.
     if let Some(stripped) = part.strip_prefix('i') {
         let num = if stripped.is_empty() {

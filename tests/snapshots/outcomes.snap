@@ -2815,3 +2815,37 @@ ex5t11	always-err {"Invalid dice expression: ex5t11"}
 20lf5	always-ok n=Some(1)
 ms0	always-err {"Mothership target must be 1-200, got 0"}
 ms999	always-err {"Mothership target must be 1-200, got 999"}
+1d1 rx0	always-err {"Cannot reroll 0s - no die shows 0"}
+1d1 rx1	always-ok n=Some(1)
+1d1 rx2	always-ok n=Some(1)
+1d1 irx0	always-err {"Cannot reroll 0s - no die shows 0"}
+1d1 irx1	always-ok n=Some(1)
+1d1 irx2	always-ok n=Some(1)
+4d1 rx1	always-ok n=Some(1)
+4d1 irx1	always-ok n=Some(1)
+4d1 irx2	always-ok n=Some(1)
+10d10 rx6	always-ok n=Some(1)
+10d10 irx6	always-ok n=Some(1)
+10d10 irx1	always-ok n=Some(1)
+10d10 irx10	always-ok n=Some(1)
+10d10 irx11	always-ok n=Some(1)
+10d10 irx6 t7ds10	always-ok n=Some(1)
+4d6irx6	always-ok n=Some(1)
+4d6rx6	always-ok n=Some(1)
+4d6 irx6 k3	always-ok n=Some(1)
+4d6 e6 irx6	always-ok n=Some(1)
+irx6	always-err {"Invalid dice expression: irx6"}
+rx6	always-err {"Invalid dice expression: rx6"}
+10d10 irx	always-err {"Invalid indefinite reroll exact value in 'irx'"}
+10d10 rxx6	always-err {"Invalid reroll exact value in 'rxx6'"}
+ex10 irx6	always-ok n=Some(1)
+ex10 rx6	always-ok n=Some(1)
+ex5t8 irx6	always-ok n=Some(1)
+ex10 irx6 ! Charm	always-ok n=Some(1)
+3 10d10 irx6 t7ds10	always-ok n=Some(3)
+1d20 + 2d6 rx6	always-ok n=Some(1)
+1d20 + 2d6 irx6	always-ok n=Some(1)
+4d6 r1rx6	always-ok n=Some(1)
+4d6 r1irx6	always-ok n=Some(1)
+10d10 rx10	always-ok n=Some(1)
+10d10 rx11	always-ok n=Some(1)

@@ -173,7 +173,7 @@ If a new system needs *almost* the same behavior as an existing helper, add a pa
 ### Modifier ordering rules
 
 - **Drop before explode** — dropped dice are never reconsidered for explosion. This is intentional and tested. Do not change the ordering.
-- Multi-character prefixes (`ie`, `irg`, `ir`, `km`, `kl`, `tl`) must be matched **before** their single-character counterparts (`e`, `r`, `k`, `t`).
+- Multi-character prefixes (`ie`, `irg`, `irx`, `ir`, `km`, `kl`, `tl`, `rg`, `rx`) must be matched **before** their single-character counterparts (`e`, `r`, `k`, `t`).
 - The ordered pattern lists are the `COMBINED_MODIFIER_PATTERNS`, `SPLIT_MODIFIER_PATTERNS`, and `MODIFIER_START_PATTERNS` statics in `parser.rs`. They are ordered lists rather than sets because the order is load-bearing — never sort or dedupe them.
 - **Math does not mean the same thing next to every modifier.** Next to `k`, `e`, `r` and friends it changes the total. Written before a success target (`t`, `tl`, `t#ds#`, the 2d20 test) it is added to each die; written after one it changes the success count. With `f#` alone, math after it is currently ignored, and so is a number in front of the dice, and with `b#` alone it is lost once math also comes before. Other game systems each decide for themselves. So before the parser moves math around a modifier, read how `roller.rs` handles that modifier — the names of enums and helpers are not a reliable guide, and two regressions in 1.8.2 came from trusting them. `AGENTS.md` has this as a table.
 

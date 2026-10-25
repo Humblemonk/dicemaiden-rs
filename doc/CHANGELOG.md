@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.0] - 2026-10-25
+
+## Added
+
+- `irx#` rerolls any die showing exactly # until it shows something else, and `rx#`
+  rerolls it once. Exalted charms that reroll 6s until 6s fail to appear are
+  `ex10 irx6`: a reroll that lands on 7+ scores, and a 10 still counts double. The
+  existing rerolls only covered ranges (`ir#` at or below, `irg#` at or above).
+
 ## [2.0.4] - 2026-10-21
 
 ## Security
