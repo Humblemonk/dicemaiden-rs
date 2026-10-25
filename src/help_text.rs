@@ -73,6 +73,7 @@ pub fn generate_basic_help() -> String {
 • `dis1` - Disadvantage 1: roll 1 extra die, drop the highest, then explode
 • `rg3` - Reroll dice ≥ 3
 • `irg3` - Reroll ≥ 3 indefinitely
+• `irx6` - Reroll 6s until they stop appearing (`rx6` once)
 • `r2` - Reroll dice ≤ 2 once
 • `ir2` - Reroll dice ≤ 2 indefinitely
 • `t7` - Count successes (≥ 7)

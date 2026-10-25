@@ -163,6 +163,8 @@ pub enum Modifier {
     Target(u32),                            // t#  - count successes >= target
     RerollGreater(u32),                     // rg# - reroll >= threshold once
     RerollGreaterIndefinite(u32),           // irg# - reroll >= threshold indefinitely
+    RerollExact(u32),                       // rx# - reroll a die showing exactly # once
+    RerollExactIndefinite(u32),             // irx# - reroll a die until it stops showing #
     TargetLower(u32),                       // tl# - count successes <= target
     TargetWithDoubleSuccess(u32, u32),      // t{target}ds{double}
     TargetLowerWithDoubleSuccess(u32, u32), // tl{target}ds{double}

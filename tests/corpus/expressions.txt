@@ -2815,3 +2815,37 @@ ex5t11
 20lf5
 ms0
 ms999
+1d1 rx0
+1d1 rx1
+1d1 rx2
+1d1 irx0
+1d1 irx1
+1d1 irx2
+4d1 rx1
+4d1 irx1
+4d1 irx2
+10d10 rx6
+10d10 irx6
+10d10 irx1
+10d10 irx10
+10d10 irx11
+10d10 irx6 t7ds10
+4d6irx6
+4d6rx6
+4d6 irx6 k3
+4d6 e6 irx6
+irx6
+rx6
+10d10 irx
+10d10 rxx6
+ex10 irx6
+ex10 rx6
+ex5t8 irx6
+ex10 irx6 ! Charm
+3 10d10 irx6 t7ds10
+1d20 + 2d6 rx6
+1d20 + 2d6 irx6
+4d6 r1rx6
+4d6 r1irx6
+10d10 rx10
+10d10 rx11

@@ -2815,3 +2815,37 @@ ex5t11	ERR	Invalid dice expression: ex5t11
 20lf5	OK	[20d6 mods=[LaserFeelings(0, 5, Lasers)] label=None comment=None flags=----]
 ms0	ERR	Mothership target must be 1-200, got 0
 ms999	ERR	Mothership target must be 1-200, got 999
+1d1 rx0	ERR	Cannot reroll 0s - no die shows 0
+1d1 rx1	OK	[1d1 mods=[RerollExact(1)] label=None comment=None flags=----]
+1d1 rx2	OK	[1d1 mods=[RerollExact(2)] label=None comment=None flags=----]
+1d1 irx0	ERR	Cannot reroll 0s - no die shows 0
+1d1 irx1	OK	[1d1 mods=[RerollExactIndefinite(1)] label=None comment=None flags=----]
+1d1 irx2	OK	[1d1 mods=[RerollExactIndefinite(2)] label=None comment=None flags=----]
+4d1 rx1	OK	[4d1 mods=[RerollExact(1)] label=None comment=None flags=----]
+4d1 irx1	OK	[4d1 mods=[RerollExactIndefinite(1)] label=None comment=None flags=----]
+4d1 irx2	OK	[4d1 mods=[RerollExactIndefinite(2)] label=None comment=None flags=----]
+10d10 rx6	OK	[10d10 mods=[RerollExact(6)] label=None comment=None flags=----]
+10d10 irx6	OK	[10d10 mods=[RerollExactIndefinite(6)] label=None comment=None flags=----]
+10d10 irx1	OK	[10d10 mods=[RerollExactIndefinite(1)] label=None comment=None flags=----]
+10d10 irx10	OK	[10d10 mods=[RerollExactIndefinite(10)] label=None comment=None flags=----]
+10d10 irx11	OK	[10d10 mods=[RerollExactIndefinite(11)] label=None comment=None flags=----]
+10d10 irx6 t7ds10	OK	[10d10 mods=[RerollExactIndefinite(6), TargetWithDoubleSuccess(7, 10)] label=None comment=None flags=----]
+4d6irx6	OK	[4d6 mods=[RerollExactIndefinite(6)] label=None comment=None flags=----]
+4d6rx6	OK	[4d6 mods=[RerollExact(6)] label=None comment=None flags=----]
+4d6 irx6 k3	OK	[4d6 mods=[RerollExactIndefinite(6), KeepHigh(3)] label=None comment=None flags=----]
+4d6 e6 irx6	OK	[4d6 mods=[Explode(Some(6)), RerollExactIndefinite(6)] label=None comment=None flags=----]
+irx6	ERR	Invalid dice expression: irx6
+rx6	ERR	Invalid dice expression: rx6
+10d10 irx	ERR	Invalid indefinite reroll exact value in 'irx'
+10d10 rxx6	ERR	Invalid reroll exact value in 'rxx6'
+ex10 irx6	OK	[10d10 mods=[Target(7), Target(10), RerollExactIndefinite(6)] label=None comment=None flags=----]
+ex10 rx6	OK	[10d10 mods=[Target(7), Target(10), RerollExact(6)] label=None comment=None flags=----]
+ex5t8 irx6	OK	[5d10 mods=[Target(8), Target(10), RerollExactIndefinite(6)] label=None comment=None flags=----]
+ex10 irx6 ! Charm	OK	[10d10 mods=[Target(7), Target(10), RerollExactIndefinite(6)] label=None comment=Some("Charm") flags=----]
+3 10d10 irx6 t7ds10	OK	[10d10 mods=[RerollExactIndefinite(6), TargetWithDoubleSuccess(7, 10)] label=Some("Set 1") comment=None flags=---- | 10d10 mods=[RerollExactIndefinite(6), TargetWithDoubleSuccess(7, 10)] label=Some("Set 2") comment=None flags=---- | 10d10 mods=[RerollExactIndefinite(6), TargetWithDoubleSuccess(7, 10)] label=Some("Set 3") comment=None flags=----]
+1d20 + 2d6 rx6	OK	[1d20 mods=[AddDice(DiceRoll { count: 2, sides: 6, modifiers: [RerollExact(6)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+1d20 + 2d6 irx6	OK	[1d20 mods=[AddDice(DiceRoll { count: 2, sides: 6, modifiers: [RerollExactIndefinite(6)], comment: None, label: None, private: false, simple: false, no_results: false, unsorted: false, original_expression: None })] label=None comment=None flags=----]
+4d6 r1rx6	OK	[4d6 mods=[Reroll(1), RerollExact(6)] label=None comment=None flags=----]
+4d6 r1irx6	OK	[4d6 mods=[Reroll(1), RerollExactIndefinite(6)] label=None comment=None flags=----]
+10d10 rx10	OK	[10d10 mods=[RerollExact(10)] label=None comment=None flags=----]
+10d10 rx11	OK	[10d10 mods=[RerollExact(11)] label=None comment=None flags=----]

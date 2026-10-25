@@ -33,10 +33,10 @@ formatting). Core types live in `dice/mod.rs`; all randomness in `dice/rng.rs`.
   explicitly asked; when in doubt, flag the compatibility question instead of deciding.
 - The parser uses **prefix matching**. A new token that overlaps with or is a prefix of an
   existing one can silently break unrelated rolls — check every token in `roll_syntax.md` first.
-- Multi-character prefixes (`ie`, `irg`, `ir`, `km`, `kl`, `tl`) must match **before** their
-  single-character counterparts (`e`, `r`, `k`, `t`). The `COMBINED_MODIFIER_PATTERNS`,
-  `SPLIT_MODIFIER_PATTERNS`, and `MODIFIER_START_PATTERNS` statics are ordered `Vec<Regex>`
-  for this reason. Never sort or dedupe them.
+- Multi-character prefixes (`ie`, `irg`, `irx`, `ir`, `km`, `kl`, `tl`, `rg`, `rx`) must
+  match **before** their single-character counterparts (`e`, `r`, `k`, `t`). The
+  `COMBINED_MODIFIER_PATTERNS`, `SPLIT_MODIFIER_PATTERNS`, and `MODIFIER_START_PATTERNS`
+  statics are ordered `Vec<Regex>` for this reason. Never sort or dedupe them.
 - **Drop before explode**: dropped dice are never reconsidered for explosion. Intentional and
   tested; do not change modifier ordering semantics.
 - **Where math applies depends on the modifier, and only the roller knows.** Before the parser

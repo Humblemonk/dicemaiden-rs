@@ -297,7 +297,7 @@ async fn main() -> Result<()> {
     }
 
     // Get bot gateway info which includes session_start_limit
-    let (actual_max_concurrency, recommended_shards) = match http.get_bot_gateway().await {
+    let (actual_max_concurrency, gateway_shards) = match http.get_bot_gateway().await {
         Ok(bot_gateway) => {
             info!("Recommended shards from Discord: {}", bot_gateway.shards);
             let session_start_limit = bot_gateway.session_start_limit;
@@ -329,7 +329,7 @@ async fn main() -> Result<()> {
                 );
             }
 
-            (discord_max_concurrency, bot_gateway.shards)
+            (discord_max_concurrency, Some(bot_gateway.shards))
         }
         Err(e) => {
             error!("Failed to get bot gateway info: {}", e);
@@ -337,23 +337,37 @@ async fn main() -> Result<()> {
                 "Using environment MAX_CONCURRENCY value: {}",
                 env_max_concurrency
             );
-            (env_max_concurrency, manual_shard_count.unwrap_or(1))
+            (env_max_concurrency, None)
         }
     };
+    let recommended_shards = gateway_shards.unwrap_or_else(|| manual_shard_count.unwrap_or(1));
 
     // Determine final shard strategy
     let (shard_strategy, shard_count, shard_start, total_shards) = if use_autosharding {
+        // Autosharding boots exactly Discord's count, settled here once: start_autosharded
+        // would ask again, and an answer that differed from this one (or this call having
+        // failed) left the stats task and startup progress watching the wrong shards.
+        // Discord not answering is a startup error: exit so the supervisor retries.
+        let autoshard_count = match gateway_shards {
+            Some(shards) => shards,
+            None => {
+                http.get_bot_gateway()
+                    .await
+                    .context("Autosharding needs Discord's recommended shard count")?
+                    .shards
+            }
+        };
         info!(
             "Using autosharding with Discord's recommended {} shards",
-            recommended_shards
+            autoshard_count
         );
         warn!(
             "PERFORMANCE WARNING: {} shards = ~{} minute startup time due to Serenity limitation",
-            recommended_shards,
-            (recommended_shards * 5) / 60
+            autoshard_count,
+            (autoshard_count * 5) / 60
         );
         warn!("Consider using manual shard count with multi-process for faster startup");
-        ("autoshard", recommended_shards, 0, recommended_shards)
+        ("autoshard", autoshard_count, 0, autoshard_count)
     } else if let Some(manual_count) = manual_shard_count {
         // Check for multi-process environment variables
         let shard_start_env = env::var("SHARD_START")
@@ -621,7 +635,8 @@ async fn start_client_with_shard_strategy(
             );
             warn!("For faster startup, consider reducing SHARD_COUNT to 64-128 shards");
             info!("Starting with autosharding - {} shards", shard_count);
-            client.start_autosharded().await
+            // start_autosharded is start_shards with Discord's count, asked for again
+            client.start_shards(shard_count).await
         }
         "manual" => {
             if shard_count == 1 {
