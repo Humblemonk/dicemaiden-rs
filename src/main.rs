@@ -494,8 +494,15 @@ async fn main() -> Result<()> {
     let shard_manager = Arc::clone(&client.shard_manager);
     let db_clone = Arc::clone(&db);
     let stats_shutdown_rx = shutdown_tx.subscribe();
-    // The shards start_client_with_shard_strategy boots in this process
-    let expected_shards = if shard_strategy == "multi_process" {
+    // The shards start_client_with_shard_strategy boots in this process. The stats
+    // task takes the mode from here rather than the environment, which could
+    // disagree (USE_AUTOSHARDING with leftover SHARD_START, or no SHARD_COUNT).
+    let multi_process = (shard_strategy == "multi_process").then_some(ProcessShardRange {
+        shard_start,
+        shard_count,
+        total_shards,
+    });
+    let expected_shards = if multi_process.is_some() {
         shard_start..shard_start.saturating_add(shard_count).saturating_add(1)
     } else {
         0..shard_count
@@ -508,6 +515,7 @@ async fn main() -> Result<()> {
             guild_counts,
             shard_manager,
             expected_shards,
+            multi_process,
             stats_shutdown_rx,
         )
         .await
@@ -730,17 +738,29 @@ async fn setup_signal_handlers(shutdown_tx: broadcast::Sender<()>) {
     }
 }
 
+/// The shard range a multi-process instance booted, as main settled it from
+/// `SHARD_START`, `SHARD_COUNT` and `TOTAL_SHARDS`. `shard_count` is one less
+/// than the shards run (see the `multi_process` arm of
+/// `start_client_with_shard_strategy`).
+#[derive(Debug, Clone, Copy)]
+struct ProcessShardRange {
+    shard_start: u32,
+    shard_count: u32,
+    total_shards: u32,
+}
+
 /// Every 15 minutes, write this process's server count and memory use to the
-/// database: one `process_stats` row in multi-process mode, one `shard_stats`
-/// row per connected shard otherwise. Warns about every shard in
-/// `expected_shards` that is not connected: one dropped shard takes the bot
-/// offline in every server on it, and nothing else in the logs shows it.
-/// Runs until a shutdown is broadcast.
+/// database: one `process_stats` row when main booted a multi-process shard
+/// range (`multi_process`), one `shard_stats` row per connected shard
+/// otherwise. Warns about every shard in `expected_shards` that is not
+/// connected: one dropped shard takes the bot offline in every server on it,
+/// and nothing else in the logs shows it. Runs until a shutdown is broadcast.
 async fn collect_shard_stats_with_shutdown(
     db: Arc<database::Database>,
     guild_counts: Arc<GuildCounts>,
     shard_manager: Arc<ShardManager>,
     expected_shards: std::ops::Range<u32>,
+    multi_process: Option<ProcessShardRange>,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<()> {
     let mut interval = interval(Duration::from_secs(900)); // 15 minutes
@@ -749,28 +769,23 @@ async fn collect_shard_stats_with_shutdown(
     let mut system = System::new();
     let current_pid = Pid::from_u32(std::process::id());
 
-    // Check if we're in multi-process mode
-    let is_multi_process = env::var("SHARD_START").is_ok() && env::var("TOTAL_SHARDS").is_ok();
-
     // One row per shard range, stable across restarts. It held the PID, so a
     // restarted container added a second row while the old one lived on until
     // the 30-minute cleanup, and bot-info's totals counted that process twice.
-    let process_id = if is_multi_process {
-        let shard_start = env::var("SHARD_START").unwrap_or_default();
-        format!("process_{shard_start}")
-    } else {
-        "single_process".to_string()
+    let process_id = match multi_process {
+        Some(range) => format!("process_{}", range.shard_start),
+        None => "single_process".to_string(),
     };
 
     info!(
         "Statistics collection mode: {}",
-        if is_multi_process {
+        if multi_process.is_some() {
             "multi-process"
         } else {
             "single-process"
         }
     );
-    if is_multi_process {
+    if multi_process.is_some() {
         info!("Process ID: {}", process_id);
     }
     // Rows from before the stable ID (`process_<start>_<pid>`) are removed
@@ -845,20 +860,11 @@ async fn collect_shard_stats_with_shutdown(
         // Get total guild count more efficiently
         let total_guilds = guild_counts.totals().0 as i32;
 
-        if is_multi_process {
+        if let Some(range) = multi_process {
             // Multi-process mode: Use process_stats table
-            let shard_start = env::var("SHARD_START")
-                .ok()
-                .and_then(|s| s.parse::<i32>().ok())
-                .unwrap_or(0);
-            let shard_count = env::var("SHARD_COUNT")
-                .ok()
-                .and_then(|s| s.parse::<i32>().ok())
-                .unwrap_or(total_shards_in_process as i32);
-            let total_shards = env::var("TOTAL_SHARDS")
-                .ok()
-                .and_then(|s| s.parse::<i32>().ok())
-                .unwrap_or(shard_count);
+            let shard_start = range.shard_start as i32;
+            let shard_count = range.shard_count as i32;
+            let total_shards = range.total_shards as i32;
 
             // Update process stats
             if let Err(e) = db
