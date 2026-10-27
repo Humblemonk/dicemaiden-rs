@@ -93,6 +93,19 @@ it: give it the diff, the intent, and the evidence (`tools/diff-vs-release.sh` o
 snapshot diff, fuzz results), not the author's conclusions about whether the code is right.
 Docs- or test-only changes can skip this.
 
+Pick the review's effort level from what the change can break, and always name it
+(`/code-review <level>` in Claude Code); an omitted level silently reuses the last one typed.
+Use only `low`, `medium` or `high`, never `xhigh`, `max` or `ultra`.
+
+| Change | Level |
+|---|---|
+| A release (diff against the last `v*` tag); new or changed tokens (a new game system included), prefix matching, modifier order, where math applies; `main.rs` sharding startup; `/purge` permissions | `high` |
+| Any other change to the files above: a fix inside one handler's arm, roll output formatting, a refactor `tools/diff-vs-release.sh` shows changes nothing | `medium` |
+| Code outside those files, when you choose to review it | `low` |
+
+Go up to `high` when `tools/diff-vs-release.sh` exits 1 or the snapshot diff has a line the
+intent doesn't explain. Never go below `medium` on the files above.
+
 ## Adding a Game System
 
 In order, no skipped steps: `aliases.rs` → `Modifier` variant in `dice/mod.rs` → `parser.rs`
