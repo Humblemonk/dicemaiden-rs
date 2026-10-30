@@ -925,7 +925,7 @@ fn apply_special_system_modifiers(
                 has_special_system = true;
             }
             Modifier::BrokenEmpires(..) => {
-                // The Broken Empires is handled in the main roll_dice function
+                // Dispatched to handle_broken_empires_roll in roll_dice_with_rng
             }
             Modifier::BrokenEmpiresFavor(_) => {
                 return Err(anyhow!(
@@ -1957,7 +1957,8 @@ fn apply_shadowrun_critical_glitch_check(result: &mut RollResult, dice_count: u3
     // Count the number of 1s in the kept rolls
     let ones_count = result.kept_rolls.iter().filter(|&&roll| roll == 1).count();
 
-    // Critical glitch occurs when more than half the dice pool shows 1s
+    // More than half the dice pool showing 1s is a glitch; with no successes
+    // it is a critical glitch
     let half_dice_pool = (dice_count as f64 / 2.0).floor() as usize;
 
     if ones_count > half_dice_pool {
@@ -2763,7 +2764,7 @@ fn handle_conan_skill_roll(dice: DiceRoll, rng: &mut impl Rng) -> Result<RollRes
     let rolls = result.individual_rolls.clone();
     push_dice_group(&mut result, format!("{dice_count}d20"), rolls, "base");
 
-    // 2. Process AddDice modifiers (this is where the 5d6 comes from)
+    // 2. Process AddDice modifiers (the combat dice: `conan3cd5` adds `5d6 cd5`)
     let mut combat_dice_total = 0;
     let mut has_combat_dice = false;
     let mut combat_specials = 0;

@@ -8,12 +8,12 @@
 //!
 //! ## `shard_stats` — single-process deployments
 //!
-//! | Column         | Type      | Description                         |
-//! |----------------|-----------|-------------------------------------|
-//! | `shard_id`     | INT PK    | Discord shard ID (0-indexed)        |
-//! | `server_count` | INT       | Guilds visible to this shard        |
-//! | `mem`          | REAL      | Process memory in MB (shard 0 only) |
-//! | `timestamp`    | DATETIME  | Last update time                    |
+//! | Column         | Type      | Description                                        |
+//! |----------------|-----------|----------------------------------------------------|
+//! | `shard_id`     | INT PK    | Discord shard ID (0-indexed)                       |
+//! | `server_count` | INT       | Process guilds split evenly; shard 0 gets the rest |
+//! | `mem`          | REAL      | Process memory in MB (shard 0 only)                |
+//! | `timestamp`    | DATETIME  | Last update time                                   |
 //!
 //! ## `process_stats` — multi-process deployments
 //!

@@ -523,6 +523,12 @@ plain dice syntax — `1d6 + 4 - 2` — and `adv1` / `dis1` for a Boon or Bane o
 - **Specialty**: Use custom target for specific situations (e.g., `ex8t6` for specialty rolls)
 - **Rerolling a number until it stops appearing**: `ex10 irx6` rerolls every 6 until it lands on something else
 
+**Double Successes Below 10:**
+- `ex7d8` → 7d10 t7ds8 (each 8 or higher counts double)
+- `ex5ds9` → 5d10 t7ds9 (the same, written with `ds`)
+- `ex5t8d9` or `ex5t8ds9` → 5d10 t8ds9 (custom target and double)
+- `ex10d8t6` → 10d10 t6ds8 (double first, then target)
+
 **Examples:**
 - `ex5` → Roll 5d10, each 7-9 = 1 success, each 10 = 2 successes
 - `ex5t8` → Roll 5d10, each 8-9 = 1 success, each 10 = 2 successes

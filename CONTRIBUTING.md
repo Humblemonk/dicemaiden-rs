@@ -79,8 +79,7 @@ src/
     ├── roll.rs         # Roll command + result formatting for Discord
     ├── help.rs         # Topic-based help
     └── purge.rs        # Message purge with permission checking
-tools/                  # Release diff, image build, and operator spot-check scripts
-```
+tools/                  # Release diff, image build, and operator spot-check scripts```
 
 Test files live in `tests/` — see [Testing](#testing) below.
 
@@ -192,8 +191,7 @@ Tests live in `tests/`:
 | `snapshot_tests.rs` | Golden snapshots pinning observable behavior |
 | `database_tests.rs` | Statistics persistence |
 | `fuzz_tests.rs` | Mutation fuzzer, run on demand (`--ignored`) |
-| `release_diff.rs` | Roll dump used by `tools/diff-vs-release.sh` (`--ignored`) |
-| `common/mod.rs` | Helpers shared by `snapshot_tests.rs` and `release_diff.rs` |
+| `release_diff.rs` | Roll dump used by `tools/diff-vs-release.sh` (`--ignored`) || `common/mod.rs` | Helpers shared by `snapshot_tests.rs` and `release_diff.rs` |
 
 ### Snapshot tests
 

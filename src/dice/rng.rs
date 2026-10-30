@@ -10,7 +10,7 @@
 //! |----------------------|--------|------------------------------------|
 //! | OS / `getrandom`     | 16     | Cryptographically secure; primary  |
 //! | Nanosecond timestamp | 4      | Sub-microsecond temporal jitter    |
-//! | Thread ID (hashed)   | 4      | Async task diversity               |
+//! | Thread ID (hashed)   | 4      | Worker-thread diversity            |
 //! | Process ID           | 4      | Per-process uniqueness             |
 //! | Stack address (ASLR) | 8 → 32 | XOR-diffused across whole seed     |
 //!
