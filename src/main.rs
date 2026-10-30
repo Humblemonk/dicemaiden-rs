@@ -9,7 +9,7 @@
 //! |--------------------|---------------|----------------------------------|-------------------|
 //! | `true`             | —             | —                                | autoshard         |
 //! | unset              | set           | both set                         | multi_process     |
-//! | unset              | set           | unset                            | manual            |
+//! | unset              | set           | not both set                     | manual            |
 //! | unset              | unset         | —                                | single            |
 //!
 //! In **multi-process** mode several bot processes each own a contiguous shard
@@ -771,7 +771,7 @@ async fn collect_shard_stats_with_shutdown(
 
     // One row per shard range, stable across restarts. It held the PID, so a
     // restarted container added a second row while the old one lived on until
-    // the 30-minute cleanup, and bot-info's totals counted that process twice.
+    // the stale-row cleanup, and bot-info's totals counted that process twice.
     let process_id = match multi_process {
         Some(range) => format!("process_{}", range.shard_start),
         None => "single_process".to_string(),

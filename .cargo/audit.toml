@@ -2,8 +2,9 @@
 # action in .github/workflows/audit.yml.
 #
 # Entries here suppress an advisory WITHOUT fixing it. Add one only when the
-# vulnerable code path is unreachable from this bot, and always record why —
-# an undocumented ignore is indistinguishable from an unnoticed vulnerability.
+# vulnerable code path is unreachable from this bot, or when the risk has been
+# knowingly accepted, and always record why — an undocumented ignore is
+# indistinguishable from an unnoticed vulnerability.
 # Re-evaluate the whole list whenever the dependency that pulls in the crate moves.
 
 [advisories]
@@ -49,14 +50,14 @@ ignore = [
     "RUSTSEC-2026-0104",
 
     # Accepts certificate paths through emSign intermediates whose private keys are
-    # public. This one WAS reachable: the gateway trusted webpki-roots 1.0.10, which
-    # still ships emSign Root CA - C1, G1 and ECC C3, and the gateway handshake
-    # carries the bot token. Made unreachable by [patch.crates-io] in Cargo.toml,
-    # which swaps in vendor/webpki-roots with every emSign root removed, so no path
-    # through those intermediates can verify. tests/tls_roots_tests.rs fails if the
-    # patch stops applying. If upstream webpki-roots drops the emSign roots first,
-    # keep this entry with that as its reason; vendor/webpki-roots/README.md has
-    # the steps for either exit.
+    # public. REACHABLE, and accepted: the gateway trusts webpki-roots, which still
+    # ships emSign roots (1.0.11 has Root CA - G1), and the gateway handshake
+    # carries the bot token, so an attacker who can intercept the bot's traffic and
+    # holds a certificate chained through a leaked intermediate could capture it.
+    # 2.0.4 closed this with a vendored webpki-roots copy minus the emSign roots;
+    # that copy was dropped as not worth maintaining. Delete this entry with the
+    # rest of the block when serenity 0.13 moves the gateway to rustls-webpki
+    # >= 0.103.16.
     "RUSTSEC-2026-0382",
 
     # --- rustls 0.22.4 ---------------------------------------------------------

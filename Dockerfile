@@ -13,8 +13,6 @@ WORKDIR /app
 # dependency compiled; a plain rm of target/release/deps misses libdicemaiden_rs-*.rlib
 # and all of .fingerprint/, which silently links the stub into the real binary.
 COPY Cargo.toml Cargo.lock ./
-# [patch.crates-io] target (RUSTSEC-2026-0382); --locked fails without it.
-COPY vendor ./vendor
 RUN mkdir -p src && \
     echo "fn main() {}" > src/main.rs && \
     echo "" > src/lib.rs && \
@@ -40,8 +38,9 @@ LABEL org.opencontainers.image.title="Dice Maiden" \
 # sqlx bundles libsqlite3-sys, so openssl-libs and sqlite-libs are not linked by the
 # bot; `ldd` on the built binary shows only libgcc_s, libm and libc.
 #
-# sqlite and jq exist solely for the manual spot-check scripts in tools/. curl is already
-# present in the base image as curl-minimal. None of these are used by the bot itself.
+# sqlite and jq exist solely for the manual spot-check scripts in tools/, and vim-minimal
+# for editing inside a running pod. curl is already present in the base image as
+# curl-minimal. None of these are used by the bot itself.
 # hadolint ignore=DL3041
 RUN microdnf update -y && \
     microdnf install -y --nodocs \

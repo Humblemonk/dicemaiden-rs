@@ -93,7 +93,8 @@ docker run --env-file .env -v dicemaiden-data:/app dicemaiden-rs
 
 The image's working directory is `/app`, so the default database is `/app/main.db`; mount the
 volume there (as [`docker-compose.yml`](docker-compose.yml) does) or the statistics are lost
-with the container.
+with the container. The compose file passes no environment of its own: put `.env` in
+`/opt/dicemaiden-rs`, which it mounts as `/app`, and the bot reads it from there at startup.
 
 <details>
 <summary><b>Systemd service</b></summary>

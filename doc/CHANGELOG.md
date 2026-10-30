@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.1] - 2026-10-30
+
+## Fixed
+
+- `/help mothership` now says that 00 is always a Critical Success and 99 always a Critical
+  Failure, and shows a Skill bonus (`ms45 + 10`). Both have worked since 2.0.0.
+- `roll_syntax.md` now lists the Exalted forms that count dice below 10 double: `ex7d8`,
+  `ex5ds9`, `ex5t8d9` and `ex10d8t6`.
+
+## Security
+
+- The emSign root certificates are trusted again (RUSTSEC-2026-0382, fixed in 2.0.4). The
+  patched copy of the trust store has been removed; the gateway gets the real fix with
+  serenity 0.13.
+
 ## [2.1.0] - 2026-10-25
 
 ## Added

@@ -553,6 +553,7 @@ Mothership uses a percentile (d100) roll-under system where rolling doubles (11,
 - `ms` → 1d100 roll-under (default target 50)
 - `ms45` → 1d100 roll-under with Strength stat 45
 - `ms30` → 1d100 roll-under with Speed stat 30
+- `ms45 + 10` → Strength 45 with a Trained Skill (+10): roll under 55
 
 **Advantage/Disadvantage:**
 - `+ms45` → Roll 2d100, select better result using Mothership logic
@@ -564,6 +565,7 @@ Mothership uses a percentile (d100) roll-under system where rolling doubles (11,
 Doubles (11, 22, 33, ..., 99, 00) are critical rolls:
 - If you succeed (roll ≤ stat), doubles = **Critical Success**
 - If you fail (roll > stat), doubles = **Critical Failure**
+- 00 is always a **Critical Success** and 99 always a **Critical Failure**
 
 **Selection Logic for Advantage:**
 When rolling with advantage, the better roll is selected by priority:
