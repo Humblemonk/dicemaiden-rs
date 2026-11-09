@@ -528,25 +528,23 @@ async fn main() -> Result<()> {
     // Setup signal handlers for graceful shutdown
     let shutdown_signal = setup_signal_handlers(shutdown_tx.clone());
 
-    // Clone shard manager for shutdown
+    // Clone shard manager for shutdown: one for the client task's shutdown arm, one
+    // for main to close the shards itself once that task has already ended
     let shard_manager_for_shutdown = Arc::clone(&client.shard_manager);
+    let shard_manager_for_exit = Arc::clone(&client.shard_manager);
     let client_shutdown_rx = shutdown_tx.subscribe();
 
     // Start the client with proper shard handling
-    let client_handle = tokio::spawn(async move {
+    let mut client_handle = tokio::spawn(async move {
         let mut shutdown_rx = client_shutdown_rx;
 
         select! {
-            result = start_client_with_shard_strategy(client, shard_strategy, shard_count, shard_start, total_shards) => {
-                if let Err(why) = result {
-                    error!("Client error: {:?}", why);
-                }
-                info!("Discord client stopped naturally");
-            }
+            result = start_client_with_shard_strategy(client, shard_strategy, shard_count, shard_start, total_shards) => result,
             _ = shutdown_rx.recv() => {
                 info!("Discord client received shutdown signal");
                 shard_manager_for_shutdown.shutdown_all().await;
                 info!("All shards shut down");
+                Ok(())
             }
         }
     });
@@ -587,9 +585,30 @@ async fn main() -> Result<()> {
         info!("Dice Maiden is running with 1 shard. Press Ctrl+C to shut down gracefully.");
     }
 
-    shutdown_signal.await;
-
-    info!("Shutdown signal received, initiating graceful shutdown...");
+    // Serenity's start returns before a shutdown when a shard gets a fatal gateway
+    // error: a bad token (4004) or bad intents (4013/4014). Those apply to the whole
+    // bot, so every other shard will get the same error, and shards that fail to boot
+    // are retried rather than ending start. Exit with the error so the supervisor
+    // restarts the process, as an autosharding startup error already does, instead of
+    // idling with no working shards.
+    // Biased so a client error that lands together with a shutdown signal is still
+    // reported rather than lost to a random pick.
+    let client_failure = select! {
+        biased;
+        finished = &mut client_handle => {
+            let error = match finished {
+                Ok(Ok(())) => anyhow::anyhow!("Discord client stopped without a shutdown signal"),
+                Ok(Err(error)) => error,
+                Err(join_error) => anyhow::Error::new(join_error).context("Discord client task failed"),
+            };
+            error!("{:#}; exiting so the process can be restarted", error);
+            Some(error)
+        }
+        _ = shutdown_signal => {
+            info!("Shutdown signal received, initiating graceful shutdown...");
+            None
+        }
+    };
 
     // Broadcast shutdown to all tasks
     if let Err(e) = shutdown_tx.send(()) {
@@ -608,19 +627,40 @@ async fn main() -> Result<()> {
         }
     }
 
-    // Don't wait for Discord client - it will shut down when the process exits
-    // Just give it a moment to clean up, but don't block shutdown
-    tokio::select! {
-        _ = client_handle => {
-            info!("Discord client finished");
+    match client_failure {
+        // The client task has already ended, so its shutdown arm can't close the
+        // shards. Close any still connected (and stop queued ones booting) before
+        // exiting. Bounded: serenity waits 5s on each shard whose runner already
+        // died (6s lets the usual single one finish), and the process exit closes
+        // whatever is left anyway.
+        Some(error) => {
+            if tokio::time::timeout(
+                Duration::from_secs(6),
+                shard_manager_for_exit.shutdown_all(),
+            )
+            .await
+            .is_err()
+            {
+                warn!("Not every shard closed within 6s, exiting anyway");
+            }
+            Err(error)
         }
-        _ = tokio::time::sleep(Duration::from_millis(500)) => {
-            info!("Discord client shutdown - continuing with process exit");
+        None => {
+            // Don't wait for Discord client - it will shut down when the process exits
+            // Just give it a moment to clean up, but don't block shutdown
+            tokio::select! {
+                _ = client_handle => {
+                    info!("Discord client finished");
+                }
+                _ = tokio::time::sleep(Duration::from_millis(500)) => {
+                    info!("Discord client shutdown - continuing with process exit");
+                }
+            }
+
+            info!("Graceful shutdown completed");
+            Ok(())
         }
     }
-
-    info!("Graceful shutdown completed");
-    Ok(())
 }
 
 /// Start the client with proper shard strategy implementation
@@ -630,7 +670,7 @@ async fn start_client_with_shard_strategy(
     shard_count: u32,
     shard_start: u32,
     total_shards: u32,
-) -> Result<(), Box<SerenityError>> {
+) -> Result<()> {
     let started = match strategy {
         "single" => {
             info!("Starting single shard");
@@ -695,9 +735,7 @@ async fn start_client_with_shard_strategy(
             Err(SerenityError::Other("Unknown shard strategy"))
         }
     };
-    // Boxed because serenity's error is large enough to trip clippy::result_large_err.
-    // A Box logs exactly as the error inside it does.
-    started.map_err(Box::new)
+    started.context("Discord client stopped")
 }
 
 async fn setup_signal_handlers(shutdown_tx: broadcast::Sender<()>) {

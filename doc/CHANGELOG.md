@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.2] - 2026-11-09
+
+## Fixed
+
+- When Discord rejects the bot's connection for good (an invalid or reset token, or a
+  gateway intent the bot isn't allowed), the bot now exits with the error instead of
+  staying up with no connection. A supervisor such as Docker's restart policy (set in
+  `docker-compose.yml`) or systemd can then restart it, and the failure is easy to spot.
+  Before, the process kept running while the bot showed offline everywhere.
+
 ## [2.1.1] - 2026-10-30
 
 ## Fixed
