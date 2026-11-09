@@ -176,7 +176,7 @@ Behavioral variants belong in a parameter, never a twin function (see `RerollDir
   instead of pasting assertion loops.
 - New syntax needs cases for: happy path, common modifiers, comments (`! text`), roll sets,
   and boundary values. Write tests alongside the implementation.
-- A bug fix ships with the roll that exposed it: a corpus line, or a test when the corpus
+- A bugfix ships with the roll that exposed it: a corpus line, or a test when the corpus
   can't state the rule.
 - A roll that only has to parse, error, or give a result is a **corpus line, not a test**:
   the snapshots already pin it exactly. Write a test for a rule the corpus can't state.
