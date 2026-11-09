@@ -630,8 +630,8 @@ async fn start_client_with_shard_strategy(
     shard_count: u32,
     shard_start: u32,
     total_shards: u32,
-) -> Result<(), SerenityError> {
-    match strategy {
+) -> Result<(), Box<SerenityError>> {
+    let started = match strategy {
         "single" => {
             info!("Starting single shard");
             client.start().await
@@ -694,7 +694,10 @@ async fn start_client_with_shard_strategy(
             error!("Unknown shard strategy: {}", strategy);
             Err(SerenityError::Other("Unknown shard strategy"))
         }
-    }
+    };
+    // Boxed because serenity's error is large enough to trip clippy::result_large_err.
+    // A Box logs exactly as the error inside it does.
+    started.map_err(Box::new)
 }
 
 async fn setup_signal_handlers(shutdown_tx: broadcast::Sender<()>) {
