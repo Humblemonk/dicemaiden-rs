@@ -51,6 +51,9 @@ cargo build
 # Run all tests (no token required)
 cargo test
 
+# Run one test while iterating
+cargo test --test game_systems_tests <test_name>
+
 # Run with logging
 RUST_LOG=debug cargo run
 ```
@@ -261,7 +264,7 @@ New syntax or game systems need cases for **all** of the following:
 - Roll sets
 - Boundary and limit values
 
-**Bugfixes must include a regression test** reproducing the original bug, added alongside the fix.
+**Bugfixes must ship with the roll that exposed the bug**, added alongside the fix: a corpus line in `tests/corpus/expressions.txt`, or a test when the corpus can't state the rule.
 
 ### Every test must be able to fail
 
