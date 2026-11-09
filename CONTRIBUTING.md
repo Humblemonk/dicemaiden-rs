@@ -79,7 +79,8 @@ src/
     ├── roll.rs         # Roll command + result formatting for Discord
     ├── help.rs         # Topic-based help
     └── purge.rs        # Message purge with permission checking
-tools/                  # Release diff, image build, and operator spot-check scripts```
+tools/                  # Release diff and operator spot-check scripts
+```
 
 Test files live in `tests/` — see [Testing](#testing) below.
 
@@ -97,7 +98,9 @@ Read [`roll_syntax.md`](roll_syntax.md) to understand the existing dice syntax. 
 
 Before you change how an input behaves, ask whether someone playing that game would actually type it at the table. The evidence is the documented syntax (`roll_syntax.md`, `/help`, the original Ruby DiceMaiden readme) and the game's own rules for modifying a roll. Documented forms, the game's normal rolls and the mistakes players genuinely make deserve a proper fix. Raw internal tokens that only alias expansion produces (`2d1 sw8`, `1d6 sil3`), and modifier combinations the game gives no meaning to, do not: leave their current behavior as it is, make sure they cannot crash or hang the bot, and note them as deferred. If it is unclear which side an input falls on, say so in your PR rather than building for it.
 
-When you review code, look for the serious bugs before anything else. The worst kind can bring the bot down or be abused by a user: a roll that crashes or hangs, a startup that fails in one of the sharding modes, a reply that pings a whole server, or `/purge` deleting without permission. Next come rolls a player would really type that silently give the wrong result, and documented rolls that stop working. After those, minor bugs in rolls people do make, such as a misleading message, a wrong display or a stats figure that is off. Last of all are inputs nobody would type, tidying and documentation, unless such an input crashes or hangs the bot, which puts it back at the top. Mention the minor and last-place findings briefly, and agree on them before spending time on fixes.
+A change to how a game system rolls needs the publisher's rulebook or SRD behind it, read directly — fan wikis, transcriptions and search summaries have been wrong before. If you can't reach an official source, open an issue describing what you suspect instead of changing the code.
+
+When you review code, look for the serious bugs before anything else. The worst kind can bring the bot down or be abused by a user: a roll that crashes or hangs, a startup that fails in one of the sharding modes, a reply that pings a whole server, or `/purge` deleting without permission. Next come rolls a player would really type that silently give the wrong result, and documented rolls that stop working. After those, minor bugs in rolls people do make, such as a misleading message, a wrong display or a stats figure that is off. Last of all are inputs nobody would type, tidying and documentation, unless such an input crashes or hangs the bot, which puts it back at the top. Wrong stats or display that only appears under contradictory sharding settings (`USE_AUTOSHARDING` together with `SHARD_START`) belongs in this last group too, unless it crashes shards or damages another process's data. Mention the minor and last-place findings briefly, and agree on them before spending time on fixes.
 
 If your PR changes how rolls are parsed, rolled or displayed, or touches startup or `/purge`, paste the output of `tools/diff-vs-release.sh` into the PR description along with what you meant the change to do. The reviewer judges the code from that evidence and the diff, so there's no need to argue that it's correct.
 
@@ -124,13 +127,13 @@ cargo clippy -- -D warnings && cargo fmt --check && cargo test
 
 ### Copypaste check (JSCPD)
 
-CI runs super-linter, whose JSCPD copypaste detector has a threshold of **0**: any clone of 5 or more lines (50+ tokens) fails the build, in every language it scans — Markdown included. Approximate it locally before opening a PR:
+The project standard is **zero** clones: any copy of 5 or more lines (50+ tokens) has to go. CI does not enforce this — super-linter's JSCPD config (`.github/linters/.jscpd.json`) only fails above 3% duplication — so run the check locally before opening a PR:
 
 ```bash
 npx jscpd@3 --threshold 0 --min-lines 5 --min-tokens 50 --max-lines 20000 --max-size 10mb src tests
 ```
 
-The `--max-*` flags matter — without them JSCPD skips `roller.rs` (too large) and `parser.rs` (too many lines), reporting a clean run that CI will contradict.
+The `--max-*` flags matter — without them JSCPD skips `roller.rs` (too large) and `parser.rs` (too many lines), reporting a clean run that means nothing.
 
 The fix is never to reword the copy — extract the shared part. See [Shared helpers](#shared-helpers) below.
 
@@ -191,7 +194,8 @@ Tests live in `tests/`:
 | `snapshot_tests.rs` | Golden snapshots pinning observable behavior |
 | `database_tests.rs` | Statistics persistence |
 | `fuzz_tests.rs` | Mutation fuzzer, run on demand (`--ignored`) |
-| `release_diff.rs` | Roll dump used by `tools/diff-vs-release.sh` (`--ignored`) || `common/mod.rs` | Helpers shared by `snapshot_tests.rs` and `release_diff.rs` |
+| `release_diff.rs` | Roll dump used by `tools/diff-vs-release.sh` (`--ignored`) |
+| `common/mod.rs` | Helpers shared by `snapshot_tests.rs` and `release_diff.rs` |
 
 ### Snapshot tests
 
@@ -277,6 +281,7 @@ The table changes between tests; the loop body usually does not. A pasted assert
 
 ### Required
 
+- Write for Rust edition 2024 and use its features — no workarounds to keep code building on edition 2021
 - Return `anyhow::Result<T>` from all fallible functions
 - Use `?` for error propagation — avoid deep `match`/`if let` nesting
 - Use `tracing::{info!, warn!, error!, debug!}` for all logging
@@ -295,7 +300,8 @@ The table changes between tests; the loop body usually does not. A pasted assert
 | Ad-hoc RNGs (`rand::rng()`, etc.) | `src/dice/rng.rs` |
 | Unnecessary `.clone()` | Prefer borrowing |
 | `Regex::new` inside a function | A `static NAME: Lazy<Regex>` |
-| A copypasted block of 5+ lines | A shared helper (JSCPD fails the build at threshold 0) |
+| Vendoring or `[patch]`-ing a crate to close a security advisory | Report it with the upstream fix; an accepted risk goes in `.cargo/audit.toml` with its reason |
+| A copypasted block of 5+ lines | A shared helper (the JSCPD check must report 0 clones) |
 
 ### Why regexes must be hoisted
 
@@ -317,7 +323,9 @@ builds regexes, add it to the list in that test.
 
 ### Docs to keep in sync
 
-- `roll_syntax.md` — update with any syntax change
+- `roll_syntax.md` — update with any syntax change. It shows what a user can type, so leave out notes about which inputs report an error
+- `src/help_text.rs` — update the `/help` text when syntax a user would look up there changes
+- `doc/CHANGELOG.md` and `version` in `Cargo.toml` — update for every release. The changelog is written for end users: skip dependency bumps unless one is a security fix they should know about
 - `env.example` — update when adding or changing an environment variable
 - `README.md` — update if your change affects env vars, commands, or deployment
 - `AGENTS.md` — the same rules for coding agents; mirror any rule you change here

@@ -1,6 +1,8 @@
 {
-  "threshold": 5,
+  "threshold": 3,
   "minTokens": 50,
+  "maxLines": 20000,
+  "maxSize": "10mb",
   "absolute": true,
   "gitignore": true,
   "reporters": ["consoleFull"],
