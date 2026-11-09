@@ -9,6 +9,7 @@ Discord dice-rolling bot in Rust (Serenity), a rewrite of the Ruby DiceMaiden, r
 
 ```
 cargo clippy -- -D warnings && cargo fmt --check && cargo test    # all must pass before done
+cargo test --test game_systems_tests <test_name>                  # one test while iterating
 UPDATE_SNAPSHOTS=1 cargo test --test snapshot_tests               # regenerate golden snapshots
 npx jscpd@3 --threshold 0 --min-lines 5 --min-tokens 50 --max-lines 20000 --max-size 10mb src tests
 tools/diff-vs-release.sh HEAD                                     # every roll, working tree vs last commit
@@ -17,9 +18,10 @@ cargo test --test fuzz_tests -- --ignored --nocapture             # mutation fuz
 
 - Tests need no Discord token. For live testing, set `GUILD_ID` in `.env` so slash commands
   register instantly.
-- CI's JSCPD check has threshold **0**: any clone of 5+ lines / 50+ tokens fails the build,
-  in every language it scans, Markdown included. Keep the `--max-*` flags — without them JSCPD
-  skips `roller.rs` and `parser.rs` and reports a clean run that CI will contradict.
+- The clone standard is **zero**: the JSCPD command above must report 0 clones (5+ lines /
+  50+ tokens) before done. CI does not enforce this (`.github/linters/.jscpd.json` only fails
+  above 3% duplication), so the local run is the gate. Keep the `--max-*` flags: without them
+  JSCPD skips `roller.rs` and `parser.rs` and reports a clean run that means nothing.
 
 ## Architecture
 
@@ -73,6 +75,11 @@ rulebook modifies a roll (flat numbers, a bigger pool, rerolls).
   hang or overflow (the fuzz test covers this), then list it as deferred.
 - Borderline? Report the finding with its verdict and let the user decide before building.
   Code reviews should give each finding a verdict too.
+- Change how a game system rolls only from the publisher's rulebook or SRD, read directly.
+  Fan wikis, transcriptions and search summaries don't count. With no official source, report
+  the suspicion and leave the code alone.
+
+## Code Review
 
 **Severity.** Code reviews hunt for P0 and P1 first and rank findings by severity:
 
@@ -84,7 +91,9 @@ rulebook modifies a roll (flat numbers, a bigger pool, rerolls).
 - **P2**: a minor bug on input that passes the real-play check: a misleading message, wrong
   display or stats, a wrong result only in a rare corner of a real roll.
 - **P3**: inputs that fail the real-play check, cleanup, docs and style. A failing input that
-  panics, hangs or overflows is still P0.
+  panics, hangs or overflows is still P0. Wrong stats or display that needs a contradictory
+  sharding env (`USE_AUTOSHARDING` plus `SHARD_START`) is P3 too, unless it crashes or hangs
+  shards or damages another process's data.
 - List P2 and P3 briefly; don't fix either without asking.
 
 **Independent review.** Review a change to `parser.rs`, `roller.rs`, `aliases.rs`, roll output
@@ -167,6 +176,8 @@ Behavioral variants belong in a parameter, never a twin function (see `RerollDir
   instead of pasting assertion loops.
 - New syntax needs cases for: happy path, common modifiers, comments (`! text`), roll sets,
   and boundary values. Write tests alongside the implementation.
+- A bug fix ships with the roll that exposed it: a corpus line, or a test when the corpus
+  can't state the rule.
 - A roll that only has to parse, error, or give a result is a **corpus line, not a test**:
   the snapshots already pin it exactly. Write a test for a rule the corpus can't state.
 - A test on random dice rolls at fixed seeds (`roll_across_seeds`, `create_seeded_rng`) and
@@ -176,6 +187,8 @@ Behavioral variants belong in a parameter, never a twin function (see `RerollDir
 
 ## Rust Rules
 
+- Edition 2024 only: use its features (let chains) and never add edition-2021 workarounds,
+  not even so an old release builds under `tools/diff-vs-release.sh`.
 - Fallible functions return `anyhow::Result<T>`; propagate with `?`; avoid deep nesting.
 - No `unwrap()`/`expect()` in production paths, no `panic!()` outside tests, no
   `todo!()`/`unimplemented!()`, no `println!()` (use `tracing`).
@@ -200,9 +213,15 @@ Behavioral variants belong in a parameter, never a twin function (see `RerollDir
 - Output from `commands/roll.rs` must fit Discord's message limit even for large roll sets;
   truncate with a notice rather than fail the send.
 - `/purge` checks permissions before acting — never weaken or bypass this.
+- Never vendor or `[patch]` a crate to close a security advisory. Report the exposure and the
+  upstream fix; an accepted risk goes in `.cargo/audit.toml` with its reason.
 
 ## Docs to Keep in Sync
 
-- `roll_syntax.md` — any syntax change
+- `roll_syntax.md` — any syntax change. It lists what a user can type: no error-case notes
+  ("X reports an error"), and their absence is not a review finding.
+- `src/help_text.rs` — the `/help` text, when syntax a user would look up there changes
 - `README.md` and `env.example` — env vars, commands, deployment
+- `doc/CHANGELOG.md` and `version` in `Cargo.toml` — every release. The changelog is for end
+  users: no dependency bumps, except a security fix they should know about.
 - `CONTRIBUTING.md` — mirror any rule changed here
