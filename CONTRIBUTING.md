@@ -80,7 +80,6 @@ src/
     ├── help.rs         # Topic-based help
     └── purge.rs        # Message purge with permission checking
 tools/                  # Release diff and operator spot-check scripts
-scripts/                # Image build and push
 ```
 
 Test files live in `tests/` — see [Testing](#testing) below.
