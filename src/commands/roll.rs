@@ -257,15 +257,19 @@ fn generate_donate_text() -> String {
 
 async fn generate_bot_info(ctx: &Context) -> Result<String> {
     // Refresh only this process: a full refresh walks every process on the host
+    // Memory shows 0 when sysinfo can't read it, rather than failing the whole reply
     let current_pid = Pid::from_u32(std::process::id());
-    let mut system = System::new();
-    system.refresh_processes(ProcessesToUpdate::Some(&[current_pid]), false);
-
-    // Get memory usage
-    let memory_usage = if let Some(process) = system.process(current_pid) {
-        process.memory() as f64 / 1024.0 / 1024.0 // Convert from KB to MB
-    } else {
-        0.0
+    let memory_usage = match System::new() {
+        Ok(mut system) => {
+            system.refresh_processes(ProcessesToUpdate::Some(&[current_pid]), false);
+            system
+                .process(current_pid)
+                .map_or(0.0, |process| process.memory() as f64 / 1024.0 / 1024.0) // KB to MB
+        }
+        Err(e) => {
+            tracing::warn!("Failed to initialize sysinfo: {e}");
+            0.0
+        }
     };
 
     let memory_display = format_memory(memory_usage);
