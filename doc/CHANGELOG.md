@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.3] - 2026-11-10
+
+## Changed
+
+- **No change to dice syntax, roll results, or output.** This release is internal
+  maintenance only.
+
 ## [2.1.2] - 2026-11-09
 
 ## Fixed
