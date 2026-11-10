@@ -807,7 +807,10 @@ async fn collect_shard_stats_with_shutdown(
     let mut interval = interval(Duration::from_secs(900)); // 15 minutes
 
     // Create system info once and only refresh our specific process
-    let mut system = System::new();
+    // Without sysinfo the stats still record, with memory at 0
+    let mut system = System::new()
+        .inspect_err(|e| warn!("Failed to initialize sysinfo; memory will show 0: {e}"))
+        .ok();
     let current_pid = Pid::from_u32(std::process::id());
 
     // One row per shard range, stable across restarts. It held the PID, so a
@@ -851,7 +854,9 @@ async fn collect_shard_stats_with_shutdown(
         }
 
         // Only refresh our specific process memory usage instead of scanning all system processes
-        system.refresh_processes(ProcessesToUpdate::Some(&[current_pid]), false);
+        if let Some(system) = system.as_mut() {
+            system.refresh_processes(ProcessesToUpdate::Some(&[current_pid]), false);
+        }
 
         // Copy what the stats need and release the runners lock before any
         // database await: the ShardManager and every `ready` handler wait on it.
@@ -892,11 +897,10 @@ async fn collect_shard_stats_with_shutdown(
         }
 
         // Calculate memory once for all shards (they share the same process)
-        let memory_usage = if let Some(process) = system.process(current_pid) {
-            process.memory() as f64 / 1024.0 / 1024.0 // Convert from KB to MB
-        } else {
-            0.0
-        };
+        let memory_usage = system
+            .as_ref()
+            .and_then(|system| system.process(current_pid))
+            .map_or(0.0, |process| process.memory() as f64 / 1024.0 / 1024.0); // KB to MB
 
         // Get total guild count more efficiently
         let total_guilds = guild_counts.totals().0 as i32;

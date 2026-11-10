@@ -1,6 +1,6 @@
 [package]
 name = "dicemaiden-rs"
-version = "2.1.2"
+version = "2.1.3"
 edition = "2024"
 rust-version = "1.95.0"
 keywords = ["discord", "bot", "dice", "rpg", "tabletop"]
@@ -38,7 +38,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Utilities
 serde = { version = "1.0", features = ["derive"] }
 dotenvy = "0.15"
-sysinfo = "0.39"
+sysinfo = "0.40"
 
 # Security fix for CVE-2026-25727: Force safe version of time crate
 time = ">=0.3.47"
