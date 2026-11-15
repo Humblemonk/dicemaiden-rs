@@ -2918,12 +2918,9 @@ fn is_multi_sided_dice_expression(part: &str) -> bool {
         }
     }
 
-    // Pattern 4: Percentile dice (d% patterns)
-    if part == "d%" || part.ends_with("d%") {
-        return true;
-    }
-
-    false // Default to not a dice expression - let normal modifier parsing handle it
+    // Pattern 4: Percentile dice (d% patterns). Anything else is not a dice
+    // expression - let normal modifier parsing handle it
+    part.ends_with("d%")
 }
 
 /// Patterns for dice expressions that stand alone rather than being combined
