@@ -95,6 +95,10 @@ The image's working directory is `/app`, so the default database is `/app/main.d
 volume there (as [`docker-compose.yml`](docker-compose.yml) does) or the statistics are lost
 with the container. The compose file passes no environment of its own: put `.env` in
 `/opt/dicemaiden-rs`, which it mounts as `/app`, and the bot reads it from there at startup.
+The bot runs as uid 1000 inside the container, so give it that directory and the `.env` in it
+before the first run (`sudo chown -R 1000:1000 /opt/dicemaiden-rs`), or it cannot read its
+settings or create the database. Under rootless podman, run
+`podman unshare chown -R 1000:1000 /opt/dicemaiden-rs` instead.
 
 <details>
 <summary><b>Systemd service</b></summary>

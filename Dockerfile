@@ -45,12 +45,10 @@ LABEL org.opencontainers.image.title="Dice Maiden" \
 RUN microdnf update -y && \
     microdnf install -y --nodocs \
         ca-certificates \
-        tzdata \
         sqlite \
         jq \
         vim-minimal && \
     microdnf clean all && \
-    rm -rf /var/cache/dnf && \
     sqlite3 --version && jq --version
 
 RUN useradd -m -u 1000 -s /bin/sh dicemaiden
