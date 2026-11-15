@@ -1,6 +1,6 @@
 [package]
 name = "dicemaiden-rs"
-version = "2.1.3"
+version = "2.1.4"
 edition = "2024"
 rust-version = "1.95.0"
 keywords = ["discord", "bot", "dice", "rpg", "tabletop"]
